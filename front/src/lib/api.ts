@@ -2,6 +2,7 @@
 // Cookie de sessão HttpOnly/Secure/SameSite=Strict: o navegador o envia sozinho.
 
 export const BASE_API = '/api';
+import { visualizacao } from './visualizacao.svelte';
 const DETALHE_NAO_AUTENTICADO = 'não autenticado';
 const DETALHE_TROCA_OBRIGATORIA = 'troca de senha obrigatória';
 const MENSAGEM_MUITAS_TENTATIVAS = 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
@@ -58,6 +59,9 @@ export async function chamar<T>(
   corpo?: unknown,
   opcoes: OpcoesChamada = {},
 ): Promise<T> {
+  if (visualizacao.ativa && metodo !== 'GET' && caminho !== '/auth/logout') {
+    throw new ErroApi(403, 'Encerre a prévia de perfil para realizar alterações.');
+  }
   const executar = opcoes.fetch ?? fetch;
   const cabecalhos: Record<string, string> = { Accept: 'application/json' };
   const init: RequestInit = { method: metodo, credentials: 'same-origin', headers: cabecalhos };
@@ -114,3 +118,4 @@ export function mensagemErro(erro: unknown): string {
   }
   return 'Algo deu errado. Tente novamente.';
 }
+

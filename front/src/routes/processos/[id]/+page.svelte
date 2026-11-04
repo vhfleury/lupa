@@ -4,6 +4,7 @@
   import { onDestroy, onMount } from 'svelte';
   import { page } from '$app/state';
   import { chamar, mensagemErro } from '$lib/api';
+  import Responsaveis from '$lib/processos/Responsaveis.svelte';
   import Aviso from '$lib/componentes/Aviso.svelte';
   import {
     enviarArquivo,
@@ -122,6 +123,8 @@
 {#if erro}<Aviso tipo="erro">{erro}</Aviso>{/if}
 {#if aviso}<Aviso tipo="sucesso">{aviso}</Aviso>{/if}
 
+{#if processo}<Responsaveis processoId={id} />{/if}
+
 {#if podeEnviar}
   <section class="cartao" aria-labelledby="titulo-envio">
     <h2 id="titulo-envio">Enviar autos</h2>
@@ -225,3 +228,4 @@
     font-size: 0.9rem;
   }
 </style>
+

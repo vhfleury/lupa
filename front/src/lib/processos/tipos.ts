@@ -23,6 +23,7 @@ export interface Processo {
 }
 
 export interface ProcessoNaLista extends Processo {
+  responsaveis?: { id: string; nome_usuario: string; ativo: boolean }[];
   ingestao: {
     situacao: SituacaoIngestao;
     por_estado: Record<string, number>;

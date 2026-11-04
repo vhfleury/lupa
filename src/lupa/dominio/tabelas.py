@@ -148,6 +148,7 @@ class UsuarioTabela(Base):
 
     __tablename__ = "usuario"
     __table_args__ = (
+        UniqueConstraint("id", "gabinete_id"),
         checar_enum("papel", PapelUsuario),
         CheckConstraint(
             "(papel = 'administrador') = (gabinete_id IS NULL)", name="admin_sem_gabinete"
@@ -194,6 +195,23 @@ class ProcessoTabela(Base):
         PG_UUID(as_uuid=True), ForeignKey("usuario.id"), nullable=False
     )
     chave_dados_cifrada: Mapped[str | None] = mapped_column(Text)
+
+
+class ProcessoResponsavelTabela(Base):
+    """Assessores responsáveis, sempre pertencentes ao gabinete do processo."""
+
+    __tablename__ = "processo_responsavel"
+    __table_args__ = (
+        Index("ix_processo_responsavel_usuario", "usuario_id"),
+        ForeignKeyConstraint(
+            ["processo_id", "gabinete_id"], ["processo.id", "processo.gabinete_id"]
+        ),
+        ForeignKeyConstraint(["usuario_id", "gabinete_id"], ["usuario.id", "usuario.gabinete_id"]),
+    )
+
+    processo_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    usuario_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    gabinete_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
 
 
 @event.listens_for(ProcessoTabela, "before_insert")

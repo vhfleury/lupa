@@ -119,3 +119,15 @@ def test_escopo_de_gabinete_so_vale_no_proprio() -> None:
     assert not pode(PapelUsuario.ASSESSOR, gerir, proprio, proprio)
     assert pode(PapelUsuario.ADMINISTRADOR, gerir, None, outro)
     assert not pode(PapelUsuario.DESEMBARGADOR, gerir, None, None)
+
+
+@pytest.mark.parametrize("permissao", list(Permissao))
+def test_desembargador_nunca_tem_permissao_fora_do_gabinete(permissao: Permissao) -> None:
+    """Toda permissão do desembargador exige um gabinete próprio válido."""
+    proprio, outro = uuid4(), uuid4()
+    papel = PapelUsuario.DESEMBARGADOR
+    assert not pode(papel, permissao, proprio, outro)
+    assert not pode(papel, permissao, proprio, None)
+    assert not pode(papel, permissao, None, outro)
+    assert not pode(papel, permissao, None, None)
+    assert pode(papel, permissao, proprio, proprio) == tem_permissao(papel, permissao)

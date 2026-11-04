@@ -32,3 +32,4 @@ front/e2e/playwright-report/
 .vault-dev/
 # Segredos em arquivo para Prometheus e Grafana (Etapa 8.1), nunca no repositorio
 .segredos/
+dados/

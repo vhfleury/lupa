@@ -1,0 +1,61 @@
+.login-cartao {
+  width: 100%;
+  max-width: 26rem;
+  padding: 1.5rem 2rem;
+  border-radius: 20px;
+  border-top: 4px solid #008e87;
+  box-shadow: 0 20px 64px rgb(3 30 63 / 9%);
+}
+.login-marca {
+  width: min(100%, 12rem);
+  margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.login-marca img { display: block; width: 100%; height: auto; }
+.login-marca .login-logo-escuro { display: none; }
+:root[data-tema='escuro'] .login-logo-claro { display: none; }
+:root[data-tema='escuro'] .login-logo-escuro { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) .login-logo-claro { display: none; }
+  :root:not([data-tema='claro']) .login-logo-escuro { display: block; }
+}
+.login-descricao {
+  text-align: center;
+  color: var(--texto-suave);
+  font-size: .8rem;
+  margin: .25rem 0 1.25rem;
+}
+.login-introducao {
+  border-top: 1px solid var(--borda);
+  padding-top: 1rem;
+  margin-bottom: 1.25rem;
+}
+.login-etapa { color: var(--texto-suave); font-size: .65rem; font-weight: 700; letter-spacing: .12em; }
+.login-introducao h1 { margin: .65rem 0 .5rem; font-size: 1.65rem; letter-spacing: -.035em; line-height: 1.2; }
+.login-introducao p { margin: 0; font-size: .9rem; color: var(--texto-suave); }
+.login-cartao .campo { margin-bottom: 1rem; }
+.login-cartao label { font-size: .85rem; margin-bottom: .5rem; }
+.login-cartao input { min-height: 50px; padding: .75rem .9rem; border-radius: 9px; font-size: .95rem; }
+.login-cartao input::placeholder { color: var(--texto-suave); opacity: .8; }
+.login-cartao input:focus-visible { outline: 2px solid var(--primaria); outline-offset: 3px; }
+.login-cartao button[type='submit'] {
+  width: 100%; min-height: 50px; border-radius: 9px;
+  background: #063453; border-color: #063453; color: #fff;
+  font-weight: 600; display: flex; align-items: center; justify-content: center; gap: .85rem;
+}
+.login-cartao button[type='submit']:hover:not(:disabled) { background: #09516b; border-color: #09516b; }
+.login-cartao .acoes { gap: .75rem; }
+.login-seguranca { text-align: center; font-size: .73rem; color: var(--texto-suave); margin: 1rem 0 0; line-height: 1.6; }
+@media (max-width: 40rem) {
+  .login-cartao { padding: 1.5rem; border-radius: 16px; }
+  .login-introducao h1 { font-size: 1.5rem; }
+}
+@media (max-height: 700px) {
+  .login-cartao { padding: 1.1rem 1.5rem; }
+  .login-marca { width: 10rem; }
+  .login-descricao { margin-bottom: .75rem; }
+  .login-introducao { padding-top: .75rem; margin-bottom: 1rem; }
+  .login-introducao h1 { font-size: 1.4rem; margin-top: .4rem; }
+  .login-cartao input, .login-cartao button[type='submit'] { min-height: 44px; }
+}

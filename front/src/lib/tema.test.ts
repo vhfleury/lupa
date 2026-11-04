@@ -34,13 +34,13 @@ class Quebrado extends Memoria {
 }
 
 describe('tema (6.10)', () => {
-  it('padrão é o do sistema; valor desconhecido também', () => {
+  it('padrão é escuro; valor desconhecido também', () => {
     const memoria = new Memoria();
-    expect(lerTema(memoria)).toBe('sistema');
+    expect(lerTema(memoria)).toBe('escuro');
     memoria.setItem(CHAVE_TEMA, 'roxo');
-    expect(lerTema(memoria)).toBe('sistema');
-    expect(lerTema(null)).toBe('sistema');
-    expect(lerTema(new Quebrado())).toBe('sistema');
+    expect(lerTema(memoria)).toBe('escuro');
+    expect(lerTema(null)).toBe('escuro');
+    expect(lerTema(new Quebrado())).toBe('escuro');
   });
 
   it('escolher grava só no localStorage e marca o <html>', () => {
@@ -53,7 +53,8 @@ describe('tema (6.10)', () => {
     escolherTema('claro', memoria, raiz);
     expect(raiz.dataset['tema']).toBe('claro');
     escolherTema('sistema', memoria, raiz);
-    expect(memoria.getItem(CHAVE_TEMA)).toBeNull();
+    expect(memoria.getItem(CHAVE_TEMA)).toBe('sistema');
+    expect(lerTema(memoria)).toBe('sistema');
     expect(raiz.dataset['tema']).toBeUndefined();
     expect(() => escolherTema('escuro', new Quebrado(), raiz)).not.toThrow();
     aplicarTema('sistema', raiz);

@@ -21,9 +21,9 @@ function armazenamentoPadrao(): Storage | null {
 export function lerTema(armazenamento: Storage | null = armazenamentoPadrao()): Tema {
   try {
     const valor = armazenamento?.getItem(CHAVE_TEMA);
-    return valor === 'claro' || valor === 'escuro' ? valor : 'sistema';
+    return valor === 'claro' || valor === 'escuro' || valor === 'sistema' ? valor : 'escuro';
   } catch {
-    return 'sistema';
+    return 'escuro';
   }
 }
 
@@ -39,8 +39,7 @@ export function escolherTema(
 ): void {
   aplicarTema(tema, raiz);
   try {
-    if (tema === 'sistema') armazenamento?.removeItem(CHAVE_TEMA);
-    else armazenamento?.setItem(CHAVE_TEMA, tema);
+    armazenamento?.setItem(CHAVE_TEMA, tema);
   } catch {
     // Sem armazenamento: o tema vale só até recarregar.
   }

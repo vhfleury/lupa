@@ -9,8 +9,9 @@ const DESTINO = 'build/inicio.js';
 const TEMA = `try {
   var tema = window.localStorage.getItem('lupa.tema');
   if (tema === 'claro' || tema === 'escuro') document.documentElement.dataset.tema = tema;
+  else if (tema === 'sistema') delete document.documentElement.dataset.tema;
 } catch (e) {
-  // Sem localStorage (modo privado ou bloqueado): segue o tema do sistema.
+  // Sem localStorage (modo privado ou bloqueado): mantém o tema escuro padrão.
 }
 `;
 

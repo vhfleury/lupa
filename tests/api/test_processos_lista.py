@@ -139,3 +139,25 @@ def test_lista_mostra_so_o_gabinete_com_situacao_da_ingestao_e_e_auditada(
 def test_resumo_da_ingestao(estados: list[str], esperado: str) -> None:
     """Situação agregada a partir dos estados dos jobs."""
     assert resumir_ingestao(estados) == esperado
+
+
+def test_meus_processos_filtra_responsavel_sem_restringir_visao_do_gabinete(
+    app_teste: FastAPI, engine_teste: Engine
+) -> None:
+    """O responsável é quem cadastrou; o desembargador continua vendo o gabinete."""
+    gabinete = criar_gabinete_teste(engine_teste)
+    a = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR, gabinete)
+    b = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR, gabinete)
+    des = criar_usuario_teste(engine_teste, PapelUsuario.DESEMBARGADOR, gabinete)
+    vizinho = criar_usuario_teste(
+        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
+    )
+    meu = _criar_processo(engine_teste, a)
+    colega = _criar_processo(engine_teste, b)
+    _criar_processo(engine_teste, vizinho)
+    cliente = _cliente(app_teste, engine_teste, a)
+    assert {p["id"] for p in cliente.get("/processos?meus=true").json()} == {str(meu)}
+    assert {p["id"] for p in cliente.get("/processos").json()} == {str(meu), str(colega)}
+    gestor = _cliente(app_teste, engine_teste, des)
+    assert {p["id"] for p in gestor.get("/processos").json()} == {str(meu), str(colega)}
+    assert gestor.get("/processos?meus=true").json() == []

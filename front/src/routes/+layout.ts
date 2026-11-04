@@ -3,6 +3,7 @@
 import { redirect } from '@sveltejs/kit';
 import { consumirMarcador } from '$lib/marcador';
 import { carregarSessao, sessao } from '$lib/sessao.svelte';
+import { visualizacao } from '$lib/visualizacao.svelte';
 import type { LayoutLoad } from './$types';
 
 export const ssr = false;
@@ -27,5 +28,7 @@ export const load: LayoutLoad = async ({ url, fetch }) => {
   }
   if (atual === null) redirect(307, expirou ? `${LOGIN}?motivo=expirada` : LOGIN);
   if (atual.troca_senha_obrigatoria && url.pathname !== TROCAR_SENHA) redirect(307, TROCAR_SENHA);
+  if (!visualizacao.permiteRota(url.pathname)) redirect(307, '/');
   return {};
 };
+

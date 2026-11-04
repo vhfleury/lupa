@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 
 from lupa.acesso.autorizacao import (
@@ -30,7 +30,13 @@ from lupa.api.middleware import auditar_rota
 from lupa.auditoria.eventos import AcaoAuditoria, ResultadoEvento
 from lupa.dominio.cnj import NumeroCnjInvalidoError, validar_numero_cnj
 from lupa.dominio.enums import EstadoJob, Materia, StatusProcesso
-from lupa.dominio.tabelas import ArquivoTabela, JobIngestaoTabela, ProcessoTabela
+from lupa.dominio.tabelas import (
+    ArquivoTabela,
+    JobIngestaoTabela,
+    ProcessoResponsavelTabela,
+    ProcessoTabela,
+    UsuarioTabela,
+)
 
 router = APIRouter()
 
@@ -100,12 +106,13 @@ def resumir_ingestao(estados: list[str]) -> str:
 
 @router.get("/processos")
 @auditar_rota(AcaoAuditoria.BUSCA, conteudo=False)
-def listar_processos(ator: Leitor, sessao: SessaoBanco) -> list[dict[str, Any]]:
+def listar_processos(ator: Leitor, sessao: SessaoBanco, meus: bool = False) -> list[dict[str, Any]]:
     """Processos visíveis ao ator, mais recentes primeiro, com o resumo da ingestão.
 
     Args:
         ator: Ator com permissão de ver processos.
         sessao: Sessão (RLS restringe ao gabinete; o administrador vê todos).
+        meus: Restringe aos processos atribuídos ao usuário como responsável.
 
     Returns:
         Processos com `ingestao: {situacao, por_estado, ultimo_envio}`.
@@ -113,7 +120,27 @@ def listar_processos(ator: Leitor, sessao: SessaoBanco) -> list[dict[str, Any]]:
     consulta = select(ProcessoTabela).order_by(ProcessoTabela.criado_em.desc())
     if ator.gabinete_id is not None:
         consulta = consulta.where(ProcessoTabela.gabinete_id == ator.gabinete_id)
+    if meus:
+        consulta = consulta.where(
+            ProcessoTabela.id.in_(
+                select(ProcessoResponsavelTabela.processo_id).where(
+                    ProcessoResponsavelTabela.usuario_id == ator.usuario_id
+                )
+            )
+        )
     processos = list(sessao.scalars(consulta))
+    responsaveis: dict[UUID, list[dict[str, Any]]] = {}
+    if processos:
+        vinculos = sessao.execute(
+            select(ProcessoResponsavelTabela.processo_id, UsuarioTabela)
+            .join(UsuarioTabela, UsuarioTabela.id == ProcessoResponsavelTabela.usuario_id)
+            .where(ProcessoResponsavelTabela.processo_id.in_([p.id for p in processos]))
+            .order_by(UsuarioTabela.nome_usuario)
+        )
+        for processo_id, usuario in vinculos:
+            responsaveis.setdefault(processo_id, []).append(
+                {"id": usuario.id, "nome_usuario": usuario.nome_usuario, "ativo": usuario.ativo}
+            )
     jobs: dict[UUID, list[tuple[str, datetime]]] = {}
     if processos:
         linhas = sessao.execute(
@@ -133,6 +160,7 @@ def listar_processos(ator: Leitor, sessao: SessaoBanco) -> list[dict[str, Any]]:
         resultado.append(
             _serializar(processo)
             | {
+                "responsaveis": responsaveis.get(processo.id, []),
                 "ingestao": {
                     "situacao": resumir_ingestao(estados),
                     "por_estado": por_estado,
@@ -269,3 +297,128 @@ def listar_arquivos(processo: Processo, sessao: SessaoBanco) -> dict[str, Any]:
         "situacao": resumir_ingestao([a["estado"] for a in arquivos if a["estado"]]),
         "arquivos": arquivos,
     }
+
+
+class CorpoResponsaveis(BaseModel):
+    """Conjunto desejado e conjunto conhecido, para evitar sobrescritas concorrentes."""
+
+    model_config = ConfigDict(extra="forbid")
+    usuarios: list[UUID] = Field(min_length=1, max_length=100)
+    anteriores: list[UUID] = Field(max_length=100)
+
+
+def _responsaveis(processo: ProcessoTabela, sessao: SessaoBanco) -> list[dict[str, Any]]:
+    usuarios = sessao.scalars(
+        select(UsuarioTabela)
+        .join(
+            ProcessoResponsavelTabela,
+            ProcessoResponsavelTabela.usuario_id == UsuarioTabela.id,
+        )
+        .where(ProcessoResponsavelTabela.processo_id == processo.id)
+        .order_by(UsuarioTabela.nome_usuario)
+    )
+    return [{"id": u.id, "nome_usuario": u.nome_usuario, "ativo": u.ativo} for u in usuarios]
+
+
+@router.get("/processos/{processo_id}/responsaveis")
+@auditar_rota(AcaoAuditoria.PROCESSO_ABERTO, conteudo=False)
+def listar_responsaveis(
+    processo: Processo, ator: AtorAutenticado, sessao: SessaoBanco
+) -> dict[str, Any]:
+    """Lista os responsáveis; gestores também recebem assessores elegíveis do gabinete."""
+    pode_gerir = pode(ator.papel, Permissao.GERIR_ASSESSOR, ator.gabinete_id, processo.gabinete_id)
+    disponiveis = []
+    if pode_gerir:
+        usuarios = sessao.scalars(
+            select(UsuarioTabela)
+            .where(
+                UsuarioTabela.gabinete_id == processo.gabinete_id,
+                UsuarioTabela.papel == "assessor",
+                UsuarioTabela.ativo.is_(True),
+            )
+            .order_by(UsuarioTabela.nome_usuario)
+        )
+        disponiveis = [
+            {"id": u.id, "nome_usuario": u.nome_usuario, "ativo": u.ativo} for u in usuarios
+        ]
+    return {
+        "responsaveis": _responsaveis(processo, sessao),
+        "disponiveis": disponiveis,
+        "pode_gerir": pode_gerir,
+    }
+
+
+@router.post("/processos/{processo_id}/responsaveis")
+def definir_responsaveis(
+    corpo: CorpoResponsaveis,
+    processo: Processo,
+    ator: AtorAutenticado,
+    sessao: SessaoBanco,
+    ctx: ContextoReq,
+) -> dict[str, Any]:
+    """Adiciona ou transfere responsabilidade a assessores ativos do mesmo gabinete."""
+    if not pode(ator.papel, Permissao.GERIR_ASSESSOR, ator.gabinete_id, processo.gabinete_id):
+        raise PermissaoNegadaError("somente o gestor do gabinete pode alterar responsáveis")
+    # Serializa alterações por processo, inclusive quando a lista inicial está vazia.
+    sessao.execute(
+        select(ProcessoTabela.id).where(ProcessoTabela.id == processo.id).with_for_update()
+    )
+    atuais = set(
+        sessao.scalars(
+            select(ProcessoResponsavelTabela.usuario_id).where(
+                ProcessoResponsavelTabela.processo_id == processo.id
+            )
+        )
+    )
+    if atuais != set(corpo.anteriores):
+        raise ConflitoError("Os responsáveis mudaram. Recarregue a lista antes de salvar.")
+    novos = set(corpo.usuarios)
+    if len(novos) != len(corpo.usuarios):
+        raise DadosInvalidosError("não repita responsáveis")
+    validos = set(
+        sessao.scalars(
+            select(UsuarioTabela.id)
+            .where(
+                UsuarioTabela.id.in_(novos),
+                UsuarioTabela.gabinete_id == processo.gabinete_id,
+                UsuarioTabela.papel == "assessor",
+                UsuarioTabela.ativo.is_(True),
+            )
+            .with_for_update()
+        )
+    )
+    if validos != novos:
+        raise DadosInvalidosError("selecione apenas assessores ativos do gabinete do processo")
+    removidos, adicionados = atuais - novos, novos - atuais
+    if removidos:
+        sessao.execute(
+            delete(ProcessoResponsavelTabela).where(
+                ProcessoResponsavelTabela.processo_id == processo.id,
+                ProcessoResponsavelTabela.usuario_id.in_(removidos),
+            )
+        )
+    for usuario_id in adicionados:
+        sessao.add(
+            ProcessoResponsavelTabela(
+                processo_id=processo.id,
+                usuario_id=usuario_id,
+                gabinete_id=processo.gabinete_id,
+            )
+        )
+    for ids, acao in (
+        (adicionados, AcaoAuditoria.RESPONSAVEL_ADICIONADO),
+        (removidos, AcaoAuditoria.RESPONSAVEL_REMOVIDO),
+    ):
+        for usuario_id in ids:
+            auditar(
+                sessao,
+                ctx,
+                acao,
+                usuario_id=ator.usuario_id,
+                gabinete_id=processo.gabinete_id,
+                processo_id=processo.id,
+                objeto_tipo="usuario",
+                objeto_id=str(usuario_id),
+            )
+    sessao.flush()
+    return {"responsaveis": _responsaveis(processo, sessao)}

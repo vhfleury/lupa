@@ -1,10 +1,12 @@
 <script lang="ts">
   // Seletor de tema (claro, escuro, do sistema); a escolha fica só no localStorage.
-  import { escolherTema, lerTema, TEMAS, type Tema } from '$lib/tema';
+  import { onMount } from 'svelte';
+  import { aplicarTema, escolherTema, lerTema, TEMAS, type Tema } from '$lib/tema';
 
   let { id = 'tema' }: { id?: string } = $props();
 
   let tema = $state<Tema>(lerTema());
+  onMount(() => aplicarTema(tema));
 
   function mudar(evento: Event): void {
     tema = (evento.currentTarget as HTMLSelectElement).value as Tema;

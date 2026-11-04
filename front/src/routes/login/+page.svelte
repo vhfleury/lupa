@@ -6,6 +6,7 @@
   import Aviso from '$lib/componentes/Aviso.svelte';
   import QrCode from '$lib/componentes/QrCode.svelte';
   import type { RespostaLogin, RespostaMfa } from '$lib/tipos';
+  import './login.css';
 
   type Etapa = { tipo: 'senha' } | { tipo: 'codigo'; resposta: RespostaLogin };
 
@@ -78,8 +79,17 @@
 
 <svelte:head><title>Entrar · Lupa</title></svelte:head>
 
-<div class="cartao">
-  <h1>Lupa</h1>
+<div class="cartao login-cartao">
+  <div class="login-marca">
+    <img class="login-logo-claro" src="/lupa-logo.svg" alt="Lupa" width="2025" height="777" />
+    <img class="login-logo-escuro" src="/lupa-logo-escuro.svg" alt="Lupa" width="2025" height="777" />
+  </div>
+  <p class="login-descricao">Apoio à análise de processos judiciais</p>
+  <div class="login-introducao">
+    <span class="login-etapa">ACESSO AO SISTEMA · {etapa.tipo === 'senha' ? '01' : '02'} / 02</span>
+    <h1>{etapa.tipo === 'senha' ? 'Bem-vindo ao Lupa' : 'Confirme seu acesso'}</h1>
+    <p>{etapa.tipo === 'senha' ? 'Entre com suas credenciais para continuar.' : 'Use seu aplicativo autenticador para concluir.'}</p>
+  </div>
   {#if expirada && etapa.tipo === 'senha'}
     <Aviso tipo="info">Sessão encerrada ou expirada. Entre novamente.</Aviso>
   {/if}
@@ -94,6 +104,7 @@
           bind:this={campoInicial}
           bind:value={nome}
           autocomplete="username"
+          placeholder="Digite seu usuário"
           autocapitalize="none"
           spellcheck="false"
           required
@@ -107,11 +118,12 @@
           type="password"
           bind:value={senha}
           autocomplete="current-password"
+          placeholder="Digite sua senha"
           required
           maxlength="256"
         />
       </div>
-      <button type="submit" disabled={enviando}>Continuar</button>
+      <button type="submit" disabled={enviando}>{enviando ? 'Verificando…' : 'Continuar'} <span aria-hidden="true">→</span></button>
     </form>
   {:else}
     {@const resposta = etapa.resposta}
@@ -159,6 +171,7 @@
       </div>
     </form>
   {/if}
+  <p class="login-seguranca">Acesso protegido por verificação em duas etapas</p>
 </div>
 
 <style>

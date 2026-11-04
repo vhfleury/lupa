@@ -52,11 +52,13 @@ def _assessor(engine: Engine) -> UsuarioTeste:
     return criar_usuario_teste(engine, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine))
 
 
-def test_assessor_do_gabinete_a_recebe_404_no_processo_do_gabinete_b_e_tentativa_e_registrada(
-    app_teste: FastAPI, engine_teste: Engine
+@pytest.mark.parametrize("papel", [PapelUsuario.ASSESSOR, PapelUsuario.DESEMBARGADOR])
+def test_usuario_do_gabinete_a_recebe_404_no_processo_do_gabinete_b_e_tentativa_e_registrada(
+    app_teste: FastAPI, engine_teste: Engine, papel: PapelUsuario
 ) -> None:
     """404 (não 403) e evento `processo_aberto` com resultado `negado`."""
-    assessor_a, assessor_b = _assessor(engine_teste), _assessor(engine_teste)
+    assessor_a = criar_usuario_teste(engine_teste, papel, criar_gabinete_teste(engine_teste))
+    assessor_b = _assessor(engine_teste)
     processo_b = _criar_processo(engine_teste, assessor_b)
     cliente = _cliente(app_teste, engine_teste, assessor_a)
     resposta = cliente.get(f"/processos/{processo_b}")

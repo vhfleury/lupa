@@ -32,6 +32,8 @@ class AcaoAuditoria(StrEnum):
     USUARIO_REATIVADO = "usuario_reativado"
     GABINETE_CRIADO = "gabinete_criado"
     PROCESSO_CRIADO = "processo_criado"
+    RESPONSAVEL_ADICIONADO = "responsavel_adicionado"
+    RESPONSAVEL_REMOVIDO = "responsavel_removido"
     ARQUIVO_ENVIADO = "arquivo_enviado"
     PROCESSO_ABERTO = "processo_aberto"
     PAGINA_VISTA = "pagina_vista"
