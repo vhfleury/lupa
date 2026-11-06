@@ -1,7 +1,7 @@
 // Etapa 6.10: segurança do front. (1) Cabeçalhos do proxy, com a CSP sem afrouxar; (2) nenhuma
 // violação de CSP nas telas (nada inline); (3) texto hostil dos autos (processo sintético com
 // `<script>`, link Markdown e URL crua numa página) aparece como texto puro: nada executa e
-// nenhuma URL do texto vira link clicável (prompt-injection.md, seção 6).
+// nenhuma URL do texto vira link clicável (docs/prompt-injection.md, seção 6).
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { contextoComo } from './credenciais';
 

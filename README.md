@@ -100,11 +100,11 @@ Métricas Prometheus em `GET /metricas` (administrador).
 |---|---|---|
 | 0. Esqueleto | `src/lupa/config.py`, `logging.py`, `api/` | este README |
 | 1. Modelo de dados | `src/lupa/dominio/` | `docs/modelo-de-dados.md` |
-| 2. Validações | `src/lupa/validacoes/` | `docs/validacoes.md`, `catalogo-validacoes.md` |
+| 2. Validações | `src/lupa/validacoes/` | `docs/validacoes.md`, `docs/catalogo-validacoes.md` |
 | 3. Acesso e auditoria | `src/lupa/acesso/`, `src/lupa/auditoria/` | `docs/auditoria.md` |
 | 4A–4F. Ingestão | `src/lupa/ingestao/` | `docs/ingestao.md`, `docs/calibracao-projudi.md` |
 | 4B. Autos sintéticos | `src/lupa/sinteticos/`, `scripts/gerar_autos.py` | `docs/sinteticos.md` |
-| 5. Agente e chat | `src/lupa/agente/` | `docs/agente.md`, `prompt-injection.md` |
+| 5. Agente e chat | `src/lupa/agente/` | `docs/agente.md`, `docs/prompt-injection.md` |
 | 6. Interface web | `front/`, `proxy/Caddyfile` | `docs/front.md` |
 | 7.1–7.7. Criptografia em repouso | `src/lupa/seguranca/`, `vault/` | `docs/criptografia.md`, `docs/decisoes/object-storage.md` |
 | 7.8. Backup | `scripts/backup*.sh`, `restaurar.*`, `expurgar_backups.*` | `docs/backup.md` |

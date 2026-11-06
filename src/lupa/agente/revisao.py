@@ -1,4 +1,4 @@
-"""Processo em revisão após incidente do agente (Etapa 6.8; `prompt-injection.md`, seção 8).
+"""Processo em revisão após incidente do agente (Etapa 6.8; `docs/prompt-injection.md`, seção 8).
 
 Quando a conferência bloqueia a resposta do modelo (instrução refletida ou identificador de
 outro processo), o processo passa a `em_revisao`: o chat e os resumos do dossiê ficam
