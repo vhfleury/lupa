@@ -1,4 +1,7 @@
-.PHONY: up down test lint typecheck format migrate verificar
+.PHONY: up down test lint typecheck format migrate verificar lock
+
+UV_COMPILE = uv pip compile pyproject.toml --generate-hashes --python-version 3.12 \
+	--python-platform x86_64-manylinux_2_28 --custom-compile-command "make lock"
 
 up:
 	docker compose up -d --build --wait
@@ -24,3 +27,7 @@ migrate:
 
 verificar:
 	docker compose exec api bash scripts/verificar.sh
+
+lock:
+	$(UV_COMPILE) -o requirements.txt
+	$(UV_COMPILE) --extra dev -c requirements.txt -o requirements-dev.txt

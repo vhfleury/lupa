@@ -34,8 +34,15 @@ O script roda `ruff check`, `ruff format --check`, `mypy --strict` e `pytest` (c
 90% em `lupa`), parando no primeiro erro. Há equivalente para PowerShell em `scripts/verificar.ps1`.
 Fora do compose, o teste marcado `integracao` é pulado se PostgreSQL ou MinIO estiverem inacessíveis.
 
-Dependências fixadas com hashes em `requirements.txt` (produção) e `requirements-dev.txt`
-(desenvolvimento), geradas por `pip-compile --generate-hashes` a partir dos arquivos `.in`.
+Dependências declaradas só no `pyproject.toml` (`dependencies` e o extra `dev`). Os arquivos
+`requirements.txt` (produção) e `requirements-dev.txt` (produção + desenvolvimento), com hashes,
+são gerados a partir dele pelo `uv`, mirando Linux (roda no Windows sem contêiner). Para mudar
+uma versão, edite o `pyproject.toml` e rode `make lock`, ou, sem `make`:
+
+```
+uv pip compile pyproject.toml --generate-hashes --python-version 3.12 --python-platform x86_64-manylinux_2_28 --custom-compile-command "make lock" -o requirements.txt
+uv pip compile pyproject.toml --generate-hashes --python-version 3.12 --python-platform x86_64-manylinux_2_28 --custom-compile-command "make lock" --extra dev -c requirements.txt -o requirements-dev.txt
+```
 
 ## Acesso e auditoria (Etapa 3)
 
