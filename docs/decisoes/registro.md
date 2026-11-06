@@ -5,11 +5,11 @@ Todas as decisões tomadas no projeto num lugar só. Este arquivo junta duas fon
 - as decisões que cada executor tomou sem estarem no roteiro, copiadas dos relatórios de etapa. Só os 19 relatórios citados pelo código e pelos manuais continuam em `docs/etapas/`; os outros 78 estão no histórico do Git (commit `58e9774`);
 - as decisões dos executores que os revisores endossaram, e o resultado de cada revisão. As revisões foram removidas do repositório; o texto original está no histórico do Git (commit `54219a2`, pasta `docs/etapas/`).
 
-Decisões de produto estão em `docs/requisitos-v1.md` e não são repetidas aqui. A decisão do object storage tem documento próprio: [object-storage.md](object-storage.md).
+Decisões de produto estão em `docs/especificacao/requisitos-v1.md` e não são repetidas aqui. A decisão do object storage tem documento próprio: [object-storage.md](object-storage.md).
 
 O que ficou de fora, as limitações e os riscos de cada etapa estão em [`docs/etapas/FICOU-DE-FORA.md`](../etapas/FICOU-DE-FORA.md).
 
-As pendências (o que ainda falta decidir ou fazer) estão em [`docs/pendencias.md`](../pendencias.md).
+As pendências (o que ainda falta decidir ou fazer) estão em [`docs/piloto/pendencias.md`](../piloto/pendencias.md).
 
 ## Mantido assim no desenvolvimento, por decisão
 
@@ -107,7 +107,7 @@ Extraídas das seções de decisão de cada relatório de etapa e das decisões 
    `prescricao_art109.yaml`.
 4. **Injeção de dados**: cada `executar` aceita um terceiro argumento opcional com as tabelas
    (testes usam feriados sintéticos); sem ele, usa os YAML empacotados (cache `lru_cache`).
-5. **Regras de borda** (a confirmar, listadas em `docs/validacoes.md`): intervalo igual ao prazo
+5. **Regras de borda** (a confirmar, listadas em `docs/sistema/validacoes.md`): intervalo igual ao prazo
    prescricional não prescreve (limite = início + prazo em meses de calendário); "maior de 70"
    = 70 completos; 90 dias exatos na preventiva é conforme; dias de suspensão não contam no prazo
    corrido; empate de datas de intimação escolhe a do réu.
@@ -335,7 +335,7 @@ Opção (a): as validações consomem `lupa.dominio.esquemas.Fato` e `Evidencia`
 #### 4B.2 — Textos por tipo de peça
 
 - Números CNJ: segmento 8, tribunal 99 (inexistente) e sequencial 9900000–9999999, faixa que
-  declaramos reservada a testes (documentado em `identidades.py` e `docs/sinteticos.md`).
+  declaramos reservada a testes (documentado em `identidades.py` e `docs/sistema/sinteticos.md`).
 - O roteiro escolhe o crime pela prescrição desejada (pena baixa quando o processo deve prescrever)
   e força intervalos entre revisões da preventiva acima de 90 dias quando o resultado pretendido é
   atenção. O resultado gravado é sempre o do motor, não o pretendido.
@@ -438,7 +438,7 @@ Opção (a): as validações consomem `lupa.dominio.esquemas.Fato` e `Evidencia`
 #### 4C.8 — Paralelismo e desempenho
 
 - Round-robin em vez de fila com prioridade: não exige mudar o RQ nem saber o tamanho do job ao enfileirar, e o estado do job continua só no banco.
-- O semáforo por gabinete vale por processo worker; com várias réplicas o teto passa a ser por réplica (registrado em `docs/ingestao.md`). Um semáforo no Redis fica para quando houver mais de um worker.
+- O semáforo por gabinete vale por processo worker; com várias réplicas o teto passa a ser por réplica (registrado em `docs/sistema/ingestao.md`). Um semáforo no Redis fica para quando houver mais de um worker.
 - O varredor também recupera jobs `validado`/`em_extracao` com lease vencido, e os que cederam a vez e ficaram 10 min sem heartbeat (mensagem perdida).
 
 #### 4C.9 — Gravação de páginas
@@ -465,7 +465,7 @@ Opção (a): as validações consomem `lupa.dominio.esquemas.Fato` e `Evidencia`
 
 - No PyMuPDF 1.25 a cor do span vem com o byte de alfa (`-1` = branco opaco); a comparação usa `cor & 0xFFFFFF`. Isso mostra que o sinal `caracteres_invisiveis` da 4C (que compara `color == 0xFFFFFF`) só pega texto branco quando ele também é pequeno ou está fora da página; não alterei o sinal da 4C para não mexer no roteamento calibrado (fica para a revisão decidir).
 - Trocar o estado das OCGs com `set_layer` não muda a extração do documento aberto; é preciso regravar e reabrir. A cópia com tudo ligado é feita uma vez por documento e só quando há OCG desligada.
-- Texto girado é visível ao assessor: não é tratado como oculto (a 4C já o tira do fluxo de leitura). Registrado na docstring e em `docs/ingestao.md`.
+- Texto girado é visível ao assessor: não é tratado como oculto (a 4C já o tira do fluxo de leitura). Registrado na docstring e em `docs/sistema/ingestao.md`.
 - Testes da 4C ajustados (arquivos de outra etapa, registrado aqui): `test_hibridas.py::test_camada_de_texto_manipulada_e_separada_como_texto_oculto` (antes `..._gera_texto_divergente`: o texto branco agora é separado antes da fusão, então a página tem `texto_oculto` em vez de `texto_divergente`); `test_paginas.py::test_texto_nativo_igual_a_camada_do_gabarito_com_offsets` (a linha oculta do gabarito não está mais no texto); `test_worker_extracao.py` passou a exigir `texto_oculto` onde exigia `texto_divergente`.
 
 #### 4D.2 — Metadados e anotações
@@ -607,7 +607,7 @@ Opção (a): as validações consomem `lupa.dominio.esquemas.Fato` e `Evidencia`
 #### 4F.8 — Cache e reprocessamento
 
 - O extrator de páginas subiu para `4f.0` (OCR de detecção em imagens de páginas nativas, ver
-  4F.9 e `docs/ingestao.md`); páginas gravadas em `4e.0` não servem de cache para `4f.0`.
+  4F.9 e `docs/sistema/ingestao.md`); páginas gravadas em `4e.0` não servem de cache para `4f.0`.
 
 #### 4F.9 — Ponta a ponta nos processos de referência
 
@@ -615,8 +615,8 @@ Opção (a): as validações consomem `lupa.dominio.esquemas.Fato` e `Evidencia`
   acima de 2% da página nativa (`lupa/ingestao/imagem_nativa.py`, extrator `4f.0`). Custo medido
   antes de implementar: 21 a 27 s por mil páginas nativas (semente_04 e semente_06); depois, o
   nativo completo ficou em 35,8 s por mil. A injeção do corpus é detectada
-  (`dirigido_a_sistema`, `alterar_resultado`). Registrado em `docs/ingestao.md`.
-- Dimensionamento (revisão 4C §5.1): registrado acima e em `docs/ingestao.md`.
+  (`dirigido_a_sistema`, `alterar_resultado`). Registrado em `docs/sistema/ingestao.md`.
+- Dimensionamento (revisão 4C §5.1): registrado acima e em `docs/sistema/ingestao.md`.
 
 #### 4F.10 — Calibração com o processo real
 
@@ -769,7 +769,7 @@ Decisão do object storage: ver [object-storage.md](object-storage.md).
 
 #### Endossadas na revisão 8.1
 
-- Sem TLS entre API/worker e Vault no piloto: um host, redes internas sem porta publicada; quem observa a rede do Docker já é root. Registrado em `docs/operacao.md` 4.6 e a reavaliar se o Vault sair do host.
+- Sem TLS entre API/worker e Vault no piloto: um host, redes internas sem porta publicada; quem observa a rede do Docker já é root. Registrado em `docs/operacao/operacao.md` 4.6 e a reavaliar se o Vault sair do host.
 - HSTS mantido no modo de desenvolvimento porque a varredura de cabeçalhos e o E2E exigem; sem efeito com certificado não confiável.
 - Agendador pelo crond da imagem de backup, para não entregar o socket do Docker a um serviço de agendamento.
 - `/metricas/servico` separado da rota de admin, porque o Prometheus não faz login com TOTP.

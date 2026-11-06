@@ -24,7 +24,7 @@ Você recebe do desembargador um **nome de usuário** e uma **senha temporária*
 celular com um aplicativo autenticador (por exemplo, Google Authenticator ou Aegis; qualquer um
 que gere "códigos de 6 dígitos").
 
-![Tela de entrada](imagens/login.png)
+![Tela de entrada](../imagens/login.png)
 
 1. Abra o endereço do Lupa no navegador. Na primeira vez o navegador pode avisar que o
    certificado não é confiável (piloto local); aceite a exceção só se o endereço for o que o
@@ -52,7 +52,7 @@ Bom saber:
 
 ## 3. Criar um processo e enviar os autos
 
-![Lista de processos](imagens/processos.png)
+![Lista de processos](../imagens/processos.png)
 
 1. Clique em **Processos** no menu.
 2. Em **Novo processo**, preencha o **Número CNJ** (no formato 0000000-00.0000.0.00.0000; o
@@ -63,7 +63,7 @@ Bom saber:
 3. Clique no número do processo na lista. Em **Enviar autos**, escolha o arquivo em
    **Arquivo PDF ou ZIP (até 512 MB)** e clique **Enviar**. Uma barra mostra o progresso.
 
-![Página do processo](imagens/processo.png)
+![Página do processo](../imagens/processo.png)
 
 4. Em **Arquivos** aparece o estado do processamento, que se atualiza sozinho:
    - **Concluído**: pronto para usar;
@@ -75,7 +75,7 @@ Bom saber:
 
 ## 4. O dossiê e o que cada marca significa
 
-![Dossiê](imagens/dossie.png)
+![Dossiê](../imagens/dossie.png)
 
 O dossiê é montado **sem inteligência artificial**, a partir do que foi lido nos autos:
 
@@ -99,7 +99,7 @@ O dossiê é montado **sem inteligência artificial**, a partir do que foi lido 
 
 ## 5. Abrir o visualizador por uma evidência
 
-![Visualizador com o trecho destacado](imagens/visualizador.png)
+![Visualizador com o trecho destacado](../imagens/visualizador.png)
 
 Tudo que tem página no Lupa é clicável: a data na linha do tempo, o intervalo de páginas no
 índice, o link de evidência nas validações e a citação no chat. O clique abre o **Visualizador**
@@ -115,7 +115,7 @@ na página certa, com o trecho usado **destacado** (caixa colorida) e o texto do
 
 ## 6. Ler um alerta de validação e refazer a conta à mão
 
-![Validações](imagens/validacoes.png)
+![Validações](../imagens/validacoes.png)
 
 Na tela **Validações**, cada conta vira um **achado** com um de três resultados:
 
@@ -218,7 +218,7 @@ réu continua preso; se houve soltura e nova prisão no meio (o sistema não sab
 
 ## 7. Confirmar ou corrigir um fato
 
-![Correção de fato](imagens/corrigir-fato.png)
+![Correção de fato](../imagens/corrigir-fato.png)
 
 Se a data (ou outro valor) usada num achado está errada:
 
@@ -237,7 +237,7 @@ registrada com seu usuário.
 
 ## 8. Usar o chat
 
-![Chat sobre os autos](imagens/chat.png)
+![Chat sobre os autos](../imagens/chat.png)
 
 Abra **Chat** no processo. Escreva em **Pergunta** e clique **Perguntar**. Cada conversa é sobre
 **um único processo**.

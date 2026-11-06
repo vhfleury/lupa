@@ -24,7 +24,7 @@ O Lupa organiza os autos, monta a linha do tempo, roda validações objetivas e 
 | Explicar achados das validações, repetindo os valores calculados | Redigir voto, decisão, ementa ou despacho |
 | Rodar as validações determinísticas (tempestividade, prescrição) | Calcular prazo ou prescrição "por conta própria" no chat |
 
-Detalhes técnicos: `docs/agente.md`, seções 2, 6 e 7.
+Detalhes técnicos: `docs/sistema/agente.md`, seções 2, 6 e 7.
 
 ## 4. Responsabilidade do magistrado e dever de conferência
 
@@ -51,7 +51,7 @@ Todo acesso e toda ação ficam registrados: quem, quando, **endereço IP, local
 
 ## 8. Limites de uso
 
-Há tetos técnicos por pergunta, conversa e processo (tamanho da pergunta, tokens, turnos do agente, páginas por conversa), descritos em `docs/agente.md`, seção 7. Ao estourar um teto a conversa é encerrada com aviso. É vedado tentar contornar recusas, testar ataques ou inserir instruções nos autos ou nas perguntas.
+Há tetos técnicos por pergunta, conversa e processo (tamanho da pergunta, tokens, turnos do agente, páginas por conversa), descritos em `docs/sistema/agente.md`, seção 7. Ao estourar um teto a conversa é encerrada com aviso. É vedado tentar contornar recusas, testar ataques ou inserir instruções nos autos ou nas perguntas.
 
 ## 9. Modelo de linguagem externo
 

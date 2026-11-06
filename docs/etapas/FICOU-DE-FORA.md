@@ -5,7 +5,7 @@ Limitações, itens fora do escopo e pendências registrados durante a construç
 - as seções "O que ficou de fora", "Fora do escopo", "Limitações" e "Pendente" de cada relatório de etapa. Só os 19 relatórios citados pelo código e pelos manuais continuam em `docs/etapas/`; os outros 78 estão no histórico do Git (commit `58e9774`);
 - os riscos, observações e pendências apontados nas revisões, que foram removidas do repositório e continuam no histórico do Git (commit `54219a2`, pasta `docs/etapas/`).
 
-Texto mantido como foi escrito na época. Muitos itens foram resolvidos em etapas seguintes; o estado consolidado está em `docs/etapas/CONFORMIDADE-GERAL.md`. As pendências abertas para o piloto e os itens para o advogado estão em `docs/pendencias.md` e não são repetidos aqui. As decisões estão em `docs/decisoes/registro.md`.
+Texto mantido como foi escrito na época. Muitos itens foram resolvidos em etapas seguintes; o estado consolidado está em `docs/etapas/CONFORMIDADE-GERAL.md`. As pendências abertas para o piloto e os itens para o advogado estão em `docs/piloto/pendencias.md` e não são repetidos aqui. As decisões estão em `docs/decisoes/registro.md`.
 
 ## Etapa 0 — Esqueleto do projeto
 
@@ -35,7 +35,7 @@ Texto mantido como foi escrito na época. Muitos itens foram resolvidos em etapa
   administrador não vê nada sob `lupa_app`. `usuario` e `evento_auditoria` já têm RLS pela mesma
   política.
 - A dependência FastAPI que abre transação e chama `definir_gabinete` por requisição: depende da
-  autenticação (Etapa 3). O procedimento está documentado em `docs/modelo-de-dados.md`.
+  autenticação (Etapa 3). O procedimento está documentado em `docs/sistema/modelo-de-dados.md`.
 - Cifra de `reu_identidade` e chave por gabinete: só a referência (`gabinete.chave_criptografia_ref`).
 - Nenhuma dependência nova foi necessária.
 
@@ -129,7 +129,7 @@ Texto mantido como foi escrito na época. Muitos itens foram resolvidos em etapa
 ### 4A.4 — Sandbox de parsing
 
 - Isolamento de rede no nível do kernel para o filho (ele compartilha a rede interna do worker,
-  sem credenciais). Documentado em `docs/ingestao.md`; um contêiner de parser sem rede fica para
+  sem credenciais). Documentado em `docs/sistema/ingestao.md`; um contêiner de parser sem rede fica para
   quando a decifragem por processo (fase 2, `requisitos-v1.md` §6) exigir worker separado.
 - seccomp e namespaces (exigiriam privilégios no contêiner).
 
@@ -238,7 +238,7 @@ A pasta `.sinteticos/` tem 4,7 GB e está dentro do OneDrive, então vai sincron
 
 ### 4D.6 — Idioma inesperado
 
-**Limitações (registradas no YAML e em `docs/ingestao.md`)**
+**Limitações (registradas no YAML e em `docs/sistema/ingestao.md`)**
 
 - Frases com menos de 8 palavras não são avaliadas; o espanhol divide muitas palavras com o português e só dispara em frase claramente espanhola; outros idiomas não são detectados.
 
@@ -470,7 +470,7 @@ validações na tela (usa a data do dia).
 ### 7.2 — Cofre de chaves (HashiCorp Vault)
 
 - TLS no listener, auto-unseal e repartição das chaves de unseal (produção; ver
-  `docs/criptografia.md`). Reiniciar o Vault sela o cofre: rodar o script de novo.
+  `docs/sistema/criptografia.md`). Reiniciar o Vault sela o cofre: rodar o script de novo.
 
 ### 7.3 — Chave de dados por processo
 

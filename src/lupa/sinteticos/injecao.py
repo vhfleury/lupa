@@ -1,4 +1,6 @@
-"""Tentativas de injeção plantadas nos autos sintéticos (vetores de ``docs/prompt-injection.md``).
+"""Tentativas de injeção plantadas nos autos sintéticos.
+
+Os vetores são os de ``docs/especificacao/prompt-injection.md``.
 
 Vetores visíveis viram parágrafos dentro de uma peça (marcados com ``{{injecao:...}}``); vetores
 ocultos são aplicados na renderização (texto branco de 1 pt, texto fora da página, anotação,

@@ -1,8 +1,8 @@
 # Manual de operação do Lupa
 
 Para o responsável técnico. Diz o que fazer, em que ordem e o que conferir. Os detalhes de cada
-mecanismo ficam nos documentos citados: [criptografia](criptografia.md), [backup](backup.md),
-[auditoria](auditoria.md), [ingestão](ingestao.md), [agente](agente.md), [front](front.md).
+mecanismo ficam nos documentos citados: [criptografia](../sistema/criptografia.md), [backup](backup.md),
+[auditoria](../sistema/auditoria.md), [ingestão](../sistema/ingestao.md), [agente](../sistema/agente.md), [front](../sistema/front.md).
 
 Convenções: comandos rodam na raiz do projeto, no host com Docker. `docker compose exec api ...`
 roda dentro do contêiner da API. Nos exemplos, `https://lupa.exemplo` é o endereço público (troque
@@ -475,7 +475,7 @@ piloto, rode e confira que não sobrou gabinete de teste (`GET /api/gabinetes`).
   - Grafana em `http://127.0.0.1:3000` (usuário `admin`, senha em `.segredos/grafana_senha`),
     painel provisionado **Lupa — piloto**: cofre, idade da fila, chamadas e tokens do modelo,
     jobs por estado, falhas por motivo, eventos de auditoria por ação
-    ([captura](imagens/grafana.png)).
+    ([captura](../imagens/grafana.png)).
   - Alertas (`monitoramento/prometheus/regras.yml`, visíveis em `http://127.0.0.1:9090/alerts`):
     `LupaFilaParada` (job em `recebido` há mais de 30 min), `LupaFalhasDeIngestao` (mais de 3
     falhas ou quarentenas em 1 h), `LupaCofreSelado` (2 min), `LupaApiFora` (5 min). Não há

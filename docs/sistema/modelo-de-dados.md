@@ -239,7 +239,7 @@ nada sob `lupa_app`.
 `pagina` ganha `sinais`, `coordenadas`, `extracao` (rota, OCR, divergência, tempo), `texto_nativo`,
 `texto_ocr`, `versao_extrator`, `origem_arquivo` e `pagina_origem`; `job_ingestao` ganha
 `relatorio` e `versao_extrator`; `diagnostico_arquivo` ganha `fronteiras_origem`, e o CHECK de
-`cenario` aceita `pdf_com_bookmarks_e_indice`. Detalhes em `docs/ingestao.md`.
+`cenario` aceita `pdf_com_bookmarks_e_indice`. Detalhes em `docs/sistema/ingestao.md`.
 
 ## Revisão 0006 (Etapa 4E)
 

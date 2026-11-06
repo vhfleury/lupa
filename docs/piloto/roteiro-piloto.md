@@ -4,7 +4,7 @@
 
 Tudo que agentes constroem para a primeira versão está pronto (Etapas 0 a 7, 8.1 e 8.2). Este roteiro ordena o que depende de você e do gabinete. Cada passo diz quem faz, o que usar, e como saber que terminou. "Agente" marca o que ainda pode ser delegado a um agente Opus com minha revisão; o resto é seu ou do gabinete.
 
-Documentos que o roteiro usa: `docs/operacao.md` (manual do operador), `docs/conformidade/checklist-piloto.md` (16 itens), `docs/calibracao-projudi.md` (primeiro processo real), `docs/guia-assessor.md` e `docs/guia-desembargador.md`, `docs/etapas/CONFORMIDADE-GERAL.md` (estado e decisões).
+Documentos que o roteiro usa: `docs/operacao/operacao.md` (manual do operador), `docs/conformidade/checklist-piloto.md` (16 itens), `docs/piloto/calibracao-projudi.md` (primeiro processo real), `docs/guias/guia-assessor.md` e `docs/guias/guia-desembargador.md`, `docs/etapas/CONFORMIDADE-GERAL.md` (estado e decisões).
 
 ---
 
@@ -16,7 +16,7 @@ Documentos que o roteiro usa: `docs/operacao.md` (manual do operador), `docs/con
 | 0.2 | Chave da API da Anthropic e termos | Você | Criar a chave na conta da Anthropic; ler os termos vigentes da API quanto a treinamento, retenção e local de processamento e guardar cópia datada em `docs/conformidade/`; rodar no seu computador o smoke real: `pytest -m llm --no-cov --noconftest tests/agente/test_smoke_llm.py` com `ANTHROPIC_API_KEY` só no ambiente | Dois testes `llm` verdes e cópia dos termos guardada |
 | 0.3 | Object storage | Você | Ler `docs/decisoes/object-storage.md` e assinar a tabela final (manter `pgsty/minio` por digest é a recomendação) | Linha de assinatura preenchida |
 | 0.4 | Objetos órfãos | Você | Apagar os 344 objetos sintéticos em claro do bucket de desenvolvimento (`docker compose exec minio mc rm --recursive --force local/lupa-autos/<prefixos>` com a lista que `scripts/recifrar_objetos_legado.py` imprime), ou recriar o bucket do zero antes do piloto | `scripts/recifrar_objetos_legado.py` reporta 0 em claro |
-| 0.5 | Dados jurídicos | Gabinete confirma; agente aplica | Entregar ao gabinete a lista de `docs/validacoes.md` ("a confirmar"): calendários de feriados e recesso do TJGO, prazos dos recursos, tabela do art. 109, `tipos_penais.yaml`, regras de borda (intervalo igual ao prazo, 70 anos, 90 dias exatos, duas intimações quando a defesa recorre, intimação na sexta). Cada confirmação vira edição de YAML com `versao` nova | YAMLs atualizados e suíte verde |
+| 0.5 | Dados jurídicos | Gabinete confirma; agente aplica | Entregar ao gabinete a lista de `docs/sistema/validacoes.md` ("a confirmar"): calendários de feriados e recesso do TJGO, prazos dos recursos, tabela do art. 109, `tipos_penais.yaml`, regras de borda (intervalo igual ao prazo, 70 anos, 90 dias exatos, duas intimações quando a defesa recorre, intimação na sexta). Cada confirmação vira edição de YAML com `versao` nova | YAMLs atualizados e suíte verde |
 | 0.6 | Advogado | Você contrata; advogado revisa | Entregar as seis minutas de `docs/conformidade/` com a lista de itens abertos da revisão 8.2, §5 | Minutas aprovadas e versão 1.0 |
 | 0.7 | Geolocalização por IP | Você (opcional) | Conta gratuita na MaxMind, baixar GeoLite2-City, apontar `LUPA_GEOIP_CAMINHO` | `/auditoria` mostra cidade em vez de "desconhecida" |
 
@@ -28,7 +28,7 @@ Ordem sugerida: 0.2 e 0.3 no primeiro dia (destravam o resto); 0.1 e 0.5 em para
 
 Pré-requisitos: máquina própria com Docker, disco separado para dados, domínio apontando para ela (ou certificado fornecido), duas pessoas de confiança além de você para as partes do Vault.
 
-1. **Instalar.** `docs/operacao.md` seção 2 ou `scripts/instalar_piloto.sh` (produção). Use `docker-compose.prod.yml`. Preencha o `.env` sem reaproveitar nada do desenvolvimento.
+1. **Instalar.** `docs/operacao/operacao.md` seção 2 ou `scripts/instalar_piloto.sh` (produção). Use `docker-compose.prod.yml`. Preencha o `.env` sem reaproveitar nada do desenvolvimento.
 2. **Vault com três partes.** `LUPA_AMBIENTE=producao` no `vault_inicializar.sh`: cada parte aparece uma vez; entregue uma a cada pessoa, fora de qualquer arquivo. Guarde o procedimento de unseal (seção 4) impresso.
 3. **Certificado.** `LUPA_TLS_MODO=acme` com domínio e e-mail, ou `fornecido` com os arquivos. Confirme HSTS no navegador.
 4. **Backup.** Confirme o `backup-agendado` no perfil de produção, defina `LUPA_BACKUP_DIR` e `LUPA_BACKUP_CHAVES_DIR` em discos diferentes, e faça uma restauração de teste no próprio servidor (seção 6).
@@ -50,7 +50,7 @@ Pré-requisitos: máquina própria com Docker, disco separado para dados, domín
 ## Fase 3 — 8.4 Primeiro processo real (1 a 2 dias)
 
 - Confirmar que o processo é público e não tem peça sigilosa.
-- Seguir `docs/calibracao-projudi.md`: `scripts/calibrar.py` sobre o arquivo exportado gera o relatório de diagnóstico, páginas, peças, eventos e achados.
+- Seguir `docs/piloto/calibracao-projudi.md`: `scripts/calibrar.py` sobre o arquivo exportado gera o relatório de diagnóstico, páginas, peças, eventos e achados.
 - Um assessor confere item a item e preenche a tabela de medidas da seção 4 do roteiro de calibração (diagnóstico, fronteiras, tipo, origem, data, eventos, achados).
 - **Agente:** com o relatório conferido, ajustar regras de fronteira, títulos, padrões de evento e calendários conforme a seção 5 do roteiro (subir `versao` dos YAML), e rodar a suíte. Eu reviso.
 - Critério: precisão de datas ≥ 99% no processo real, nenhuma data inventada, diagnóstico correto.
@@ -78,14 +78,14 @@ Pré-requisitos: máquina própria com Docker, disco separado para dados, domín
 ## Fase 6 — 8.8 Revisão de segurança (paralela à Fase 5)
 
 - Contratar teste de intrusão externo ou revisão independente com escopo explícito: autenticação e MFA, isolamento por gabinete (RLS e rotas), injeção via autos (corpus `.sinteticos/injecao/` disponível), exfiltração pelo agente, exposição do proxy, Vault e backups.
-- Entregar ao revisor `docs/criptografia.md`, `docs/agente.md`, `docs/auditoria.md`, `docs/operacao.md` e o `docker-compose.prod.yml`.
+- Entregar ao revisor `docs/sistema/criptografia.md`, `docs/sistema/agente.md`, `docs/sistema/auditoria.md`, `docs/operacao/operacao.md` e o `docker-compose.prod.yml`.
 - **Agente:** corrigir os achados críticos e altos; eu reviso. Critério: relatório recebido e críticos corrigidos antes de ampliar o uso.
 
 ---
 
 ## Fase 7 — 8.9 e 8.10 Relatório e decisão (1 semana)
 
-- **Agente:** consolidar `docs/relatorio-piloto.md` a partir das planilhas da Fase 5, das métricas da Fase 4, do relatório de uso, do custo por processo e do feedback dos assessores. Eu reviso.
+- **Agente:** consolidar `docs/piloto/relatorio-piloto.md` a partir das planilhas da Fase 5, das métricas da Fase 4, do relatório de uso, do custo por processo e do feedback dos assessores. Eu reviso.
 - Apresentar ao desembargador.
 - Decidir a continuidade e priorizar o backlog da versão 2, que já tem candidatos registrados nas revisões: catálogo cível, prescrição pela pena aplicada e pena aplicada como fato, validações semânticas, anonimização para processos sigilosos, múltiplos réus e concurso de crimes, destaque por caractere no visualizador, retomada de upload, desfazer correção, filtros de auditoria por nome, auto-unseal com KMS, canal de alertas, mais gabinetes.
 

@@ -1,4 +1,4 @@
-"""Gera autos sintéticos com gabarito (Etapa 4B). Veja ``docs/sinteticos.md``."""
+"""Gera autos sintéticos com gabarito (Etapa 4B). Veja ``docs/sistema/sinteticos.md``."""
 
 from lupa.sinteticos.cli import main_gerar
 

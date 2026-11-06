@@ -2,7 +2,7 @@
 
 > **MINUTA para revisão de advogado; não é parecer jurídico.** Versão 0.1 · 21 de outubro de 2026 · subetapa 8.2.
 
-Complementa a seção 10 de `docs/operacao.md` (passos técnicos) com papéis, prazos e comunicação.
+Complementa a seção 10 de `docs/operacao/operacao.md` (passos técnicos) com papéis, prazos e comunicação.
 
 ## 1. Fundamentos confirmados
 
@@ -65,7 +65,7 @@ Guardar por no mínimo 5 anos.
 
 ## Anexo A. Ensaio: credencial de assessor comprometida (Etapa 7.10, 21/10/2026, desenvolvimento, dados sintéticos)
 
-Rotação da chave do gabinete (v1→v2, 1 DEK reenvelopada) → reset de senha → reset de MFA. Execução das rotas em 0,23 s; as duas sessões do assessor passaram a 401; senha antiga recusada; dossiê seguiu abrindo. Classificação: nível 3 simulado. Detalhes: `docs/etapas/RELATORIO-ETAPA-7.10.md` e `docs/operacao.md`, seção 13.
+Rotação da chave do gabinete (v1→v2, 1 DEK reenvelopada) → reset de senha → reset de MFA. Execução das rotas em 0,23 s; as duas sessões do assessor passaram a 401; senha antiga recusada; dossiê seguiu abrindo. Classificação: nível 3 simulado. Detalhes: `docs/etapas/RELATORIO-ETAPA-7.10.md` e `docs/operacao/operacao.md`, seção 13.
 
 ## Anexo B. Ensaio: injeção com processo em revisão (Etapa 7.10, 21/10/2026, desenvolvimento, dados sintéticos)
 

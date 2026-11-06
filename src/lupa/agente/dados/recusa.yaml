@@ -1,6 +1,6 @@
 # Politica de recusa do chat (Etapa 5.7). Classificador por regras aplicado ANTES de chamar o
 # modelo, sobre a pergunta em minusculas e sem acentos (escreva os padroes assim). Vedado pela
-# Res. CNJ 615/2025 (Anexo, AR2 a AR4) e pelo contrato do agente (docs/agente.md): valorar prova,
+# Res. CNJ 615/2025 (Anexo, AR2 a AR4) e pelo contrato do agente (docs/sistema/agente.md): valorar prova,
 # tipificar, concluir sobre norma ou precedente, opinar sobre o resultado, redigir ato e calcular
 # prazo sem a ferramenta. Mudou um padrao: suba a versao e rode tests/agente/test_recusa.py
 # (recall 100% nas vedadas, falso positivo <= 10% nas permitidas).

@@ -147,7 +147,7 @@ ao Transit. Idempotente (valor já `lupa1:` ou `vault:` é pulado) e reversível
 decifra). Precisa do cofre configurado quando há dados. Objetos já gravados em claro no storage
 continuam legíveis; para cifrá-los, rode `scripts/recifrar_objetos_legado.py` (7.10, simula sem
 `--executar`, idempotente), reenvie o arquivo ou descarte o processo. Operação do Vault em
-produção: `docs/operacao.md`, seção 4.
+produção: `docs/operacao/operacao.md`, seção 4.
 
 ## Desempenho
 

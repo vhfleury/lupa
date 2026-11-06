@@ -2,9 +2,9 @@
 
 O que ainda falta decidir ou fazer, num lugar só. Junta as pendências do `docs/etapas/CONFORMIDADE-GERAL.md` e das revisões finais (7.10, 8.1 e 8.2), que foram removidas do repositório e continuam no histórico do Git (commit `54219a2`, pasta `docs/etapas/`).
 
-Estado registrado em 22/10/2026. Confira antes de agir: algumas podem já ter sido resolvidas no piloto. A ordem de execução está em [roteiro-piloto.md](roteiro-piloto.md), e os itens formais de segurança em [conformidade/checklist-piloto.md](conformidade/checklist-piloto.md).
+Estado registrado em 22/10/2026. Confira antes de agir: algumas podem já ter sido resolvidas no piloto. A ordem de execução está em [roteiro-piloto.md](roteiro-piloto.md), e os itens formais de segurança em [conformidade/checklist-piloto.md](../conformidade/checklist-piloto.md).
 
-Decisões já tomadas estão em [decisoes/registro.md](decisoes/registro.md). Limitações e itens fora do escopo de cada etapa, a maioria já resolvida, estão em [etapas/FICOU-DE-FORA.md](etapas/FICOU-DE-FORA.md).
+Decisões já tomadas estão em [decisoes/registro.md](../decisoes/registro.md). Limitações e itens fora do escopo de cada etapa, a maioria já resolvida, estão em [etapas/FICOU-DE-FORA.md](../etapas/FICOU-DE-FORA.md).
 
 ## Antes do primeiro processo real
 
@@ -12,11 +12,11 @@ Decisões já tomadas estão em [decisoes/registro.md](decisoes/registro.md). Li
    - Opção A (recomendada pela revisão 8.2): estender a pseudonimização a vítimas e testemunhas identificadas na denúncia, nos termos de depoimento e nas certidões, com uma tabela de identidades por papel; medir recall nos sintéticos; teste de que nenhum nome cadastrado chega ao modelo.
    - Opção B: aceitar a limitação no piloto, só com processos públicos, e registrar no aviso de tratamento que nomes de outras pessoas podem constar dos trechos enviados ao fornecedor do modelo.
 2. **Chave da API da Anthropic**, smoke test real do agente (`pytest -m llm`) e leitura dos termos vigentes da API quanto a treinamento, retenção e local de processamento. A aprovação da Etapa 5 ficou condicionada ao smoke test.
-3. **Assinatura da decisão do object storage** ([decisoes/object-storage.md](decisoes/object-storage.md)).
+3. **Assinatura da decisão do object storage** ([decisoes/object-storage.md](../decisoes/object-storage.md)).
 4. **Apagar os 344 objetos sintéticos órfãos** em claro no storage de desenvolvimento. São de processos sintéticos já removidos do banco; o script de descarte não os alcança. Basta um `mc rm` ou um script com lista por prefixo.
 5. **Ambiente de produção**: Vault com três pessoas segurando as partes de unseal (sem auto-unseal, pois não há KMS), TLS no Vault, backup frio do volume do Vault, certificado real no proxy, porta direta da API não publicada, perfil de produção num servidor de verdade, `instalar_piloto.sh` ponta a ponta.
 6. **Revisão das minutas por advogado** (`docs/conformidade/`) e aceite dos termos pelos usuários.
-7. **Confirmação dos dados jurídicos pelo gabinete**: calendários (`feriados`, `suspensoes`), `prazos_recursos`, `prescricao_art109`, `tipos_penais`, `eventos.yaml` e as regras de borda listadas em `docs/validacoes.md`.
+7. **Confirmação dos dados jurídicos pelo gabinete**: calendários (`feriados`, `suspensoes`), `prazos_recursos`, `prescricao_art109`, `tipos_penais`, `eventos.yaml` e as regras de borda listadas em `docs/sistema/validacoes.md`.
 8. **Valores reais das variáveis de produção**: `LUPA_DB_*`, `LUPA_ADMIN_*`, chaves do object storage.
 
 ## Itens para o advogado

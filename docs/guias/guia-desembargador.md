@@ -6,7 +6,7 @@ telas usam dados **fictícios** de teste.
 
 ## 1. Gestão de assessores
 
-![Tela de usuários](imagens/usuarios.png)
+![Tela de usuários](../imagens/usuarios.png)
 
 Menu **Usuários**. A tabela mostra cada pessoa do gabinete com **Papel**, **Situação** (ativo ou
 desativado) e **Autenticador** (cadastrado ou pendente).
@@ -53,7 +53,7 @@ Dossiê e validações continuam funcionando.
 
 ## 4. Auditoria do gabinete
 
-![Auditoria](imagens/auditoria.png)
+![Auditoria](../imagens/auditoria.png)
 
 Menu **Auditoria**. O senhor vê só o próprio gabinete.
 
@@ -72,7 +72,7 @@ Menu **Auditoria**. O senhor vê só o próprio gabinete.
 
 ## 5. Relatório de uso
 
-![Relatório de uso](imagens/relatorio-uso.png)
+![Relatório de uso](../imagens/relatorio-uso.png)
 
 Na mesma tela, seção **Relatório de uso**: escolha **Por** (processo ou usuário), cole o
 **Identificador** (ou clique num id na tabela) e gere. Mostra quantas vezes cada ação ocorreu,

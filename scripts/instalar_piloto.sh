@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instalacao do Lupa do zero (Etapa 8.1): torna executavel a secao 2 do docs/operacao.md.
+# Instalacao do Lupa do zero (Etapa 8.1): torna executavel a secao 2 do docs/operacao/operacao.md.
 # Idempotente: cada passo confere se ja foi feito; passos que sobrescrevem algo pedem confirmacao.
 #
 #   bash scripts/instalar_piloto.sh            producao (perfil docker-compose.prod.yml)
@@ -162,4 +162,4 @@ passo "10. conferencia"
 "$PY" scripts/conferir_piloto.py || true
 echo
 echo "Proximos passos manuais: primeiro acesso do administrador (TOTP), gabinete, desembargador"
-echo "(docs/operacao.md, secao 2.2, passos 6 a 8). Monitoramento: docker compose --profile monitoramento up -d"
+echo "(docs/operacao/operacao.md, secao 2.2, passos 6 a 8). Monitoramento: docker compose --profile monitoramento up -d"

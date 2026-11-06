@@ -24,7 +24,7 @@
 | `src/lupa/dominio/` (acréscimos) | `SessaoTabela`, `DesafioMfaTabela`, `FalhaLoginTabela`, `BloqueioLoginTabela`; `usuario.mfa_ultimo_passo`; `evento_auditoria.sequencia` e índices; `EventoAuditoria.sequencia`; `definir_papel` |
 | `src/lupa/config.py` (acréscimos) | `db_usuario_app`, `db_senha_app`, `geoip_caminho`, `url_banco_aplicacao()` |
 | `scripts/criar_admin.py`, `scripts/criar_usuario_banco.py` | scripts finos que chamam `lupa.acesso.instalacao` |
-| `docs/auditoria.md`, seção no `README.md`, `.env.example` | documentação |
+| `docs/sistema/auditoria.md`, seção no `README.md`, `.env.example` | documentação |
 | `tests/acesso/`, `tests/auditoria/`, `tests/api/test_processos.py`, `tests/api/test_banco.py`, `tests/conftest.py` (acréscimos) | 77 testes novos + 1 de carga |
 
 Migração 0002: tabelas `sessao`, `desafio_mfa`, `falha_login`, `bloqueio_login`; coluna
@@ -167,7 +167,7 @@ banco do compose (`alembic current` → `0002 (head)`).
 - Na execução final de `verificar.sh` os testes de validação passam (ver seção 7). Mesmo assim,
   peço que a Etapa 2 confira se alguma alteração dela entre 19:57 e 19:59 se perdeu.
 
-Não toquei em `docs/validacoes.md` nem em `docs/exemplos/**`.
+Não toquei em `docs/sistema/validacoes.md` nem em `docs/exemplos/**`.
 
 ## 5. O que ficou de fora e por quê
 
@@ -243,5 +243,5 @@ Cobertura dos pacotes da etapa:
 | Nenhum evento contém chave de `CAMPOS_PROIBIDOS` | ok | `test_nenhum_evento_contem_campo_proibido_nem_segredo` (importa `CAMPOS_PROIBIDOS` de `lupa.logging`, varre todos os eventos e também os valores) |
 | Carga: 1 milhão de eventos, consulta por usuário e intervalo < 200 ms | ok | `test_um_milhao_de_eventos_consulta_por_usuario_e_intervalo_abaixo_de_200ms`: mediana 3,0 ms |
 | Admin em rota de conteúdo gera `admin_acesso_conteudo` além do evento normal | ok | `test_acesso_de_admin_a_rota_de_conteudo_gera_admin_acesso_conteudo` |
-| `docs/auditoria.md` em linguagem simples | ok | `docs/auditoria.md` |
+| `docs/sistema/auditoria.md` em linguagem simples | ok | `docs/sistema/auditoria.md` |
 | Cobertura ≥ 90% e `verificar.sh` passa | ok | seção 7 |

@@ -468,4 +468,4 @@ revisão 4C).
   achados, com `--volume` para reaproveitar as páginas da 4E pelo cache e `--repetir` para medir o
   segundo upload.
 - `scripts/calibrar.py <arquivo>`: relatório Markdown para conferência manual; roteiro em
-  `docs/calibracao-projudi.md`.
+  `docs/piloto/calibracao-projudi.md`.

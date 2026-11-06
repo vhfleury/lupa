@@ -90,8 +90,8 @@ fatiar.
   acima de 2% da página nativa (`lupa/ingestao/imagem_nativa.py`, extrator `4f.0`). Custo medido
   antes de implementar: 21 a 27 s por mil páginas nativas (semente_04 e semente_06); depois, o
   nativo completo ficou em 35,8 s por mil. A injeção do corpus é detectada
-  (`dirigido_a_sistema`, `alterar_resultado`). Registrado em `docs/ingestao.md`.
-- Dimensionamento (revisão 4C §5.1): registrado acima e em `docs/ingestao.md`.
+  (`dirigido_a_sistema`, `alterar_resultado`). Registrado em `docs/sistema/ingestao.md`.
+- Dimensionamento (revisão 4C §5.1): registrado acima e em `docs/sistema/ingestao.md`.
 
 ## O que ficou de fora
 

@@ -4,7 +4,7 @@
 
 Finalidade: permitir ao magistrado prestar ao tribunal as informações sobre o uso de solução de mercado de IA (Res. CNJ 615/2025, art. 19, § 7º, "na forma do regulamento"). O regulamento do tribunal pode exigir outro formulário; nesse caso, use este modelo como fonte dos dados (a confirmar pelo advogado se o TJGO já editou regulamento).
 
-Fonte dos números: Auditoria → Relatório de uso no sistema, ou `GET /api/auditoria/relatorio-uso?usuario=<id>` / `?processo=<id>`; eventos em `GET /api/auditoria/exportar?formato=csv`. Ver `docs/operacao.md`, seção 11. Nada disso contém conteúdo dos autos.
+Fonte dos números: Auditoria → Relatório de uso no sistema, ou `GET /api/auditoria/relatorio-uso?usuario=<id>` / `?processo=<id>`; eventos em `GET /api/auditoria/exportar?formato=csv`. Ver `docs/operacao/operacao.md`, seção 11. Nada disso contém conteúdo dos autos.
 
 ---
 

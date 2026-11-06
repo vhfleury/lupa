@@ -1,4 +1,6 @@
-"""Confere o checklist de segurança do docs/operacao.md (seção 12) no ambiente em execução.
+"""Confere no ambiente em execução o checklist de segurança do manual de operação.
+
+Checklist: docs/operacao/operacao.md, seção 12.
 
 Etapa 8.1. Roda no HOST, na raiz do projeto, com o compose no ar:
 

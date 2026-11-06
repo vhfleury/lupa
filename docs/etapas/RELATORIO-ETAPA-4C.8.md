@@ -9,7 +9,7 @@
 ## Decisões não previstas
 
 - Round-robin em vez de fila com prioridade: não exige mudar o RQ nem saber o tamanho do job ao enfileirar, e o estado do job continua só no banco.
-- O semáforo por gabinete vale por processo worker; com várias réplicas o teto passa a ser por réplica (registrado em `docs/ingestao.md`). Um semáforo no Redis fica para quando houver mais de um worker.
+- O semáforo por gabinete vale por processo worker; com várias réplicas o teto passa a ser por réplica (registrado em `docs/sistema/ingestao.md`). Um semáforo no Redis fica para quando houver mais de um worker.
 - O varredor também recupera jobs `validado`/`em_extracao` com lease vencido, e os que cederam a vez e ficaram 10 min sem heartbeat (mensagem perdida).
 
 ## Comandos e saída

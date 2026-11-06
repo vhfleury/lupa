@@ -38,7 +38,7 @@ Python 3.12, pytest 8 com `pytest-asyncio` em modo automático, `ruff` e `mypy -
 - Tempo é injetado, não esperado: use `relogio_fixo` e datas fixas em vez de `sleep` ou do relógio real.
 - Dependências externas entram por dublês que já existem (cofre em memória, `ResolvedorFalso`, cliente roteirizado do agente). O modelo real só é chamado em testes marcados `llm`, que não fazem parte do ciclo.
 - Marcadores: `integracao` (exige PostgreSQL e MinIO), `injecao`, `agente`, `carga`, `llm`. A configuração padrão exclui `carga` e `llm`.
-- As regras jurídicas estão descritas em `docs/catalogo-validacoes.md` e `docs/validacoes.md`. São a fonte para saber o resultado esperado de uma validação.
+- As regras jurídicas estão descritas em `docs/especificacao/catalogo-validacoes.md` e `docs/sistema/validacoes.md`. São a fonte para saber o resultado esperado de uma validação.
 
 ## Convenções do front (`front/`)
 

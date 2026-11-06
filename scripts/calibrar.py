@@ -1,4 +1,6 @@
-"""Calibração da pipeline sobre um arquivo (Etapa 4F.10); roteiro em ``docs/calibracao-projudi.md``.
+"""Calibração da pipeline sobre um arquivo (Etapa 4F.10).
+
+Roteiro em ``docs/piloto/calibracao-projudi.md``.
 
 Roda dentro do contêiner ``api``: cria um gabinete de calibração no banco configurado, lacra o
 arquivo no storage configurado, processa com o código do worker até os achados e escreve o
