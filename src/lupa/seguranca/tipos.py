@@ -2,7 +2,7 @@
 
 Na gravação o valor é cifrado com a DEK do processo ativo do contexto (`dek_para_gravar`); na
 leitura o processo vem do cabeçalho do campo. O rótulo (`tabela.coluna`) entra no AAD. Valor
-legado ainda em claro (antes da migração 0010) é devolvido como está.
+em claro na leitura é recusado com `CifraInvalidaError`.
 """
 
 import json
@@ -87,8 +87,8 @@ class TextoCifrado(TypeDecorator[str]):
         Returns:
             Texto em claro.
         """
-        if value is None or not campo_cifrado(value):
-            return value
+        if value is None:
+            return None
         return decifrar_valor(self.rotulo, value)
 
 
@@ -135,6 +135,4 @@ class JsonCifrado(TypeDecorator[Any]):
         """
         if value is None:
             return None
-        if campo_cifrado(value):
-            return json.loads(decifrar_valor(self.rotulo, value))
-        return json.loads(value) if isinstance(value, str) else value
+        return json.loads(decifrar_valor(self.rotulo, value))

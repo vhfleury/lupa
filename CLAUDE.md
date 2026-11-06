@@ -13,7 +13,7 @@ Regras que valem para todo código do repositório. Vieram do plano de execuçã
 
 - `pytest` com cobertura mínima de 90% em `lupa`, medida por `pytest-cov`.
 - Testes nomeados pelo comportamento: `test_apelacao_interposta_no_sexto_dia_e_intempestiva`.
-- `scripts/verificar.sh` (ou `scripts/verificar.ps1`) roda lint, formatação, tipagem e testes, parando no primeiro erro.
+- `scripts/verificar.sh` roda lint, formatação, tipagem e testes, parando no primeiro erro.
 
 ## Contêineres
 

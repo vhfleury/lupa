@@ -4,7 +4,7 @@ O diretório ainda não é repositório git. Antes do primeiro commit:
 
 1. Confira que `.gitattributes` e `.gitignore` estão na raiz. O `.gitattributes` fixa LF em
    scripts, Python, YAML, HCL, Markdown, TypeScript, Svelte e JSON (o `sh` dos contêineres quebra
-   com `\r`); os `.ps1` também ficam em LF (o PowerShell 5.1 aceita).
+   com `\r`).
 2. `git init` e `git add --renormalize .` (aplica o fim de linha a tudo que já existe).
 3. Rode `git status --ignored` e confira que estão como **ignorados** e nunca entram:
    - `.env` (senhas, `LUPA_VAULT_SECRET_ID`); só `.env.example`, com valores fictícios, entra;

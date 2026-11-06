@@ -32,3 +32,19 @@ echo "== cabecalhos de seguranca =="
 echo "== suite de injecao do agente (Etapa 5.8, sem skip) =="
 LUPA_EXIGIR_INTEGRACAO=1 LUPA_METRICAS_AGENTE="${LUPA_METRICAS_AGENTE:-/tmp/metricas_agente.json}" "$PY" -m pytest -m agente tests/agente --no-cov -q
 "$PY" -c "import json,sys; m=json.load(open(sys.argv[1])); print({k: m[k] for k in ('versao_modelo','versao_prompt','cenarios','achados_suprimidos','achados_criados','vazamentos','embutidas_executadas','respostas_bloqueadas')})" "${LUPA_METRICAS_AGENTE:-/tmp/metricas_agente.json}"
+# Etapa 6.10: suite E2E (Playwright), opcional e so no host (precisa de docker). Ative com
+# LUPA_VERIFICAR_E2E=1; o e2e.sh sobe a stack com o cliente falso e, ao terminar, recria a API sem ele.
+if [ "${LUPA_VERIFICAR_E2E:-0}" = "1" ]; then
+  echo "== e2e =="
+  bash front/scripts/e2e.sh
+else
+  echo "== e2e == (pulado; defina LUPA_VERIFICAR_E2E=1 para rodar a suite Playwright)"
+fi
+# Etapa 7.8: backup cifrado, restauracao em ambiente limpo e expurgo, opcional e so no host (precisa
+# de docker). Usa banco e bucket de TESTE criados pelo proprio teste. Ative com LUPA_VERIFICAR_BACKUP=1.
+if [ "${LUPA_VERIFICAR_BACKUP:-0}" = "1" ]; then
+  echo "== backup cifrado e restauracao =="
+  "$PY" -m pytest -m backup tests/backup --no-cov -q --confcutdir=tests/backup
+else
+  echo "== backup == (pulado; defina LUPA_VERIFICAR_BACKUP=1 para testar backup e restauracao)"
+fi

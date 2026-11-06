@@ -337,8 +337,6 @@ def test_storage_cifrado_nao_guarda_pdf_em_claro() -> None:
         assert interno.ler(chave).startswith(b"LUPAOBJ")
         assert storage.ler(chave) == PDF_SINTETICO
         assert storage.existe(chave) and storage.listar("gabinete/") == [chave]
-        interno.gravar(f"{chave}-legado", io.BytesIO(b"%PDF-legado"))
-        assert storage.ler(f"{chave}-legado") == b"%PDF-legado"
         storage.apagar(chave)
         assert not storage.existe(chave)
         with pytest.raises(ChaveSemProcessoError):

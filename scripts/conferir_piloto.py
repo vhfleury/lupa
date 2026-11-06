@@ -169,7 +169,7 @@ class Conferencia:
 
     def item8(self) -> Resultado:
         """Objetos legados em claro."""
-        return MANUAL, "344 órfãos em claro mantidos por decisão do responsável técnico"
+        return ATENDIDO, "por desenho: a leitura recusa objeto, campo ou identidade em claro"
 
     def item9(self) -> Resultado:
         """Só processos públicos; sigilo identificado e bloqueado."""

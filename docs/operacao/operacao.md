@@ -18,7 +18,7 @@ para o tribunal · 12. Checklist de segurança (seção 6 dos requisitos) · 13.
 ## 1. Pré-requisitos e dimensionamento
 
 **Software:** Docker Engine com Compose v2 (no Windows, Docker Desktop com WSL 2), `bash` (no
-Windows, Git Bash) ou PowerShell 5.1, Python 3 no host só para os scripts do Vault e do backup. Nada
+Windows, Git Bash), Python 3 no host só para os scripts do Vault e do backup. Nada
 mais é instalado na máquina: tudo roda nos contêineres.
 
 **Serviços:** `proxy` (Caddy, HTTPS), `front` (SPA), `api` (FastAPI), `worker` (ingestão, sem saída
@@ -112,8 +112,7 @@ fictícios. Variáveis (as marcadas **segredo** dão acesso a dados; guarde-as n
 ### 2.2 Ordem dos comandos
 
 **Atalho (Etapa 8.1):** `bash scripts/instalar_piloto.sh` encadeia os passos abaixo em produção
-(`--dev` para desenvolvimento; no Windows, `powershell -File scripts/instalar_piloto.ps1`, só
-desenvolvimento). Ele cria o `.env` a partir do exemplo, pergunta domínio, modo do certificado,
+(`--dev` para desenvolvimento). Ele cria o `.env` a partir do exemplo, pergunta domínio, modo do certificado,
 pastas de dados e de backup, gera os segredos aleatórios sem mostrá-los, cria as pastas com o dono
 de cada imagem, sobe o Vault e o inicializa, sobe o resto, migra, cria o usuário restrito e o
 administrador e no fim roda `scripts/conferir_piloto.py`. É idempotente (rodar de novo só completa
@@ -130,7 +129,7 @@ docker compose build
 docker compose up -d vault
 
 # 2. inicializar o Vault (produção: 3 partes, limiar 2, seção 4.1; desenvolvimento: 1 parte)
-bash scripts/vault_inicializar.sh          # Windows (dev): powershell -File scripts/vault_inicializar.ps1
+bash scripts/vault_inicializar.sh
 
 # 3. subir o resto
 docker compose up -d --wait
@@ -202,8 +201,7 @@ funcionando).
 
 ### 4.1 Inicialização em produção
 
-Com `LUPA_AMBIENTE=producao` no `.env`, o mesmo `scripts/vault_inicializar.sh` (só a versão bash;
-o `.ps1` é só desenvolvimento) entra em modo produção:
+Com `LUPA_AMBIENTE=producao` no `.env`, o mesmo `scripts/vault_inicializar.sh` entra em modo produção:
 
 ```bash
 docker compose up -d vault
@@ -434,10 +432,9 @@ Detalhes em [backup.md](backup.md). Resumo operacional:
   backup da seção 6.
 - **Rotação da chave do gabinete:** seção 4.3. Rotação não substitui descarte: quem já tinha a DEK
   aberta em memória ou um backup antigo continua tendo o que tinha.
-- **Objetos legados em claro** (gravados antes da 7.4): `docker compose exec api python
-  scripts/recifrar_objetos_legado.py` simula; com `--executar` recifra com a DEK do processo e
-  confere cada objeto. Idempotente. Objetos em claro de processos que não existem mais no banco
-  aparecem como `sem DEK` e não são tocados: são órfãos, apague-os depois de conferir.
+- **Dado em claro:** a leitura recusa objeto sem cabeçalho `LUPAOBJ`, campo sem prefixo `lupa1:`
+  e identidade sem token do cofre (`CifraInvalidaError` ou `TokenInvalidoError`). Não há legado a
+  converter; dado em claro no bucket ou no banco é incidente (seção 10).
 
 ---
 
@@ -488,7 +485,7 @@ piloto, rode e confira que não sobrou gabinete de teste (`GET /api/gabinetes`).
 - **Disco:** `df -h` e `docker system df`; alarme abaixo de 15 GB.
 - **Logs:** JSON por linha (`docker compose logs api worker`), campos `event`, `level`,
   `timestamp`, ids (`job_id`, `processo_id`, lote, estado, motivo). No perfil prod, rotação de
-  10 MB × 5 arquivos por contêiner. Avisos úteis: `objeto_legado_em_claro`, `CofreError` (Vault
+  10 MB × 5 arquivos por contêiner. Avisos úteis: `CifraInvalidaError`, `CofreError` (Vault
   selado ou fora), falhas de job.
 - **Nunca aparece em log** (e se aparecer é incidente): texto dos autos, nome ou CPF de réu,
   texto de pergunta ou resposta do chat, senha, token, segredo TOTP, `secret_id`, DEK, chave de
@@ -515,8 +512,7 @@ que a comunicação legal seja feita no prazo que a norma vigente exigir.
 ### 10.1 Vazamento suspeito (disco, dump, bucket, backup ou log)
 
 1. Identifique o que saiu: banco (colunas de autos cifradas com DEK; identidades cifradas no
-   Vault; auditoria e metadados em claro), bucket (objetos `LUPAOBJ`; confira se havia legado em
-   claro com `recifrar_objetos_legado.py`), backup (cifrado com `age`), log (não deve ter conteúdo).
+   Vault; auditoria e metadados em claro), bucket (objetos `LUPAOBJ`), backup (cifrado com `age`), log (não deve ter conteúdo).
 2. Se só saiu dado cifrado e o Vault e o `.env` estão íntegros: o conteúdo não é legível. Ainda
    assim troque as credenciais que estavam na mesma máquina (10.3) e rotacione as chaves dos
    gabinetes afetados.
@@ -626,7 +622,7 @@ portas de dev em `127.0.0.1`). Saída em desenvolvimento no relatório da 8.1.
 | 5 | Texto extraído e índices também cifrados | atendido | texto das páginas, trechos, evidências, mensagens, cache do visualizador; hashes SHA-256 em claro |
 | 6 | Arquivo cifrado antes de qualquer parser; worker decifra cópia só para processar | atendido | 7.4 |
 | 7 | Exclusão pela destruição da chave | atendido, com limite | 7.7; backups anteriores guardam o envelope por até 30 dias (seção 6) |
-| 8 | Objetos legados em claro | manual | 344 órfãos em claro de processos já removidos do banco, mantidos por decisão do responsável técnico |
+| 8 | Objetos legados em claro | atendido | a leitura recusa objeto, campo ou identidade em claro; o bucket de dev é recriado antes do piloto (roteiro, passo 0.4) |
 | 9 | Só processos públicos; sigilo identificado e bloqueado | atendido | sigiloso recebe 403 na ingestão |
 | 10 | Pseudonimização; tabela de resolução separada e cifrada | atendido | `reu_identidade` cifrada no Transit |
 | 11 | Contrato do fornecedor do modelo veda treino (art. 19, §3º, III) | manual | conferir termos da API antes do piloto (decisão de Victor) |

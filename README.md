@@ -14,7 +14,7 @@ curl -k https://localhost:8443/api/saude   # {"api":"ok","db":"ok","minio":"ok",
 ```
 
 Instalação guiada (gera o `.env`, sobe, Vault, migra, usuário restrito, admin):
-`bash scripts/instalar_piloto.sh` (produção) ou `--dev`; Windows: `scripts/instalar_piloto.ps1`.
+`bash scripts/instalar_piloto.sh` (produção) ou `--dev` (no Windows, pelo Git Bash).
 
 Serviços: `api` (FastAPI, porta `API_PORTA_HOST`, padrão 8000), `db` (PostgreSQL 16, só na rede
 interna), `minio` (console em `MINIO_CONSOLE_PORTA_HOST`, padrão 9001; API S3 só na rede interna) e
@@ -31,11 +31,18 @@ docker compose exec api bash scripts/verificar.sh   # ou: make verificar
 ```
 
 O script roda `ruff check`, `ruff format --check`, `mypy --strict` e `pytest` (cobertura mínima de
-90% em `lupa`), parando no primeiro erro. Há equivalente para PowerShell em `scripts/verificar.ps1`.
+90% em `lupa`), parando no primeiro erro.
 Fora do compose, o teste marcado `integracao` é pulado se PostgreSQL ou MinIO estiverem inacessíveis.
 
-Dependências fixadas com hashes em `requirements.txt` (produção) e `requirements-dev.txt`
-(desenvolvimento), geradas por `pip-compile --generate-hashes` a partir dos arquivos `.in`.
+Dependências declaradas só no `pyproject.toml` (`dependencies` e o extra `dev`). Os arquivos
+`requirements.txt` (produção) e `requirements-dev.txt` (produção + desenvolvimento), com hashes,
+são gerados a partir dele pelo `uv`, mirando Linux (roda no Windows sem contêiner). Para mudar
+uma versão, edite o `pyproject.toml` e rode `make lock`, ou, sem `make`:
+
+```
+uv pip compile pyproject.toml --generate-hashes --python-version 3.12 --python-platform x86_64-manylinux_2_28 --custom-compile-command "make lock" -o requirements.txt
+uv pip compile pyproject.toml --generate-hashes --python-version 3.12 --python-platform x86_64-manylinux_2_28 --custom-compile-command "make lock" --extra dev -c requirements.txt -o requirements-dev.txt
+```
 
 ## Acesso e auditoria (Etapa 3)
 
@@ -109,7 +116,7 @@ Métricas Prometheus em `GET /metricas` (administrador).
 | 7.1–7.7. Criptografia em repouso | `src/lupa/seguranca/`, `vault/` | `docs/sistema/criptografia.md`, `docs/decisoes/object-storage.md` |
 | 7.8. Backup | `scripts/backup*.sh`, `restaurar.*`, `expurgar_backups.*` | `docs/operacao/backup.md` |
 | 7.9. Guias dos usuários | `docs/imagens/` | `docs/guias/guia-assessor.md`, `docs/guias/guia-desembargador.md` |
-| 7.10. Operação | `scripts/recifrar_objetos_legado.py`, `scripts/preparar_repositorio.md` | `docs/operacao/operacao.md` |
+| 7.10. Operação | `scripts/preparar_repositorio.md` | `docs/operacao/operacao.md` |
 | Testes | `tests/` (espelha `src/lupa/`) | — |
 | Relatórios, decisões e pendências | — | `docs/etapas/`, `docs/decisoes/registro.md`, `docs/piloto/pendencias.md` (índice em `docs/README.md`) |
 
@@ -170,11 +177,11 @@ docker compose exec api python -m pytest -m llm --no-cov tests/agente/test_smoke
 
 ## Backup cifrado e guias (Etapas 7.8 e 7.9)
 
-- Backup: `bash scripts/backup.sh` (ou `.ps1`), `restaurar.sh`, `expurgar_backups.sh`; serviço
+- Backup: `bash scripts/backup.sh`, `restaurar.sh`, `expurgar_backups.sh`; serviço
   `backup` do compose (perfil `backup`), saída por bind mount em `LUPA_BACKUP_DIR` (padrão
   `.backups/`), chaves por mês em `LUPA_BACKUP_CHAVES_DIR` (padrão `.backup-chaves/`). Recusa sem
   espaço livre de 2× a estimativa + 2 GB. Detalhes em `docs/operacao/backup.md`; teste com
-  `LUPA_VERIFICAR_BACKUP=1` no `scripts/verificar.ps1`.
+  `LUPA_VERIFICAR_BACKUP=1` no `scripts/verificar.sh`.
 - Guias para usuários: `docs/guias/guia-assessor.md` e `docs/guias/guia-desembargador.md`; capturas em
   `docs/imagens/` geradas por `bash front/scripts/capturas.sh` (processos sintéticos).
 
@@ -188,7 +195,7 @@ decisão de object storage (pendente de assinatura) em
 
 ```bash
 docker compose up -d vault
-bash scripts/vault_inicializar.sh       # Windows: powershell -File scripts/vault_inicializar.ps1
+bash scripts/vault_inicializar.sh
 docker compose up -d --build --wait     # a API e o worker leem o .env com o AppRole
 docker compose exec api alembic -c src/lupa/migrations/alembic.ini upgrade head
 ```
@@ -206,8 +213,6 @@ instalação do zero, atualização, Vault (unseal, rotação, backup, pendênci
 certificado real e portas, backup e restauração, descarte, limpeza de sintéticos, monitoramento,
 resposta a incidente, relatório de uso para o tribunal e checklist de segurança.
 
-- Objetos anteriores à 7.4 ainda em claro no storage:
-  `docker compose exec api python scripts/recifrar_objetos_legado.py [--executar]`.
 - Antes do primeiro commit: `scripts/preparar_repositorio.md` (`.gitattributes` fixa LF).
 
 ## Ambiente de piloto (Etapa 8.1)

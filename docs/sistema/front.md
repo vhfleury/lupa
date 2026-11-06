@@ -69,7 +69,7 @@ Tudo roda em contêiner; não é preciso Node no host.
 ```
 docker build --target verificacao front          # lint + typecheck + testes unitários
 docker compose up -d --build --wait              # a imagem do front só sai se os três passarem
-bash front/scripts/e2e.sh                        # ou: powershell front/scripts/e2e.ps1
+bash front/scripts/e2e.sh
 ```
 
 `front/scripts/e2e.sh` sobe a stack, roda `scripts/e2e_preparar.py` no contêiner da API (garante
@@ -108,7 +108,7 @@ A API do chat devolve `pagina_numero` e `arquivo_id` em cada citação.
 
 **Modelo falso no E2E:** `front/scripts/e2e.sh` exporta `LUPA_AGENTE_CLIENTE=falso` antes de subir
 a stack; a API usa então o roteiro `src/lupa/agente/dados/roteiro_falso.json` (recusado em
-produção). Ao terminar (mesmo em falha ou Ctrl+C, por `trap`; no `.ps1`, por `finally`), o
+produção). Ao terminar (mesmo em falha ou Ctrl+C, por `trap`), o
 script recria o serviço `api` sem a variável (6.10). `scripts/e2e_semear_chat.py --carga` cria desembargador e processo sintéticos e, só na
 primeira vez, 1 milhão de eventos de auditoria em 40 gabinetes "carga" (gerador do
 `tests/auditoria/test_carga.py`).
@@ -134,7 +134,7 @@ o tema salvo antes do primeiro desenho e falha o build se sobrar script, `<style
 atributo `style` fixo) — permitido só pelo hash SHA-256 desse texto exato com `'unsafe-hashes'`
 (a varredura confere o hash; qualquer outro estilo inline continua bloqueado).
 Varredura: `scripts/verificar_cabecalhos.py` (passo `== cabecalhos de seguranca ==` do
-`verificar.sh`/`.ps1`; falha se faltar cabeçalho ou a CSP afrouxar; proxy fora do ar só avisa, a
+`verificar.sh`; falha se faltar cabeçalho ou a CSP afrouxar; proxy fora do ar só avisa, a
 menos que `LUPA_EXIGIR_CABECALHOS=1`) e `front/e2e/testes/seguranca.spec.ts`.
 
 **Conteúdo dos autos só como texto** (`prompt-injection.md`, seção 6): nenhum `{@html}` (regra do
@@ -164,7 +164,7 @@ de cada conta e a guarda pela fixture global (`testes/global-setup.ts` limpa
 último passo usado e o estado de sessão do navegador). `finais` depende de `fluxos`:
 `acessibilidade.spec.ts`, `seguranca.spec.ts` e `auditoria-admin.spec.ts` (admin vê todos os
 gabinetes, custo no relatório por usuário, aviso de sessão expirada). Rodar tudo:
-`bash front/scripts/e2e.sh` (ou `front/scripts/e2e.ps1`). No host, `scripts/verificar.ps1` roda a
+`bash front/scripts/e2e.sh`. No host, `scripts/verificar.sh` roda a
 suíte no passo opcional `== e2e ==` com `LUPA_VERIFICAR_E2E=1`; dentro do contêiner da API o
 passo não existe (sem Docker).
 

@@ -12,7 +12,6 @@
 *.json text eol=lf
 Caddyfile text eol=lf
 Dockerfile text eol=lf
-*.ps1 text eol=lf
 *.pdf binary
 *.png binary
 *.docx binary

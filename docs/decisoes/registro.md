@@ -1,6 +1,6 @@
 # Lupa — Registro de decisões
 
-Todas as decisões tomadas no projeto num lugar só. Este arquivo junta duas fontes:
+Todas as decisões tomadas no projeto num lugar só. As decisões tomadas depois da Etapa 8 ficam em [seção própria](#decisões-posteriores-à-v1), no fim, dizendo o que substituem. Fora isso, este arquivo junta duas fontes:
 
 - as decisões que cada executor tomou sem estarem no roteiro, copiadas dos relatórios de etapa. Só os 19 relatórios citados pelo código e pelos manuais continuam em `docs/etapas/`; os outros 78 estão no histórico do Git (commit `58e9774`);
 - as decisões dos executores que os revisores endossaram, e o resultado de cada revisão. As revisões foram removidas do repositório; o texto original está no histórico do Git (commit `54219a2`, pasta `docs/etapas/`).
@@ -773,6 +773,16 @@ Decisão do object storage: ver [object-storage.md](object-storage.md).
 - HSTS mantido no modo de desenvolvimento porque a varredura de cabeçalhos e o E2E exigem; sem efeito com certificado não confiável.
 - Agendador pelo crond da imagem de backup, para não entregar o socket do Docker a um serviço de agendamento.
 - `/metricas/servico` separado da rota de admin, porque o Prometheus não faz login com TOTP.
+
+## Decisões posteriores à v1
+
+Tomadas depois da Etapa 8, ao simplificar o projeto. Cada uma diz o que substitui; as entradas antigas acima ficam como foram escritas.
+
+### Simplificação (novembro de 2026)
+
+- **Dependências declaradas só no `pyproject.toml`.** Os `requirements.txt` e `requirements-dev.txt`, com hashes, são gerados dele por `make lock` (`uv pip compile`, mirando `x86_64-manylinux_2_28` e Python 3.12). O `requirements-dev.txt` traz produção + dev, e a imagem de dev instala só ele. Substitui o item 1 da Etapa 0 (`pip-compile` a partir dos `.in`) e a regeneração dentro do contêiner da 4A. Motivo: a mesma lista estava em três arquivos, e gerar no Windows trazia `tzdata` e `colorama`; mirar a plataforma resolve isso sem contêiner. Versões e hashes de produção não mudaram.
+- **Só scripts `.sh`.** Os oito `.ps1` saíram. No Windows, os scripts rodam pelo Git Bash; o resto, pelo `docker compose`. Substitui a menção ao `e2e.ps1` da Etapa 6. Motivo: os pares já tinham divergido. O `verificar.ps1` tinha os passos de E2E e de backup que faltavam no `verificar.sh`, e eles foram levados para o `.sh`.
+- **Dado em claro é recusado na leitura.** Objeto sem cabeçalho `LUPAOBJ` e campo sem prefixo `lupa1:` geram `CifraInvalidaError`; identidade sem token do cofre gera `TokenInvalidoError`. Saiu o `scripts/recifrar_objetos_legado.py` (7.10). A migração `0012` tira o `DEFAULT '[]'` em claro de `pagina.trechos_ocultos` e `pagina.trechos_suspeitos`; a lista vazia agora vem do modelo, já cifrada. Substitui a leitura de legado da 7.4 (aviso `objeto_legado_em_claro`) e resolve o item da 7.4 em [`FICOU-DE-FORA.md`](../etapas/FICOU-DE-FORA.md). Motivo: aceitar dado em claro servia só como caminho de migração e escondia gravação sem cifra; não há dado real anterior à 7.4. Consequência: dado em claro no banco ou no bucket passa a ser incidente (`docs/operacao/operacao.md`, seção 10), e o bucket de desenvolvimento é recriado antes do piloto (`docs/piloto/roteiro-piloto.md`, passo 0.4).
 
 ## Resultado das revisões
 

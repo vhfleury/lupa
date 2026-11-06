@@ -13,7 +13,7 @@ Decisões já tomadas estão em [decisoes/registro.md](../decisoes/registro.md).
    - Opção B: aceitar a limitação no piloto, só com processos públicos, e registrar no aviso de tratamento que nomes de outras pessoas podem constar dos trechos enviados ao fornecedor do modelo.
 2. **Chave da API da Anthropic**, smoke test real do agente (`pytest -m llm`) e leitura dos termos vigentes da API quanto a treinamento, retenção e local de processamento. A aprovação da Etapa 5 ficou condicionada ao smoke test.
 3. **Assinatura da decisão do object storage** ([decisoes/object-storage.md](../decisoes/object-storage.md)).
-4. **Apagar os 344 objetos sintéticos órfãos** em claro no storage de desenvolvimento. São de processos sintéticos já removidos do banco; o script de descarte não os alcança. Basta um `mc rm` ou um script com lista por prefixo.
+4. **Recriar o bucket de desenvolvimento**, que guarda 344 objetos sintéticos órfãos em claro, de processos já removidos do banco. A leitura agora recusa objeto em claro, então eles não servem para nada. Passo 0.4 do [roteiro do piloto](roteiro-piloto.md).
 5. **Ambiente de produção**: Vault com três pessoas segurando as partes de unseal (sem auto-unseal, pois não há KMS), TLS no Vault, backup frio do volume do Vault, certificado real no proxy, porta direta da API não publicada, perfil de produção num servidor de verdade, `instalar_piloto.sh` ponta a ponta.
 6. **Revisão das minutas por advogado** (`docs/conformidade/`) e aceite dos termos pelos usuários.
 7. **Confirmação dos dados jurídicos pelo gabinete**: calendários (`feriados`, `suspensoes`), `prazos_recursos`, `prescricao_art109`, `tipos_penais`, `eventos.yaml` e as regras de borda listadas em `docs/sistema/validacoes.md`.

@@ -155,7 +155,7 @@ services:
 
   # Cofre de chaves (Etapa 7.2): HashiCorp Vault em modo servidor (storage em arquivo, sem modo
   # dev), so nas redes internas. Depois da primeira subida (e a cada reinicio, que sela o cofre),
-  # rode scripts/vault_inicializar.sh (ou .ps1): init, unseal, Transit, politica e AppRole.
+  # rode scripts/vault_inicializar.sh: init, unseal, Transit, politica e AppRole.
   # Etapa 8.1: o healthcheck exige o cofre DESTRAVADO (`vault status` sai com 2 se selado, 1 se
   # fora do ar). Numa instalacao nova ou depois de reiniciar, o vault fica `unhealthy` (e a api e o
   # worker esperam) ate o unseal: suba primeiro `docker compose up -d vault`, rode o
