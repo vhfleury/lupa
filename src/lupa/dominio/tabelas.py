@@ -283,10 +283,10 @@ class PaginaTabela(Base):
     pagina_origem: Mapped[int | None] = mapped_column(Integer)
     texto_normalizado: Mapped[str | None] = mapped_column(TextoCifrado("pagina.texto_normalizado"))
     trechos_ocultos: Mapped[list[dict[str, Any]]] = mapped_column(
-        JsonCifrado("pagina.trechos_ocultos"), nullable=False, server_default="[]"
+        JsonCifrado("pagina.trechos_ocultos"), nullable=False, default=list
     )
     trechos_suspeitos: Mapped[list[dict[str, Any]]] = mapped_column(
-        JsonCifrado("pagina.trechos_suspeitos"), nullable=False, server_default="[]"
+        JsonCifrado("pagina.trechos_suspeitos"), nullable=False, default=list
     )
     sinais_fronteira: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default="{}"

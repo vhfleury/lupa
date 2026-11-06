@@ -19,9 +19,8 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from lupa.config import Settings
-from lupa.logging import get_logger
 from lupa.seguranca.contexto import dek_de
-from lupa.seguranca.envelope import LeitorCifrado, decifrar_objeto, objeto_cifrado
+from lupa.seguranca.envelope import LeitorCifrado, decifrar_objeto
 
 CODIGOS_AUSENTE = frozenset({"404", "NoSuchKey", "NotFound"})
 PROCESSO_NA_CHAVE = re.compile(r"(?:^|/)processo/([0-9a-fA-F-]{36})/")
@@ -265,12 +264,11 @@ class StorageCifrado:
 
         Returns:
             Conteúdo em claro.
+
+        Raises:
+            CifraInvalidaError: Objeto sem cabeçalho `LUPAOBJ` (em claro) ou adulterado.
         """
-        dados = self.interno.ler(chave)
-        if not objeto_cifrado(dados):
-            get_logger(__name__).warning("objeto_legado_em_claro")
-            return dados
-        return decifrar_objeto(dek_de(processo_da_chave(chave)), dados)
+        return decifrar_objeto(dek_de(processo_da_chave(chave)), self.interno.ler(chave))
 
     def existe(self, chave: str) -> bool:
         """Diz se a chave existe.

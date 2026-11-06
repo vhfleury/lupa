@@ -78,8 +78,9 @@ efêmero do job (`TemporaryDirectory`, 0700, arquivo criado com `O_EXCL` e modo 
 apagado ao fim do job, inclusive em exceção (teste
 `test_worker_decifra_em_temporario_0600_e_apaga_mesmo_em_falha`). As entradas de ZIP e o cache de
 PNG/medidas do visualizador passam pelo mesmo `StorageCifrado`. A renderização grava o PDF num
-temporário 0600 que some ao fim da chamada. Objeto legado em claro (anterior à 7.4) ainda é lido,
-com aviso `objeto_legado_em_claro` no log.
+temporário 0600 que some ao fim da chamada. Objeto sem cabeçalho `LUPAOBJ` (em claro) é recusado
+na leitura com `CifraInvalidaError`; o mesmo vale para campo sem `lupa1:` e, com
+`TokenInvalidoError`, para identidade sem token do cofre.
 
 ## Busca do agente (7.5)
 
@@ -144,9 +145,7 @@ Adiciona `processo.chave_dados_cifrada`, aceita `descartado` no status, troca os
 para texto e cria `lupa_chave_processo`/`lupa_descartar_processo`. Dados existentes: cada processo
 ganha DEK; textos, trechos, evidências e mensagens são cifrados em lotes de 500 e as identidades vão
 ao Transit. Idempotente (valor já `lupa1:` ou `vault:` é pulado) e reversível (o downgrade
-decifra). Precisa do cofre configurado quando há dados. Objetos já gravados em claro no storage
-continuam legíveis; para cifrá-los, rode `scripts/recifrar_objetos_legado.py` (7.10, simula sem
-`--executar`, idempotente), reenvie o arquivo ou descarte o processo. Operação do Vault em
+decifra). Precisa do cofre configurado quando há dados. Operação do Vault em
 produção: `docs/operacao/operacao.md`, seção 4.
 
 ## Desempenho

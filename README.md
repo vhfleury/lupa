@@ -116,7 +116,7 @@ Métricas Prometheus em `GET /metricas` (administrador).
 | 7.1–7.7. Criptografia em repouso | `src/lupa/seguranca/`, `vault/` | `docs/sistema/criptografia.md`, `docs/decisoes/object-storage.md` |
 | 7.8. Backup | `scripts/backup*.sh`, `restaurar.*`, `expurgar_backups.*` | `docs/operacao/backup.md` |
 | 7.9. Guias dos usuários | `docs/imagens/` | `docs/guias/guia-assessor.md`, `docs/guias/guia-desembargador.md` |
-| 7.10. Operação | `scripts/recifrar_objetos_legado.py`, `scripts/preparar_repositorio.md` | `docs/operacao/operacao.md` |
+| 7.10. Operação | `scripts/preparar_repositorio.md` | `docs/operacao/operacao.md` |
 | Testes | `tests/` (espelha `src/lupa/`) | — |
 | Relatórios, decisões e pendências | — | `docs/etapas/`, `docs/decisoes/registro.md`, `docs/piloto/pendencias.md` (índice em `docs/README.md`) |
 
@@ -213,8 +213,6 @@ instalação do zero, atualização, Vault (unseal, rotação, backup, pendênci
 certificado real e portas, backup e restauração, descarte, limpeza de sintéticos, monitoramento,
 resposta a incidente, relatório de uso para o tribunal e checklist de segurança.
 
-- Objetos anteriores à 7.4 ainda em claro no storage:
-  `docker compose exec api python scripts/recifrar_objetos_legado.py [--executar]`.
 - Antes do primeiro commit: `scripts/preparar_repositorio.md` (`.gitattributes` fixa LF).
 
 ## Ambiente de piloto (Etapa 8.1)
