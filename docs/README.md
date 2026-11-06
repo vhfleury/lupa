@@ -54,5 +54,4 @@ Minutas para revisão de advogado em [conformidade/](conformidade/): aviso de tr
 
 ## Outros
 
-- `exemplos/fatos.json`: exemplo de entrada do motor de validações, usado pelos testes.
 - `contexto/`: relatórios de pesquisa usados no desenho (gabinete do TJGO, dados judiciais, prompt injection).

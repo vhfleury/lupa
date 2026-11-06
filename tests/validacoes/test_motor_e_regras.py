@@ -41,7 +41,6 @@ from tests.validacoes.conftest import criar_fato, id_sintetico, modelo_de
 RAIZ = Path(__file__).resolve().parents[2]
 PACOTE = RAIZ / "src" / "lupa" / "validacoes"
 EXEMPLO = Path(__file__).with_name("fatos_exemplo.json")
-EXEMPLO_DOCS = RAIZ / "docs" / "exemplos" / "fatos.json"
 REFERENCIA = date(2026, 10, 20)
 CONSTANTES_PERMITIDAS = {"_SABADO", "_DOMINGO", "_MESES_NO_ANO"}
 
@@ -294,9 +293,3 @@ def test_nenhum_numero_de_prazo_ou_data_em_arquivo_py() -> None:
                 continue
             if isinstance(no, ast.Constant) and type(no.value) is int and no.value not in (0, 1):
                 assert id(no) in permitidos, f"{arquivo}:{no.lineno}"
-
-
-@pytest.mark.skipif(not EXEMPLO_DOCS.exists(), reason="docs/ não é copiado para a imagem")
-def test_exemplo_da_documentacao_e_o_mesmo_dos_testes() -> None:
-    """O fatos.json de docs/exemplos é idêntico ao usado nos testes."""
-    assert EXEMPLO_DOCS.read_bytes() == EXEMPLO.read_bytes()

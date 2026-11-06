@@ -114,10 +114,11 @@ cadeia (o sistema não sabe disso).
 
 ```bash
 docker compose exec api python -m lupa.validacoes --fatos /dev/stdin --materia criminal \
-  --referencia 2026-10-20 < docs/exemplos/fatos.json
+  --referencia 2026-10-20 < tests/validacoes/fatos_exemplo.json
 ```
 
-`docs/exemplos/fatos.json` é um processo sintético que serve de modelo do formato de entrada.
+`tests/validacoes/fatos_exemplo.json` é um processo sintético que serve de modelo do formato de
+entrada; é o mesmo usado nos testes das validações.
 A saída é a lista de achados em JSON.
 
 ### Formato dos fatos
