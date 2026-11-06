@@ -73,7 +73,7 @@ Requisitos atendidos nesta rodada: chat de localização e extração com citaç
 
 **Condição registrada:** o smoke test com o modelo real (dois testes marcados `llm`) não rodou por falta de credencial neste ambiente. Deve ser executado pelo responsável técnico com `ANTHROPIC_API_KEY` no ambiente antes de qualquer uso real do chat. Até lá, a garantia de que o harness do Claude Agent SDK não executa ferramentas embutidas vem das opções do SDK e do hook de bloqueio, ambos testados sem rede.
 
-Novas decisões pendentes de Victor: chave de API da Anthropic para o piloto; aprovação formal do contrato `docs/agente.md`. Cada etapa tem relatório do executor em `RELATORIO-ETAPA-*.md` e revisão independente em `REVISAO-ETAPA-*.md` nesta pasta.
+Novas decisões pendentes de Victor: chave de API da Anthropic para o piloto; aprovação formal do contrato `docs/agente.md`. Cada etapa tem relatório do executor em `RELATORIO-ETAPA-*.md` nesta pasta; as revisões independentes (`REVISAO-ETAPA-*.md`) foram removidas e ficam no histórico do Git.
 
 ## 1. Estado verificado
 
@@ -168,4 +168,4 @@ Registradas nas revisões, não bloqueantes para as próximas etapas:
 
 ## 8. Próximos passos
 
-Etapas 5 (agente e chat), 6 (interface web), 7 (criptografia em repouso e guia) e 8 (piloto), conforme `roteiro-etapas-4-8.md`. As subetapas 5.1, 5.2 e 6.1 a 6.3 podem começar em paralelo; a decisão sobre o object storage (7.1) deve vir antes de qualquer gravação de autos reais.
+Etapas 0 a 7, 8.1 e 8.2 concluídas. O que falta é o piloto (8.3 a 8.10), conforme `docs/roteiro-piloto.md`. Os roteiros das Etapas 4 a 8 foram removidos e ficam no histórico do Git.
