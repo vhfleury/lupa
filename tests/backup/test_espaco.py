@@ -10,7 +10,6 @@ Só roda no host com Docker e ``LUPA_VERIFICAR_BACKUP=1``, como o teste de resta
 import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -27,9 +26,6 @@ if shutil.which("docker") is None:
 
 
 def _comando_backup() -> list[str]:
-    if sys.platform == "win32":
-        return ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-                str(RAIZ / "scripts" / "backup.ps1")]  # fmt: skip
     return ["bash", str(RAIZ / "scripts" / "backup.sh")]
 
 

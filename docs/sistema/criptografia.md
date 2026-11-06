@@ -126,7 +126,7 @@ Configuração em `vault/lupa.hcl`; política mínima em `vault/politicas/lupa.h
 
 ```
 docker compose up -d --build --wait
-bash scripts/vault_inicializar.sh        # ou: powershell -File scripts/vault_inicializar.ps1
+bash scripts/vault_inicializar.sh
 docker compose up -d api worker          # relê o .env com o AppRole
 ```
 

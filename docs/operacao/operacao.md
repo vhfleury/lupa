@@ -18,7 +18,7 @@ para o tribunal · 12. Checklist de segurança (seção 6 dos requisitos) · 13.
 ## 1. Pré-requisitos e dimensionamento
 
 **Software:** Docker Engine com Compose v2 (no Windows, Docker Desktop com WSL 2), `bash` (no
-Windows, Git Bash) ou PowerShell 5.1, Python 3 no host só para os scripts do Vault e do backup. Nada
+Windows, Git Bash), Python 3 no host só para os scripts do Vault e do backup. Nada
 mais é instalado na máquina: tudo roda nos contêineres.
 
 **Serviços:** `proxy` (Caddy, HTTPS), `front` (SPA), `api` (FastAPI), `worker` (ingestão, sem saída
@@ -112,8 +112,7 @@ fictícios. Variáveis (as marcadas **segredo** dão acesso a dados; guarde-as n
 ### 2.2 Ordem dos comandos
 
 **Atalho (Etapa 8.1):** `bash scripts/instalar_piloto.sh` encadeia os passos abaixo em produção
-(`--dev` para desenvolvimento; no Windows, `powershell -File scripts/instalar_piloto.ps1`, só
-desenvolvimento). Ele cria o `.env` a partir do exemplo, pergunta domínio, modo do certificado,
+(`--dev` para desenvolvimento). Ele cria o `.env` a partir do exemplo, pergunta domínio, modo do certificado,
 pastas de dados e de backup, gera os segredos aleatórios sem mostrá-los, cria as pastas com o dono
 de cada imagem, sobe o Vault e o inicializa, sobe o resto, migra, cria o usuário restrito e o
 administrador e no fim roda `scripts/conferir_piloto.py`. É idempotente (rodar de novo só completa
@@ -130,7 +129,7 @@ docker compose build
 docker compose up -d vault
 
 # 2. inicializar o Vault (produção: 3 partes, limiar 2, seção 4.1; desenvolvimento: 1 parte)
-bash scripts/vault_inicializar.sh          # Windows (dev): powershell -File scripts/vault_inicializar.ps1
+bash scripts/vault_inicializar.sh
 
 # 3. subir o resto
 docker compose up -d --wait
@@ -202,8 +201,7 @@ funcionando).
 
 ### 4.1 Inicialização em produção
 
-Com `LUPA_AMBIENTE=producao` no `.env`, o mesmo `scripts/vault_inicializar.sh` (só a versão bash;
-o `.ps1` é só desenvolvimento) entra em modo produção:
+Com `LUPA_AMBIENTE=producao` no `.env`, o mesmo `scripts/vault_inicializar.sh` entra em modo produção:
 
 ```bash
 docker compose up -d vault

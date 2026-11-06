@@ -35,7 +35,7 @@ Um backup é um único arquivo `lupa-AAAA-MM-<carimbo>.tar.age`, cifrado com `ag
 ## Comandos (host)
 
 ```bash
-bash scripts/backup.sh                 # ou: powershell scripts/backup.ps1
+bash scripts/backup.sh
 LUPA_RESTAURAR_BANCO=lupa_restaurado LUPA_RESTAURAR_BUCKET=lupa-restaurado \
   bash scripts/restaurar.sh lupa-2026-10-20261021T020000Z.tar.age
 bash scripts/expurgar_backups.sh       # retenção
@@ -80,10 +80,10 @@ backup precisa do binário `vault` e o snapshot entra no manifesto e no mesmo `.
 
 `tests/backup/test_restauracao.py` (marcadores `integracao` e `backup`), só no host com Docker:
 
-```powershell
-$env:LUPA_VERIFICAR_BACKUP = "1"; powershell scripts/verificar.ps1   # passo == backup ==
+```bash
+LUPA_VERIFICAR_BACKUP=1 bash scripts/verificar.sh   # passo == backup ==
 # ou só ele:
-$env:LUPA_VERIFICAR_BACKUP = "1"; python -m pytest -m backup tests/backup --no-cov -q --confcutdir=tests/backup
+LUPA_VERIFICAR_BACKUP=1 python -m pytest -m backup tests/backup --no-cov -q --confcutdir=tests/backup
 ```
 
 Ele **nunca** usa o banco `lupa` nem o bucket `lupa-autos`: cria um banco `lupa_bkp_o_<sufixo>`

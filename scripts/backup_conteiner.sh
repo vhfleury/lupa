@@ -1,6 +1,6 @@
 #!/bin/sh
 # Backup cifrado do Lupa (Etapa 7.8). Roda DENTRO do servico `backup` do compose (perfil `backup`),
-# chamado por scripts/backup.sh, scripts/restaurar.sh e scripts/expurgar_backups.sh (ou os .ps1).
+# chamado por scripts/backup.sh, scripts/restaurar.sh e scripts/expurgar_backups.sh.
 #
 #   backup_conteiner.sh fazer                  pg_dump (custom) + espelho do bucket -> tar -> age
 #   backup_conteiner.sh restaurar ARQUIVO      decifra, confere o manifesto e restaura em banco e
