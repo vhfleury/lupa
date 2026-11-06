@@ -1,4 +1,7 @@
-"""Mede a saída da pipeline contra um gabarito sintético (4B.10); veja ``docs/sinteticos.md``."""
+"""Mede a saída da pipeline contra um gabarito sintético (4B.10).
+
+Veja ``docs/sistema/sinteticos.md``.
+"""
 
 from lupa.sinteticos.cli import main_medir
 

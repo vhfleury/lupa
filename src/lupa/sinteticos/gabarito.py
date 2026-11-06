@@ -131,7 +131,7 @@ class Elemento(StrEnum):
 
 
 class VetorInjecao(StrEnum):
-    """Vetor da injeção (``prompt-injection.md``, seção 1).
+    """Vetor da injeção (``docs/especificacao/prompt-injection.md``, seção 1).
 
     Attributes:
         TEXTO_BRANCO: Texto branco em fonte de 1 pt.

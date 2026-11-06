@@ -5,7 +5,7 @@ credenciais do banco, do storage ou do Redis), diretório de trabalho temporári
 desabilitados no próprio filho e limites `setrlimit` de espaço de endereçamento, CPU, tamanho
 de arquivo gravado e descritores. O resultado volta só por JSON em stdout; stderr é descartado
 (nunca vai ao log). Isolamento de rede no nível do sistema vem do contêiner do worker, que fica
-numa rede interna sem saída (ver `docs/ingestao.md`).
+numa rede interna sem saída (ver `docs/sistema/ingestao.md`).
 """
 
 import json

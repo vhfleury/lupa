@@ -5,7 +5,7 @@
 O arquivo do Projudi ainda não existe. Entregue o roteiro e a ferramenta para o dia em que ele
 chegar:
 
-- `docs/calibracao-projudi.md`: como montar o arquivo no contêiner sem copiá-lo para o
+- `docs/piloto/calibracao-projudi.md`: como montar o arquivo no contêiner sem copiá-lo para o
   repositório, comando, o que o relatório traz, instruções de conferência para o assessor, o que
   medir (com a referência sintética de cada medida), onde ajustar cada tipo de erro e qual versão
   subir, limpeza e a tabela "Registro" a preencher (acertou, errou, mudou).
@@ -41,6 +41,6 @@ gabarito (referência 17/07/2016) ela é `conforme`, e a 4F.9 confirma 3/3 nessa
 
 | Item | Evidência |
 | --- | --- |
-| Roteiro pronto (comandos, o que medir, comparar com o assessor, onde registrar) | `docs/calibracao-projudi.md` |
+| Roteiro pronto (comandos, o que medir, comparar com o assessor, onde registrar) | `docs/piloto/calibracao-projudi.md` |
 | `scripts/calibrar.py` gera o relatório Markdown | execução acima, `rc=0` |
 | Testado com processo sintético | acima e `test_calibracao_de_processo_sintetico_gera_relatorio_para_conferencia` |

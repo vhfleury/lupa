@@ -1,4 +1,4 @@
-// Etapa 6.10 (prompt-injection.md, seção 6): nada que venha dos autos vira HTML, Markdown ou
+// Etapa 6.10 (docs/especificacao/prompt-injection.md, seção 6): nada que venha dos autos vira HTML, Markdown ou
 // link clicável. Dois níveis: (1) componente real com trecho hostil sai como texto; (2) varredura
 // das fontes: nenhum {@html}, innerHTML, renderizador de Markdown nem link montado com texto.
 import { readdirSync, readFileSync, statSync } from 'node:fs';

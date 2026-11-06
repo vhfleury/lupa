@@ -196,7 +196,7 @@ restaurar() {
   if [ -f "$TRABALHO/conteudo/vault.tar" ]; then
     # Etapa 8.1: o armazenamento do Vault NAO e reposto sozinho (exige parar o vault e as partes
     # de unseal da epoca); fica em /backups/vault-<arquivo>.tar para o procedimento manual
-    # (docs/operacao.md, secao 4.4).
+    # (docs/operacao/operacao.md, secao 4.4).
     destino_vault="$BACKUPS/vault-$(basename "$caminho" .tar.age).tar"
     cp "$TRABALHO/conteudo/vault.tar" "$destino_vault"
     echo "backup: armazenamento do vault em $(basename "$destino_vault") (reposicao manual)" >&2

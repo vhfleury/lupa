@@ -21,4 +21,4 @@ O diretório ainda não é repositório git. Antes do primeiro commit:
 6. `git commit -m "Lupa v1: etapas 0 a 7"`.
 
 Se um segredo entrar por engano: troque o segredo (não basta apagar o commit) e siga
-`docs/operacao.md`, seção "Comprometimento de credencial".
+`docs/operacao/operacao.md`, seção "Comprometimento de credencial".

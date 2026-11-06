@@ -42,7 +42,7 @@ Dependências fixadas com hashes em `requirements.txt` (produção) e `requireme
 Login por usuário e senha (argon2id, mínimo 12 caracteres, fora das 10 mil senhas mais comuns),
 seguido de código TOTP de aplicativo autenticador. Sem e-mail em nenhum fluxo. Papéis
 `assessor`, `desembargador` e `administrador` (matriz em `src/lupa/acesso/papeis.py`).
-O que a auditoria registra e como verificar a integridade: [`docs/auditoria.md`](docs/auditoria.md).
+O que a auditoria registra e como verificar a integridade: [`docs/sistema/auditoria.md`](docs/sistema/auditoria.md).
 
 Primeira instalação, depois de `docker compose up -d --build --wait`:
 
@@ -82,7 +82,7 @@ docker compose up -d api   # recria a API para ler as variáveis novas do .env
 ## Ingestão — fundações (Etapa 4A)
 
 Upload de PDF ou ZIP do processo, lacre por SHA-256, object storage, fila e worker isolado até o
-job em `validado`. Detalhes: [`docs/ingestao.md`](docs/ingestao.md).
+job em `validado`. Detalhes: [`docs/sistema/ingestao.md`](docs/sistema/ingestao.md).
 
 ```bash
 docker compose exec api alembic -c src/lupa/migrations/alembic.ini upgrade head   # revisão 0003
@@ -99,24 +99,24 @@ Métricas Prometheus em `GET /metricas` (administrador).
 | Etapa | Código | Documentação |
 |---|---|---|
 | 0. Esqueleto | `src/lupa/config.py`, `logging.py`, `api/` | este README |
-| 1. Modelo de dados | `src/lupa/dominio/` | `docs/modelo-de-dados.md` |
-| 2. Validações | `src/lupa/validacoes/` | `docs/validacoes.md`, `catalogo-validacoes.md` |
-| 3. Acesso e auditoria | `src/lupa/acesso/`, `src/lupa/auditoria/` | `docs/auditoria.md` |
-| 4A–4F. Ingestão | `src/lupa/ingestao/` | `docs/ingestao.md`, `docs/calibracao-projudi.md` |
-| 4B. Autos sintéticos | `src/lupa/sinteticos/`, `scripts/gerar_autos.py` | `docs/sinteticos.md` |
-| 5. Agente e chat | `src/lupa/agente/` | `docs/agente.md`, `prompt-injection.md` |
-| 6. Interface web | `front/`, `proxy/Caddyfile` | `docs/front.md` |
-| 7.1–7.7. Criptografia em repouso | `src/lupa/seguranca/`, `vault/` | `docs/criptografia.md`, `docs/decisoes/object-storage.md` |
-| 7.8. Backup | `scripts/backup*.sh`, `restaurar.*`, `expurgar_backups.*` | `docs/backup.md` |
-| 7.9. Guias dos usuários | `docs/imagens/` | `docs/guia-assessor.md`, `docs/guia-desembargador.md` |
-| 7.10. Operação | `scripts/recifrar_objetos_legado.py`, `scripts/preparar_repositorio.md` | `docs/operacao.md` |
+| 1. Modelo de dados | `src/lupa/dominio/` | `docs/sistema/modelo-de-dados.md` |
+| 2. Validações | `src/lupa/validacoes/` | `docs/sistema/validacoes.md`, `docs/especificacao/catalogo-validacoes.md` |
+| 3. Acesso e auditoria | `src/lupa/acesso/`, `src/lupa/auditoria/` | `docs/sistema/auditoria.md` |
+| 4A–4F. Ingestão | `src/lupa/ingestao/` | `docs/sistema/ingestao.md`, `docs/piloto/calibracao-projudi.md` |
+| 4B. Autos sintéticos | `src/lupa/sinteticos/`, `scripts/gerar_autos.py` | `docs/sistema/sinteticos.md` |
+| 5. Agente e chat | `src/lupa/agente/` | `docs/sistema/agente.md`, `docs/especificacao/prompt-injection.md` |
+| 6. Interface web | `front/`, `proxy/Caddyfile` | `docs/sistema/front.md` |
+| 7.1–7.7. Criptografia em repouso | `src/lupa/seguranca/`, `vault/` | `docs/sistema/criptografia.md`, `docs/decisoes/object-storage.md` |
+| 7.8. Backup | `scripts/backup*.sh`, `restaurar.*`, `expurgar_backups.*` | `docs/operacao/backup.md` |
+| 7.9. Guias dos usuários | `docs/imagens/` | `docs/guias/guia-assessor.md`, `docs/guias/guia-desembargador.md` |
+| 7.10. Operação | `scripts/recifrar_objetos_legado.py`, `scripts/preparar_repositorio.md` | `docs/operacao/operacao.md` |
 | Testes | `tests/` (espelha `src/lupa/`) | — |
-| Relatórios e revisões | — | `docs/etapas/` |
+| Relatórios, decisões e pendências | — | `docs/etapas/`, `docs/decisoes/registro.md`, `docs/piloto/pendencias.md` (índice em `docs/README.md`) |
 
 ## Autos sintéticos (Etapa 4B)
 
 Processos criminais falsos, com gabarito, que servem de régua para a ingestão. Detalhes em
-[`docs/sinteticos.md`](docs/sinteticos.md).
+[`docs/sistema/sinteticos.md`](docs/sistema/sinteticos.md).
 
 ```bash
 docker compose exec api python scripts/gerar_autos.py --destino /tmp/sinteticos processo --semente 1 --paginas 40
@@ -143,11 +143,11 @@ acesso. O proxy (Caddy) serve o front em `/` e a API em `/api`, no mesmo origin.
   proxy (`python scripts/verificar_cabecalhos.py --url https://localhost:8443`); varredura axe nas
   telas; tema claro/escuro/sistema escolhido no cabeçalho. Limpeza dos dados sintéticos do banco
   de desenvolvimento: `docker compose exec api python scripts/limpar_dev.py --sim`.
-- Detalhes, decisões e comandos: `docs/front.md`.
+- Detalhes, decisões e comandos: `docs/sistema/front.md`.
 
 ## Agente e chat (Etapa 5)
 
-Contrato em [`docs/agente.md`](docs/agente.md). O agente usa o Claude Agent SDK (`claude-agent-sdk`,
+Contrato em [`docs/sistema/agente.md`](docs/sistema/agente.md). O agente usa o Claude Agent SDK (`claude-agent-sdk`,
 que embute o binário do Claude Code) atrás da interface `ClienteAgente`
 (`src/lupa/agente/cliente.py`); só as ferramentas somente leitura do Lupa ficam disponíveis, travadas
 no processo da requisição. Toda citação é conferida por código antes de aparecer; pergunta de
@@ -173,16 +173,16 @@ docker compose exec api python -m pytest -m llm --no-cov tests/agente/test_smoke
 - Backup: `bash scripts/backup.sh` (ou `.ps1`), `restaurar.sh`, `expurgar_backups.sh`; serviço
   `backup` do compose (perfil `backup`), saída por bind mount em `LUPA_BACKUP_DIR` (padrão
   `.backups/`), chaves por mês em `LUPA_BACKUP_CHAVES_DIR` (padrão `.backup-chaves/`). Recusa sem
-  espaço livre de 2× a estimativa + 2 GB. Detalhes em `docs/backup.md`; teste com
+  espaço livre de 2× a estimativa + 2 GB. Detalhes em `docs/operacao/backup.md`; teste com
   `LUPA_VERIFICAR_BACKUP=1` no `scripts/verificar.ps1`.
-- Guias para usuários: `docs/guia-assessor.md` e `docs/guia-desembargador.md`; capturas em
+- Guias para usuários: `docs/guias/guia-assessor.md` e `docs/guias/guia-desembargador.md`; capturas em
   `docs/imagens/` geradas por `bash front/scripts/capturas.sh` (processos sintéticos).
 
 ## Criptografia em repouso (Etapas 7.1 a 7.7)
 
 Autos, trechos, conversas e originais ficam cifrados com uma chave por processo (DEK), envelopada
 pela chave do gabinete no HashiCorp Vault (Transit); identidades dos réus vão direto ao Transit com
-chave própria. Detalhes, formatos e limites em [docs/criptografia.md](docs/criptografia.md);
+chave própria. Detalhes, formatos e limites em [docs/sistema/criptografia.md](docs/sistema/criptografia.md);
 decisão de object storage (pendente de assinatura) em
 [docs/decisoes/object-storage.md](docs/decisoes/object-storage.md).
 
@@ -201,7 +201,7 @@ gabinete: `POST /gabinetes/{id}/rotacionar-chave` (administrador).
 
 ## Operação (Etapa 7.10)
 
-Manual do responsável técnico em [`docs/operacao.md`](docs/operacao.md): dimensionamento,
+Manual do responsável técnico em [`docs/operacao/operacao.md`](docs/operacao/operacao.md): dimensionamento,
 instalação do zero, atualização, Vault (unseal, rotação, backup, pendências de produção),
 certificado real e portas, backup e restauração, descarte, limpeza de sintéticos, monitoramento,
 resposta a incidente, relatório de uso para o tribunal e checklist de segurança.

@@ -4,7 +4,7 @@
 
 ## O que foi feito
 
-1. **`docs/operacao.md`**: manual do responsável técnico, em 13 seções: dimensionamento (tempos
+1. **`docs/operacao/operacao.md`**: manual do responsável técnico, em 13 seções: dimensionamento (tempos
    das revisões 4C/4F e relatório 4F.9, disco por mil folhas, recomendação para o piloto);
    instalação do zero na ordem exata (tabela de todas as variáveis do `.env` com as que são
    segredo); atualização de versão; Vault (inicialização de produção à mão com 5 partes e limiar
@@ -38,7 +38,7 @@
      testes: simula/executa/idempotente com objeto cifrado, legado, órfão e chave fora do padrão;
      parada quando a releitura não confere).
 4. **README**: seção "Operação" e tabela "Onde cada etapa fica" refeita (etapa, código,
-   documentação); frase de abertura atualizada. `docs/criptografia.md` aponta para o script de
+   documentação); frase de abertura atualizada. `docs/sistema/criptografia.md` aponta para o script de
    recifragem. `.env.example`: acréscimo comentado de `LUPA_BACKUP_ESTIMATIVA_BYTES` e nota de
    operação.
 

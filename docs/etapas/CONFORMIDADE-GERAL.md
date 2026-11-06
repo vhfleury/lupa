@@ -37,7 +37,7 @@
 | Cifra | páginas, evidências, mensagens, identidades e objetos novos cifrados; conferido no banco e no storage; objetos legados de processos existentes recifrados |
 | Vault | serviço real no compose com Transit e AppRole; ensaios de rotação, incidente de injeção e reinício com unseal registrados |
 | Guias | assessor e desembargador com 11 capturas reais; leitor externo 10 de 10 |
-| Operação | `docs/operacao.md` com instalação, atualização, Vault, certificado, backup, descarte, monitoramento, incidentes, relatório de uso e checklist de segurança |
+| Operação | `docs/operacao/operacao.md` com instalação, atualização, Vault, certificado, backup, descarte, monitoramento, incidentes, relatório de uso e checklist de segurança |
 
 Incidente de processo: a primeira execução encheu o disco por um backup de teste contra o banco e o bucket principais, derrubando Docker e WSL. Recuperado com autorização do responsável técnico; regras de disco adicionadas aos briefs e ao script de backup (estimativa e recusa). Registrado na revisão 7.1-7.9, §0.
 
@@ -73,7 +73,7 @@ Requisitos atendidos nesta rodada: chat de localização e extração com citaç
 
 **Condição registrada:** o smoke test com o modelo real (dois testes marcados `llm`) não rodou por falta de credencial neste ambiente. Deve ser executado pelo responsável técnico com `ANTHROPIC_API_KEY` no ambiente antes de qualquer uso real do chat. Até lá, a garantia de que o harness do Claude Agent SDK não executa ferramentas embutidas vem das opções do SDK e do hook de bloqueio, ambos testados sem rede.
 
-Novas decisões pendentes de Victor: chave de API da Anthropic para o piloto; aprovação formal do contrato `docs/agente.md`. Cada etapa tem relatório do executor em `RELATORIO-ETAPA-*.md` e revisão independente em `REVISAO-ETAPA-*.md` nesta pasta.
+Novas decisões pendentes de Victor: chave de API da Anthropic para o piloto; aprovação formal do contrato `docs/sistema/agente.md`. Ficaram nesta pasta só os relatórios de etapa citados pelo código e pelos manuais; os outros 78 relatórios e as revisões independentes foram removidos e ficam no histórico do Git (relatórios no commit `58e9774`, revisões no `54219a2`). O que ficou de fora em cada etapa está em `FICOU-DE-FORA.md`. As decisões e pendências das revisões, citadas neste documento como "revisão N, §M", estão em `docs/decisoes/registro.md` (decisões) e `docs/piloto/pendencias.md` (o que falta fazer).
 
 ## 1. Estado verificado
 
@@ -148,7 +148,7 @@ Registradas nas revisões, não bloqueantes para as próximas etapas:
 | Base GeoLite2 | conta gratuita na MaxMind; sem ela a localização fica `desconhecida` | antes do piloto |
 | Dimensionamento do worker | 1 worker, 12 CPUs, 4 lotes de 8 páginas: 15 minutos por mil páginas digitalizadas | antes do piloto |
 | Pasta `.sinteticos` no OneDrive | 4,7 GB sincronizando; excluir da sincronização ou mover com `LUPA_SINTETICOS_DIR` | quando quiser |
-| Dados jurídicos a confirmar pelo gabinete | calendários (`feriados`, `suspensoes`), `prazos_recursos`, `prescricao_art109`, `tipos_penais`, `eventos.yaml`; regras de borda listadas em `docs/validacoes.md` | antes do piloto |
+| Dados jurídicos a confirmar pelo gabinete | calendários (`feriados`, `suspensoes`), `prazos_recursos`, `prescricao_art109`, `tipos_penais`, `eventos.yaml`; regras de borda listadas em `docs/sistema/validacoes.md` | antes do piloto |
 | Valores reais das variáveis de produção | `LUPA_DB_*`, `LUPA_ADMIN_*`, chaves do MinIO | ambiente do piloto |
 
 ## 6. Limitações declaradas e aceitas
@@ -168,4 +168,4 @@ Registradas nas revisões, não bloqueantes para as próximas etapas:
 
 ## 8. Próximos passos
 
-Etapas 5 (agente e chat), 6 (interface web), 7 (criptografia em repouso e guia) e 8 (piloto), conforme `roteiro-etapas-4-8.md`. As subetapas 5.1, 5.2 e 6.1 a 6.3 podem começar em paralelo; a decisão sobre o object storage (7.1) deve vir antes de qualquer gravação de autos reais.
+Etapas 0 a 7, 8.1 e 8.2 concluídas. O que falta é o piloto (8.3 a 8.10), conforme `docs/piloto/roteiro-piloto.md`. Os roteiros das Etapas 4 a 8 foram removidos e ficam no histórico do Git.

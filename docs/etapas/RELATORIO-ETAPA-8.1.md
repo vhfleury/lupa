@@ -112,7 +112,7 @@ sai com 1. A varredura de cabeçalhos do `verificar.sh` continua `ok em 4 rotas`
   token raiz** no fim; `--so-unseal` para reinícios. Em dev continua 1/1 com `.vault-dev/init.json`.
   O `.ps1` recusa produção e aponta para o `.sh`. O modo produção **não foi executado** (exige
   terminal interativo e três pessoas); a sintaxe foi conferida e os caminhos de dev rodaram.
-- **Decisão: sem TLS entre API/worker e Vault no piloto** (registrada em `docs/operacao.md` 4.6 e
+- **Decisão: sem TLS entre API/worker e Vault no piloto** (registrada em `docs/operacao/operacao.md` 4.6 e
   no `vault/producao/lupa.hcl`). Rede interna de um único host, sem porta publicada; quem enxerga
   a ponte do Docker já é root e lê o `.env` e a memória; a CA interna traria renovação e mais um
   ponto de falha no reinício sem ganho real. Reavaliar se o Vault sair do host.
@@ -212,7 +212,7 @@ O arquivo de teste `lupa-2026-10-20261021T235335Z.tar.age` (830 KB) ficou em `.b
 
 ## 7. Documentação
 
-`docs/operacao.md`: 2.1 (variáveis novas), 2.2 (atalho do instalador e ordem nova com o Vault
+`docs/operacao/operacao.md`: 2.1 (variáveis novas), 2.2 (atalho do instalador e ordem nova com o Vault
 primeiro), 3 (atualização com o Vault selado), 4 (intro), 4.1 (produção pelo script, 3/2), 4.2
 (selado agora detectado; `--so-unseal`), 4.4 (Vault dentro do `.age`, restauração testada), 4.6
 (tabela de decisões, TLS interno), 5.1 (três modos), 5.3 (portas), 5.4 (perfil prod), 6 (backup

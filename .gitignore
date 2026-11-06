@@ -33,3 +33,5 @@ front/e2e/playwright-report/
 # Segredos em arquivo para Prometheus e Grafana (Etapa 8.1), nunca no repositorio
 .segredos/
 dados/
+# Claude Code: permissoes locais de cada maquina
+.claude/settings.local.json

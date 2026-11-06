@@ -88,7 +88,7 @@ services:
     security_opt: ["no-new-privileges:true"]
 
   # Testes ponta a ponta (Playwright) contra a stack real, pelo proxy. So sobe sob demanda:
-  # `docker compose run --rm e2e` (ver docs/front.md e front/scripts/e2e.sh).
+  # `docker compose run --rm e2e` (ver docs/sistema/front.md e front/scripts/e2e.sh).
   e2e:
     build:
       context: ./front/e2e
@@ -233,7 +233,7 @@ services:
 
   # Backup cifrado (Etapa 7.8), so sob demanda: `docker compose --profile backup run --rm backup
   # /scripts/backup_conteiner.sh fazer` (use scripts/backup.sh, restaurar.sh, expurgar_backups.sh;
-  # ver docs/backup.md). pg_dump 16 da mesma imagem do banco, `mc` copiado da imagem fixada do
+  # ver docs/operacao/backup.md). pg_dump 16 da mesma imagem do banco, `mc` copiado da imagem fixada do
   # MinIO e `age` (cifra) do Alpine. Backups (.age) e chaves por mes ficam em pastas separadas do
   # host, por bind mount (LUPA_BACKUP_DIR, padrao .backups/; LUPA_BACKUP_CHAVES_DIR, padrao
   # .backup-chaves/). Raiz do conteiner so leitura: nenhum dado de backup vai a camada gravavel; a
