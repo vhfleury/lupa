@@ -9,7 +9,7 @@ Caddy. O documento principal (arquitetura, telas, segurança, E2E) é
 | Caminho | Conteúdo |
 | --- | --- |
 | `src/routes/` | Telas, uma pasta por rota (`login`, `processos/[id]/chat`, `usuarios`...) |
-| `src/lib/` | Cliente da API, sessão, permissões e tema. Testes Vitest ao lado (`*.test.ts`) |
+| `src/lib/` | Cliente da API, sessão, permissões, tema, armazenamento do navegador e atualização automática. Testes Vitest ao lado (`*.test.ts`) |
 | `src/lib/<assunto>/` | Lógica e componentes de cada assunto: `auditoria`, `chat`, `processos`, `visualizador` |
 | `src/lib/componentes/` | Componentes usados por mais de uma tela |
 | `static/` | Favicon e logos |
@@ -25,8 +25,9 @@ Tudo roda em contêiner. Não é preciso Node na máquina. Os comandos abaixo pa
 docker build --target verificacao front
 ```
 
-Roda lint, typecheck e testes unitários. O `docker compose up --build` só gera a imagem do front se
-os três passarem.
+Roda lint (Prettier e ESLint), typecheck e testes unitários. O `docker compose up --build` só gera
+a imagem do front se os três passarem. Se o Prettier acusar formatação, rode `npm run format` num
+contêiner Node.
 
 ```bash
 bash front/scripts/e2e.sh

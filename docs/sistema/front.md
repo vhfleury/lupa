@@ -61,7 +61,8 @@ Tudo roda em contêiner; não é preciso Node no host.
 
 | Comando | Onde | O que faz |
 | --- | --- | --- |
-| `npm run lint` | build da imagem `front` | ESLint 9 + typescript-eslint strict + eslint-plugin-svelte, `--max-warnings 0`, proíbe `{@html}` |
+| `npm run lint` | build da imagem `front` | `prettier --check` (com `prettier-plugin-svelte`) e depois ESLint 9 + typescript-eslint strict + eslint-plugin-svelte, `--max-warnings 0`, proíbe `{@html}` |
+| `npm run format` | contêiner Node | Formata com Prettier o que o `lint` acusar |
 | `npm run typecheck` | idem | `svelte-check --fail-on-warnings` (inclui avisos de acessibilidade do compilador) |
 | `npm test` | idem | Vitest + Testing Library em jsdom |
 | `npm run e2e` | contêiner `e2e` | Playwright (Chromium) contra a stack real via `https://proxy:8443` |
