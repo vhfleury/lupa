@@ -23,6 +23,7 @@
     SITUACAO,
   } from '$lib/processos/rotulos';
   import type { ArquivosDoProcesso, Processo } from '$lib/processos/tipos';
+  import { repetirEnquanto } from '$lib/repeticao';
   import { sessao, tem } from '$lib/sessao.svelte';
 
   const INTERVALO_MS = 2500;
@@ -35,8 +36,6 @@
   let progresso = $state<Progresso | null>(null);
   let envio: EnvioEmCurso | null = null;
   let seletor = $state<HTMLInputElement | null>(null);
-  let temporizador: ReturnType<typeof setTimeout> | undefined;
-  let ativo = true;
 
   const podeEnviar = $derived(tem(sessao.atual, 'subir_processo') && processo?.sigiloso === false);
   const pendente = $derived(
@@ -53,22 +52,21 @@
     } catch (e) {
       erro = mensagemErro(e);
     }
-    clearTimeout(temporizador);
-    if (ativo && pendente) temporizador = setTimeout(() => void carregarArquivos(), INTERVALO_MS);
   }
+
+  const atualizacao = repetirEnquanto(carregarArquivos, () => pendente, INTERVALO_MS);
 
   onMount(async () => {
     try {
       processo = await chamar<Processo>('GET', `/processos/${id}`);
-      await carregarArquivos();
+      await atualizacao.executar();
     } catch (e) {
       erro = mensagemErro(e);
     }
   });
 
   onDestroy(() => {
-    ativo = false;
-    clearTimeout(temporizador);
+    atualizacao.parar();
     envio?.cancelar();
   });
 
@@ -94,7 +92,7 @@
         ? `${arquivo.name}: este conteúdo já tinha sido enviado neste processo.`
         : `${arquivo.name} recebido (${formatarBytes(resposta.tamanho_bytes)}). Processando…`;
       if (seletor) seletor.value = '';
-      await carregarArquivos();
+      await atualizacao.executar();
     } catch (e) {
       erro = mensagemErro(e);
     } finally {

@@ -7,6 +7,7 @@
   import { mascararCnj, problemaCnj } from '$lib/processos/cnj';
   import { formatarData, legivel, SITUACAO } from '$lib/processos/rotulos';
   import type { Materia, Processo, ProcessoNaLista } from '$lib/processos/tipos';
+  import { repetirEnquanto } from '$lib/repeticao';
   import { sessao, tem } from '$lib/sessao.svelte';
 
   const INTERVALO_MS = 4000;
@@ -15,7 +16,6 @@
   let situacao = $state('');
   let responsavel = $state('');
   let novoAberto = $state(false);
-  let ativo = true;
   let processos = $state<ProcessoNaLista[]>([]);
   let carregando = $state(true);
   let erro = $state('');
@@ -26,7 +26,6 @@
   let sigiloso = $state(false);
   let tocado = $state(false);
   let enviando = $state(false);
-  let temporizador: ReturnType<typeof setTimeout> | undefined;
 
   const atual = $derived(sessao.atual);
   const podeCriar = $derived(tem(atual, 'subir_processo') && atual?.gabinete_id !== null);
@@ -48,17 +47,12 @@
       erro = mensagemErro(e);
     } finally {
       carregando = false;
-      agendar();
     }
   }
 
-  function agendar(): void {
-    clearTimeout(temporizador);
-    if (ativo && processando) temporizador = setTimeout(() => void carregar(), INTERVALO_MS);
-  }
-
-  onMount(() => void carregar());
-  onDestroy(() => { ativo = false; clearTimeout(temporizador); });
+  const atualizacao = repetirEnquanto(carregar, () => processando, INTERVALO_MS);
+  onMount(() => void atualizacao.executar());
+  onDestroy(atualizacao.parar);
 
   async function criar(evento: SubmitEvent): Promise<void> {
     evento.preventDefault();
@@ -78,7 +72,7 @@
       classe = '';
       sigiloso = false;
       tocado = false;
-      await carregar();
+      await atualizacao.executar();
     } catch (e) {
       erro = mensagemErro(e);
     } finally {
