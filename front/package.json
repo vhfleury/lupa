@@ -9,7 +9,8 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "test": "vitest run",
-    "verificar": "npm run lint && npm run typecheck && npm test"
+    "verificar": "npm run lint && npm run typecheck && npm test",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "qrcode": "1.5.4"
@@ -27,6 +28,8 @@
     "globals": "15.14.0",
     "jsdom": "25.0.1",
     "picomatch": "4.0.2",
+    "prettier": "3.4.2",
+    "prettier-plugin-svelte": "3.3.2",
     "svelte": "5.16.0",
     "svelte-check": "4.1.1",
     "typescript": "5.7.2",
