@@ -3,12 +3,12 @@
   import type { Snippet } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { chamar, configurarManipuladores } from '$lib/api';
+  import { configurarManipuladores } from '$lib/api';
   import Cabecalho from '$lib/componentes/Cabecalho.svelte';
   import MenuLateral from '$lib/componentes/MenuLateral.svelte';
   import SeletorTema from '$lib/componentes/SeletorTema.svelte';
   import { consumirMarcador } from '$lib/marcador';
-  import { sessao } from '$lib/sessao.svelte';
+  import { encerrarSessao, sessao } from '$lib/sessao.svelte';
   import { visualizacao, type PerfilVisualizacao } from '$lib/visualizacao.svelte';
 
   let { children }: { children: Snippet } = $props();
@@ -35,13 +35,7 @@
   );
 
   async function sair(): Promise<void> {
-    try {
-      await chamar('POST', '/auth/logout', undefined, { tratarSessao: false });
-    } catch {
-      // Sessão já inválida: basta voltar ao login.
-    }
-    consumirMarcador(); // saída voluntária: o próximo login não fala em expiração
-    sessao.definir(null);
+    await encerrarSessao();
     await goto('/login');
   }
 </script>

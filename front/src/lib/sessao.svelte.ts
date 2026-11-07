@@ -1,6 +1,6 @@
 // Estado da sessão corrente, recarregado do servidor a cada navegação.
 import { chamar, ErroApi, type OpcoesChamada } from './api';
-import { marcarSessao } from './marcador';
+import { consumirMarcador, marcarSessao } from './marcador';
 import type { Permissao, Sessao } from './tipos';
 import { visualizacao } from './visualizacao.svelte';
 
@@ -35,6 +35,20 @@ export async function carregarSessao(executar?: typeof fetch): Promise<Sessao | 
     }
     throw erro;
   }
+}
+
+/**
+ * Saída voluntária: encerra a sessão no servidor e esquece a local. Apaga o marcador, para o
+ * próximo login não falar em sessão expirada. Falha no logout não impede a saída.
+ */
+export async function encerrarSessao(): Promise<void> {
+  try {
+    await chamar('POST', '/auth/logout', undefined, { tratarSessao: false });
+  } catch {
+    // Sessão já inválida no servidor: basta esquecer a local.
+  }
+  consumirMarcador();
+  sessao.definir(null);
 }
 
 export function tem(s: Sessao | null, permissao: Permissao): boolean {
