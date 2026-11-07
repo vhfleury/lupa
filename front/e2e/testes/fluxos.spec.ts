@@ -4,7 +4,8 @@
 // partir da URI otpauth:// exibida na tela.
 import { randomBytes } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { guardarConta } from './credenciais';
+import { enviarSenha, entrar, primeiroAcesso, senhaNova } from './acesso';
+import { guardarConta, type Conta } from './credenciais';
 import { Autenticador, segredoDaUri } from './totp';
 
 const ADMIN_USUARIO = process.env['LUPA_E2E_ADMIN_USUARIO'] ?? '';
@@ -16,62 +17,14 @@ const ASSESSOR = `ass.e2e.${SUFIXO}`;
 const MENSAGEM_CREDENCIAIS = 'Usuário ou senha inválidos.';
 const MENSAGEM_BLOQUEIO = /Muitas tentativas/;
 
-interface Conta {
-  usuario: string;
-  senha: string;
-  autenticador: Autenticador;
-}
-
 const contas: Record<string, Conta> = {};
 let senhaTemporariaDesembargador = '';
 let senhaTemporariaAssessor = '';
-
-function senhaNova(): string {
-  return `frase-e2e-${randomBytes(9).toString('base64url')}-lupa`;
-}
 
 function conta(nome: string): Conta {
   const encontrada = contas[nome];
   if (!encontrada) throw new Error(`conta ${nome} ainda não criada`);
   return encontrada;
-}
-
-async function enviarSenha(page: Page, usuario: string, senha: string): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Usuário').fill(usuario);
-  await page.getByLabel('Senha', { exact: true }).fill(senha);
-  await page.getByRole('button', { name: 'Continuar' }).click();
-}
-
-async function primeiroAcesso(page: Page, usuario: string, temporaria: string): Promise<Conta> {
-  await enviarSenha(page, usuario, temporaria);
-  await expect(page.getByRole('heading', { name: 'Cadastre o autenticador' })).toBeVisible();
-  await expect(page.getByRole('img', { name: /QR code para cadastrar/ })).toBeVisible();
-  const uri = (await page.getByTestId('uri-mfa').textContent()) ?? '';
-  const segredo = segredoDaUri(uri.trim());
-  await expect(page.getByTestId('segredo-mfa')).toHaveText(segredo);
-  const autenticador = new Autenticador(segredo);
-  await page.getByLabel('Código de 6 dígitos').fill(await autenticador.proximo());
-  await page.getByRole('button', { name: 'Confirmar autenticador' }).click();
-  await expect(page).toHaveURL(/\/trocar-senha$/);
-  await expect(page.getByText(/defina uma senha pessoal/)).toBeVisible();
-  const senha = senhaNova();
-  await page.getByLabel('Senha atual').fill(temporaria);
-  await page.getByLabel('Nova senha', { exact: true }).fill(senha);
-  await page.getByLabel('Confirme a nova senha').fill(senha);
-  await page.getByRole('button', { name: 'Salvar nova senha' }).click();
-  await expect(page.getByTestId('usuario-nome')).toHaveText(usuario);
-  const nova = { usuario, senha, autenticador };
-  contas[usuario] = nova;
-  return nova;
-}
-
-async function entrar(page: Page, c: Conta): Promise<void> {
-  await enviarSenha(page, c.usuario, c.senha);
-  await expect(page.getByRole('heading', { name: 'Verificação em duas etapas' })).toBeVisible();
-  await page.getByLabel('Código de 6 dígitos').fill(await c.autenticador.proximo());
-  await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.getByTestId('usuario-nome')).toHaveText(c.usuario);
 }
 
 async function sair(page: Page): Promise<void> {
@@ -183,7 +136,7 @@ test.describe.serial('Etapa 6.1 a 6.3', () => {
   });
 
   test('6.2/6.3 desembargador: primeiro acesso e gestão completa de assessor', async ({ page }) => {
-    await primeiroAcesso(page, DESEMBARGADOR, senhaTemporariaDesembargador);
+    contas[DESEMBARGADOR] = await primeiroAcesso(page, DESEMBARGADOR, senhaTemporariaDesembargador);
     await expect(page.getByTestId('usuario-papel')).toHaveText('Desembargador');
     const menu = page.getByRole('navigation', { name: 'Menu principal' });
     await expect(menu.getByRole('link', { name: 'Gabinetes' })).toHaveCount(0);
@@ -239,7 +192,7 @@ test.describe.serial('Etapa 6.1 a 6.3', () => {
   test('6.2/6.3 assessor: primeiro acesso após reset; sem telas de gestão; servidor nega', async ({
     page,
   }) => {
-    await primeiroAcesso(page, ASSESSOR, senhaTemporariaAssessor);
+    contas[ASSESSOR] = await primeiroAcesso(page, ASSESSOR, senhaTemporariaAssessor);
     await expect(page.getByTestId('usuario-papel')).toHaveText('Assessor');
     const menu = page.getByRole('navigation', { name: 'Menu principal' });
     await expect(menu.getByRole('link')).toHaveText(['Início', 'Processos']); // Processos: 6.4

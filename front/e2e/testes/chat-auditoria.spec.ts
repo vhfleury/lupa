@@ -4,47 +4,20 @@
 // pergunta escolhe um desfecho pelo texto: "intimada" (citação válida), "descarte" (uma citação
 // descartada), "sem evidência", "incidente" (instrução refletida → processo em revisão) e
 // "teto" (chamada acima do limite; a quarta encerra a conversa pelo teto).
-import { randomBytes } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { guardarConta } from './credenciais';
-import { Autenticador, segredoDaUri } from './totp';
+import { entrar, primeiroAcesso } from './acesso';
+import { guardarConta, type Conta } from './credenciais';
 
 const USUARIO = process.env['LUPA_E2E_CHAT_USUARIO'] ?? '';
 const TEMPORARIA = process.env['LUPA_E2E_CHAT_SENHA'] ?? '';
 const PROCESSO = process.env['LUPA_E2E_CHAT_PROCESSO'] ?? '';
 const LIMITE_MS = 1000;
 
-let senha = '';
-let autenticador: Autenticador | null = null;
+let contaChat: Conta | null = null;
 
-async function primeiroAcesso(page: Page): Promise<void> {
-  await page.goto('/login');
-  await page.getByLabel('Usuário').fill(USUARIO);
-  await page.getByLabel('Senha', { exact: true }).fill(TEMPORARIA);
-  await page.getByRole('button', { name: 'Continuar' }).click();
-  const uri = ((await page.getByTestId('uri-mfa').textContent()) ?? '').trim();
-  autenticador = new Autenticador(segredoDaUri(uri));
-  await page.getByLabel('Código de 6 dígitos').fill(await autenticador.proximo());
-  await page.getByRole('button', { name: 'Confirmar autenticador' }).click();
-  await expect(page).toHaveURL(/\/trocar-senha$/);
-  senha = `frase-e2e-${randomBytes(9).toString('base64url')}-lupa`;
-  await page.getByLabel('Senha atual').fill(TEMPORARIA);
-  await page.getByLabel('Nova senha', { exact: true }).fill(senha);
-  await page.getByLabel('Confirme a nova senha').fill(senha);
-  await page.getByRole('button', { name: 'Salvar nova senha' }).click();
-  await expect(page.getByTestId('usuario-nome')).toHaveText(USUARIO);
-  guardarConta('desembargador-chat', { usuario: USUARIO, senha, autenticador });
-}
-
-async function entrar(page: Page): Promise<void> {
-  if (!autenticador) throw new Error('primeiro acesso não feito');
-  await page.goto('/login');
-  await page.getByLabel('Usuário').fill(USUARIO);
-  await page.getByLabel('Senha', { exact: true }).fill(senha);
-  await page.getByRole('button', { name: 'Continuar' }).click();
-  await page.getByLabel('Código de 6 dígitos').fill(await autenticador.proximo());
-  await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.getByTestId('usuario-nome')).toHaveText(USUARIO);
+function conta(): Conta {
+  if (!contaChat) throw new Error('primeiro acesso não feito');
+  return contaChat;
 }
 
 async function perguntar(page: Page, pergunta: string): Promise<void> {
@@ -67,11 +40,12 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
 
   // 6.10: guarda o último passo TOTP usado, para os testes finais reutilizarem a conta.
   test.afterAll(() => {
-    if (autenticador) guardarConta('desembargador-chat', { usuario: USUARIO, senha, autenticador });
+    if (contaChat) guardarConta('desembargador-chat', contaChat);
   });
 
   test('6.8 primeiro acesso do desembargador e chat vazio', async ({ page }) => {
-    await primeiroAcesso(page);
+    contaChat = await primeiroAcesso(page, USUARIO, TEMPORARIA);
+    guardarConta('desembargador-chat', contaChat);
     await page.goto(`/processos/${PROCESSO}/chat`);
     await expect(page.getByRole('heading', { name: 'Chat sobre os autos' })).toBeVisible();
     await expect(page.getByText('Nenhuma conversa aberta')).toBeVisible();
@@ -80,7 +54,7 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
   test('6.8 resposta com citação: aviso de IA e citação clicada abre a página', async ({
     page,
   }) => {
-    await entrar(page);
+    await entrar(page, conta());
     await page.goto(`/processos/${PROCESSO}/chat`);
     await perguntar(page, 'Quando a defesa foi intimada?');
     const resposta = ultimaResposta(page);
@@ -95,7 +69,7 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
   });
 
   test('6.8 descartes contados, sem evidência marcada, recusa explicada', async ({ page }) => {
-    await entrar(page);
+    await entrar(page, conta());
     await page.goto(`/processos/${PROCESSO}/chat`);
     await perguntar(page, 'Mostre o descarte da certidão');
     await expect(ultimaResposta(page).getByTestId('descartes')).toContainText(
@@ -119,7 +93,7 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
   test('6.8 incidente põe o processo em revisão até o desembargador liberar', async ({
     page,
   }) => {
-    await entrar(page);
+    await entrar(page, conta());
     await page.goto(`/processos/${PROCESSO}/chat`);
     await perguntar(page, 'Simule o incidente');
     await expect(ultimaResposta(page)).toHaveAttribute('data-status', 'descartada');
@@ -138,7 +112,7 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
   });
 
   test('6.8 teto: a conversa é encerrada e vai para o histórico', async ({ page }) => {
-    await entrar(page);
+    await entrar(page, conta());
     await page.goto(`/processos/${PROCESSO}/chat`);
     for (let i = 0; i < 3; i += 1) {
       await perguntar(page, `Teste de teto ${i}`);
@@ -161,7 +135,7 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
   });
 
   test('6.9 desembargador vê só o próprio gabinete; consulta abaixo de 1 s', async ({ page }) => {
-    await entrar(page);
+    await entrar(page, conta());
     const sessao = await (await page.request.get('/api/auth/sessao')).json();
     const gabinete: string = sessao.gabinete_id;
     await page.getByRole('link', { name: 'Auditoria' }).click();
@@ -193,7 +167,7 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
   test('6.9 filtros, paginação, exportação, verificação e relatório com custo', async ({
     page,
   }) => {
-    await entrar(page);
+    await entrar(page, conta());
     await page.goto('/auditoria');
     await expect(page.getByTestId('evento').first()).toBeVisible();
     await page.getByLabel('Ação').selectOption('processo_em_revisao');

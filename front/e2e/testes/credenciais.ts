@@ -3,7 +3,8 @@
 // O último passo TOTP usado também é guardado: o servidor recusa código de passo já usado.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import type { Browser, BrowserContext, Page } from '@playwright/test';
+import { entrar } from './acesso';
 import { Autenticador } from './totp';
 
 export const DIRETORIO_ESTADO = process.env['LUPA_E2E_ESTADO'] ?? '/tmp/lupa-e2e-estado';
@@ -60,14 +61,11 @@ export async function guardarSessao(papel: Papel, contexto: BrowserContext): Pro
 /** Login completo (senha + TOTP) pela tela, com a conta guardada; atualiza o passo TOTP. */
 export async function entrarComo(page: Page, papel: Papel): Promise<Conta> {
   const conta = lerConta(papel);
-  await page.goto('/login');
-  await page.getByLabel('Usuário').fill(conta.usuario);
-  await page.getByLabel('Senha', { exact: true }).fill(conta.senha);
-  await page.getByRole('button', { name: 'Continuar' }).click();
-  await page.getByLabel('Código de 6 dígitos').fill(await conta.autenticador.proximo());
-  guardarConta(papel, conta);
-  await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.getByTestId('usuario-nome')).toHaveText(conta.usuario);
+  try {
+    await entrar(page, conta);
+  } finally {
+    guardarConta(papel, conta);
+  }
   return conta;
 }
 

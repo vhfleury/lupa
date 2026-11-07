@@ -8,8 +8,8 @@ import { stat, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { primeiroAcesso } from './acesso';
 import { guardarConta, guardarSessao } from './credenciais';
-import { Autenticador, segredoDaUri } from './totp';
 
 const USUARIO = process.env['LUPA_E2E_PROC_USUARIO'] ?? '';
 const SENHA_TEMPORARIA = process.env['LUPA_E2E_PROC_SENHA'] ?? '';
@@ -95,23 +95,9 @@ test.describe.serial('Etapas 6.4 a 6.7', () => {
   });
 
   test('primeiro acesso do assessor do processo sintético', async () => {
-    await page.goto('/login');
-    await page.getByLabel('Usuário').fill(USUARIO);
-    await page.getByLabel('Senha', { exact: true }).fill(SENHA_TEMPORARIA);
-    await page.getByRole('button', { name: 'Continuar' }).click();
-    const uri = (await page.getByTestId('uri-mfa').textContent()) ?? '';
-    const autenticador = new Autenticador(segredoDaUri(uri.trim()));
-    await page.getByLabel('Código de 6 dígitos').fill(await autenticador.proximo());
-    await page.getByRole('button', { name: 'Confirmar autenticador' }).click();
-    await expect(page).toHaveURL(/\/trocar-senha$/);
-    const senha = `frase-e2e-${randomBytes(9).toString('base64url')}-proc`;
-    await page.getByLabel('Senha atual').fill(SENHA_TEMPORARIA);
-    await page.getByLabel('Nova senha', { exact: true }).fill(senha);
-    await page.getByLabel('Confirme a nova senha').fill(senha);
-    await page.getByRole('button', { name: 'Salvar nova senha' }).click();
-    await expect(page.getByTestId('usuario-nome')).toHaveText(USUARIO);
+    const conta = await primeiroAcesso(page, USUARIO, SENHA_TEMPORARIA);
     // 6.10: conta e sessão ficam para os testes finais (acessibilidade nas telas do processo).
-    guardarConta('assessor-processos', { usuario: USUARIO, senha, autenticador });
+    guardarConta('assessor-processos', conta);
     await guardarSessao('assessor-processos', contexto);
   });
 
