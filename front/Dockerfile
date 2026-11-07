@@ -7,8 +7,7 @@ RUN npm ci --no-audit --no-fund
 
 FROM deps AS verificacao
 COPY . .
-RUN npm run lint && npm run typecheck && npm test \
- && node scripts/carimbo.mjs > /app/verificacao.json
+RUN npm run verificar && node scripts/carimbo.mjs > /app/verificacao.json
 
 FROM verificacao AS build
 RUN npm run build && cp /app/verificacao.json /app/build/verificacao.json
