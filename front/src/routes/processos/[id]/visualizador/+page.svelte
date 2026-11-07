@@ -19,7 +19,9 @@
 
   const arquivo = $derived(arquivos?.arquivos.find((a) => a.arquivo_id === arquivoId) ?? null);
   const legiveis = $derived(
-    arquivos?.arquivos.filter((a) => a.total_paginas && (a.estado === 'concluido' || a.estado === 'em_revisao')) ?? [],
+    arquivos?.arquivos.filter(
+      (a) => a.total_paginas && (a.estado === 'concluido' || a.estado === 'em_revisao'),
+    ) ?? [],
   );
 
   function sincronizarUrl(): void {
@@ -40,7 +42,10 @@
       arquivos = await chamar<ArquivosDoProcesso>('GET', `/processos/${id}/arquivos`);
       const evidencia = consulta.get('evidencia');
       if (evidencia) {
-        destaque = await chamar<BboxEvidencia>('GET', `/processos/${id}/evidencias/${evidencia}/bbox`);
+        destaque = await chamar<BboxEvidencia>(
+          'GET',
+          `/processos/${id}/evidencias/${evidencia}/bbox`,
+        );
         arquivoId = destaque.arquivo_id;
         pagina = destaque.pagina;
         semDestaque = destaque.uniao === null;

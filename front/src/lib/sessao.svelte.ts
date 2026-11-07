@@ -14,7 +14,13 @@ export const sessao = {
     return atual;
   },
   definir(nova: Sessao | null): void {
-    if (!nova || nova.usuario_id !== atual?.usuario_id || nova.papel !== atual?.papel || nova.troca_senha_obrigatoria) visualizacao.encerrar();
+    if (
+      !nova ||
+      nova.usuario_id !== atual?.usuario_id ||
+      nova.papel !== atual?.papel ||
+      nova.troca_senha_obrigatoria
+    )
+      visualizacao.encerrar();
     atual = nova;
   },
 };

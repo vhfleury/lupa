@@ -27,13 +27,19 @@ describe('encerrarSessao', () => {
 
     await encerrarSessao();
 
-    expect(executar).toHaveBeenCalledWith('/api/auth/logout', expect.objectContaining({ method: 'POST' }));
+    expect(executar).toHaveBeenCalledWith(
+      '/api/auth/logout',
+      expect.objectContaining({ method: 'POST' }),
+    );
     expect(sessionStorage.getItem(CHAVE_MARCADOR)).toBeNull();
     expect(sessao.real).toBeNull();
   });
 
   it('saída voluntária com logout falhando ainda apaga o marcador e limpa a sessão', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"detail":"não autenticado"}', { status: 401 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{"detail":"não autenticado"}', { status: 401 })),
+    );
     sessao.definir(assessor);
     marcarSessao();
 

@@ -111,7 +111,10 @@ test.describe.serial('Etapa 6.1 a 6.3', () => {
     page,
   }) => {
     await entrar(page, conta(ADMIN_USUARIO));
-    await page.getByRole('navigation', { name: 'Menu principal' }).getByRole('link', { name: 'Gabinetes' }).click();
+    await page
+      .getByRole('navigation', { name: 'Menu principal' })
+      .getByRole('link', { name: 'Gabinetes' })
+      .click();
     await page.getByLabel('Nome do gabinete').fill(GABINETE);
     await page.getByRole('button', { name: 'Criar gabinete' }).click();
     await expect(page.getByRole('status')).toContainText(`Gabinete ${GABINETE} criado`);
@@ -124,12 +127,19 @@ test.describe.serial('Etapa 6.1 a 6.3', () => {
     await page.reload();
     await expect(page.getByText(senhaTemporariaDesembargador)).toHaveCount(0);
 
-    await page.getByRole('navigation', { name: 'Menu principal' }).getByRole('link', { name: 'Usuários' }).click();
+    await page
+      .getByRole('navigation', { name: 'Menu principal' })
+      .getByRole('link', { name: 'Usuários' })
+      .click();
     const linhaDes = linha(page, DESEMBARGADOR);
     await expect(linhaDes).toContainText('Desembargador');
     await expect(linhaDes).toContainText(GABINETE);
-    await expect(linhaDes.getByRole('button', { name: `Desativar ${DESEMBARGADOR}` })).toBeVisible();
-    await expect(linhaDes.getByRole('button', { name: `Resetar senha de ${DESEMBARGADOR}` })).toBeVisible();
+    await expect(
+      linhaDes.getByRole('button', { name: `Desativar ${DESEMBARGADOR}` }),
+    ).toBeVisible();
+    await expect(
+      linhaDes.getByRole('button', { name: `Resetar senha de ${DESEMBARGADOR}` }),
+    ).toBeVisible();
     await expect(linha(page, ADMIN_USUARIO).getByRole('button')).toHaveCount(0);
     await sair(page);
     expect((await page.request.get('/api/auth/sessao')).status()).toBe(401);
@@ -180,7 +190,9 @@ test.describe.serial('Etapa 6.1 a 6.3', () => {
     await page.goto('/gabinetes');
     await expect(page.getByRole('alert')).toContainText('Só o administrador');
     await expect(page.getByRole('button', { name: 'Criar gabinete' })).toHaveCount(0);
-    expect((await page.request.post('/api/gabinetes', { data: { nome: 'Gabinete pirata' } })).status()).toBe(403);
+    expect(
+      (await page.request.post('/api/gabinetes', { data: { nome: 'Gabinete pirata' } })).status(),
+    ).toBe(403);
     expect((await page.request.get('/api/gabinetes')).status()).toBe(403);
     const desembargadorNovo = await page.request.post('/api/usuarios', {
       data: { nome_usuario: `des.pirata.${SUFIXO}`, papel: 'desembargador' },
@@ -210,7 +222,10 @@ test.describe.serial('Etapa 6.1 a 6.3', () => {
     // Simula a expiração no servidor: o navegador deixa de ter uma sessão válida e a próxima
     // navegação descobre isso ao conferir a sessão.
     await context.clearCookies();
-    await page.getByRole('navigation', { name: 'Menu principal' }).getByRole('link', { name: 'Usuários' }).click();
+    await page
+      .getByRole('navigation', { name: 'Menu principal' })
+      .getByRole('link', { name: 'Usuários' })
+      .click();
     await expect(page).toHaveURL(/\/login\?motivo=expirada$/);
     await expect(page.getByRole('status')).toContainText('Sessão encerrada ou expirada');
   });

@@ -10,7 +10,13 @@
     visualizandoAssessor?: boolean;
   }
 
-  let { sessao, aoSair, aoVisualizarAssessor, aoVisualizarDesembargador, visualizandoAssessor = false }: Props = $props();
+  let {
+    sessao,
+    aoSair,
+    aoVisualizarAssessor,
+    aoVisualizarDesembargador,
+    visualizandoAssessor = false,
+  }: Props = $props();
 </script>
 
 <header class="cabecalho">
@@ -18,10 +24,14 @@
   <div class="usuario">
     <SeletorTema id="tema-cabecalho" />
     {#if aoVisualizarDesembargador && !visualizandoAssessor && sessao.papel === 'administrador'}
-      <button type="button" class="secundario" onclick={aoVisualizarDesembargador}>Visualizar como desembargador</button>
+      <button type="button" class="secundario" onclick={aoVisualizarDesembargador}
+        >Visualizar como desembargador</button
+      >
     {/if}
     {#if aoVisualizarAssessor && !visualizandoAssessor && sessao.papel !== 'assessor'}
-      <button type="button" class="secundario" onclick={aoVisualizarAssessor}>Visualizar como assessor</button>
+      <button type="button" class="secundario" onclick={aoVisualizarAssessor}
+        >Visualizar como assessor</button
+      >
     {/if}
     <span data-testid="usuario-nome">{sessao.nome_usuario}</span>
     <span class="papel" data-testid="usuario-papel">{ROTULO_PAPEL[sessao.papel]}</span>

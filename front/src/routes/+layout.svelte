@@ -50,11 +50,25 @@
   }}>Pular para o conteúdo</a
 >
 {#if comMoldura && atual && real}
-  <Cabecalho sessao={real} aoSair={sair} aoVisualizarAssessor={() => visualizarPerfil('assessor')} aoVisualizarDesembargador={() => visualizarPerfil('desembargador')} visualizandoAssessor={visualizacao.ativa} />
+  <Cabecalho
+    sessao={real}
+    aoSair={sair}
+    aoVisualizarAssessor={() => visualizarPerfil('assessor')}
+    aoVisualizarDesembargador={() => visualizarPerfil('desembargador')}
+    visualizandoAssessor={visualizacao.ativa}
+  />
   {#if visualizacao.ativa}
     <aside class="aviso-visualizacao" aria-label={`Visualização como ${visualizacao.perfil}`}>
-      <div><strong>Visualizando como {visualizacao.perfil}</strong><p>Prévia dos menus e controles, somente para consulta. Os dados são os acessíveis à sua conta, sem simular o gabinete de outro usuário.</p></div>
-      <button type="button" class="secundario" onclick={() => visualizacao.encerrar()}>Voltar ao meu perfil</button>
+      <div>
+        <strong>Visualizando como {visualizacao.perfil}</strong>
+        <p>
+          Prévia dos menus e controles, somente para consulta. Os dados são os acessíveis à sua
+          conta, sem simular o gabinete de outro usuário.
+        </p>
+      </div>
+      <button type="button" class="secundario" onclick={() => visualizacao.encerrar()}
+        >Voltar ao meu perfil</button
+      >
     </aside>
   {/if}
   <div class="corpo">
@@ -66,16 +80,39 @@
     </main>
   </div>
 {:else}
-  <main id="conteudo" class="avulso" class:pagina-login={page.url.pathname === '/login'} tabindex="-1">
+  <main
+    id="conteudo"
+    class="avulso"
+    class:pagina-login={page.url.pathname === '/login'}
+    tabindex="-1"
+  >
     {@render children()}
     <footer class="rodape"><SeletorTema id="tema-avulso" /></footer>
   </main>
 {/if}
 
 <style>
-  .conteudo-pagina { border: 0; padding: 0; margin: 0; min-width: 0; }
-  .aviso-visualizacao { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 1rem 1.25rem; background: var(--aviso-fundo); color: var(--aviso-texto); }
-  .aviso-visualizacao p { margin: .25rem 0 0; font-size: .85rem; max-width: 55rem; }
+  .conteudo-pagina {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+  }
+  .aviso-visualizacao {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 1rem 1.25rem;
+    background: var(--aviso-fundo);
+    color: var(--aviso-texto);
+  }
+  .aviso-visualizacao p {
+    margin: 0.25rem 0 0;
+    font-size: 0.85rem;
+    max-width: 55rem;
+  }
   .pular {
     position: absolute;
     left: -999px;
@@ -130,4 +167,3 @@
     }
   }
 </style>
-

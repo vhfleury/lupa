@@ -12,7 +12,9 @@ export const TEMAS: readonly { valor: Tema; rotulo: string }[] = [
   { valor: 'escuro', rotulo: 'Escuro' },
 ];
 
-export function lerTema(armazenamento: Storage | null = armazenamentoDoNavegador('localStorage')): Tema {
+export function lerTema(
+  armazenamento: Storage | null = armazenamentoDoNavegador('localStorage'),
+): Tema {
   const valor = lerItem(armazenamento, CHAVE_TEMA);
   return valor === 'claro' || valor === 'escuro' || valor === 'sistema' ? valor : 'escuro';
 }

@@ -102,11 +102,16 @@ test.describe.serial('Etapas 6.4 a 6.7', () => {
   });
 
   test('6.4 lista mostra o processo sintético e o status acompanha a fila', async () => {
-    await page.getByRole('navigation', { name: 'Menu principal' }).getByRole('link', { name: 'Processos' }).click();
+    await page
+      .getByRole('navigation', { name: 'Menu principal' })
+      .getByRole('link', { name: 'Processos' })
+      .click();
     await expect(page).toHaveURL(/\/processos$/);
     const linha = page.locator(`tr[data-processo="${PROCESSO}"]`);
     await expect(linha).toBeVisible();
-    await expect(linha.getByTestId('situacao')).toHaveText(/Concluído|Com pendências/, { timeout: 120_000 });
+    await expect(linha.getByTestId('situacao')).toHaveText(/Concluído|Com pendências/, {
+      timeout: 120_000,
+    });
   });
 
   test('6.4 cria processo (CNJ validado), envia PDF e o status muda; quarentena legível', async () => {
@@ -153,7 +158,7 @@ test.describe.serial('Etapas 6.4 a 6.7', () => {
     const caminho = await arquivoGrande(MEGABYTES_GRANDE);
     try {
       const tamanho = (await stat(caminho)).size;
-        await page.goto(`/processos/${processoNovo}`);
+      await page.goto(`/processos/${processoNovo}`);
       await page.getByLabel(/Arquivo PDF ou ZIP/).setInputFiles(caminho);
       const inicio = Date.now();
       await page.getByRole('button', { name: 'Enviar' }).click();
@@ -188,7 +193,9 @@ test.describe.serial('Etapas 6.4 a 6.7', () => {
         type: 'upload',
         description: `${(tamanho / 1048576).toFixed(0)} MB em ${segundos.toFixed(1)} s; maior intervalo entre quadros ${maiorIntervalo.toFixed(0)} ms`,
       });
-      console.log(`[6.4] upload ${(tamanho / 1048576).toFixed(0)} MB em ${segundos.toFixed(1)} s; maior intervalo entre quadros ${maiorIntervalo.toFixed(0)} ms`);
+      console.log(
+        `[6.4] upload ${(tamanho / 1048576).toFixed(0)} MB em ${segundos.toFixed(1)} s; maior intervalo entre quadros ${maiorIntervalo.toFixed(0)} ms`,
+      );
       expect(['quarentena', 'falho']).toContain((await estadoFinal(page, 'sintetico-')).at(-1));
     } finally {
       await unlink(caminho);
@@ -211,17 +218,24 @@ test.describe.serial('Etapas 6.4 a 6.7', () => {
       await expect(page).toHaveURL(/\/visualizador\?evidencia=/);
       await expect(page.getByTestId('pagina-atual')).toHaveText(new RegExp(`^Página ${pagina}\\b`));
       await expect(page.getByTestId('destaque-evidencia').first()).toBeVisible();
-      const largura = await page.getByTestId('imagem-pagina').evaluate((img) => (img as HTMLImageElement).naturalWidth);
+      const largura = await page
+        .getByTestId('imagem-pagina')
+        .evaluate((img) => (img as HTMLImageElement).naturalWidth);
       expect(largura).toBeGreaterThan(0);
     }
   });
 
-  test('6.6 evidência de cada fato e achado abre na página e destaca o trecho', async ({ request }) => {
+  test('6.6 evidência de cada fato e achado abre na página e destaca o trecho', async ({
+    request,
+  }) => {
     test.setTimeout(240_000);
     await page.goto(`/processos/${PROCESSO}/validacoes`);
     await expect(page.getByTestId('achado').first()).toBeVisible();
     const links = await page.getByTestId('link-evidencia').evaluateAll((els) =>
-      els.map((el) => ({ href: el.getAttribute('href') ?? '', texto: el.textContent?.trim() ?? '' })),
+      els.map((el) => ({
+        href: el.getAttribute('href') ?? '',
+        texto: el.textContent?.trim() ?? '',
+      })),
     );
     const unicos = [...new Map(links.map((l) => [l.href, l])).values()];
     expect(unicos.length).toBeGreaterThan(0);
@@ -275,10 +289,14 @@ test.describe.serial('Etapas 6.4 a 6.7', () => {
     await campo.fill(`${ano}${atual.slice(4)}`);
     await page.getByRole('button', { name: 'Salvar correção' }).click();
     await expect(page.getByText(/Fato corrigido\. Validações reexecutadas/)).toBeVisible();
-    await expect(page.getByTestId('status-fato').filter({ hasText: 'Corrigido' }).first()).toBeVisible();
+    await expect(
+      page.getByTestId('status-fato').filter({ hasText: 'Corrigido' }).first(),
+    ).toBeVisible();
     await expect(page.getByTestId('historico-fatos')).toContainText(String(ano));
     await expect(page.getByTestId('historico-achados').locator('tbody tr').first()).toBeVisible();
-    expect(await page.locator(`[data-fato="${fatoId}"] button`, { hasText: 'Corrigir' }).count()).toBe(0);
+    expect(
+      await page.locator(`[data-fato="${fatoId}"] button`, { hasText: 'Corrigir' }).count(),
+    ).toBe(0);
 
     const achado = page.getByTestId('achado').first();
     await achado.getByRole('button', { name: 'Anotar' }).last().click();

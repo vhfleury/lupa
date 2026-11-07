@@ -81,7 +81,10 @@ export async function contextoComo(
   const sessao = arquivoSessao(papel);
   const contexto = await browser.newContext(existsSync(sessao) ? { storageState: sessao } : {});
   if (opcoes.tema) {
-    await contexto.addInitScript((tema) => window.localStorage.setItem('lupa.tema', tema), opcoes.tema);
+    await contexto.addInitScript(
+      (tema) => window.localStorage.setItem('lupa.tema', tema),
+      opcoes.tema,
+    );
   }
   const page = await contexto.newPage();
   const atual = await page.request.get('/api/auth/sessao');

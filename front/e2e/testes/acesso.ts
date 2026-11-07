@@ -18,7 +18,11 @@ export async function enviarSenha(page: Page, usuario: string, senha: string): P
 }
 
 /** Primeiro acesso completo de uma conta com senha temporária; devolve a conta já pronta. */
-export async function primeiroAcesso(page: Page, usuario: string, temporaria: string): Promise<Conta> {
+export async function primeiroAcesso(
+  page: Page,
+  usuario: string,
+  temporaria: string,
+): Promise<Conta> {
   await enviarSenha(page, usuario, temporaria);
   await expect(page.getByRole('heading', { name: 'Cadastre o autenticador' })).toBeVisible();
   await expect(page.getByRole('img', { name: /QR code para cadastrar/ })).toBeVisible();

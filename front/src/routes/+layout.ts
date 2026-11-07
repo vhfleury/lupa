@@ -31,4 +31,3 @@ export const load: LayoutLoad = async ({ url, fetch }) => {
   if (!visualizacao.permiteRota(url.pathname)) redirect(307, '/');
   return {};
 };
-

@@ -43,7 +43,9 @@ test.describe('6.10 segurança do front', () => {
     for (const rota of ROTAS) {
       const resposta = await request.get(rota);
       const h = resposta.headers();
-      expect(h['strict-transport-security'], rota).toMatch(/max-age=(\d{8,}|[2-9]\d{7}|1[6-9]\d{6})/);
+      expect(h['strict-transport-security'], rota).toMatch(
+        /max-age=(\d{8,}|[2-9]\d{7}|1[6-9]\d{6})/,
+      );
       expect(h['permissions-policy'], rota).toContain('camera=()');
       expect(h['permissions-policy'], rota).toContain('microphone=()');
       expect(h['permissions-policy'], rota).toContain('geolocation=()');
@@ -56,7 +58,11 @@ test.describe('6.10 segurança do front', () => {
       expect(csp.get('default-src'), rota).toEqual(["'none'"]);
       expect(csp.get('script-src'), rota).toEqual(["'self'"]);
       // Única exceção: o estilo fixo do anunciador de rota do SvelteKit, por hash.
-      expect(csp.get('style-src'), rota).toEqual(["'self'", "'unsafe-hashes'", "'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo='"]);
+      expect(csp.get('style-src'), rota).toEqual([
+        "'self'",
+        "'unsafe-hashes'",
+        "'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo='",
+      ]);
       expect(csp.get('object-src'), rota).toEqual(["'none'"]);
       expect(csp.get('frame-ancestors'), rota).toEqual(["'none'"]);
       expect(csp.get('base-uri'), rota).toEqual(["'none'"]);
@@ -82,7 +88,17 @@ test.describe('6.10 segurança do front', () => {
   test('nenhuma violação de CSP ao navegar pelas telas', async ({ browser }) => {
     const encontradas: string[] = [];
     for (const [papel, caminhos] of [
-      ['assessor-processos', ['/', '/processos', `/processos/${PROC}`, `/processos/${PROC}/dossie`, `/processos/${PROC}/visualizador`, `/processos/${PROC}/validacoes`]],
+      [
+        'assessor-processos',
+        [
+          '/',
+          '/processos',
+          `/processos/${PROC}`,
+          `/processos/${PROC}/dossie`,
+          `/processos/${PROC}/visualizador`,
+          `/processos/${PROC}/validacoes`,
+        ],
+      ],
       ['desembargador-chat', [`/processos/${CHAT}/chat`, '/auditoria', '/usuarios']],
     ] as const) {
       const { contexto, page } = await contextoComo(browser, papel);
@@ -130,7 +146,9 @@ test.describe('6.10 segurança do front', () => {
       await expect(citacao).toContainText('[link](http://x)');
       await expect(citacao).toContainText('http://exemplo');
       // Nada executou e nenhum elemento foi criado a partir do texto.
-      expect(await page.evaluate(() => (window as unknown as { __lupaXss?: number }).__lupaXss)).toBeUndefined();
+      expect(
+        await page.evaluate(() => (window as unknown as { __lupaXss?: number }).__lupaXss),
+      ).toBeUndefined();
       expect(await page.locator('main script').count()).toBe(0);
       expect(await page.locator('a[href^="http"]').count()).toBe(0);
       expect(await page.locator('a[href*="exemplo"], a[href="http://x"]').count()).toBe(0);

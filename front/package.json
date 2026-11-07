@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build && node scripts/externalizar-inicio.mjs",
-    "lint": "eslint . --max-warnings 0",
+    "lint": "prettier --check . && eslint . --max-warnings 0",
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "test": "vitest run",
     "verificar": "npm run lint && npm run typecheck && npm test",

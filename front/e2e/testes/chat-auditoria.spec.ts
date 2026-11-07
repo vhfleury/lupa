@@ -90,9 +90,7 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
     await expect(recusa).toContainText('Experimente');
   });
 
-  test('6.8 incidente põe o processo em revisão até o desembargador liberar', async ({
-    page,
-  }) => {
+  test('6.8 incidente põe o processo em revisão até o desembargador liberar', async ({ page }) => {
     await entrar(page, conta());
     await page.goto(`/processos/${PROCESSO}/chat`);
     await perguntar(page, 'Simule o incidente');
@@ -142,9 +140,9 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
     await expect(page).toHaveURL(/\/auditoria$/);
     await expect(page.getByTestId('evento').first()).toBeVisible();
     await expect(page.getByLabel('Gabinete')).toHaveCount(0);
-    const gabinetes = await page.getByTestId('evento').evaluateAll((linhas) =>
-      linhas.map((l) => l.getAttribute('data-gabinete')),
-    );
+    const gabinetes = await page
+      .getByTestId('evento')
+      .evaluateAll((linhas) => linhas.map((l) => l.getAttribute('data-gabinete')));
     expect(new Set(gabinetes)).toEqual(new Set([gabinete]));
     const outro = await page.request.get(
       '/api/auditoria?gabinete_id=00000000-0000-4000-8000-000000000000',

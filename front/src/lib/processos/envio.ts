@@ -53,7 +53,10 @@ export function enviarArquivo(
     xhr.setRequestHeader('Content-Type', 'application/octet-stream');
     xhr.setRequestHeader('Accept', 'application/json');
     xhr.upload.onprogress = (evento) => {
-      aoProgredir({ enviados: evento.loaded, total: evento.lengthComputable ? evento.total : arquivo.size });
+      aoProgredir({
+        enviados: evento.loaded,
+        total: evento.lengthComputable ? evento.total : arquivo.size,
+      });
     };
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {

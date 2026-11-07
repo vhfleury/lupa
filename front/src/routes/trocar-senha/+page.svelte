@@ -54,7 +54,9 @@
 <div class="cartao">
   <h1>Trocar senha</h1>
   {#if obrigatoria}
-    <Aviso tipo="info">Antes de continuar, defina uma senha pessoal no lugar da senha temporária.</Aviso>
+    <Aviso tipo="info"
+      >Antes de continuar, defina uma senha pessoal no lugar da senha temporária.</Aviso
+    >
   {/if}
   {#if erro}<Aviso tipo="erro">{erro}</Aviso>{/if}
   <form onsubmit={enviar}>
