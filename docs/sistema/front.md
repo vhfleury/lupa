@@ -61,7 +61,8 @@ Tudo roda em contêiner; não é preciso Node no host.
 
 | Comando | Onde | O que faz |
 | --- | --- | --- |
-| `npm run lint` | build da imagem `front` | ESLint 9 + typescript-eslint strict + eslint-plugin-svelte, `--max-warnings 0`, proíbe `{@html}` |
+| `npm run lint` | build da imagem `front` | `prettier --check` (com `prettier-plugin-svelte`) e depois ESLint 9 + typescript-eslint strict + eslint-plugin-svelte, `--max-warnings 0`, proíbe `{@html}` |
+| `npm run format` | contêiner Node | Formata com Prettier o que o `lint` acusar |
 | `npm run typecheck` | idem | `svelte-check --fail-on-warnings` (inclui avisos de acessibilidade do compilador) |
 | `npm test` | idem | Vitest + Testing Library em jsdom |
 | `npm run e2e` | contêiner `e2e` | Playwright (Chromium) contra a stack real via `https://proxy:8443` |
@@ -78,7 +79,8 @@ troca obrigatória, apaga o autenticador e limpa falhas/bloqueios de login; só 
 desenvolvimento/teste), passa nome e senha ao contêiner `e2e` por variável de ambiente (nada em
 arquivo) e roda `npm run e2e`. O teste resolve o MFA calculando o TOTP a partir da URI
 `otpauth://` mostrada na tela. **Atenção:** o script reseta o administrador do banco de
-desenvolvimento a cada execução.
+desenvolvimento a cada execução. Esse preparo fica em `front/scripts/preparar-e2e.sh`, que também
+é usado por `front/scripts/capturas.sh`. Mudanças no preparo valem para os dois.
 
 `scripts/verificar.sh` ganhou o passo `== front ==` no fim: com Docker disponível (host) refaz o
 estágio `verificacao`; com Node, roda `npm run verificar`; dentro do contêiner da API (sem Node

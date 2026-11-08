@@ -50,7 +50,12 @@ test.describe.serial('capturas dos guias', () => {
     await page.goto(`/processos/${PROCESSO}/validacoes`);
     await expect(page.getByTestId('achado').first()).toBeVisible();
     await foto(page, 'validacoes');
-    await page.getByTestId('achado').first().getByRole('button', { name: 'Corrigir' }).first().click();
+    await page
+      .getByTestId('achado')
+      .first()
+      .getByRole('button', { name: 'Corrigir' })
+      .first()
+      .click();
     await expect(page.getByLabel('Valor corrigido')).toBeVisible();
     await foto(page, 'corrigir-fato');
     await contexto.close();

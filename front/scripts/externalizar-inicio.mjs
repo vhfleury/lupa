@@ -17,7 +17,8 @@ const TEMA = `try {
 
 let html = readFileSync(INDICE, 'utf8');
 const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
-if (inline.length !== 1) throw new Error(`esperado 1 script inline no index.html, achei ${inline.length}`);
+if (inline.length !== 1)
+  throw new Error(`esperado 1 script inline no index.html, achei ${inline.length}`);
 const [bloco, codigo] = inline[0];
 writeFileSync(DESTINO, `${TEMA}${codigo.trim()}\n`);
 html = html.replace(bloco, '<script src="/inicio.js"></script>');

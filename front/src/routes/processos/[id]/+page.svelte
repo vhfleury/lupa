@@ -23,6 +23,7 @@
     SITUACAO,
   } from '$lib/processos/rotulos';
   import type { ArquivosDoProcesso, Processo } from '$lib/processos/tipos';
+  import { repetirEnquanto } from '$lib/repeticao';
   import { sessao, tem } from '$lib/sessao.svelte';
 
   const INTERVALO_MS = 2500;
@@ -35,14 +36,14 @@
   let progresso = $state<Progresso | null>(null);
   let envio: EnvioEmCurso | null = null;
   let seletor = $state<HTMLInputElement | null>(null);
-  let temporizador: ReturnType<typeof setTimeout> | undefined;
-  let ativo = true;
 
   const podeEnviar = $derived(tem(sessao.atual, 'subir_processo') && processo?.sigiloso === false);
   const pendente = $derived(
     dados?.arquivos.some((a) => a.estado !== null && !ESTADOS_FINAIS.has(a.estado)) ?? false,
   );
-  const pronto = $derived(dados?.arquivos.some((a) => a.estado === 'concluido' || a.estado === 'em_revisao') ?? false);
+  const pronto = $derived(
+    dados?.arquivos.some((a) => a.estado === 'concluido' || a.estado === 'em_revisao') ?? false,
+  );
   const percentual = $derived(
     progresso && progresso.total > 0 ? Math.floor((progresso.enviados / progresso.total) * 100) : 0,
   );
@@ -53,22 +54,21 @@
     } catch (e) {
       erro = mensagemErro(e);
     }
-    clearTimeout(temporizador);
-    if (ativo && pendente) temporizador = setTimeout(() => void carregarArquivos(), INTERVALO_MS);
   }
+
+  const atualizacao = repetirEnquanto(carregarArquivos, () => pendente, INTERVALO_MS);
 
   onMount(async () => {
     try {
       processo = await chamar<Processo>('GET', `/processos/${id}`);
-      await carregarArquivos();
+      await atualizacao.executar();
     } catch (e) {
       erro = mensagemErro(e);
     }
   });
 
   onDestroy(() => {
-    ativo = false;
-    clearTimeout(temporizador);
+    atualizacao.parar();
     envio?.cancelar();
   });
 
@@ -94,7 +94,7 @@
         ? `${arquivo.name}: este conteúdo já tinha sido enviado neste processo.`
         : `${arquivo.name} recebido (${formatarBytes(resposta.tamanho_bytes)}). Processando…`;
       if (seletor) seletor.value = '';
-      await carregarArquivos();
+      await atualizacao.executar();
     } catch (e) {
       erro = mensagemErro(e);
     } finally {
@@ -131,18 +131,28 @@
     <form onsubmit={enviar}>
       <div class="campo">
         <label for="arquivo">Arquivo PDF ou ZIP (até 512 MB)</label>
-        <input id="arquivo" type="file" accept=".pdf,.zip,application/pdf,application/zip" bind:this={seletor} disabled={progresso !== null} />
+        <input
+          id="arquivo"
+          type="file"
+          accept=".pdf,.zip,application/pdf,application/zip"
+          bind:this={seletor}
+          disabled={progresso !== null}
+        />
       </div>
       {#if progresso}
         <div class="progresso" data-testid="progresso-envio">
           <label for="barra">Enviando… {percentual}%</label>
           <progress id="barra" max="100" value={percentual}>{percentual}%</progress>
-          <span class="dica">{formatarBytes(progresso.enviados)} de {formatarBytes(progresso.total)}</span>
+          <span class="dica"
+            >{formatarBytes(progresso.enviados)} de {formatarBytes(progresso.total)}</span
+          >
           <!-- 6.10: anúncio de progresso para leitor de tela, em degraus de 10% (não a cada byte). -->
           <span class="visualmente-oculto" aria-live="polite" data-testid="anuncio-envio"
             >Enviando: {Math.floor(percentual / 10) * 10}%</span
           >
-          <button type="button" class="secundario" onclick={() => envio?.cancelar()}>Cancelar</button>
+          <button type="button" class="secundario" onclick={() => envio?.cancelar()}
+            >Cancelar</button
+          >
         </div>
       {:else}
         <button type="submit">Enviar</button>
@@ -154,7 +164,9 @@
 <h2>Arquivos</h2>
 {#if dados}
   <p>
-    Situação: <strong data-testid="situacao-processo">{SITUACAO[dados.situacao] ?? dados.situacao}</strong>
+    Situação: <strong data-testid="situacao-processo"
+      >{SITUACAO[dados.situacao] ?? dados.situacao}</strong
+    >
     {#if pendente}<span class="dica" aria-live="polite"> — atualizando automaticamente…</span>{/if}
   </p>
   {#if dados.arquivos.length === 0}
@@ -177,16 +189,22 @@
             <td>{formatarBytes(a.tamanho_bytes)}</td>
             <td>{formatarData(a.enviado_em)}</td>
             <td>
-              <span data-testid="estado-arquivo" data-estado={a.estado}>{a.estado ? (ESTADO_JOB[a.estado] ?? a.estado) : '—'}</span>
+              <span data-testid="estado-arquivo" data-estado={a.estado}
+                >{a.estado ? (ESTADO_JOB[a.estado] ?? a.estado) : '—'}</span
+              >
               {#if a.estado === 'quarentena'}
-                <p class="motivo" data-testid="motivo-quarentena">{motivoQuarentena(a.motivo_quarentena)}</p>
+                <p class="motivo" data-testid="motivo-quarentena">
+                  {motivoQuarentena(a.motivo_quarentena)}
+                </p>
               {:else if a.estado === 'falho'}
                 <p class="motivo">{motivoFalha(a.motivo_falha)}</p>
               {/if}
             </td>
             <td>
               {#if a.total_paginas && (a.estado === 'concluido' || a.estado === 'em_revisao')}
-                <a href="/processos/{id}/visualizador?arquivo={a.arquivo_id}&pagina=1">{a.total_paginas}</a>
+                <a href="/processos/{id}/visualizador?arquivo={a.arquivo_id}&pagina=1"
+                  >{a.total_paginas}</a
+                >
               {:else}
                 {a.total_paginas ?? '—'}
               {/if}
@@ -228,4 +246,3 @@
     font-size: 0.9rem;
   }
 </style>
-

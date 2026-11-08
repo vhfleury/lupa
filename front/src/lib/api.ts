@@ -118,4 +118,3 @@ export function mensagemErro(erro: unknown): string {
   }
   return 'Algo deu errado. Tente novamente.';
 }
-

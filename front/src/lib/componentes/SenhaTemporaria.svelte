@@ -14,7 +14,11 @@
   });
 </script>
 
-<section class="cartao destaque" aria-labelledby="titulo-senha-temporaria" data-testid="senha-temporaria">
+<section
+  class="cartao destaque"
+  aria-labelledby="titulo-senha-temporaria"
+  data-testid="senha-temporaria"
+>
   <h2 id="titulo-senha-temporaria">Senha temporária de {nomeUsuario}</h2>
   <p>
     Entregue esta senha pessoalmente. Ela <strong>não será exibida de novo</strong>; no primeiro

@@ -23,9 +23,21 @@ const TELAS: Tela[] = [
   { papel: 'assessor-processos', caminho: () => '/processos', titulo: /^Processos$/ },
   { papel: 'assessor-processos', caminho: () => `/processos/${PROC}`, titulo: /./ },
   { papel: 'assessor-processos', caminho: () => `/processos/${PROC}/dossie`, titulo: /Dossiê/ },
-  { papel: 'assessor-processos', caminho: () => `/processos/${PROC}/visualizador`, titulo: /Visualizador/ },
-  { papel: 'assessor-processos', caminho: () => `/processos/${PROC}/validacoes`, titulo: /Validações/ },
-  { papel: 'desembargador-chat', caminho: () => `/processos/${CHAT}/chat`, titulo: /Chat sobre os autos/ },
+  {
+    papel: 'assessor-processos',
+    caminho: () => `/processos/${PROC}/visualizador`,
+    titulo: /Visualizador/,
+  },
+  {
+    papel: 'assessor-processos',
+    caminho: () => `/processos/${PROC}/validacoes`,
+    titulo: /Validações/,
+  },
+  {
+    papel: 'desembargador-chat',
+    caminho: () => `/processos/${CHAT}/chat`,
+    titulo: /Chat sobre os autos/,
+  },
   { papel: 'desembargador-chat', caminho: () => '/auditoria', titulo: /Auditoria/ },
   { papel: 'desembargador-chat', caminho: () => '/usuarios', titulo: /Usuários/ },
   { papel: 'admin', caminho: () => '/gabinetes', titulo: /Gabinetes/ },
@@ -66,7 +78,10 @@ test.describe('6.10 acessibilidade', () => {
             .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
             .analyze();
           for (const v of resultado.violations.filter((v) => GRAVES.has(v.impact ?? ''))) {
-            const alvos = v.nodes.map((n) => n.target.join(' ')).slice(0, 5).join(' | ');
+            const alvos = v.nodes
+              .map((n) => n.target.join(' '))
+              .slice(0, 5)
+              .join(' | ');
             achados.push(`${tela.caminho()} [${tema}] ${v.id} (${v.impact}): ${alvos}`);
           }
         } finally {
@@ -114,7 +129,14 @@ test.describe('6.10 acessibilidade', () => {
         await page.keyboard.press('Tab');
         vistos.add(await descreverFoco(page));
       }
-      for (const esperado of ['a:Pular para o conteúdo', 'a:Lupa', 'select:Tema', 'button:Sair', 'a:Processos', 'a:Auditoria']) {
+      for (const esperado of [
+        'a:Pular para o conteúdo',
+        'a:Lupa',
+        'select:Tema',
+        'button:Sair',
+        'a:Processos',
+        'a:Auditoria',
+      ]) {
         expect([...vistos]).toContain(esperado);
       }
       // Pular para o conteúdo leva o foco ao <main>.
@@ -125,7 +147,11 @@ test.describe('6.10 acessibilidade', () => {
       // Navega até Processos só com Tab e Enter.
       const menu = page.getByRole('navigation', { name: 'Menu principal' });
       const processos = menu.getByRole('link', { name: 'Processos' });
-      for (let i = 0; i < 15 && !(await processos.evaluate((el) => el === document.activeElement)); i += 1) {
+      for (
+        let i = 0;
+        i < 15 && !(await processos.evaluate((el) => el === document.activeElement));
+        i += 1
+      ) {
         await page.keyboard.press('Tab');
       }
       await expect(processos).toBeFocused();
@@ -215,6 +241,7 @@ async function descreverFoco(page: Page): Promise<string> {
       '';
     return `${el.tagName.toLowerCase()}:${rotulo.trim().replace(/\s+/g, ' ')}`;
   });
-  if (descricao !== 'body:') expect(await focoVisivel(page), `foco visível em ${descricao}`).toBe(true);
+  if (descricao !== 'body:')
+    expect(await focoVisivel(page), `foco visível em ${descricao}`).toBe(true);
   return descricao;
 }

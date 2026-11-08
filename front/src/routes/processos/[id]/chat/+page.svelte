@@ -128,7 +128,7 @@
       </p>
       <div aria-live="polite" data-testid="conversa-atual">
         {#each atual.mensagens as m (m.mensagem_id)}
-          <MensagemChat processoId={processoId} mensagem={m} />
+          <MensagemChat {processoId} mensagem={m} />
         {/each}
       </div>
     {:else}
@@ -171,7 +171,7 @@
             {/if}
           </summary>
           {#each conversa.mensagens as m (m.mensagem_id)}
-            <MensagemChat processoId={processoId} mensagem={m} />
+            <MensagemChat {processoId} mensagem={m} />
           {/each}
         </details>
       {/each}

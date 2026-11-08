@@ -5,11 +5,17 @@ import { chamar } from './api';
 import type { Sessao } from './tipos';
 
 const admin: Sessao = {
-  usuario_id: 'admin', nome_usuario: 'admin', papel: 'administrador',
-  gabinete_id: null, troca_senha_obrigatoria: false,
+  usuario_id: 'admin',
+  nome_usuario: 'admin',
+  papel: 'administrador',
+  gabinete_id: null,
+  troca_senha_obrigatoria: false,
   permissoes: ['ver_processo', 'subir_processo', 'anotar', 'gerir_gabinetes', 'ver_auditoria'],
 };
-afterEach(() => { sessao.definir(null); visualizacao.encerrar(); });
+afterEach(() => {
+  sessao.definir(null);
+  visualizacao.encerrar();
+});
 
 describe('visualização como assessor', () => {
   it('admin visualiza desembargador com rotas próprias e sem gestão de gabinetes', () => {

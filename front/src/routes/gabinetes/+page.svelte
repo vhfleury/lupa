@@ -93,7 +93,12 @@
     </form>
 
     {#if gabinetes.length > 0}
-      <FormNovoUsuario papeis={['desembargador']} {gabinetes} titulo="Novo desembargador" {aoCriar} />
+      <FormNovoUsuario
+        papeis={['desembargador']}
+        {gabinetes}
+        titulo="Novo desembargador"
+        {aoCriar}
+      />
     {/if}
   </div>
 {/if}

@@ -1,6 +1,8 @@
 // Alternância manual de tema (6.10): claro, escuro ou o do sistema. A escolha fica só no
 // localStorage deste navegador (nada vai ao servidor); /inicio.js a aplica antes do primeiro
 // desenho e este módulo a troca em tempo de execução.
+import { armazenamentoDoNavegador, gravarItem, lerItem } from './armazenamento';
+
 export type Tema = 'claro' | 'escuro' | 'sistema';
 
 export const CHAVE_TEMA = 'lupa.tema';
@@ -10,21 +12,11 @@ export const TEMAS: readonly { valor: Tema; rotulo: string }[] = [
   { valor: 'escuro', rotulo: 'Escuro' },
 ];
 
-function armazenamentoPadrao(): Storage | null {
-  try {
-    return typeof localStorage === 'undefined' ? null : localStorage;
-  } catch {
-    return null;
-  }
-}
-
-export function lerTema(armazenamento: Storage | null = armazenamentoPadrao()): Tema {
-  try {
-    const valor = armazenamento?.getItem(CHAVE_TEMA);
-    return valor === 'claro' || valor === 'escuro' || valor === 'sistema' ? valor : 'escuro';
-  } catch {
-    return 'escuro';
-  }
+export function lerTema(
+  armazenamento: Storage | null = armazenamentoDoNavegador('localStorage'),
+): Tema {
+  const valor = lerItem(armazenamento, CHAVE_TEMA);
+  return valor === 'claro' || valor === 'escuro' || valor === 'sistema' ? valor : 'escuro';
 }
 
 export function aplicarTema(tema: Tema, raiz: HTMLElement = document.documentElement): void {
@@ -34,13 +26,9 @@ export function aplicarTema(tema: Tema, raiz: HTMLElement = document.documentEle
 
 export function escolherTema(
   tema: Tema,
-  armazenamento: Storage | null = armazenamentoPadrao(),
+  armazenamento: Storage | null = armazenamentoDoNavegador('localStorage'),
   raiz: HTMLElement = document.documentElement,
 ): void {
   aplicarTema(tema, raiz);
-  try {
-    armazenamento?.setItem(CHAVE_TEMA, tema);
-  } catch {
-    // Sem armazenamento: o tema vale só até recarregar.
-  }
+  gravarItem(armazenamento, CHAVE_TEMA, tema);
 }
