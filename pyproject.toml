@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lupa"
-version = "0.0.1"
+version = "0.1.0"
 description = "Lupa: apoio à análise de processos judiciais"
 requires-python = ">=3.12,<3.13"
 dependencies = [
