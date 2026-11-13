@@ -9,9 +9,6 @@
 - [runbooks/](runbooks/README.md): procedimentos operacionais com resultado observável.
 - Na raiz: [CONTRIBUTING.md](../CONTRIBUTING.md), [CHANGELOG.md](../CHANGELOG.md) e [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md).
 
-## Piloto: o que fazer agora
-
-
 ## Especificação
 
 - [especificacao/requisitos-v1.md](especificacao/requisitos-v1.md): decisões de produto da primeira versão.
