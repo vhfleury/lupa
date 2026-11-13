@@ -243,7 +243,7 @@ relatorio` (auditada, sem conteúdo dos autos).
 
 `scripts/medir_extracao.py` (dentro do contêiner `api`, que monta `.sinteticos` só leitura):
 `diagnostico`, `roteador`, `ocr`, `tempo` e `extrair <processo>` (gera `saida.json` para
-`scripts/medir.py` e o relatório de qualidade). Resultados em `docs/etapas/RELATORIO-ETAPA-4C.*`.
+`scripts/medir.py` e o relatório de qualidade). Resultados na [etapa 4C](../etapas/ETAPAS.md#etapa-4c).
 
 # Saneamento contra injeção (Etapa 4D)
 
@@ -355,7 +355,7 @@ motivo fica com a culpada. A partida do filho (≈ 0,8 s) era o custo dominante.
 ## Medição (4E.9)
 
 `scripts/medir_extracao.py pecas --destino <pasta>` usa as páginas de `extrair` e mede
-fronteira, tipo, origem e data nos três cenários; ver `docs/etapas/RELATORIO-ETAPA-4E.9.md`.
+fronteira, tipo, origem e data nos três cenários; ver [medição contra o gabarito na 4E.9](../etapas/ETAPAS.md#etapa-4e-9).
 
 # Eventos e ponta a ponta (Etapa 4F)
 
@@ -454,8 +454,8 @@ a partir do extrator `4f.0`.
 
 Configuração usada nas medições da 4F.9: um worker, `LUPA_EXTRACAO_PAGINAS_POR_LOTE=8`,
 `LOTES_POR_JOB=4`, `LOTES_POR_GABINETE=4`, sandbox de 1024 MB e 60 s de CPU por lote, Tesseract
-com `OMP_THREAD_LIMIT=1`, sem fatiar. Tempos por mil páginas, nativo e digitalizado, em
-`docs/etapas/RELATORIO-ETAPA-4F.9.md`. Recomendação para o piloto: uma réplica com 4 lotes
+com `OMP_THREAD_LIMIT=1`, sem fatiar. Tempos por mil páginas, nativo e digitalizado, na
+[medição da 4F.9](../etapas/ETAPAS.md#tempo-4f-9). Recomendação para o piloto: uma réplica com 4 lotes
 simultâneos por job; mais réplicas só depois do semáforo por gabinete no Redis (risco 3 da
 revisão 4C).
 
