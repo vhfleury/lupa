@@ -8,18 +8,25 @@ O formato segue o [Keep a Changelog 1.1.0](https://keepachangelog.com/pt-BR/1.1.
 ## Como as versões funcionam
 
 - A versão é do monorepo inteiro: back, front, proxy e scripts sobem juntos. O `pyproject.toml` e o
-  `front/package.json` declaram a mesma versão, `0.0.1`.
-- O repositório ainda não tem tags nem releases no GitHub. Por isso tudo está em `Não publicado`.
-- Ao publicar: crie a tag, mova as entradas para uma seção `## [X.Y.Z] - AAAA-MM-DD` e atualize as
-  duas declarações de versão. Esquema de numeração: `{{esquema de versão e quem publica a tag}}`.
+  `front/package.json` (e o `front/package-lock.json`) declaram a mesma versão, `0.1.0`.
+- Esquema de numeração: [SemVer 2.0](https://semver.org/lang/pt-BR/). Enquanto a versão for `0.x`,
+  uma versão menor pode quebrar compatibilidade.
+- Ao publicar: num PR para o `develop`, mova as entradas de `Não publicado` para uma seção
+  `## [X.Y.Z] - AAAA-MM-DD` e atualize as declarações de versão; depois do PR `develop` → `main`,
+  o responsável técnico cria a tag `vX.Y.Z` no `main` e a release no GitHub.
 
 ## [Não publicado]
+
+Nada ainda.
+
+## [0.1.0] - 2026-11-13
 
 ### Adicionado
 
 - Documentação de entrada do repositório: [CONTRIBUTING.md](CONTRIBUTING.md),
   [docs/arquitetura.md](docs/arquitetura.md), [ADRs](docs/adr/README.md),
-  [runbooks](docs/runbooks/README.md), este changelog e o [código de conduta](CODE_OF_CONDUCT.md).
+  [runbooks](docs/runbooks/README.md), este changelog e o [código de conduta](CODE_OF_CONDUCT.md)
+  (`vhfleury/lupa1.1#4`).
 - 2026-11-07: o lint do front passa a conferir a formatação com Prettier. Um arquivo fora do padrão
   impede a geração da imagem do front. Ação: rode `npm run format` num contêiner Node antes do
   build (`vhfleury/lupa1.1#3`).
@@ -66,3 +73,6 @@ O formato segue o [Keep a Changelog 1.1.0](https://keepachangelog.com/pt-BR/1.1.
   (`docker compose exec api alembic -c src/lupa/migrations/alembic.ini upgrade head`) e recrie o
   bucket de desenvolvimento, que guarda objetos antigos em claro
   ([ADR 0012](docs/adr/0012-recusa-de-dado-em-claro.md)).
+
+[Não publicado]: https://github.com/vhfleury/lupa/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/vhfleury/lupa/releases/tag/v0.1.0

@@ -784,6 +784,10 @@ Tomadas depois da Etapa 8, ao simplificar o projeto. Cada uma diz o que substitu
 - **Só scripts `.sh`.** Os oito `.ps1` saíram. No Windows, os scripts rodam pelo Git Bash; o resto, pelo `docker compose`. Substitui a menção ao `e2e.ps1` da Etapa 6. Motivo: os pares já tinham divergido. O `verificar.ps1` tinha os passos de E2E e de backup que faltavam no `verificar.sh`, e eles foram levados para o `.sh`.
 - **Dado em claro é recusado na leitura.** Objeto sem cabeçalho `LUPAOBJ` e campo sem prefixo `lupa1:` geram `CifraInvalidaError`; identidade sem token do cofre gera `TokenInvalidoError`. Saiu o `scripts/recifrar_objetos_legado.py` (7.10). A migração `0012` tira o `DEFAULT '[]'` em claro de `pagina.trechos_ocultos` e `pagina.trechos_suspeitos`; a lista vazia agora vem do modelo, já cifrada. Substitui a leitura de legado da 7.4 (aviso `objeto_legado_em_claro`) e resolve a pendência registrada na [7.4 — Cifra dos originais](../etapas/ETAPAS.md#etapa-7-4). Motivo: aceitar dado em claro servia só como caminho de migração e escondia gravação sem cifra; não há dado real anterior à 7.4. Consequência: dado em claro no banco ou no bucket passa a ser incidente (`docs/operacao/operacao.md`, seção 10), e o bucket de desenvolvimento é recriado antes do piloto (roteiro do piloto, passo 0.4(removido; ver histórico do Git).
 
+### Versões (novembro de 2026)
+
+- **SemVer com tag `vX.Y.Z` no `main`.** A primeira versão publicada é a `0.1.0`. A versão vale para o monorepo inteiro e é declarada no `pyproject.toml` e no `front/package.json`. O bump e o `CHANGELOG.md` entram por PR no `develop`; depois do PR `develop` → `main`, o responsável técnico cria a tag e a release no GitHub. Substitui a versão `0.0.1` sem tag e o esquema em aberto no `CHANGELOG.md`.
+
 ## Resultado das revisões
 
 | Revisão | Resultado |
