@@ -9,7 +9,7 @@ Decisões de produto estão em `docs/especificacao/requisitos-v1.md` e não são
 
 O que ficou de fora, as limitações e os riscos de cada etapa estão no [histórico por etapa](../etapas/ETAPAS.md#etapas-e-pendencias).
 
-As pendências (o que ainda falta decidir ou fazer) estão em [`docs/piloto/pendencias.md`](../piloto/pendencias.md).
+As pendências (o que ainda falta decidir ou fazer) estavam em `docs/piloto/pendencias.md` (removido; ver histórico do Git).
 
 ## Mantido assim no desenvolvimento, por decisão
 
@@ -782,7 +782,7 @@ Tomadas depois da Etapa 8, ao simplificar o projeto. Cada uma diz o que substitu
 
 - **Dependências declaradas só no `pyproject.toml`.** Os `requirements.txt` e `requirements-dev.txt`, com hashes, são gerados dele por `make lock` (`uv pip compile`, mirando `x86_64-manylinux_2_28` e Python 3.12). O `requirements-dev.txt` traz produção + dev, e a imagem de dev instala só ele. Substitui o item 1 da Etapa 0 (`pip-compile` a partir dos `.in`) e a regeneração dentro do contêiner da 4A. Motivo: a mesma lista estava em três arquivos, e gerar no Windows trazia `tzdata` e `colorama`; mirar a plataforma resolve isso sem contêiner. Versões e hashes de produção não mudaram.
 - **Só scripts `.sh`.** Os oito `.ps1` saíram. No Windows, os scripts rodam pelo Git Bash; o resto, pelo `docker compose`. Substitui a menção ao `e2e.ps1` da Etapa 6. Motivo: os pares já tinham divergido. O `verificar.ps1` tinha os passos de E2E e de backup que faltavam no `verificar.sh`, e eles foram levados para o `.sh`.
-- **Dado em claro é recusado na leitura.** Objeto sem cabeçalho `LUPAOBJ` e campo sem prefixo `lupa1:` geram `CifraInvalidaError`; identidade sem token do cofre gera `TokenInvalidoError`. Saiu o `scripts/recifrar_objetos_legado.py` (7.10). A migração `0012` tira o `DEFAULT '[]'` em claro de `pagina.trechos_ocultos` e `pagina.trechos_suspeitos`; a lista vazia agora vem do modelo, já cifrada. Substitui a leitura de legado da 7.4 (aviso `objeto_legado_em_claro`) e resolve a pendência registrada na [7.4 — Cifra dos originais](../etapas/ETAPAS.md#etapa-7-4). Motivo: aceitar dado em claro servia só como caminho de migração e escondia gravação sem cifra; não há dado real anterior à 7.4. Consequência: dado em claro no banco ou no bucket passa a ser incidente (`docs/operacao/operacao.md`, seção 10), e o bucket de desenvolvimento é recriado antes do piloto (`docs/piloto/roteiro-piloto.md`, passo 0.4).
+- **Dado em claro é recusado na leitura.** Objeto sem cabeçalho `LUPAOBJ` e campo sem prefixo `lupa1:` geram `CifraInvalidaError`; identidade sem token do cofre gera `TokenInvalidoError`. Saiu o `scripts/recifrar_objetos_legado.py` (7.10). A migração `0012` tira o `DEFAULT '[]'` em claro de `pagina.trechos_ocultos` e `pagina.trechos_suspeitos`; a lista vazia agora vem do modelo, já cifrada. Substitui a leitura de legado da 7.4 (aviso `objeto_legado_em_claro`) e resolve a pendência registrada na [7.4 — Cifra dos originais](../etapas/ETAPAS.md#etapa-7-4). Motivo: aceitar dado em claro servia só como caminho de migração e escondia gravação sem cifra; não há dado real anterior à 7.4. Consequência: dado em claro no banco ou no bucket passa a ser incidente (`docs/operacao/operacao.md`, seção 10), e o bucket de desenvolvimento é recriado antes do piloto (roteiro do piloto, passo 0.4(removido; ver histórico do Git).
 
 ## Resultado das revisões
 

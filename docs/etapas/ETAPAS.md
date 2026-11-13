@@ -4,7 +4,7 @@ Este histórico reúne os 19 relatórios de execução citados pelo código e pe
 
 Cada etapa reúne as entregas do executor e os riscos e observações do revisor. Os itens fora do escopo vêm das seções “O que ficou de fora”, “Fora do escopo”, “Limitações” e “Pendente” dos relatórios. Alguns foram resolvidos em etapas seguintes. As medições e os comandos correspondem ao momento de cada registro. O [balanço de conformidade](#conformidade-geral) acompanha as entregas até a 8.2 e identifica as [divergências entre registros](#divergencias).
 
-As referências a “revisão N, §M” remetem às revisões históricas. As decisões também estão no [registro de decisões](../decisoes/registro.md). As ações ainda abertas para o piloto e as questões para o advogado estão nas [pendências do piloto](../piloto/pendencias.md).
+As referências a “revisão N, §M” remetem às revisões históricas. As decisões também estão no [registro de decisões](../decisoes/registro.md). As ações ainda abertas para o piloto e as questões para o advogado estavam nas pendências do piloto (removido; ver histórico do Git).
 
 <a id="etapas-e-pendencias"></a>
 
@@ -2181,7 +2181,7 @@ O [balanço de conformidade](#conformidade-geral) registra o fechamento da revis
 
 ### 8.6 — Métricas do piloto (previstas)
 
-O gabinete ainda precisa registrar as medições com os gabaritos reais e confirmar os calendários oficiais do TJGO. Essa subetapa integra a execução humana prevista para 8.3 a 8.10. [Roteiro do piloto](../piloto/roteiro-piloto.md)
+O gabinete ainda precisa registrar as medições com os gabaritos reais e confirmar os calendários oficiais do TJGO. Essa subetapa integra a execução humana prevista para 8.3 a 8.10. Roteiro do piloto (removido; ver histórico do Git)
 
 ## Conformidade geral
 
@@ -2212,7 +2212,7 @@ O gabinete ainda precisa registrar as medições com os gabaritos reais e confir
 7. Confirmação dos dados jurídicos pelo gabinete: calendários, prazos, tabela do art. 109, tipos penais, regras de borda.
 8. Conta na MaxMind para geolocalização por IP (opcional).
 
-O [roteiro do piloto](../piloto/roteiro-piloto.md) detalha a execução humana das subetapas 8.3 a 8.10. Os roteiros originais das Etapas 4 a 8 estão no histórico do Git.
+O roteiro do piloto (removido; ver histórico do Git) detalhava a execução humana das subetapas 8.3 a 8.10. Os roteiros originais das Etapas 4 a 8 estão no histórico do Git.
 
 ### Verificações anteriores
 

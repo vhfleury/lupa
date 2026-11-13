@@ -32,7 +32,7 @@ Proposta: manter `pgsty/minio` fixado por digest como padrão, parametrizado por
 
 - Depende de um mantenedor comunitário.
 - Como os objetos já saem cifrados da aplicação ([ADR 0007](0007-cifra-na-aplicacao-com-dek-por-processo.md)), trocar de storage é `mc mirror`, sem recifrar.
-- Pendência 3 de [piloto/pendencias.md](../piloto/pendencias.md) até a assinatura.
+- Pendência 3 de pendências do piloto (removido; ver histórico do Git) até a assinatura.
 
 ## Fontes
 

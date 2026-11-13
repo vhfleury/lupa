@@ -98,14 +98,14 @@ e FK composta `(x_id, gabinete_id)` para o pai.
 
 ## Estado das mudanças
 
-Estado registrado em [piloto/pendencias.md](piloto/pendencias.md) em 22/10/2026. Confira antes de agir.
+Estado registrado nas pendências do piloto (removido; ver histórico do Git) em 22/10/2026. Confira antes de agir.
 
 | Item | Status |
 | --- | --- |
 | Ingestão, validações, agente, interface, criptografia em repouso, backup e monitoramento | Implementado e verificado em desenvolvimento com autos sintéticos |
 | Instalação no servidor do piloto (perfil de produção, Vault com três partes, certificado real) | Planejado; nenhum ambiente de produção registrado no repositório |
 | Primeiro processo real | Planejado; depende do [checklist do piloto](conformidade/CONFORMIDADE.md#checklist-piloto) |
-| Pseudonimização de vítimas e testemunhas | Em decisão (opções A e B em [piloto/pendencias.md](piloto/pendencias.md)) |
+| Pseudonimização de vítimas e testemunhas | Em decisão (opções A e B nas pendências do piloto (removido; ver histórico do Git)) |
 | Imagem do object storage | Proposto ([ADR 0008](adr/0008-imagem-do-object-storage.md)) |
 | Semáforo por gabinete no Redis, para mais de uma réplica do worker | Planejado, sem data |
 | Canal de notificação dos alertas (Alertmanager) | Planejado, sem data |

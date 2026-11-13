@@ -30,7 +30,7 @@ O agente usa o `claude-agent-sdk` atrás da interface `ClienteAgente` (`src/lupa
 ## Consequências
 
 - Trechos dos autos saem do servidor para o fornecedor do modelo; isso consta do aviso de tratamento.
-- A pseudonimização cobre só réus; vítimas e testemunhas estão em decisão ([piloto/pendencias.md](../piloto/pendencias.md), item 1).
+- A pseudonimização cobre só réus; vítimas e testemunhas estão em decisão (pendências do piloto, item 1; removido, ver histórico do Git).
 - A imagem da API cresce cerca de 300 MB, porque o wheel embute o binário do Claude Code.
 - O SDK não tem `max_tokens` por chamada: o teto é conferido depois e o laço é limitado por `max_turns`.
 - Trocar de modelo exige rodar a suíte do agente.

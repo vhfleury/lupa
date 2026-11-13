@@ -467,5 +467,4 @@ revisão 4C).
 - `scripts/ponta_a_ponta.py`: upload pelo código do worker (storage e banco configurados) até os
   achados, com `--volume` para reaproveitar as páginas da 4E pelo cache e `--repetir` para medir o
   segundo upload.
-- `scripts/calibrar.py <arquivo>`: relatório Markdown para conferência manual; roteiro em
-  `docs/piloto/calibracao-projudi.md`.
+- `scripts/calibrar.py <arquivo>`: relatório Markdown para conferência manual.

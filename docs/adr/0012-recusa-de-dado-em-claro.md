@@ -26,7 +26,7 @@ Objeto sem cabeçalho `LUPAOBJ` e campo sem prefixo `lupa1:` geram `CifraInvalid
 ## Consequências
 
 - Dado em claro no banco ou no bucket passa a ser incidente ([operacao/operacao.md](../operacao/operacao.md), seção 10).
-- O bucket de desenvolvimento é recriado antes do piloto ([piloto/roteiro-piloto.md](../piloto/roteiro-piloto.md), passo 0.4).
+- O bucket de desenvolvimento é recriado antes do piloto (roteiro do piloto, passo 0.4; removido, ver histórico do Git).
 - Ação para quem opera: aplique a migração `0012` com `alembic upgrade head`.
 
 ## Fontes

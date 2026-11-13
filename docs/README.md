@@ -11,9 +11,6 @@
 
 ## Piloto: o que fazer agora
 
-- [piloto/roteiro-piloto.md](piloto/roteiro-piloto.md): o que falta, em ordem, com quem faz e quando termina.
-- [piloto/pendencias.md](piloto/pendencias.md): decisões e tarefas em aberto.
-- [piloto/calibracao-projudi.md](piloto/calibracao-projudi.md): como rodar o primeiro processo real do Projudi.
 
 ## Especificação
 

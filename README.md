@@ -201,7 +201,7 @@ Métricas Prometheus em `GET /metricas` (administrador).
 | 1. Modelo de dados | `src/lupa/dominio/` | `docs/sistema/modelo-de-dados.md` |
 | 2. Validações | `src/lupa/validacoes/` | `docs/sistema/validacoes.md`, `docs/especificacao/catalogo-validacoes.md` |
 | 3. Acesso e auditoria | `src/lupa/acesso/`, `src/lupa/auditoria/` | `docs/sistema/auditoria.md` |
-| 4A–4F. Ingestão | `src/lupa/ingestao/` | `docs/sistema/ingestao.md`, `docs/piloto/calibracao-projudi.md` |
+| 4A–4F. Ingestão | `src/lupa/ingestao/` | `docs/sistema/ingestao.md` |
 | 4B. Autos sintéticos | `src/lupa/sinteticos/`, `scripts/gerar_autos.py` | `docs/sistema/sinteticos.md` |
 | 5. Agente e chat | `src/lupa/agente/` | `docs/sistema/agente.md`, `docs/especificacao/prompt-injection.md` |
 | 6. Interface web | `front/`, `proxy/Caddyfile` | `docs/sistema/front.md` |
@@ -210,7 +210,7 @@ Métricas Prometheus em `GET /metricas` (administrador).
 | 7.9. Guias dos usuários | `docs/imagens/` | `docs/guias/guia-assessor.md`, `docs/guias/guia-desembargador.md` |
 | 7.10. Operação | `scripts/preparar_repositorio.md` | `docs/operacao/operacao.md` |
 | Testes | `tests/` (espelha `src/lupa/`) | — |
-| Relatórios, decisões e pendências | — | [Histórico por etapa](docs/etapas/ETAPAS.md#etapas-e-pendencias), `docs/decisoes/registro.md`, `docs/piloto/pendencias.md` (índice em `docs/README.md`) |
+| Relatórios, decisões e pendências | — | [Histórico por etapa](docs/etapas/ETAPAS.md#etapas-e-pendencias), `docs/decisoes/registro.md` (índice em `docs/README.md`) |
 
 ## Autos sintéticos (Etapa 4B)
 

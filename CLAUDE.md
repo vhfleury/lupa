@@ -49,7 +49,6 @@ docs/
     incidentes/     post-mortems: data, sintoma, causa, correção e pendências
     operacao/       manual do responsável técnico, backup e runbooks
     etapas/         ETAPAS.md reúne relatórios, pendências e conformidade por etapa
-    piloto/         roteiro, pendências e calibração do piloto
     conformidade/   CONFORMIDADE.md reúne as minutas LGPD e Res. CNJ 615/2025
     guias/          guias dos usuários; capturas de tela em imagens/
     contexto/       pesquisa usada no desenho
