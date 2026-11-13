@@ -25,7 +25,7 @@ mais é instalado na máquina: tudo roda nos contêineres.
 de rede), `db` (PostgreSQL 16), `minio` (S3), `redis` (fila), `vault` (chaves), mais `minio-init`
 (cria o bucket e sai) e `backup` (perfil `backup`, só quando chamado).
 
-**Medidas que existem** (revisões 4C e 4F, relatório 4F.9; 1 worker, host com 12 CPUs, lotes de 8
+**Medidas que existem** (revisões 4C e 4F, [medição da 4F.9](../etapas/ETAPAS.md#tempo-4f-9); 1 worker, host com 12 CPUs, lotes de 8
 páginas, 4 lotes por job, sandbox de 1024 MB e 60 s de CPU por lote, Tesseract com uma thread):
 
 | Medida | Tempo por mil páginas |
@@ -279,7 +279,7 @@ bash scripts/backup.sh --vault-frio     # para o vault, faz o backup, sobe o vau
 bash scripts/vault_inicializar.sh --so-unseal
 ```
 
-**Restaurar o Vault** (testado em desenvolvimento em 21/10/2026, relatório 8.1):
+**Restaurar o Vault** (testado em desenvolvimento em 21/10/2026, [ensaio da 8.1](../etapas/ETAPAS.md#vault-8-1)):
 
 1. `restaurar.sh` deixa o armazenamento em `LUPA_BACKUP_DIR/vault-<arquivo>.tar` (não repõe
    sozinho);
@@ -500,12 +500,12 @@ piloto, rode e confira que não sobrou gabinete de teste (`GET /api/gabinetes`).
 
 Regra geral para todos: (1) conter, (2) preservar evidência (não apague logs nem eventos; exporte
 a auditoria do período em CSV), (3) corrigir, (4) verificar a cadeia de auditoria, (5) registrar em
-`docs/incidentes/AAAA-MM-DD-<tipo>.md` (o que, quando, quem, o que foi feito, horários).
+`docs/incidentes/AAAA-MM-DD-<tipo>.md` conforme o [modelo de registro](../conformidade/CONFORMIDADE.md#modelo-registro-incidente) (o que, quando, quem, o que foi feito, horários).
 
 **Comunicação (LGPD).** O fornecedor é o controlador dos dados pessoais dos autos perante a LGPD
 (`requisitos-v1.md`, seção 2). Os requisitos **não fixam** prazos nem a forma de comunicar
 incidente à autoridade nacional e aos titulares. Até que Victor defina isso com o jurídico (entra
-nos documentos da subetapa 8.2), a regra operacional é: incidente com dado pessoal confirmado ou
+no [plano de resposta a incidentes da subetapa 8.2](../conformidade/CONFORMIDADE.md#prazos-incidentes)), a regra operacional é: incidente com dado pessoal confirmado ou
 provável → avisar Victor e o desembargador do gabinete **no mesmo dia**, com o registro acima, para
 que a comunicação legal seja feita no prazo que a norma vigente exigir.
 
@@ -602,7 +602,7 @@ conforme os requisitos). Como gerar:
   exportação vira evento.
 
 Nada disso traz conteúdo dos autos nem texto de pergunta ou resposta. Guarde cada exportação
-enviada e combine a periodicidade com o tribunal.
+enviada e combine a periodicidade com o tribunal. [Modelo de relatório de uso ao tribunal](../conformidade/CONFORMIDADE.md#relatorio-uso-tribunal)
 
 ---
 
@@ -611,7 +611,7 @@ enviada e combine a periodicidade com o tribunal.
 Conferível no ambiente em execução por `python scripts/conferir_piloto.py` (item a item:
 atendido, pendente ou manual). Estado abaixo para o **perfil prod**; em desenvolvimento os itens
 2, 13 e 14 aparecem pendentes por desenho (TLS 1.2 aceito no modo `interno`, Vault com 1 parte,
-portas de dev em `127.0.0.1`). Saída em desenvolvimento no relatório da 8.1.
+portas de dev em `127.0.0.1`). A [conferência da 8.1](../etapas/ETAPAS.md#conferencia-8-1) registra a saída em desenvolvimento.
 
 | # | Item da seção 6 | Estado | Observação |
 | --- | --- | --- | --- |
@@ -635,7 +635,7 @@ portas de dev em `127.0.0.1`). Saída em desenvolvimento no relatório da 8.1.
 ## 13. Ensaios registrados (Etapa 7.10, 21/10/2026, ambiente de desenvolvimento)
 
 Executados uma vez pela aplicação real (rotas, banco, Vault real), com gabinete, usuários e
-processo sintéticos; detalhes e saídas em `docs/etapas/RELATORIO-ETAPA-7.10.md`.
+processo sintéticos; detalhes e saídas nos [ensaios da 7.10](../etapas/ETAPAS.md#ensaios-7-10).
 
 | Ensaio | Passos | Tempo | Resultado |
 | --- | --- | --- | --- |

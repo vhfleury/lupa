@@ -150,5 +150,5 @@ produção: `docs/operacao/operacao.md`, seção 4.
 
 ## Desempenho
 
-Medido no contêiner da API (ver `docs/etapas/RELATORIO-ETAPA-7.5.md`): custo da cifra por mil
+Medido no contêiner da API (ver [desempenho na 7.5](../etapas/ETAPAS.md#etapa-7-5)): custo da cifra por mil
 páginas sintéticas, gravação e leitura pelo ORM, e objeto de 1 MB.

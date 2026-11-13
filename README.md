@@ -1,20 +1,112 @@
 # Lupa
 
-Apoio à análise de processos judiciais. Etapas 0 a 7 concluídas (ingestão, validações, agente,
-interface, criptografia em repouso, backup, guias e operação); a Etapa 8 é o piloto.
+O gabinete de um desembargador recebe autos de até cerca de 10 mil páginas e confere à mão
+prazos, prescrição e revisões de prisão. O Lupa recebe o PDF ou o ZIP do processo, separa as
+peças, extrai os fatos datados com a página de origem e roda validações determinísticas.
 
-## Subir
+- **Quem usa:** assessores e desembargador de um gabinete, pela interface web. O responsável
+  técnico instala e opera.
+- **O que produz:** dossiê do processo (peças, linha do tempo, réus pseudonimizados), achados das
+  três validações do piloto (tempestividade do recurso, prescrição pela pena em abstrato, revisão
+  da preventiva em 90 dias) e respostas de chat com citações conferidas contra a página.
+- **O que não faz:** não decide, não valora prova, não tipifica e não redige atos.
+
+Etapas 0 a 7 concluídas (ingestão, validações, agente, interface, criptografia em repouso, backup,
+guias e operação); a Etapa 8 é o piloto.
+
+## Primeira execução
+
+Pré-requisitos na máquina. O restante roda em contêiner.
+
+| Ferramenta | Versão | Para quê |
+| --- | --- | --- |
+| Docker Engine com Compose v2 | não fixada no repositório (no Windows, Docker Desktop com WSL 2) | toda a stack |
+| `bash` | no Windows, Git Bash | scripts de `scripts/` e `front/scripts/` |
+| Python 3 | qualquer 3.x no host | só os scripts do Vault e do backup |
+
+Versões dentro dos contêineres, fixadas no repositório: Python 3.12 (`python:3.12-slim`),
+PostgreSQL 16, Redis 7.4, Vault 1.21.3, Caddy 2.8.4, Node 22.12.0 (build do front), Tesseract 5.5.0.
+As dependências Python vêm de `requirements*.txt` com hashes; as do front, de
+`front/package-lock.json`. Nada é instalado no host.
+
+Rode na raiz do repositório:
 
 ```bash
 cp .env.example .env        # troque os valores fictícios
 docker compose up -d vault           # o vault so fica healthy destravado (Etapa 8.1)
 bash scripts/vault_inicializar.sh   # init/unseal de dev, Transit, AppRole e chave lupa-saude
 docker compose up -d --build --wait   # ou: make up
-curl -k https://localhost:8443/api/saude   # {"api":"ok","db":"ok","minio":"ok","cofre":"ok"}
+docker compose exec api alembic -c src/lupa/migrations/alembic.ini upgrade head
 ```
 
+### Conferir o resultado
+
+1. Confira a saúde dos serviços:
+
+   ```bash
+   curl -k https://localhost:8443/api/saude
+   ```
+
+   Saída esperada: `{"api":"ok","db":"ok","minio":"ok","cofre":"ok"}`.
+
+2. Rode as validações sobre a entrada de exemplo
+   [`tests/validacoes/fatos_exemplo.json`](tests/validacoes/fatos_exemplo.json) (processo sintético):
+
+   ```bash
+   docker compose exec api python -m lupa.validacoes --fatos tests/validacoes/fatos_exemplo.json --materia criminal --referencia 2026-10-20
+   ```
+
+   Saída esperada: uma lista JSON com três achados, todos com `"resultado": "conforme"`.
+
+   | `validacao` | Valores que devem aparecer na `explicacao` |
+   | --- | --- |
+   | `tempestividade_recurso` | prazo de 5 dias contado de 03/09/2026, vencimento em 08/09/2026 |
+   | `prescricao_abstrata` | pena máxima de 48 meses, prazo de 8 anos |
+   | `revisao_preventiva` | maior intervalo de 87 dias |
+
+   Se o comando terminar sem erro com outra contagem ou outro resultado, a instalação está errada.
+
+Para usar a interface, crie o usuário restrito do banco e o administrador
+([Acesso e auditoria](#acesso-e-auditoria-etapa-3)) e abra <https://localhost:8443>.
+
+## Mapa dos módulos
+
+A configuração compartilhada fica na raiz: `.env.example`, `docker-compose.yml`,
+`docker-compose.prod.yml`, `pyproject.toml`, `Makefile` e `Dockerfile`.
+
+| Módulo | Conteúdo | Instruções |
+| --- | --- | --- |
+| `src/lupa/` | API (FastAPI), ingestão e worker, validações, agente, acesso, auditoria, criptografia, migrações | [docs/README.md](docs/README.md), seção "Como o sistema funciona" |
+| `front/` | Interface web (SvelteKit) e testes E2E | [front/README.md](front/README.md) |
+| `proxy/` | Caddy: HTTPS, front em `/` e API em `/api` | [docs/sistema/front.md](docs/sistema/front.md) |
+| `vault/` | Configuração e política do Vault | [docs/sistema/criptografia.md](docs/sistema/criptografia.md) |
+| `monitoramento/` | Prometheus e Grafana (perfil `monitoramento`) | [docs/operacao/operacao.md](docs/operacao/operacao.md), seção 9 |
+| `scripts/` | Verificação, instalação, Vault, backup, sintéticos e medição | docstring de cada script |
+| `tests/` | Espelha `src/lupa/` | [CONTRIBUTING.md](CONTRIBUTING.md) |
+
+O mapa por etapa está em [Onde cada etapa fica](#onde-cada-etapa-fica).
+
+## Documentos
+
+- [CONTRIBUTING.md](CONTRIBUTING.md): caminho de uma alteração, testes e checklist do PR.
+- [docs/arquitetura.md](docs/arquitetura.md): limite do sistema, componentes e uma execução de ponta a ponta.
+- [docs/adr/](docs/adr/README.md): registros de decisão de arquitetura.
+- [docs/runbooks/](docs/runbooks/README.md): procedimentos operacionais.
+- [CHANGELOG.md](CHANGELOG.md): mudanças por versão.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): código de conduta.
+- [docs/README.md](docs/README.md): índice de toda a documentação.
+
+## Suporte
+
+- Responsável técnico: Victor Hugo Fleury Barreto (`vhfleury` no GitHub).
+- Canal de suporte: `{{canal de suporte do Lupa: e-mail ou mensageria combinada com o gabinete}}`.
+- Nunca envie trecho de autos por mensagem ou e-mail.
+
+## Subir
+
 Instalação guiada (gera o `.env`, sobe, Vault, migra, usuário restrito, admin):
-`bash scripts/instalar_piloto.sh` (produção) ou `--dev` (no Windows, pelo Git Bash).
+`bash scripts/instalar_piloto.sh` (produção) ou `--dev` (no Windows, pelo Git Bash). Os comandos
+manuais estão em [Primeira execução](#primeira-execução).
 
 Serviços: `api` (FastAPI, porta `API_PORTA_HOST`, padrão 8000), `db` (PostgreSQL 16, só na rede
 interna), `minio` (console em `MINIO_CONSOLE_PORTA_HOST`, padrão 9001; API S3 só na rede interna) e
@@ -109,7 +201,7 @@ Métricas Prometheus em `GET /metricas` (administrador).
 | 1. Modelo de dados | `src/lupa/dominio/` | `docs/sistema/modelo-de-dados.md` |
 | 2. Validações | `src/lupa/validacoes/` | `docs/sistema/validacoes.md`, `docs/especificacao/catalogo-validacoes.md` |
 | 3. Acesso e auditoria | `src/lupa/acesso/`, `src/lupa/auditoria/` | `docs/sistema/auditoria.md` |
-| 4A–4F. Ingestão | `src/lupa/ingestao/` | `docs/sistema/ingestao.md`, `docs/piloto/calibracao-projudi.md` |
+| 4A–4F. Ingestão | `src/lupa/ingestao/` | `docs/sistema/ingestao.md` |
 | 4B. Autos sintéticos | `src/lupa/sinteticos/`, `scripts/gerar_autos.py` | `docs/sistema/sinteticos.md` |
 | 5. Agente e chat | `src/lupa/agente/` | `docs/sistema/agente.md`, `docs/especificacao/prompt-injection.md` |
 | 6. Interface web | `front/`, `proxy/Caddyfile` | `docs/sistema/front.md` |
@@ -118,7 +210,7 @@ Métricas Prometheus em `GET /metricas` (administrador).
 | 7.9. Guias dos usuários | `docs/imagens/` | `docs/guias/guia-assessor.md`, `docs/guias/guia-desembargador.md` |
 | 7.10. Operação | `scripts/preparar_repositorio.md` | `docs/operacao/operacao.md` |
 | Testes | `tests/` (espelha `src/lupa/`) | — |
-| Relatórios, decisões e pendências | — | `docs/etapas/`, `docs/decisoes/registro.md`, `docs/piloto/pendencias.md` (índice em `docs/README.md`) |
+| Relatórios, decisões e pendências | — | [Histórico por etapa](docs/etapas/ETAPAS.md#etapas-e-pendencias), `docs/decisoes/registro.md` (índice em `docs/README.md`) |
 
 ## Autos sintéticos (Etapa 4B)
 
@@ -228,5 +320,21 @@ resposta a incidente, relatório de uso para o tribunal e checklist de seguranç
   `127.0.0.1:9090`, Grafana em `127.0.0.1:3000`, painel "Lupa — piloto", alertas em
   `monitoramento/prometheus/regras.yml`).
 - **Conferência:** `python scripts/conferir_piloto.py` (checklist da seção 12 do manual).
-- Relatório: [`docs/etapas/RELATORIO-ETAPA-8.1.md`](docs/etapas/RELATORIO-ETAPA-8.1.md).
-"# lupa1.1" 
+- [Relatório da etapa 8.1 — Ambiente de piloto](docs/etapas/ETAPAS.md#etapa-8-1).
+
+## Tamanho do repositório
+
+O projeto tem **533 arquivos** e cerca de **99,3 mil linhas**. A contagem considera só o que está versionado no git, então ficam de fora `.venv`, `node_modules` e outros arquivos ignorados.
+
+| Extensão | Arquivos |
+|---|---|
+| `.py` | 290 |
+| `.md` | 54 |
+| `.ts` | 39 |
+| `.txt` | 29 |
+| `.svelte` | 24 |
+| `.yaml` | 19 |
+| `.sh` | 12 |
+| `.png` | 12 |
+
+As linhas incluem tudo: código, testes, documentação e arquivos de dados. As 12 imagens `.png` também entram nessa conta e podem inflar um pouco o número.

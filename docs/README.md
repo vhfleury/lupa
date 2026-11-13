@@ -2,11 +2,12 @@
 
 Índice da pasta `docs/`. As convenções de código estão no [`CLAUDE.md`](../CLAUDE.md) e a instalação de desenvolvimento no [README da raiz](../README.md).
 
-## Piloto: o que fazer agora
+## Visão geral
 
-- [piloto/roteiro-piloto.md](piloto/roteiro-piloto.md): o que falta, em ordem, com quem faz e quando termina.
-- [piloto/pendencias.md](piloto/pendencias.md): decisões e tarefas em aberto.
-- [piloto/calibracao-projudi.md](piloto/calibracao-projudi.md): como rodar o primeiro processo real do Projudi.
+- [arquitetura.md](arquitetura.md): limite do sistema, componentes, uma execução de ponta a ponta e o estado das mudanças.
+- [adr/](adr/README.md): registros de decisão de arquitetura, um arquivo por decisão.
+- [runbooks/](runbooks/README.md): procedimentos operacionais com resultado observável.
+- Na raiz: [CONTRIBUTING.md](../CONTRIBUTING.md), [CHANGELOG.md](../CHANGELOG.md) e [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md).
 
 ## Especificação
 
@@ -42,15 +43,20 @@ As capturas de tela ficam em `imagens/`, gravadas por `front/scripts/capturas.sh
 
 ## Conformidade (LGPD e Res. CNJ 615/2025)
 
-Minutas para revisão de advogado em [conformidade/](conformidade/): aviso de tratamento, termos de uso, registro de operações, plano de incidentes, relatório de uso ao tribunal e checklist do piloto.
+As minutas para revisão de advogado estão em [Conformidade do Lupa](conformidade/CONFORMIDADE.md).
+
+- [Termos de uso do Lupa](conformidade/CONFORMIDADE.md#termos-de-uso) e [aceite pelo gabinete](conformidade/CONFORMIDADE.md#aceite-dos-termos)
+- [Aviso de tratamento de dados pessoais](conformidade/CONFORMIDADE.md#aviso-de-tratamento) e [registro das operações de tratamento](conformidade/CONFORMIDADE.md#registro-de-operacoes)
+- [Plano de resposta a incidentes](conformidade/CONFORMIDADE.md#plano-de-incidentes)
+- [Modelo de relatório de uso ao tribunal](conformidade/CONFORMIDADE.md#relatorio-uso-tribunal)
+- [Checklist antes do primeiro processo real](conformidade/CONFORMIDADE.md#checklist-piloto)
 
 ## Histórico da construção
 
-- [etapas/CONFORMIDADE-GERAL.md](etapas/CONFORMIDADE-GERAL.md): estado e métricas ao fim das Etapas 0 a 8.2.
-- [decisoes/registro.md](decisoes/registro.md): decisões tomadas em cada etapa e resultado das revisões.
+- [Relatórios, limitações e pendências por etapa](etapas/ETAPAS.md#etapas-e-pendencias). Os demais relatórios de execução estão no histórico do Git.
+- [Conformidade geral](etapas/ETAPAS.md#conformidade-geral) reúne o estado e as métricas até a 8.2.
+- [decisoes/registro.md](decisoes/registro.md): decisões tomadas em cada etapa e resultado das revisões. As que definem a arquitetura têm registro próprio em [adr/](adr/README.md).
 - [decisoes/object-storage.md](decisoes/object-storage.md): decisão do object storage.
-- [etapas/FICOU-DE-FORA.md](etapas/FICOU-DE-FORA.md): limitações e itens fora do escopo de cada etapa.
-- `etapas/RELATORIO-ETAPA-*.md`: os relatórios de etapa citados pelo código e pelos manuais. Os demais estão no histórico do Git.
 
 ## Outros
 
