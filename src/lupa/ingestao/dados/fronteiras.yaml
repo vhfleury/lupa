@@ -5,7 +5,7 @@
 versao: "1"
 fonte: >-
   Calibrado no cenario pdf_liso dos dez processos de referencia em 2026-10-21; matriz e erros
-  em docs/etapas/RELATORIO-ETAPA-4E.2.md.
+  em docs/etapas/ETAPAS.md#etapa-4e-2.
 pesos:
   titulo: 0.5
   # titulo que tambem aparece como secao dentro de outra peca (razoes de apelacao)

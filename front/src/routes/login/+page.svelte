@@ -82,13 +82,23 @@
 <div class="cartao login-cartao">
   <div class="login-marca">
     <img class="login-logo-claro" src="/lupa-logo.svg" alt="Lupa" width="2025" height="777" />
-    <img class="login-logo-escuro" src="/lupa-logo-escuro.svg" alt="Lupa" width="2025" height="777" />
+    <img
+      class="login-logo-escuro"
+      src="/lupa-logo-escuro.svg"
+      alt="Lupa"
+      width="2025"
+      height="777"
+    />
   </div>
   <p class="login-descricao">Apoio à análise de processos judiciais</p>
   <div class="login-introducao">
     <span class="login-etapa">ACESSO AO SISTEMA · {etapa.tipo === 'senha' ? '01' : '02'} / 02</span>
     <h1>{etapa.tipo === 'senha' ? 'Bem-vindo ao Lupa' : 'Confirme seu acesso'}</h1>
-    <p>{etapa.tipo === 'senha' ? 'Entre com suas credenciais para continuar.' : 'Use seu aplicativo autenticador para concluir.'}</p>
+    <p>
+      {etapa.tipo === 'senha'
+        ? 'Entre com suas credenciais para continuar.'
+        : 'Use seu aplicativo autenticador para concluir.'}
+    </p>
   </div>
   {#if expirada && etapa.tipo === 'senha'}
     <Aviso tipo="info">Sessão encerrada ou expirada. Entre novamente.</Aviso>
@@ -123,14 +133,18 @@
           maxlength="256"
         />
       </div>
-      <button type="submit" disabled={enviando}>{enviando ? 'Verificando…' : 'Continuar'} <span aria-hidden="true">→</span></button>
+      <button type="submit" disabled={enviando}
+        >{enviando ? 'Verificando…' : 'Continuar'} <span aria-hidden="true">→</span></button
+      >
     </form>
   {:else}
     {@const resposta = etapa.resposta}
     {#if resposta.etapa === 'configurar_mfa'}
       <h2>Cadastre o autenticador</h2>
       <ol class="passos">
-        <li>Abra o aplicativo autenticador no celular (por exemplo, Google Authenticator ou Aegis).</li>
+        <li>
+          Abra o aplicativo autenticador no celular (por exemplo, Google Authenticator ou Aegis).
+        </li>
         <li>Leia o QR code abaixo ou digite a chave manualmente.</li>
         <li>Digite o código de 6 dígitos que o aplicativo mostrar.</li>
       </ol>

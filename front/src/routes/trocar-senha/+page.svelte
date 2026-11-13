@@ -2,7 +2,7 @@
   import { goto } from '$app/navigation';
   import { chamar, ErroApi, mensagemErro } from '$lib/api';
   import Aviso from '$lib/componentes/Aviso.svelte';
-  import { carregarSessao, sessao } from '$lib/sessao.svelte';
+  import { carregarSessao, encerrarSessao, sessao } from '$lib/sessao.svelte';
 
   let atual = $state('');
   let nova = $state('');
@@ -44,12 +44,7 @@
   }
 
   async function sair(): Promise<void> {
-    try {
-      await chamar('POST', '/auth/logout', undefined, { tratarSessao: false });
-    } catch {
-      // Sessão já inválida.
-    }
-    sessao.definir(null);
+    await encerrarSessao();
     await goto('/login');
   }
 </script>
@@ -59,7 +54,9 @@
 <div class="cartao">
   <h1>Trocar senha</h1>
   {#if obrigatoria}
-    <Aviso tipo="info">Antes de continuar, defina uma senha pessoal no lugar da senha temporária.</Aviso>
+    <Aviso tipo="info"
+      >Antes de continuar, defina uma senha pessoal no lugar da senha temporária.</Aviso
+    >
   {/if}
   {#if erro}<Aviso tipo="erro">{erro}</Aviso>{/if}
   <form onsubmit={enviar}>

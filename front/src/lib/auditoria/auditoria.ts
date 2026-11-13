@@ -153,7 +153,8 @@ export function linkExportacao(f: Filtros, formato: 'csv' | 'json'): string {
 }
 
 export function textoVerificacao(v: Verificacao): string {
-  if (v.integra) return `Cadeia íntegra: ${v.total} evento(s) conferido(s), nenhum hash divergente.`;
+  if (v.integra)
+    return `Cadeia íntegra: ${v.total} evento(s) conferido(s), nenhum hash divergente.`;
   const onde = v.primeiro_evento_quebrado ?? 'desconhecido';
   return `Cadeia QUEBRADA a partir do evento ${onde}${v.motivo ? ` (${v.motivo})` : ''}.`;
 }

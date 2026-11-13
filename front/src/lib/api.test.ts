@@ -8,7 +8,12 @@ function respostaFalsa(status: number, corpo: unknown): typeof fetch {
 describe('chamar', () => {
   it('prefixa /api e envia JSON com credenciais do mesmo origin', async () => {
     const executar = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));
-    const resultado = await chamar<{ ok: boolean }>('POST', '/auth/login', { a: 1 }, { fetch: executar });
+    const resultado = await chamar<{ ok: boolean }>(
+      'POST',
+      '/auth/login',
+      { a: 1 },
+      { fetch: executar },
+    );
     expect(resultado.ok).toBe(true);
     const [url, init] = executar.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('/api/auth/login');
@@ -18,14 +23,18 @@ describe('chamar', () => {
 
   it('204 devolve undefined', async () => {
     const executar = vi.fn(async () => new Response(null, { status: 204 }));
-    await expect(chamar('POST', '/auth/logout', undefined, { fetch: executar })).resolves.toBeUndefined();
+    await expect(
+      chamar('POST', '/auth/logout', undefined, { fetch: executar }),
+    ).resolves.toBeUndefined();
   });
 
   it('401 de sessão chama o manipulador de sessão expirada', async () => {
     const sessaoExpirada = vi.fn();
     configurarManipuladores({ sessaoExpirada, trocaObrigatoria: vi.fn() });
     const executar = respostaFalsa(401, { detail: 'não autenticado' });
-    await expect(chamar('GET', '/usuarios', undefined, { fetch: executar })).rejects.toBeInstanceOf(ErroApi);
+    await expect(chamar('GET', '/usuarios', undefined, { fetch: executar })).rejects.toBeInstanceOf(
+      ErroApi,
+    );
     expect(sessaoExpirada).toHaveBeenCalledOnce();
   });
 
@@ -43,7 +52,9 @@ describe('chamar', () => {
     const trocaObrigatoria = vi.fn();
     configurarManipuladores({ sessaoExpirada: vi.fn(), trocaObrigatoria });
     const executar = respostaFalsa(403, { detail: 'troca de senha obrigatória' });
-    await expect(chamar('GET', '/usuarios', undefined, { fetch: executar })).rejects.toBeInstanceOf(ErroApi);
+    await expect(chamar('GET', '/usuarios', undefined, { fetch: executar })).rejects.toBeInstanceOf(
+      ErroApi,
+    );
     expect(trocaObrigatoria).toHaveBeenCalledOnce();
   });
 });

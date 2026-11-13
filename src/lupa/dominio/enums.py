@@ -115,7 +115,7 @@ class TipoPagina(StrEnum):
 
 
 class FlagPagina(StrEnum):
-    """Marcadores de ingestão definidos em `prompt-injection.md`.
+    """Marcadores de ingestão definidos em `docs/especificacao/prompt-injection.md`.
 
     Attributes:
         TEXTO_OCULTO: Texto invisível (cor, tamanho ou posição).

@@ -19,7 +19,9 @@
   const paginaParaArquivo = $derived(
     new Map(
       fatos.flatMap((f) =>
-        f.evidencias.map((e) => [e.pagina_id, { arquivo: e.arquivo_id, pagina: e.pagina }] as const),
+        f.evidencias.map(
+          (e) => [e.pagina_id, { arquivo: e.arquivo_id, pagina: e.pagina }] as const,
+        ),
       ),
     ),
   );
@@ -99,7 +101,11 @@
     <ol class="linha-tempo" data-testid="linha-do-tempo">
       {#each dossie.linha_do_tempo as ev, i (`${ev.fato_id}-${i}`)}
         <li>
-          <a href={linkEvento(ev.fato_id, ev.pagina_id)} data-testid="evento" data-pagina={ev.pagina}>
+          <a
+            href={linkEvento(ev.fato_id, ev.pagina_id)}
+            data-testid="evento"
+            data-pagina={ev.pagina}
+          >
             <strong>{formatarData(ev.data)}</strong> — {legivel(ev.tipo)}
             {#if ev.pagina !== null}<span class="dica">(fl. {ev.pagina})</span>{/if}
           </a>
@@ -147,9 +153,12 @@
             <td>{formatarData(p.data)}</td>
             <td>{percentual(p.confianca)} <span class="dica">({legivel(p.metodo)})</span></td>
             <td>
-              {#each p.resumo_flags.peca as flag (flag)}<span class="selo">{legivel(flag)}</span>{/each}
+              {#each p.resumo_flags.peca as flag (flag)}<span class="selo">{legivel(flag)}</span
+                >{/each}
               {#if p.resumo_flags.total_saneamento}
-                <span class="selo alerta">{p.resumo_flags.total_saneamento} alerta(s) de saneamento</span>
+                <span class="selo alerta"
+                  >{p.resumo_flags.total_saneamento} alerta(s) de saneamento</span
+                >
               {/if}
             </td>
           </tr>
@@ -160,7 +169,10 @@
       <button type="button" class="secundario" onclick={gerarResumos} disabled={gerando}>
         {gerando ? 'Gerando…' : 'Gerar resumos das peças (modelo)'}
       </button>
-      <span class="dica">Texto gerado pelo modelo aparece marcado como <span class="rotulo-gerado">gerado</span>.</span>
+      <span class="dica"
+        >Texto gerado pelo modelo aparece marcado como <span class="rotulo-gerado">gerado</span
+        >.</span
+      >
     </p>
   {:else}
     <p class="dica">Índice ainda não disponível.</p>

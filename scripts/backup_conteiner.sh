@@ -1,6 +1,6 @@
 #!/bin/sh
 # Backup cifrado do Lupa (Etapa 7.8). Roda DENTRO do servico `backup` do compose (perfil `backup`),
-# chamado por scripts/backup.sh, scripts/restaurar.sh e scripts/expurgar_backups.sh (ou os .ps1).
+# chamado por scripts/backup.sh, scripts/restaurar.sh e scripts/expurgar_backups.sh.
 #
 #   backup_conteiner.sh fazer                  pg_dump (custom) + espelho do bucket -> tar -> age
 #   backup_conteiner.sh restaurar ARQUIVO      decifra, confere o manifesto e restaura em banco e
@@ -196,7 +196,7 @@ restaurar() {
   if [ -f "$TRABALHO/conteudo/vault.tar" ]; then
     # Etapa 8.1: o armazenamento do Vault NAO e reposto sozinho (exige parar o vault e as partes
     # de unseal da epoca); fica em /backups/vault-<arquivo>.tar para o procedimento manual
-    # (docs/operacao.md, secao 4.4).
+    # (docs/operacao/operacao.md, secao 4.4).
     destino_vault="$BACKUPS/vault-$(basename "$caminho" .tar.age).tar"
     cp "$TRABALHO/conteudo/vault.tar" "$destino_vault"
     echo "backup: armazenamento do vault em $(basename "$destino_vault") (reposicao manual)" >&2

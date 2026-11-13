@@ -71,7 +71,9 @@
   }
 
   function notasDe(alvo: { achado?: string; fato?: string }): Anotacao[] {
-    return anotacoes.filter((a) => (alvo.achado ? a.achado_id === alvo.achado : a.fato_id === alvo.fato));
+    return anotacoes.filter((a) =>
+      alvo.achado ? a.achado_id === alvo.achado : a.fato_id === alvo.fato,
+    );
   }
 
   function iniciarCorrecao(fato: Fato): void {
@@ -157,10 +159,16 @@
         <label for="nota-{chave}">Anotação</label>
         <textarea id="nota-{chave}" bind:value={textoNota} maxlength="2000" rows="2"></textarea>
         <button type="submit">Salvar anotação</button>
-        <button type="button" class="secundario" onclick={() => (anotandoEm = null)}>Cancelar</button>
+        <button type="button" class="secundario" onclick={() => (anotandoEm = null)}
+          >Cancelar</button
+        >
       </form>
     {:else}
-      <button type="button" class="secundario" onclick={() => ((anotandoEm = chave), (textoNota = ''))}>Anotar</button>
+      <button
+        type="button"
+        class="secundario"
+        onclick={() => ((anotandoEm = chave), (textoNota = ''))}>Anotar</button
+      >
     {/if}
   {/if}
 {/snippet}
@@ -174,7 +182,9 @@
     <article class="cartao achado {a.resultado}" data-testid="achado" data-validacao={a.validacao}>
       <header>
         <h2>{legivel(a.validacao)}</h2>
-        <span class="resultado {a.resultado}" data-testid="resultado">{RESULTADO[a.resultado] ?? a.resultado}</span>
+        <span class="resultado {a.resultado}" data-testid="resultado"
+          >{RESULTADO[a.resultado] ?? a.resultado}</span
+        >
       </header>
       <p>{a.explicacao}</p>
       <h3>Valores</h3>
@@ -194,7 +204,9 @@
               {#each datasDosValores(valor) as d (d.chave)}
                 {@const fato = fatoDaData(a, d.data)}
                 {#if fato && linkEvidencia(fato)}
-                  <a class="data-interna" href={linkEvidencia(fato)} data-testid="link-data">{formatarData(d.data)}</a>
+                  <a class="data-interna" href={linkEvidencia(fato)} data-testid="link-data"
+                    >{formatarData(d.data)}</a
+                  >
                 {/if}
               {/each}
             {/if}
@@ -209,10 +221,15 @@
           {#if fato}
             <li data-testid="fato" data-fato={fato.id}>
               <span>{legivel(fato.tipo)}: <strong>{textoDoValor(fato.valor)}</strong></span>
-              <span class="selo" data-testid="status-fato">{STATUS_FATO[fato.status] ?? fato.status}</span>
+              <span class="selo" data-testid="status-fato"
+                >{STATUS_FATO[fato.status] ?? fato.status}</span
+              >
               {#if !fato.vigente}<span class="selo antigo">substituído</span>{/if}
               {#each fato.evidencias as ev (ev.id)}
-                <a href="/processos/{id}/visualizador?evidencia={ev.id}" data-testid="link-evidencia">
+                <a
+                  href="/processos/{id}/visualizador?evidencia={ev.id}"
+                  data-testid="link-evidencia"
+                >
                   fl. {ev.pagina ?? '?'}
                 </a>
               {/each}
@@ -228,11 +245,19 @@
                     <label for="valor-{fato.id}">Valor corrigido</label>
                     <input id="valor-{fato.id}" bind:value={valorNovo} />
                     <button type="submit">Salvar correção</button>
-                    <button type="button" class="secundario" onclick={() => (editando = null)}>Cancelar</button>
+                    <button type="button" class="secundario" onclick={() => (editando = null)}
+                      >Cancelar</button
+                    >
                   </form>
                 {:else}
-                  <button type="button" class="secundario" onclick={() => void registrar(fato, 'confirmado')}>Confirmar</button>
-                  <button type="button" class="secundario" onclick={() => iniciarCorrecao(fato)}>Corrigir</button>
+                  <button
+                    type="button"
+                    class="secundario"
+                    onclick={() => void registrar(fato, 'confirmado')}>Confirmar</button
+                  >
+                  <button type="button" class="secundario" onclick={() => iniciarCorrecao(fato)}
+                    >Corrigir</button
+                  >
                 {/if}
               {/if}
               {@render notas(notasDe({ fato: fato.id }))}
@@ -258,7 +283,11 @@
     <h3>Achados anteriores</h3>
     <table data-testid="historico-achados">
       <thead>
-        <tr><th scope="col">Validação</th><th scope="col">Resultado</th><th scope="col">Explicação</th><th scope="col">Gravado em</th></tr>
+        <tr
+          ><th scope="col">Validação</th><th scope="col">Resultado</th><th scope="col"
+            >Explicação</th
+          ><th scope="col">Gravado em</th></tr
+        >
       </thead>
       <tbody>
         {#each antigos as a (a.id)}

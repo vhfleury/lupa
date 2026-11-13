@@ -58,7 +58,9 @@
       autocomplete="off"
       aria-describedby="{idBase}-dica"
     />
-    <p class="dica" id="{idBase}-dica">3 a 64 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado.</p>
+    <p class="dica" id="{idBase}-dica">
+      3 a 64 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado.
+    </p>
   </div>
   {#if papeis.length > 1}
     <div class="campo">
@@ -81,5 +83,6 @@
       </select>
     </div>
   {/if}
-  <button type="submit" disabled={enviando}>Criar {ROTULO_PAPEL[papelEfetivo].toLowerCase()}</button>
+  <button type="submit" disabled={enviando}>Criar {ROTULO_PAPEL[papelEfetivo].toLowerCase()}</button
+  >
 </form>

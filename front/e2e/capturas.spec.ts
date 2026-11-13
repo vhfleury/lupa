@@ -1,4 +1,4 @@
-// Etapa 7.9: capturas de tela reais para docs/guia-assessor.md e docs/guia-desembargador.md, sobre
+// Etapa 7.9: capturas de tela reais para docs/guias/guia-assessor.md e docs/guias/guia-desembargador.md, sobre
 // os processos SINTÉTICOS do E2E (nenhum dado real). Grava PNGs em LUPA_CAPTURAS_DIR (bind mount
 // do host feito por front/scripts/capturas.sh). Não faz asserções de regra: só navega e fotografa.
 import { join } from 'node:path';
@@ -50,7 +50,12 @@ test.describe.serial('capturas dos guias', () => {
     await page.goto(`/processos/${PROCESSO}/validacoes`);
     await expect(page.getByTestId('achado').first()).toBeVisible();
     await foto(page, 'validacoes');
-    await page.getByTestId('achado').first().getByRole('button', { name: 'Corrigir' }).first().click();
+    await page
+      .getByTestId('achado')
+      .first()
+      .getByRole('button', { name: 'Corrigir' })
+      .first()
+      .click();
     await expect(page.getByLabel('Valor corrigido')).toBeVisible();
     await foto(page, 'corrigir-fato');
     await contexto.close();

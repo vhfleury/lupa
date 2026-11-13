@@ -16,7 +16,12 @@ from uuid import UUID
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from lupa.seguranca.cofre import Cofre, nome_chave_gabinete, nome_chave_identidades
+from lupa.seguranca.cofre import (
+    Cofre,
+    TokenInvalidoError,
+    nome_chave_gabinete,
+    nome_chave_identidades,
+)
 from lupa.seguranca.contexto import Carregador, ChaveIndisponivelError
 
 PREFIXOS_TOKEN_COFRE = ("vault:v", "mem:v")
@@ -120,11 +125,17 @@ def decifrar_identidade(cofre: Cofre, gabinete_id: UUID, valor: str | None) -> s
     Args:
         cofre: Cofre.
         gabinete_id: Gabinete.
-        valor: Token do cofre (ou None; valor legado em claro volta como está).
+        valor: Token do cofre (ou None).
 
     Returns:
         Texto em claro (ou None).
+
+    Raises:
+        TokenInvalidoError: Valor em claro, sem prefixo de token do cofre.
     """
-    if valor is None or not identidade_cifrada(valor):
-        return valor
-    return cofre.decifrar(nome_chave_identidades(gabinete_id), valor).decode()
+    if valor is None:
+        return None
+    nome = nome_chave_identidades(gabinete_id)
+    if not identidade_cifrada(valor):
+        raise TokenInvalidoError(nome)
+    return cofre.decifrar(nome, valor).decode()

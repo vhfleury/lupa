@@ -1,13 +1,13 @@
 """Restauração do backup cifrado em ambiente limpo (Etapa 7.8).
 
-Pelo caminho documentado em ``docs/backup.md``: ingere um processo sintético pequeno num banco e
-num bucket de teste, roda ``scripts/backup.ps1`` (Windows) ou ``scripts/backup.sh``, apaga o banco
-e o bucket, restaura com ``scripts/restaurar.*`` em banco e bucket novos e confere, linha a linha
+Pelo caminho documentado em ``docs/operacao/backup.md``: ingere um processo sintético pequeno
+num banco e num bucket de teste, roda ``scripts/backup.sh``, apaga o banco e o bucket, restaura
+com ``scripts/restaurar.sh`` em banco e bucket novos e confere, linha a linha
 (impressão de cada tabela) e byte a byte (SHA-256 de cada objeto), que tudo voltou. Por fim, o
 expurgo com o relógio 31 dias à frente apaga o backup e destrói a chave do mês, com registro
 encadeado no log.
 
-Só roda no host com Docker e ``LUPA_VERIFICAR_BACKUP=1`` (passo opcional do ``verificar.ps1``);
+Só roda no host com Docker e ``LUPA_VERIFICAR_BACKUP=1`` (passo opcional do ``verificar.sh``);
 dentro do contêiner da API não há Docker e o teste é pulado.
 """
 
@@ -16,7 +16,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import time
 from pathlib import Path
 from uuid import uuid4
@@ -71,12 +70,7 @@ def _mc(comando: str) -> str:
 
 
 def _script(nome: str, env: dict[str, str], *argumentos: str) -> str:
-    if sys.platform == "win32":
-        comando = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-                   str(RAIZ / "scripts" / f"{nome}.ps1"), *argumentos]  # fmt: skip
-    else:
-        comando = ["bash", str(RAIZ / "scripts" / f"{nome}.sh"), *argumentos]
-    return _rodar(comando, env=env)
+    return _rodar(["bash", str(RAIZ / "scripts" / f"{nome}.sh"), *argumentos], env=env)
 
 
 def _impressao(banco: str) -> dict[str, str]:

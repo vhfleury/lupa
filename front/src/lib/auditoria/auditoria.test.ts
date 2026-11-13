@@ -15,9 +15,12 @@ const ID = '11111111-2222-3333-4444-555555555555';
 describe('filtros da auditoria', () => {
   it('query leva só os campos preenchidos e os extras', () => {
     expect(montarQuery(FILTROS_VAZIOS)).toBe('');
-    const query = montarQuery({ ...FILTROS_VAZIOS, usuario_id: ID, ip: ' 10.0.0.1 ' }, {
-      limite: '50',
-    });
+    const query = montarQuery(
+      { ...FILTROS_VAZIOS, usuario_id: ID, ip: ' 10.0.0.1 ' },
+      {
+        limite: '50',
+      },
+    );
     const busca = new URLSearchParams(query.slice(1));
     expect(busca.get('usuario_id')).toBe(ID);
     expect(busca.get('ip')).toBe('10.0.0.1');

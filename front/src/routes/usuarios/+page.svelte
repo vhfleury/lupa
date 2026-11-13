@@ -9,12 +9,7 @@
   import SenhaTemporaria from '$lib/componentes/SenhaTemporaria.svelte';
   import { acoesSobre, gereUsuarios, papeisCriaveis } from '$lib/permissoes';
   import { sessao, tem } from '$lib/sessao.svelte';
-  import {
-    ROTULO_PAPEL,
-    type Gabinete,
-    type Usuario,
-    type UsuarioComSenha,
-  } from '$lib/tipos';
+  import { ROTULO_PAPEL, type Gabinete, type Usuario, type UsuarioComSenha } from '$lib/tipos';
 
   type Acao = 'desativar' | 'reativar' | 'resetar-senha' | 'resetar-mfa';
 
@@ -114,7 +109,9 @@
     <p role="status">Carregando…</p>
   {:else}
     <table>
-      <caption class="visualmente-oculto">Usuários {ehAdmin ? 'de todos os gabinetes' : 'do gabinete'}</caption>
+      <caption class="visualmente-oculto"
+        >Usuários {ehAdmin ? 'de todos os gabinetes' : 'do gabinete'}</caption
+      >
       <thead>
         <tr>
           <th scope="col">Usuário</th>

@@ -7,7 +7,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt requirements-dev.txt ./
 RUN pip install --require-hashes -r requirements.txt
 ARG INSTALAR_DEV=false
-RUN if [ "$INSTALAR_DEV" = "true" ]; then pip install --require-hashes -r requirements.txt -r requirements-dev.txt; fi
+RUN if [ "$INSTALAR_DEV" = "true" ]; then pip install --require-hashes -r requirements-dev.txt; fi
 
 FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/opt/venv/bin:$PATH" PYTHONPATH=/app/src

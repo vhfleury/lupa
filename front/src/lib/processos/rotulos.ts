@@ -50,7 +50,13 @@ export const STATUS_FATO: Record<string, string> = {
   corrigido: 'Corrigido',
 };
 
-export const ESTADOS_FINAIS = new Set(['concluido', 'falho', 'quarentena', 'em_revisao', 'parcial']);
+export const ESTADOS_FINAIS = new Set([
+  'concluido',
+  'falho',
+  'quarentena',
+  'em_revisao',
+  'parcial',
+]);
 
 /** Texto legível de um identificador em snake_case (`tempestividade_recurso`). */
 export function legivel(chave: string): string {
@@ -97,7 +103,8 @@ export const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Datas ISO encontradas (recursivamente) nos valores de um achado, com o caminho da chave. */
 export function datasDosValores(valores: unknown, caminho = ''): { chave: string; data: string }[] {
-  if (typeof valores === 'string') return DATA_ISO.test(valores) ? [{ chave: caminho, data: valores }] : [];
+  if (typeof valores === 'string')
+    return DATA_ISO.test(valores) ? [{ chave: caminho, data: valores }] : [];
   if (Array.isArray(valores)) {
     return valores.flatMap((v, i) => datasDosValores(v, `${caminho}[${i}]`));
   }

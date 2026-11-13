@@ -91,6 +91,8 @@ def cifrar_campo(dek: bytes, processo_id: UUID, rotulo: str, texto: str) -> str:
 
 
 def _bruto(valor: str) -> bytes:
+    if not campo_cifrado(valor):
+        raise CifraInvalidaError("prefixo ausente")
     try:
         bruto = base64.b64decode(valor.removeprefix(PREFIXO_CAMPO), validate=True)
     except ValueError:

@@ -264,7 +264,12 @@
       </tbody>
     </table>
     {#if cursor}
-      <button type="button" class="secundario" onclick={() => consultar(true)} disabled={consultando}>
+      <button
+        type="button"
+        class="secundario"
+        onclick={() => consultar(true)}
+        disabled={consultando}
+      >
         Carregar mais
       </button>
     {/if}
@@ -329,11 +334,18 @@
           <table>
             <caption>Chamadas ao modelo por versão</caption>
             <thead>
-              <tr><th scope="col">Modelo</th><th scope="col">Prompt</th><th scope="col">Total</th></tr>
+              <tr
+                ><th scope="col">Modelo</th><th scope="col">Prompt</th><th scope="col">Total</th
+                ></tr
+              >
             </thead>
             <tbody>
               {#each relatorio.chamadas_modelo as c, i (i)}
-                <tr><td>{c.versao_modelo ?? '—'}</td><td>{c.versao_prompt ?? '—'}</td><td>{c.total}</td></tr>
+                <tr
+                  ><td>{c.versao_modelo ?? '—'}</td><td>{c.versao_prompt ?? '—'}</td><td
+                    >{c.total}</td
+                  ></tr
+                >
               {/each}
             </tbody>
           </table>
@@ -347,8 +359,8 @@
           </strong>
           — {relatorio.custo_estimado.observacao}
           <br /><small>
-            Tabela de preços versão {relatorio.custo_estimado.versao_tabela};
-            fonte: {relatorio.custo_estimado.fonte}.
+            Tabela de preços versão {relatorio.custo_estimado.versao_tabela}; fonte: {relatorio
+              .custo_estimado.fonte}.
           </small>
           {#each relatorio.custo_estimado.por_modelo as m (m.modelo)}
             <br /><small>
