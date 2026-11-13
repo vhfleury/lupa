@@ -3,7 +3,7 @@ versao: "1"
 fonte: >-
   Calibrado nas paginas dos dez processos de referencia (.sinteticos/referencia, cenario
   pdf_liso, 15.647 folhas) em 2026-10-20; matriz de confusao em
-  docs/etapas/RELATORIO-ETAPA-4C.4.md. Imagens opacas de carimbo/logo reais podem levar
+  docs/etapas/ETAPAS.md#etapa-4c-4. Imagens opacas de carimbo/logo reais podem levar
   paginas nativas a abstencao (custo de OCR, nunca perda de conteudo).
 vazia:
   # pagina sem tinta visivel e quase sem texto

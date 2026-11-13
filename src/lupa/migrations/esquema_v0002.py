@@ -1,6 +1,6 @@
 """Revisão 0002, escrita à mão: sessões, rate limit de login, auditoria append-only e RLS do admin.
 
-Resolve os pontos herdados da Etapa 1 (ver `docs/etapas/RELATORIO-ETAPA-3.md`):
+Resolve os pontos herdados da Etapa 1 (ver `docs/etapas/ETAPAS.md#etapa-3`):
 
 - login sob RLS: função `lupa_localizar_usuario` (SECURITY DEFINER) devolve só id, gabinete e
   papel a partir do nome de usuário, para a aplicação definir o contexto antes de ler o usuário;
