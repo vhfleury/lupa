@@ -22,17 +22,15 @@ class StatusProcesso(StrEnum):
         CRIADO: Cadastrado, sem arquivos processados.
         EM_INGESTAO: Arquivos sendo processados.
         PRONTO: Fatos extraídos e validações disponíveis.
-        BLOQUEADO: Ingestão recusada (por exemplo, processo sigiloso na v1).
         ARQUIVADO: Fora de uso; mantido para auditoria.
-        EM_REVISAO: Incidente de injeção no agente; relatório e chat bloqueados até um
-            desembargador ou administrador liberar (Etapa 6.8).
+        EM_REVISAO: Incidente de injeção no agente; o chat fica bloqueado até o desembargador
+            liberar (RF-CHA-08).
         DESCARTADO: Exclusão criptográfica (Etapa 7.7): DEK apagada, só resta o registro.
     """
 
     CRIADO = "criado"
     EM_INGESTAO = "em_ingestao"
     PRONTO = "pronto"
-    BLOQUEADO = "bloqueado"
     ARQUIVADO = "arquivado"
     EM_REVISAO = "em_revisao"
     DESCARTADO = "descartado"
@@ -205,17 +203,63 @@ class ResultadoAchado(StrEnum):
 
 
 class PapelUsuario(StrEnum):
-    """Papel de acesso (detalhado na Etapa 3).
+    """Papel de acesso (RF-ACE-03).
 
     Attributes:
-        ASSESSOR: Acessa processos do próprio gabinete.
-        DESEMBARGADOR: Assessor mais auditoria e gestão do gabinete.
-        ADMINISTRADOR: Visão de todos os gabinetes; sem gabinete próprio.
+        ASSESSOR: Vê todos os processos e trabalha neles.
+        DESEMBARGADOR: Assessor mais auditoria, relatório de uso e gestão de assessores.
     """
 
     ASSESSOR = "assessor"
     DESEMBARGADOR = "desembargador"
-    ADMINISTRADOR = "administrador"
+
+
+class ClasseProcessual(StrEnum):
+    """Classe processual do processo (seção 3.1 da especificação).
+
+    Attributes:
+        APELACAO_CIVEL: Apelação cível.
+        AGRAVO_INSTRUMENTO: Agravo de instrumento.
+        EMBARGOS_DECLARACAO: Embargos de declaração.
+        AGRAVO_INTERNO: Agravo interno.
+        ACAO_ORIGINARIA: Ação originária (rescisória, mandado de segurança e demais).
+    """
+
+    APELACAO_CIVEL = "apelacao_civel"
+    AGRAVO_INSTRUMENTO = "agravo_instrumento"
+    EMBARGOS_DECLARACAO = "embargos_declaracao"
+    AGRAVO_INTERNO = "agravo_interno"
+    ACAO_ORIGINARIA = "acao_originaria"
+
+
+class Polo(StrEnum):
+    """Polo da parte no processo (RF-FAT-04).
+
+    Attributes:
+        ATIVO: Autor, apelante, agravante, embargante.
+        PASSIVO: Réu, apelado, agravado, embargado.
+        TERCEIRO: Terceiro interessado.
+    """
+
+    ATIVO = "ativo"
+    PASSIVO = "passivo"
+    TERCEIRO = "terceiro"
+
+
+class QualidadeParte(StrEnum):
+    """Qualidade da parte que decide prazo em dobro e dispensas (RF-FAT-01).
+
+    Attributes:
+        FAZENDA_PUBLICA: Fazenda Pública.
+        MINISTERIO_PUBLICO: Ministério Público.
+        DEFENSORIA_PUBLICA: Defensoria Pública.
+        PARTICULAR: Demais partes.
+    """
+
+    FAZENDA_PUBLICA = "fazenda_publica"
+    MINISTERIO_PUBLICO = "ministerio_publico"
+    DEFENSORIA_PUBLICA = "defensoria_publica"
+    PARTICULAR = "particular"
 
 
 class EstadoJob(StrEnum):

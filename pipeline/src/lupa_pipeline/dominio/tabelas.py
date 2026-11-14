@@ -1,48 +1,56 @@
-"""Tabelas SQLAlchemy do domínio; espelham a migração inicial do Alembic.
+"""Tabelas do Data Vault 2.0 (hubs, links e satélites); espelham a revisão `v0001_data_vault`.
 
-Toda tabela que pertence a um gabinete carrega `gabinete_id` (desnormalizado a partir do
-processo) para que a Row Level Security filtre sem junções. Chaves estrangeiras compostas
-`(x_id, gabinete_id)` garantem que o filho fique no mesmo gabinete do pai.
+Convenções (plano da 0.2, "O que muda"): `hk_*` é `BYTEA` de 32 bytes; hub tem a chave de negócio
+única; link tem os `hk` dos hubs ligados, únicos em conjunto e com um índice por FK; satélite tem
+PK `(hk_<pai>, load_dts)` (mais a subchave, se multiativo), `hash_diff` e `record_source`; toda
+tabela tem `load_dts` com `clock_timestamp()` e é imutável (trigger `<tabela>_imutavel`). Colunas
+de enum são `TEXT` com `CHECK` gerado do enum. Colunas cifradas usam `TextoCifrado` ou
+`JsonCifrado`, com o rótulo que entra no AAD.
+
+O `info` de cada tabela diz o tipo (`hub`, `link`, `satelite`) e o que `gravacao` precisa: as
+colunas da chave de negócio do hub, as colunas de hub do link, a coluna do pai, a subchave
+multiativa e se o satélite sempre insere.
 """
 
-from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
-from uuid import UUID, uuid4
 
 from sqlalchemy import (
     ARRAY,
     BigInteger,
     Boolean,
     CheckConstraint,
+    Column,
     Date,
     DateTime,
-    Float,
+    Double,
     ForeignKey,
-    ForeignKeyConstraint,
     Index,
     Integer,
     MetaData,
+    PrimaryKeyConstraint,
+    Table,
     Text,
     UniqueConstraint,
-    event,
-    func,
+    text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import BYTEA, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.engine import Connection
-from sqlalchemy.orm import DeclarativeBase, Mapped, Mapper, mapped_column
+from sqlalchemy.sql.schema import SchemaItem
 
 from lupa_pipeline.dominio.enums import (
     CenarioArquivo,
+    ClasseProcessual,
     EstadoJob,
     EstadoLote,
-    Materia,
     MetodoClassificacao,
+    MotivoFalha,
     MotivoQuarentena,
     OrigemPeca,
     PapelMensagem,
     PapelUsuario,
+    Polo,
+    QualidadeParte,
     ResultadoAchado,
     ResultadoChamada,
     StatusFato,
@@ -52,8 +60,6 @@ from lupa_pipeline.dominio.enums import (
     TipoPagina,
     TipoPeca,
 )
-from lupa_pipeline.seguranca.chaves import cifrar_identidade
-from lupa_pipeline.seguranca.contexto import nova_dek, obter_cofre, registrar_dek
 from lupa_pipeline.seguranca.tipos import JsonCifrado, TextoCifrado
 
 CONVENCAO_NOMES = {
@@ -63,35 +69,12 @@ CONVENCAO_NOMES = {
     "fk": "fk_%(table_name)s_%(column_0_N_name)s",
     "pk": "pk_%(table_name)s",
 }
+TAMANHO_HK = 32
+TIPOS_DATA_PECA = ("assinatura", "protocolo", "juntada")
+SITUACOES_REVISAO = ("aberta", "liberada")
+COLUNAS_TECNICAS = frozenset({"load_dts", "record_source", "hash_diff"})
 
-TABELAS_COM_GABINETE_V1 = (
-    "usuario",
-    "processo",
-    "arquivo",
-    "pagina",
-    "peca",
-    "evidencia",
-    "fato",
-    "fato_evidencia",
-    "reu",
-    "reu_identidade",
-    "achado",
-    "anotacao",
-    "evento_auditoria",
-)
-"""Tabelas com gabinete das revisões 0001 e 0002 (congeladas: as migrações antigas usam esta)."""
-
-TABELAS_INGESTAO = ("job_ingestao", "lote_ingestao", "diagnostico_arquivo")
-"""Tabelas com gabinete criadas pela revisão 0003 (ingestão)."""
-
-TABELAS_AGENTE = ("conversa", "mensagem", "chamada_modelo")
-"""Tabelas com gabinete criadas pela revisão 0007 (agente e chat)."""
-
-TABELAS_REVISAO = ("revisao_processo",)
-"""Tabela com gabinete criada pela revisão 0009 (processo em revisão após incidente)."""
-
-TABELAS_COM_GABINETE = TABELAS_COM_GABINETE_V1 + TABELAS_INGESTAO + TABELAS_AGENTE + TABELAS_REVISAO
-"""Todas as tabelas com `gabinete_id` e RLS no esquema corrente."""
+metadata = MetaData(naming_convention=CONVENCAO_NOMES)
 
 
 def checar_enum(coluna: str, enum: type[StrEnum]) -> CheckConstraint:
@@ -104,681 +87,572 @@ def checar_enum(coluna: str, enum: type[StrEnum]) -> CheckConstraint:
     Returns:
         A constraint nomeada `<coluna>_valido`.
     """
-    valores = ", ".join(f"'{membro.value}'" for membro in enum)
-    return CheckConstraint(f"{coluna} IN ({valores})", name=f"{coluna}_valido")
+    return checar_valores(coluna, tuple(membro.value for membro in enum))
 
 
-def _uuid_pk() -> Mapped[UUID]:
-    return mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+def checar_valores(coluna: str, valores: tuple[str, ...]) -> CheckConstraint:
+    """Cria CHECK que restringe a coluna de texto a uma lista fixa de valores.
 
+    Args:
+        coluna: Nome da coluna.
+        valores: Valores permitidos.
 
-def _gabinete() -> Mapped[UUID]:
-    return mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
-
-
-def _instante() -> Mapped[datetime]:
-    return mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-
-
-def _fk_composta(coluna: str, alvo: str) -> ForeignKeyConstraint:
-    return ForeignKeyConstraint(
-        [coluna, "gabinete_id"], [f"{alvo}.id", f"{alvo}.gabinete_id"], ondelete="CASCADE"
-    )
-
-
-class Base(DeclarativeBase):
-    """Base declarativa com convenção de nomes de constraints."""
-
-    metadata = MetaData(naming_convention=CONVENCAO_NOMES)
-
-
-class GabineteTabela(Base):
-    """Tabela `gabinete` (tenant)."""
-
-    __tablename__ = "gabinete"
-
-    id: Mapped[UUID] = _uuid_pk()
-    nome: Mapped[str] = mapped_column(Text, nullable=False)
-    chave_criptografia_ref: Mapped[str | None] = mapped_column(Text)
-    criado_em: Mapped[datetime] = _instante()
-
-
-class UsuarioTabela(Base):
-    """Tabela `usuario`; `gabinete_id` nulo só para administrador."""
-
-    __tablename__ = "usuario"
-    __table_args__ = (
-        UniqueConstraint("id", "gabinete_id"),
-        checar_enum("papel", PapelUsuario),
-        CheckConstraint(
-            "(papel = 'administrador') = (gabinete_id IS NULL)", name="admin_sem_gabinete"
-        ),
-    )
-
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("gabinete.id"), index=True
-    )
-    nome_usuario: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
-    papel: Mapped[str] = mapped_column(Text, nullable=False)
-    senha_hash: Mapped[str] = mapped_column(Text, nullable=False)
-    mfa_segredo: Mapped[str | None] = mapped_column(Text)
-    mfa_confirmado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    troca_senha_obrigatoria: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    criado_em: Mapped[datetime] = _instante()
-    mfa_ultimo_passo: Mapped[int | None] = mapped_column(BigInteger)
-
-
-class ProcessoTabela(Base):
-    """Tabela `processo`."""
-
-    __tablename__ = "processo"
-    __table_args__ = (
-        UniqueConstraint("gabinete_id", "numero_cnj"),
-        UniqueConstraint("id", "gabinete_id"),
-        checar_enum("materia", Materia),
-        checar_enum("status", StatusProcesso),
-    )
-
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("gabinete.id"), nullable=False, index=True
-    )
-    numero_cnj: Mapped[str] = mapped_column(Text, nullable=False)
-    classe: Mapped[str] = mapped_column(Text, nullable=False)
-    materia: Mapped[str] = mapped_column(Text, nullable=False)
-    sigiloso: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    status: Mapped[str] = mapped_column(Text, nullable=False)
-    criado_em: Mapped[datetime] = _instante()
-    criado_por: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("usuario.id"), nullable=False
-    )
-    chave_dados_cifrada: Mapped[str | None] = mapped_column(Text)
-
-
-class ProcessoResponsavelTabela(Base):
-    """Assessores responsáveis, sempre pertencentes ao gabinete do processo."""
-
-    __tablename__ = "processo_responsavel"
-    __table_args__ = (
-        Index("ix_processo_responsavel_usuario", "usuario_id"),
-        ForeignKeyConstraint(
-            ["processo_id", "gabinete_id"], ["processo.id", "processo.gabinete_id"]
-        ),
-        ForeignKeyConstraint(["usuario_id", "gabinete_id"], ["usuario.id", "usuario.gabinete_id"]),
-    )
-
-    processo_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
-    usuario_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
-    gabinete_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-
-
-@event.listens_for(ProcessoTabela, "before_insert")
-def _gerar_dek_do_processo(_mapper: Mapper[Any], _conexao: Connection, alvo: Any) -> None:
-    """Etapa 7.3: todo processo nasce com DEK própria, cifrada pela chave do gabinete.
-
-    A DEK em claro fica só no contexto de cifra do escopo, que passa a gravar com ela.
+    Returns:
+        A constraint nomeada `<coluna>_valido`.
     """
-    if alvo.chave_dados_cifrada is not None:
-        return
-    if alvo.id is None:
-        alvo.id = uuid4()
-    dek, token = nova_dek(obter_cofre(), alvo.gabinete_id)
-    alvo.chave_dados_cifrada = token
-    registrar_dek(alvo.id, dek)
+    lista = ", ".join(f"'{valor}'" for valor in valores)
+    return CheckConstraint(f"{coluna} IN ({lista})", name=f"{coluna}_valido")
 
 
-class ArquivoTabela(Base):
-    """Tabela `arquivo`; imutável (trigger bloqueia UPDATE)."""
-
-    __tablename__ = "arquivo"
-    __table_args__ = (
-        _fk_composta("processo_id", "processo"),
-        UniqueConstraint("processo_id", "sha256"),
-        UniqueConstraint("id", "gabinete_id"),
-        CheckConstraint("tamanho_bytes > 0", name="tamanho_positivo"),
-    )
-
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    processo_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    sha256: Mapped[str] = mapped_column(Text, nullable=False)
-    tamanho_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
-    nome_original: Mapped[str] = mapped_column(Text, nullable=False)
-    mime: Mapped[str] = mapped_column(Text, nullable=False)
-    chave_storage: Mapped[str] = mapped_column(Text, nullable=False)
-    enviado_por: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("usuario.id"), nullable=False
-    )
-    enviado_em: Mapped[datetime] = _instante()
+def _hk(nome: str, alvo: str | None = None, *, nulo: bool = False) -> Column[Any]:
+    chave = [ForeignKey(alvo)] if alvo else []
+    return Column(nome, BYTEA, *chave, nullable=nulo)
 
 
-class PaginaTabela(Base):
-    """Tabela `pagina`."""
-
-    __tablename__ = "pagina"
-    __table_args__ = (
-        _fk_composta("arquivo_id", "arquivo"),
-        UniqueConstraint("arquivo_id", "numero"),
-        UniqueConstraint("id", "gabinete_id"),
-        checar_enum("tipo", TipoPagina),
-    )
-
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    arquivo_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    numero: Mapped[int] = mapped_column(Integer, nullable=False)
-    tipo: Mapped[str] = mapped_column(Text, nullable=False)
-    texto: Mapped[str] = mapped_column(TextoCifrado("pagina.texto"), nullable=False)
-    hash_texto: Mapped[str] = mapped_column(Text, nullable=False)
-    flags: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
-    sinais: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
-    coordenadas: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
-    extracao: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
-    texto_nativo: Mapped[str | None] = mapped_column(TextoCifrado("pagina.texto_nativo"))
-    texto_ocr: Mapped[str | None] = mapped_column(TextoCifrado("pagina.texto_ocr"))
-    versao_extrator: Mapped[str | None] = mapped_column(Text)
-    origem_arquivo: Mapped[str | None] = mapped_column(Text)
-    pagina_origem: Mapped[int | None] = mapped_column(Integer)
-    texto_normalizado: Mapped[str | None] = mapped_column(TextoCifrado("pagina.texto_normalizado"))
-    trechos_ocultos: Mapped[list[dict[str, Any]]] = mapped_column(
-        JsonCifrado("pagina.trechos_ocultos"), nullable=False, default=list
-    )
-    trechos_suspeitos: Mapped[list[dict[str, Any]]] = mapped_column(
-        JsonCifrado("pagina.trechos_suspeitos"), nullable=False, default=list
-    )
-    sinais_fronteira: Mapped[dict[str, Any]] = mapped_column(
-        JSONB, nullable=False, server_default="{}"
-    )
+def _texto(nome: str, *, nulo: bool = False) -> Column[Any]:
+    return Column(nome, Text, nullable=nulo)
 
 
-class PecaTabela(Base):
-    """Tabela `peca`; reclassificação grava linha nova e a anterior deixa de ser vigente (4E)."""
+def _inteiro(nome: str, *, nulo: bool = False) -> Column[Any]:
+    return Column(nome, Integer, nullable=nulo)
 
-    __tablename__ = "peca"
-    __table_args__ = (
-        _fk_composta("arquivo_id", "arquivo"),
-        ForeignKeyConstraint(
-            ["data_evidencia_id", "gabinete_id"], ["evidencia.id", "evidencia.gabinete_id"]
-        ),
-        ForeignKeyConstraint(["substitui_peca_id", "gabinete_id"], ["peca.id", "peca.gabinete_id"]),
-        UniqueConstraint("id", "gabinete_id"),
-        CheckConstraint("pagina_final >= pagina_inicial", name="paginas_em_ordem"),
+
+def _grande(nome: str) -> Column[Any]:
+    return Column(nome, BigInteger, nullable=False)
+
+
+def _booleano(nome: str) -> Column[Any]:
+    return Column(nome, Boolean, nullable=False)
+
+
+def _instante(nome: str, *, nulo: bool = False) -> Column[Any]:
+    return Column(nome, DateTime(timezone=True), nullable=nulo)
+
+
+def _json(nome: str, *, nulo: bool = False) -> Column[Any]:
+    return Column(nome, JSONB, nullable=nulo)
+
+
+def _real(nome: str) -> Column[Any]:
+    return Column(nome, Double, nullable=False)
+
+
+def _cifrado(nome: str, rotulo: str, *, nulo: bool = False) -> Column[Any]:
+    return Column(nome, TextoCifrado(rotulo), nullable=nulo)
+
+
+def _json_cifrado(nome: str, rotulo: str, *, nulo: bool = False) -> Column[Any]:
+    return Column(nome, JsonCifrado(rotulo), nullable=nulo)
+
+
+def _usuario(nome: str = "hk_usuario", *, nulo: bool = False) -> Column[Any]:
+    return _hk(nome, "hub_usuario.hk_usuario", nulo=nulo)
+
+
+def _confianca() -> list[SchemaItem]:
+    return [
+        _real("confianca"),
         CheckConstraint("confianca BETWEEN 0 AND 1", name="confianca_intervalo"),
-        CheckConstraint(
-            "tipo_data IS NULL OR tipo_data IN ('assinatura', 'protocolo', 'juntada')",
-            name="tipo_data_valido",
+    ]
+
+
+def _tecnicas() -> list[Column[Any]]:
+    return [
+        Column(
+            "load_dts",
+            DateTime(timezone=True),
+            nullable=False,
+            server_default=text("clock_timestamp()"),
         ),
-        checar_enum("tipo", TipoPeca),
-        checar_enum("metodo", MetodoClassificacao),
-        checar_enum("origem", OrigemPeca),
-        Index("ix_peca_arquivo_id_vigente", "arquivo_id", "vigente"),
-    )
-
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    arquivo_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    tipo: Mapped[str] = mapped_column(Text, nullable=False)
-    pagina_inicial: Mapped[int] = mapped_column(Integer, nullable=False)
-    pagina_final: Mapped[int] = mapped_column(Integer, nullable=False)
-    confianca: Mapped[float] = mapped_column(Float, nullable=False)
-    metodo: Mapped[str] = mapped_column(Text, nullable=False)
-    origem: Mapped[str] = mapped_column(Text, nullable=False)
-    data: Mapped[date | None] = mapped_column(Date)
-    tipo_data: Mapped[str | None] = mapped_column(Text)
-    data_evidencia_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
-    substitui_peca_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
-    vigente: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
-    flags: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
-    classificacao: Mapped[dict[str, Any]] = mapped_column(
-        JSONB, nullable=False, server_default="{}"
-    )
+        _texto("record_source"),
+    ]
 
 
-class EvidenciaTabela(Base):
-    """Tabela `evidencia`."""
-
-    __tablename__ = "evidencia"
-    __table_args__ = (
-        _fk_composta("pagina_id", "pagina"),
-        UniqueConstraint("id", "gabinete_id"),
-        CheckConstraint("inicio >= 0 AND fim > inicio", name="offsets_validos"),
-    )
-
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    pagina_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    trecho: Mapped[str] = mapped_column(TextoCifrado("evidencia.trecho"), nullable=False)
-    hash_trecho: Mapped[str] = mapped_column(Text, nullable=False)
-    inicio: Mapped[int] = mapped_column(Integer, nullable=False)
-    fim: Mapped[int] = mapped_column(Integer, nullable=False)
-    bbox: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+def _tabela(nome: str, itens: list[SchemaItem], info: dict[str, Any]) -> Table:
+    colunas_hk = [i.name for i in itens if isinstance(i, Column) and i.name.startswith("hk_")]
+    tamanhos = [
+        CheckConstraint(f"octet_length({coluna}) = {TAMANHO_HK}", name=f"{coluna}_tamanho")
+        for coluna in colunas_hk
+    ]
+    return Table(nome, metadata, *itens, *tamanhos, info=info)
 
 
-class FatoTabela(Base):
-    """Tabela `fato`; trigger adiado exige ao menos uma linha em `fato_evidencia`."""
+def hub(nome: str, entidade: str, *chave: SchemaItem) -> Table:
+    """Declara um hub: `hk_<entidade>`, chave de negócio única e colunas técnicas.
 
-    __tablename__ = "fato"
-    __table_args__ = (
-        _fk_composta("processo_id", "processo"),
-        UniqueConstraint("id", "gabinete_id"),
-        Index("ix_fato_processo_id_tipo", "processo_id", "tipo"),
-        CheckConstraint("confianca BETWEEN 0 AND 1", name="confianca_intervalo"),
-        checar_enum("tipo", TipoFato),
-        checar_enum("status", StatusFato),
-    )
+    Args:
+        nome: Nome da tabela (`hub_<entidade>`).
+        entidade: Entidade do hub.
+        *chave: Colunas da chave de negócio (na ordem do hash) e CHECKs extras.
 
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    processo_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    tipo: Mapped[str] = mapped_column(Text, nullable=False)
-    valor: Mapped[Any] = mapped_column(JSONB, nullable=False)
-    extraido_por: Mapped[str] = mapped_column(Text, nullable=False)
-    versao_extrator: Mapped[str] = mapped_column(Text, nullable=False)
-    confianca: Mapped[float] = mapped_column(Float, nullable=False)
-    status: Mapped[str] = mapped_column(Text, nullable=False)
-    substitui_fato_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("fato.id")
-    )
-    criado_em: Mapped[datetime] = _instante()
-
-
-class FatoEvidenciaTabela(Base):
-    """Associação N:N entre `fato` e `evidencia`."""
-
-    __tablename__ = "fato_evidencia"
-    __table_args__ = (
-        _fk_composta("fato_id", "fato"),
-        _fk_composta("evidencia_id", "evidencia"),
-    )
-
-    fato_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
-    evidencia_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
-    gabinete_id: Mapped[UUID] = _gabinete()
-
-
-class ReuTabela(Base):
-    """Tabela `reu`: só pseudônimo, sem nome real."""
-
-    __tablename__ = "reu"
-    __table_args__ = (
-        _fk_composta("processo_id", "processo"),
-        UniqueConstraint("id", "gabinete_id"),
-    )
-
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    processo_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    pseudonimo: Mapped[str] = mapped_column(Text, nullable=False)
-
-
-class ReuIdentidadeTabela(Base):
-    """Tabela `reu_identidade`: nome e documento cifrados no Transit (7.6)."""
-
-    __tablename__ = "reu_identidade"
-    __table_args__ = (_fk_composta("reu_id", "reu"),)
-
-    reu_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
-    gabinete_id: Mapped[UUID] = _gabinete()
-    nome: Mapped[str] = mapped_column(Text, nullable=False)
-    documento: Mapped[str | None] = mapped_column(Text)
-
-
-@event.listens_for(ReuIdentidadeTabela, "before_insert")
-@event.listens_for(ReuIdentidadeTabela, "before_update")
-def _cifrar_identidade(_mapper: Mapper[Any], _conexao: Connection, alvo: Any) -> None:
-    """Etapa 7.6: nome e documento só chegam ao banco cifrados pelo Transit do gabinete."""
-    cofre = obter_cofre()
-    alvo.nome = cifrar_identidade(cofre, alvo.gabinete_id, alvo.nome)
-    alvo.documento = cifrar_identidade(cofre, alvo.gabinete_id, alvo.documento)
-
-
-class AchadoTabela(Base):
-    """Tabela `achado`; imutável (trigger bloqueia UPDATE)."""
-
-    __tablename__ = "achado"
-    __table_args__ = (
-        _fk_composta("processo_id", "processo"),
-        UniqueConstraint("id", "gabinete_id"),
-        checar_enum("resultado", ResultadoAchado),
-    )
-
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    processo_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    validacao: Mapped[str] = mapped_column(Text, nullable=False)
-    versao_catalogo: Mapped[str] = mapped_column(Text, nullable=False)
-    resultado: Mapped[str] = mapped_column(Text, nullable=False)
-    fatos_usados: Mapped[list[UUID]] = mapped_column(
-        ARRAY(PG_UUID(as_uuid=True)), nullable=False, server_default="{}"
-    )
-    valores: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
-    explicacao: Mapped[str] = mapped_column(Text, nullable=False)
-    criado_em: Mapped[datetime] = _instante()
-
-
-class AnotacaoTabela(Base):
-    """Tabela `anotacao`: nota sobre achado ou fato."""
-
-    __tablename__ = "anotacao"
-    __table_args__ = (
-        _fk_composta("achado_id", "achado"),
-        _fk_composta("fato_id", "fato"),
-        CheckConstraint("(achado_id IS NULL) <> (fato_id IS NULL)", name="um_alvo"),
-    )
-
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    achado_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
-    fato_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
-    usuario_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("usuario.id"), nullable=False
-    )
-    texto: Mapped[str] = mapped_column(Text, nullable=False)
-    criado_em: Mapped[datetime] = _instante()
-
-
-class EventoAuditoriaTabela(Base):
-    """Tabela `evento_auditoria`: append-only, encadeada por hash dentro de cada gabinete.
-
-    `sequencia` é a posição do evento na cadeia do gabinete (ou na cadeia global, quando
-    `gabinete_id` é nulo); a unicidade `(gabinete_id, sequencia)` com `NULLS NOT DISTINCT`
-    impede dois eventos com o mesmo antecessor.
+    Returns:
+        A tabela.
     """
-
-    __tablename__ = "evento_auditoria"
-    __table_args__ = (
-        UniqueConstraint("gabinete_id", "sequencia", postgresql_nulls_not_distinct=True),
-        Index("ix_evento_auditoria_ocorrido_em", "ocorrido_em"),
-        Index("ix_evento_auditoria_usuario_id_ocorrido_em", "usuario_id", "ocorrido_em"),
-        Index("ix_evento_auditoria_gabinete_id_ocorrido_em", "gabinete_id", "ocorrido_em"),
-        Index("ix_evento_auditoria_processo_id_ocorrido_em", "processo_id", "ocorrido_em"),
-        Index("ix_evento_auditoria_acao_ocorrido_em", "acao", "ocorrido_em"),
-        Index("ix_evento_auditoria_ip_ocorrido_em", "ip", "ocorrido_em"),
-    )
-
-    id: Mapped[UUID] = _uuid_pk()
-    ocorrido_em: Mapped[datetime] = _instante()
-    usuario_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("usuario.id"))
-    gabinete_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("gabinete.id"), index=True
-    )
-    processo_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
-    acao: Mapped[str] = mapped_column(Text, nullable=False)
-    objeto_tipo: Mapped[str | None] = mapped_column(Text)
-    objeto_id: Mapped[str | None] = mapped_column(Text)
-    ip: Mapped[str | None] = mapped_column(Text)
-    localizacao: Mapped[str | None] = mapped_column(Text)
-    resultado: Mapped[str] = mapped_column(Text, nullable=False)
-    versao_modelo: Mapped[str | None] = mapped_column(Text)
-    versao_prompt: Mapped[str | None] = mapped_column(Text)
-    hash_anterior: Mapped[str | None] = mapped_column(Text)
-    hash_evento: Mapped[str] = mapped_column(Text, nullable=False)
-    sequencia: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    colunas = [item.name for item in chave if isinstance(item, Column)]
+    itens: list[SchemaItem] = [
+        Column(f"hk_{entidade}", BYTEA, primary_key=True),
+        *chave,
+        *_tecnicas(),
+        UniqueConstraint(*colunas),
+    ]
+    return _tabela(nome, itens, {"tipo": "hub", "hk": f"hk_{entidade}", "chave": tuple(colunas)})
 
 
-class SessaoTabela(Base):
-    """Tabela `sessao`: sessão server-side; `id` é o SHA-256 do token entregue no cookie.
+def link(nome: str, hk: str, *hubs: tuple[str, str]) -> Table:
+    """Declara um link historizável: `hk` próprio e os `hk` dos hubs, únicos em conjunto.
 
-    `gabinete_id` e `papel` são copiados do usuário para que a requisição defina o contexto
-    da RLS antes de ler o próprio usuário.
+    Args:
+        nome: Nome da tabela (`link_<a>_<b>`).
+        hk: Coluna da chave do link.
+        *hubs: Pares `(coluna, hub)` na ordem do hash do link.
+
+    Returns:
+        A tabela.
     """
-
-    __tablename__ = "sessao"
-
-    id: Mapped[str] = mapped_column(Text, primary_key=True)
-    usuario_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("usuario.id"), nullable=False, index=True
-    )
-    gabinete_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("gabinete.id")
-    )
-    papel: Mapped[str] = mapped_column(Text, nullable=False)
-    criada_em: Mapped[datetime] = _instante()
-    expira_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    ultimo_acesso_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    ip_criacao: Mapped[str | None] = mapped_column(Text)
-    revogada: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    colunas = [coluna for coluna, _ in hubs]
+    itens: list[SchemaItem] = [
+        Column(hk, BYTEA, primary_key=True),
+        *(_hk(coluna, f"{alvo}.{coluna}") for coluna, alvo in hubs),
+        *_tecnicas(),
+        UniqueConstraint(*colunas),
+        *(Index(f"ix_{nome}_{coluna}", coluna) for coluna in colunas),
+    ]
+    return _tabela(nome, itens, {"tipo": "link", "hk": hk, "hubs": tuple(colunas)})
 
 
-class DesafioMfaTabela(Base):
-    """Tabela `desafio_mfa`: etapa intermediária do login (senha ok, TOTP pendente)."""
+def satelite(
+    nome: str,
+    pai: str,
+    alvo: str,
+    *atributos: SchemaItem,
+    multiativo: str | None = None,
+    sempre_insere: bool = False,
+) -> Table:
+    """Declara um satélite: PK `(pai, [subchave], load_dts)`, `hash_diff` e atributos.
 
-    __tablename__ = "desafio_mfa"
+    Args:
+        nome: Nome da tabela (`sat_<pai>_<assunto>`).
+        pai: Coluna `hk` do pai.
+        alvo: Tabela do pai (hub ou link).
+        *atributos: Colunas de negócio e CHECKs.
+        multiativo: Coluna que distingue as linhas ativas ao mesmo tempo, se houver.
+        sempre_insere: Se toda gravação insere, sem comparar o `hash_diff` (anotação, falha).
 
-    id: Mapped[str] = mapped_column(Text, primary_key=True)
-    usuario_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("usuario.id"), nullable=False, index=True
-    )
-    gabinete_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("gabinete.id")
-    )
-    papel: Mapped[str] = mapped_column(Text, nullable=False)
-    criado_em: Mapped[datetime] = _instante()
-    expira_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    consumido: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-
-
-class FalhaLoginTabela(Base):
-    """Tabela `falha_login`: falhas recentes, para o rate limit.
-
-    `chave` é o SHA-256 do nome de usuário digitado; o nome em si não é guardado, porque às
-    vezes a pessoa digita a senha no campo de usuário.
+    Returns:
+        A tabela.
     """
+    chave = [pai, *([multiativo] if multiativo else []), "load_dts"]
+    itens: list[SchemaItem] = [
+        _hk(pai, f"{alvo}.{pai}"),
+        *_tecnicas(),
+        Column("hash_diff", BYTEA, nullable=False),
+        *atributos,
+        PrimaryKeyConstraint(*chave),
+    ]
+    info = {
+        "tipo": "satelite",
+        "pai": pai,
+        "multiativo": multiativo,
+        "sempre_insere": sempre_insere,
+    }
+    return _tabela(nome, itens, info)
 
-    __tablename__ = "falha_login"
-    __table_args__ = (Index("ix_falha_login_chave_ocorrida_em", "chave", "ocorrida_em"),)
 
-    id: Mapped[UUID] = _uuid_pk()
-    chave: Mapped[str] = mapped_column(Text, nullable=False)
-    ocorrida_em: Mapped[datetime] = _instante()
+def atributos_do_satelite(tabela: Table) -> list[str]:
+    """Colunas de negócio de um satélite, que entram no `hash_diff`.
 
+    Args:
+        tabela: Satélite.
 
-class BloqueioLoginTabela(Base):
-    """Tabela `bloqueio_login`: chave (SHA-256 do nome de usuário) bloqueada até um instante."""
-
-    __tablename__ = "bloqueio_login"
-
-    chave: Mapped[str] = mapped_column(Text, primary_key=True)
-    bloqueado_ate: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-
-
-class JobIngestaoTabela(Base):
-    """Tabela `job_ingestao`: um job por arquivo, com estado, lease e fencing token.
-
-    `fencing_token` cresce a cada aquisição de lease; gravações de lote só são aceitas com o
-    token corrente, o que impede um worker que perdeu o lease de gravar depois do sucessor.
+    Returns:
+        Nomes das colunas, sem o pai e sem as colunas técnicas.
     """
-
-    __tablename__ = "job_ingestao"
-    __table_args__ = (
-        _fk_composta("arquivo_id", "arquivo"),
-        _fk_composta("processo_id", "processo"),
-        UniqueConstraint("arquivo_id"),
-        UniqueConstraint("id", "gabinete_id"),
-        checar_enum("estado", EstadoJob),
-        checar_enum("motivo_quarentena", MotivoQuarentena),
-        CheckConstraint(
-            "(estado = 'quarentena') = (motivo_quarentena IS NOT NULL)",
-            name="quarentena_com_motivo",
-        ),
-        Index("ix_job_ingestao_estado_lease_expira_em", "estado", "lease_expira_em"),
-    )
-
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    processo_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    arquivo_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    estado: Mapped[str] = mapped_column(Text, nullable=False)
-    motivo_quarentena: Mapped[str | None] = mapped_column(Text)
-    motivo_falha: Mapped[str | None] = mapped_column(Text)
-    tentativas: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
-    fencing_token: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
-    lease_dono: Mapped[str | None] = mapped_column(Text)
-    lease_expira_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    heartbeat_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    total_paginas: Mapped[int | None] = mapped_column(Integer)
-    manifesto: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
-    relatorio: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    versao_extrator: Mapped[str | None] = mapped_column(Text)
-    criado_em: Mapped[datetime] = _instante()
-    iniciado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    finalizado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    pai = tabela.info["pai"]
+    return [c.name for c in tabela.columns if c.name != pai and c.name not in COLUNAS_TECNICAS]
 
 
-class LoteIngestaoTabela(Base):
-    """Tabela `lote_ingestao`: resultado de cada lote; único por `(job_id, numero)`."""
+def satelite_cifrado(tabela: Table) -> bool:
+    """Diz se o satélite tem coluna cifrada com a DEK do processo (D5).
 
-    __tablename__ = "lote_ingestao"
-    __table_args__ = (
-        _fk_composta("job_id", "job_ingestao"),
-        UniqueConstraint("job_id", "numero"),
-        checar_enum("estado", EstadoLote),
-    )
+    Args:
+        tabela: Satélite.
 
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    job_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    numero: Mapped[int] = mapped_column(Integer, nullable=False)
-    estado: Mapped[str] = mapped_column(Text, nullable=False)
-    fencing_token: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    resultado: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
-    gravado_em: Mapped[datetime] = _instante()
-
-
-class DiagnosticoArquivoTabela(Base):
-    """Tabela `diagnostico_arquivo`: cenário e sinais do arquivo (um por arquivo)."""
-
-    __tablename__ = "diagnostico_arquivo"
-    __table_args__ = (
-        _fk_composta("arquivo_id", "arquivo"),
-        UniqueConstraint("arquivo_id"),
-        checar_enum("cenario", CenarioArquivo),
-        CheckConstraint("total_paginas >= 0", name="paginas_nao_negativas"),
-    )
-
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    arquivo_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    cenario: Mapped[str] = mapped_column(Text, nullable=False)
-    total_paginas: Mapped[int] = mapped_column(Integer, nullable=False)
-    tem_indice: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    sinais: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
-    fronteiras_origem: Mapped[list[dict[str, Any]]] = mapped_column(
-        JSONB, nullable=False, server_default="[]"
-    )
-    metadados_descartados: Mapped[list[dict[str, Any]]] = mapped_column(
-        JSONB, nullable=False, server_default="[]"
-    )
-    criado_em: Mapped[datetime] = _instante()
-
-
-class ConversaTabela(Base):
-    """Tabela `conversa`: uma conversa do chat de um usuário sobre um processo (Etapa 5).
-
-    Guarda os contadores usados nos tetos (tokens, páginas originais) e o contador de citações
-    descartadas. Conversa encerrada (teto) não recebe mais perguntas.
+    Returns:
+        Verdadeiro se alguma coluna é `TextoCifrado` ou `JsonCifrado`.
     """
-
-    __tablename__ = "conversa"
-    __table_args__ = (
-        _fk_composta("processo_id", "processo"),
-        UniqueConstraint("id", "gabinete_id"),
-        Index("ix_conversa_processo_id_usuario_id", "processo_id", "usuario_id"),
-    )
-
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    processo_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    usuario_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("usuario.id"), nullable=False
-    )
-    criada_em: Mapped[datetime] = _instante()
-    encerrada: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
-    motivo_encerramento: Mapped[str | None] = mapped_column(Text)
-    tokens_entrada: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
-    tokens_saida: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
-    paginas_originais: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
-    citacoes_descartadas: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    return any(isinstance(c.type, TextoCifrado | JsonCifrado) for c in tabela.columns)
 
 
-class MensagemTabela(Base):
-    """Tabela `mensagem`: pergunta ou resposta do chat; `texto` cifrado com a DEK do processo."""
+hub_usuario = hub("hub_usuario", "usuario", _texto("nome_usuario"))
+hub_processo = hub("hub_processo", "processo", _texto("numero_cnj"))
+hub_arquivo = hub("hub_arquivo", "arquivo", _texto("numero_cnj"), _texto("sha256"))
+hub_pagina = hub("hub_pagina", "pagina", _texto("numero_cnj"), _texto("sha256"), _inteiro("numero"))
+hub_peca = hub(
+    "hub_peca", "peca", _texto("numero_cnj"), _texto("sha256"), _inteiro("pagina_inicial")
+)
+hub_evidencia = hub(
+    "hub_evidencia",
+    "evidencia",
+    _texto("numero_cnj"),
+    _texto("sha256"),
+    _inteiro("numero"),
+    _inteiro("inicio"),
+    _inteiro("fim"),
+    CheckConstraint("inicio >= 0 AND fim > inicio", name="offsets_validos"),
+)
+hub_fato = hub(
+    "hub_fato",
+    "fato",
+    _texto("numero_cnj"),
+    _texto("tipo"),
+    _texto("sujeito"),
+    _hk("hk_evidencia_origem", "hub_evidencia.hk_evidencia"),
+    checar_enum("tipo", TipoFato),
+)
+hub_achado = hub(
+    "hub_achado", "achado", _texto("numero_cnj"), _texto("validacao"), _texto("sujeito")
+)
+hub_parte = hub("hub_parte", "parte", _texto("numero_cnj"), _hk("chave_nome"))
+hub_conversa = hub(
+    "hub_conversa", "conversa", Column("conversa_id", PG_UUID(as_uuid=True), nullable=False)
+)
+hub_sessao = hub("hub_sessao", "sessao", _texto("token_sha256"))
+hub_desafio_mfa = hub("hub_desafio_mfa", "desafio_mfa", _texto("token_sha256"))
+hub_chave_login = hub("hub_chave_login", "chave_login", _texto("chave"))
 
-    __tablename__ = "mensagem"
-    __table_args__ = (
-        _fk_composta("conversa_id", "conversa"),
-        Index("ix_mensagem_conversa_id_criado_em", "conversa_id", "criado_em"),
-        checar_enum("papel", PapelMensagem),
-        checar_enum("status", StatusMensagem),
-    )
+PROCESSO = ("hk_processo", "hub_processo")
+ARQUIVO = ("hk_arquivo", "hub_arquivo")
+PAGINA = ("hk_pagina", "hub_pagina")
+PECA = ("hk_peca", "hub_peca")
+EVIDENCIA = ("hk_evidencia", "hub_evidencia")
+FATO = ("hk_fato", "hub_fato")
+ACHADO = ("hk_achado", "hub_achado")
+PARTE = ("hk_parte", "hub_parte")
+USUARIO = ("hk_usuario", "hub_usuario")
+CONVERSA = ("hk_conversa", "hub_conversa")
 
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    conversa_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    papel: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[str] = mapped_column(Text, nullable=False)
-    texto: Mapped[str] = mapped_column(TextoCifrado("mensagem.texto"), nullable=False)
-    citacoes: Mapped[list[dict[str, Any]]] = mapped_column(
-        JSONB, nullable=False, server_default="[]"
-    )
-    avisos: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default="[]")
-    criado_em: Mapped[datetime] = _instante()
+link_processo_arquivo = link("link_processo_arquivo", "hk_processo_arquivo", PROCESSO, ARQUIVO)
+link_arquivo_pagina = link("link_arquivo_pagina", "hk_arquivo_pagina", ARQUIVO, PAGINA)
+link_arquivo_peca = link("link_arquivo_peca", "hk_arquivo_peca", ARQUIVO, PECA)
+link_pagina_evidencia = link("link_pagina_evidencia", "hk_pagina_evidencia", PAGINA, EVIDENCIA)
+link_processo_fato = link("link_processo_fato", "hk_processo_fato", PROCESSO, FATO)
+link_fato_evidencia = link("link_fato_evidencia", "hk_fato_evidencia", FATO, EVIDENCIA)
+link_processo_achado = link("link_processo_achado", "hk_processo_achado", PROCESSO, ACHADO)
+link_achado_fato = link("link_achado_fato", "hk_achado_fato", ACHADO, FATO)
+link_processo_parte = link("link_processo_parte", "hk_processo_parte", PROCESSO, PARTE)
+link_processo_responsavel = link(
+    "link_processo_responsavel", "hk_processo_responsavel", PROCESSO, USUARIO
+)
+link_processo_conversa = link(
+    "link_processo_conversa", "hk_processo_conversa", PROCESSO, CONVERSA, USUARIO
+)
+link_sessao_usuario = link(
+    "link_sessao_usuario", "hk_sessao_usuario", ("hk_sessao", "hub_sessao"), USUARIO
+)
+link_desafio_mfa_usuario = link(
+    "link_desafio_mfa_usuario",
+    "hk_desafio_mfa_usuario",
+    ("hk_desafio_mfa", "hub_desafio_mfa"),
+    USUARIO,
+)
 
-
-class ChamadaModeloTabela(Base):
-    """Tabela `chamada_modelo`: metadados de cada chamada ao modelo, sem conteúdo (Etapa 5.9).
-
-    O evento `chamada_modelo` da auditoria aponta para a linha (`objeto_id`); aqui ficam os
-    hashes, tokens e latência, que não cabem no formato fixo do evento.
-    """
-
-    __tablename__ = "chamada_modelo"
-    __table_args__ = (
-        _fk_composta("processo_id", "processo"),
-        Index("ix_chamada_modelo_processo_id_criado_em", "processo_id", "criado_em"),
+link_chamada_modelo = _tabela(
+    "link_chamada_modelo",
+    [
+        Column("hk_chamada", BYTEA, primary_key=True),
+        _hk("hk_processo", "hub_processo.hk_processo"),
+        _hk("hk_conversa", "hub_conversa.hk_conversa", nulo=True),
+        *_tecnicas(),
+        _texto("modelo"),
+        _texto("versao_prompt"),
+        _texto("hash_prompt_sistema"),
+        _texto("hash_entrada"),
+        _texto("hash_saida"),
+        _inteiro("tokens_entrada"),
+        _inteiro("tokens_saida"),
+        _inteiro("latencia_ms"),
+        Column("ferramentas", ARRAY(Text), nullable=False),
+        _texto("resultado"),
         checar_enum("resultado", ResultadoChamada),
-    )
+        Index("ix_link_chamada_modelo_hk_processo_load_dts", "hk_processo", "load_dts"),
+        Index("ix_link_chamada_modelo_hk_conversa", "hk_conversa"),
+    ],
+    {"tipo": "link", "hk": "hk_chamada", "hubs": ("hk_processo", "hk_conversa")},
+)
 
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    processo_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    conversa_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
-    modelo: Mapped[str] = mapped_column(Text, nullable=False)
-    versao_prompt: Mapped[str] = mapped_column(Text, nullable=False)
-    hash_prompt_sistema: Mapped[str] = mapped_column(Text, nullable=False)
-    hash_entrada: Mapped[str] = mapped_column(Text, nullable=False)
-    hash_saida: Mapped[str] = mapped_column(Text, nullable=False)
-    tokens_entrada: Mapped[int] = mapped_column(Integer, nullable=False)
-    tokens_saida: Mapped[int] = mapped_column(Integer, nullable=False)
-    latencia_ms: Mapped[int] = mapped_column(Integer, nullable=False)
-    ferramentas: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, server_default="{}")
-    resultado: Mapped[str] = mapped_column(Text, nullable=False)
-    criado_em: Mapped[datetime] = _instante()
+link_evento_auditoria = _tabela(
+    "link_evento_auditoria",
+    [
+        Column("hk_evento", BYTEA, primary_key=True),
+        Column("sequencia", BigInteger, nullable=False, unique=True),
+        _instante("ocorrido_em"),
+        _usuario(nulo=True),
+        _hk("hk_processo", "hub_processo.hk_processo", nulo=True),
+        *_tecnicas(),
+        _texto("acao"),
+        _texto("objeto_tipo", nulo=True),
+        _texto("objeto_id", nulo=True),
+        _texto("ip", nulo=True),
+        _texto("localizacao", nulo=True),
+        _texto("resultado"),
+        _texto("versao_modelo", nulo=True),
+        _texto("versao_prompt", nulo=True),
+        _texto("hash_anterior", nulo=True),
+        _texto("hash_evento"),
+        Index("ix_link_evento_auditoria_ocorrido_em", "ocorrido_em"),
+        Index("ix_link_evento_auditoria_hk_usuario_ocorrido_em", "hk_usuario", "ocorrido_em"),
+        Index("ix_link_evento_auditoria_hk_processo_ocorrido_em", "hk_processo", "ocorrido_em"),
+        Index("ix_link_evento_auditoria_acao_ocorrido_em", "acao", "ocorrido_em"),
+        Index("ix_link_evento_auditoria_ip_ocorrido_em", "ip", "ocorrido_em"),
+    ],
+    {"tipo": "link", "hk": "hk_evento", "hubs": ("hk_usuario", "hk_processo")},
+)
 
+sat_usuario_cadastro = satelite(
+    "sat_usuario_cadastro",
+    *USUARIO,
+    _texto("papel"),
+    _booleano("ativo"),
+    checar_enum("papel", PapelUsuario),
+)
+sat_usuario_credencial = satelite(
+    "sat_usuario_credencial",
+    *USUARIO,
+    _texto("senha_hash"),
+    _booleano("troca_senha_obrigatoria"),
+    _texto("mfa_segredo", nulo=True),
+    _booleano("mfa_confirmado"),
+    Column("mfa_ultimo_passo", BigInteger, nullable=True),
+)
+sat_processo_dados = satelite(
+    "sat_processo_dados",
+    *PROCESSO,
+    _texto("classe"),
+    _usuario(),
+    checar_enum("classe", ClasseProcessual),
+)
+sat_processo_estado = satelite(
+    "sat_processo_estado", *PROCESSO, _texto("status"), checar_enum("status", StatusProcesso)
+)
+sat_processo_chave = satelite("sat_processo_chave", *PROCESSO, _texto("chave_dados_cifrada"))
+sat_processo_revisao = satelite(
+    "sat_processo_revisao",
+    *PROCESSO,
+    _texto("situacao"),
+    _texto("motivo"),
+    _texto("status_anterior"),
+    _usuario(nulo=True),
+    checar_valores("situacao", SITUACOES_REVISAO),
+)
+sat_arquivo_dados = satelite(
+    "sat_arquivo_dados",
+    *ARQUIVO,
+    _inteiro("tamanho_bytes"),
+    _cifrado("nome_original", "sat_arquivo_dados.nome_original"),
+    _texto("mime"),
+    _texto("chave_storage"),
+    _usuario(),
+    CheckConstraint("tamanho_bytes > 0", name="tamanho_positivo"),
+)
+sat_arquivo_ingestao = satelite(
+    "sat_arquivo_ingestao",
+    *ARQUIVO,
+    _texto("estado"),
+    _texto("motivo_quarentena", nulo=True),
+    _texto("motivo_falha", nulo=True),
+    _inteiro("tentativas"),
+    _inteiro("total_paginas", nulo=True),
+    _json("manifesto", nulo=True),
+    _json("relatorio", nulo=True),
+    _texto("versao_extrator", nulo=True),
+    checar_enum("estado", EstadoJob),
+    checar_enum("motivo_quarentena", MotivoQuarentena),
+    checar_enum("motivo_falha", MotivoFalha),
+    CheckConstraint(
+        "(estado = 'quarentena') = (motivo_quarentena IS NOT NULL)", name="quarentena_com_motivo"
+    ),
+    Index("ix_sat_arquivo_ingestao_estado_load_dts", "estado", "load_dts"),
+)
+sat_arquivo_lote = satelite(
+    "sat_arquivo_lote",
+    *ARQUIVO,
+    _inteiro("numero"),
+    _texto("estado"),
+    _json("resultado"),
+    checar_enum("estado", EstadoLote),
+    multiativo="numero",
+)
+sat_arquivo_diagnostico = satelite(
+    "sat_arquivo_diagnostico",
+    *ARQUIVO,
+    _texto("cenario"),
+    _inteiro("total_paginas"),
+    _booleano("tem_indice"),
+    _json("sinais"),
+    _json("fronteiras_origem"),
+    _json("metadados_descartados"),
+    checar_enum("cenario", CenarioArquivo),
+    CheckConstraint("total_paginas >= 0", name="paginas_nao_negativas"),
+)
+sat_pagina_extracao = satelite(
+    "sat_pagina_extracao",
+    *PAGINA,
+    _texto("tipo"),
+    _cifrado("texto", "sat_pagina_extracao.texto"),
+    _texto("hash_texto"),
+    _cifrado("texto_nativo", "sat_pagina_extracao.texto_nativo", nulo=True),
+    _cifrado("texto_ocr", "sat_pagina_extracao.texto_ocr", nulo=True),
+    _json("coordenadas"),
+    _json("sinais"),
+    _json("extracao"),
+    _texto("versao_extrator", nulo=True),
+    _texto("origem_arquivo", nulo=True),
+    _inteiro("pagina_origem", nulo=True),
+    checar_enum("tipo", TipoPagina),
+)
+sat_pagina_saneamento = satelite(
+    "sat_pagina_saneamento",
+    *PAGINA,
+    _cifrado("texto_normalizado", "sat_pagina_saneamento.texto_normalizado", nulo=True),
+    _json("flags"),
+    _json_cifrado("trechos_ocultos", "sat_pagina_saneamento.trechos_ocultos"),
+    _json_cifrado("trechos_suspeitos", "sat_pagina_saneamento.trechos_suspeitos"),
+)
+sat_pagina_fronteira = satelite("sat_pagina_fronteira", *PAGINA, _json("sinais_fronteira"))
+sat_peca_classificacao = satelite(
+    "sat_peca_classificacao",
+    *PECA,
+    _texto("tipo"),
+    _inteiro("pagina_final"),
+    *_confianca(),
+    _texto("metodo"),
+    _texto("origem"),
+    Column("data", Date, nullable=True),
+    _texto("tipo_data", nulo=True),
+    _hk("hk_evidencia_data", "hub_evidencia.hk_evidencia", nulo=True),
+    _json("flags"),
+    _json("classificacao"),
+    _booleano("vigente"),
+    _usuario(nulo=True),
+    checar_enum("tipo", TipoPeca),
+    checar_enum("metodo", MetodoClassificacao),
+    checar_enum("origem", OrigemPeca),
+    checar_valores("tipo_data", TIPOS_DATA_PECA),
+)
+sat_evidencia_trecho = satelite(
+    "sat_evidencia_trecho",
+    *EVIDENCIA,
+    _cifrado("trecho", "sat_evidencia_trecho.trecho"),
+    _texto("hash_trecho"),
+    _json("bbox", nulo=True),
+)
+sat_fato_valor = satelite(
+    "sat_fato_valor",
+    *FATO,
+    _json_cifrado("valor", "sat_fato_valor.valor"),
+    _texto("extraido_por"),
+    _texto("versao_extrator"),
+    *_confianca(),
+    _texto("status"),
+    _usuario(nulo=True),
+    checar_enum("status", StatusFato),
+)
+sat_fato_anotacao = satelite(
+    "sat_fato_anotacao",
+    *FATO,
+    _cifrado("texto", "anotacao.texto"),
+    _usuario(),
+    sempre_insere=True,
+)
+sat_fato_evidencia_vigencia = satelite(
+    "sat_fato_evidencia_vigencia", "hk_fato_evidencia", "link_fato_evidencia", _booleano("vigente")
+)
+sat_achado_resultado = satelite(
+    "sat_achado_resultado",
+    *ACHADO,
+    _texto("versao_catalogo"),
+    _texto("resultado"),
+    Column("fatos_usados", ARRAY(BYTEA), nullable=False),
+    _json_cifrado("valores", "sat_achado_resultado.valores"),
+    _cifrado("explicacao", "sat_achado_resultado.explicacao"),
+    checar_enum("resultado", ResultadoAchado),
+)
+sat_achado_anotacao = satelite(
+    "sat_achado_anotacao",
+    *ACHADO,
+    _cifrado("texto", "anotacao.texto"),
+    _usuario(),
+    sempre_insere=True,
+)
+sat_parte_identidade = satelite(
+    "sat_parte_identidade",
+    *PARTE,
+    _cifrado("nome", "sat_parte_identidade.nome"),
+    _texto("polo"),
+    _texto("qualidade"),
+    _hk("hk_evidencia", "hub_evidencia.hk_evidencia"),
+    checar_enum("polo", Polo),
+    checar_enum("qualidade", QualidadeParte),
+)
+sat_processo_responsavel_vigencia = satelite(
+    "sat_processo_responsavel_vigencia",
+    "hk_processo_responsavel",
+    "link_processo_responsavel",
+    _booleano("vigente"),
+)
+sat_conversa_estado = satelite(
+    "sat_conversa_estado",
+    *CONVERSA,
+    _booleano("encerrada"),
+    _texto("motivo_encerramento", nulo=True),
+    _grande("tokens_entrada"),
+    _grande("tokens_saida"),
+    _inteiro("paginas_originais"),
+    _inteiro("citacoes_descartadas"),
+)
+sat_conversa_mensagem = satelite(
+    "sat_conversa_mensagem",
+    *CONVERSA,
+    _inteiro("sequencia"),
+    _texto("papel"),
+    _texto("status"),
+    _cifrado("texto", "sat_conversa_mensagem.texto"),
+    _json("citacoes"),
+    _json("avisos"),
+    checar_enum("papel", PapelMensagem),
+    checar_enum("status", StatusMensagem),
+    multiativo="sequencia",
+)
+sat_sessao_estado = satelite(
+    "sat_sessao_estado",
+    "hk_sessao",
+    "hub_sessao",
+    _texto("papel"),
+    _instante("expira_em"),
+    _instante("ultimo_acesso_em"),
+    _booleano("revogada"),
+    _texto("ip_criacao", nulo=True),
+    checar_enum("papel", PapelUsuario),
+)
+sat_desafio_mfa_estado = satelite(
+    "sat_desafio_mfa_estado",
+    "hk_desafio_mfa",
+    "hub_desafio_mfa",
+    _texto("papel"),
+    _instante("expira_em"),
+    _booleano("consumido"),
+    checar_enum("papel", PapelUsuario),
+)
+sat_chave_login_falha = satelite(
+    "sat_chave_login_falha", "hk_chave_login", "hub_chave_login", sempre_insere=True
+)
+sat_chave_login_bloqueio = satelite(
+    "sat_chave_login_bloqueio",
+    "hk_chave_login",
+    "hub_chave_login",
+    _instante("bloqueado_ate", nulo=True),
+)
 
-class RevisaoProcessoTabela(Base):
-    """Tabela `revisao_processo`: incidente que pôs o processo em revisão (Etapa 6.8).
-
-    Aberta quando a conferência bloqueia uma resposta do modelo (instrução refletida ou
-    identificador de outro processo); fechada quando um desembargador ou administrador libera.
-    Guarda o status anterior para devolvê-lo na liberação. Sem conteúdo dos autos.
-    """
-
-    __tablename__ = "revisao_processo"
-    __table_args__ = (
-        _fk_composta("processo_id", "processo"),
-        Index("ix_revisao_processo_processo_id", "processo_id"),
-    )
-
-    id: Mapped[UUID] = _uuid_pk()
-    gabinete_id: Mapped[UUID] = _gabinete()
-    processo_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    motivo: Mapped[str] = mapped_column(Text, nullable=False)
-    status_anterior: Mapped[str] = mapped_column(Text, nullable=False)
-    aberta_em: Mapped[datetime] = _instante()
-    liberada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    liberada_por: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("usuario.id")
-    )
+HUBS = tuple(t for t in metadata.tables.values() if t.info["tipo"] == "hub")
+LINKS = tuple(t for t in metadata.tables.values() if t.info["tipo"] == "link")
+SATELITES = tuple(t for t in metadata.tables.values() if t.info["tipo"] == "satelite")

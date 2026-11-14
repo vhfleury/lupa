@@ -13,12 +13,15 @@ O banco é recriado do zero. Convenções que valem para todas as linhas da tabe
 - `hk_*` é `BYTEA NOT NULL` com `CHECK (octet_length = 32)`.
 - Todo hub tem `hk_<entidade>` (PK), a chave de negócio (única), `load_dts TIMESTAMPTZ NOT NULL
   DEFAULT clock_timestamp()` e `record_source TEXT NOT NULL`.
-- Todo link tem `hk_<link>` (PK), os `hk_` dos hubs ligados (FK, únicos em conjunto, um índice por
+- Todo link tem `hk_<link>` (PK; o nome do link sem `link_`, como `hk_processo_arquivo`), os `hk_` dos hubs ligados (FK, únicos em conjunto, um índice por
   FK), `load_dts` e `record_source`.
 - Todo satélite tem PK `(hk_<pai>, load_dts)`, FK para o pai, `hash_diff BYTEA NOT NULL` e
   `record_source`. Satélite multiativo acrescenta a coluna indicada à PK.
 - `(C)` marca coluna cifrada com a DEK do processo (`TextoCifrado` ou `JsonCifrado`).
 - Toda tabela tem o trigger `<tabela>_imutavel`.
+- `load_dts` vem sempre do banco (`clock_timestamp()`); a aplicação não o informa. Instante de
+  negócio injetado (relógio da requisição) fica em atributo próprio (`ultimo_acesso_em`,
+  `expira_em`, `ocorrido_em`).
 - Coluna de enum é `TEXT` com `CHECK ... IN (...)` gerado dos enums do domínio.
 
 | Objeto | Depois |
@@ -67,7 +70,7 @@ O banco é recriado do zero. Convenções que valem para todas as linhas da tabe
 | `sat_peca_classificacao` | `tipo TEXT` (enum `TipoPeca`), `pagina_final INTEGER`, `confianca DOUBLE PRECISION CHECK (BETWEEN 0 AND 1)`, `metodo TEXT` (`regra`, `manual`), `origem TEXT` (enum), `data DATE`, `tipo_data TEXT` (`assinatura`, `protocolo`, `juntada`), `hk_evidencia_data` (nulo), `flags JSONB`, `classificacao JSONB`, `vigente BOOLEAN`, `hk_usuario` (nulo) |
 | `sat_evidencia_trecho` | `trecho TEXT (C)`, `hash_trecho TEXT`, `bbox JSONB` |
 | `sat_fato_valor` | `valor JSONB (C)`, `extraido_por TEXT`, `versao_extrator TEXT`, `confianca DOUBLE PRECISION CHECK (BETWEEN 0 AND 1)`, `status TEXT` (enum `StatusFato`), `hk_usuario` (nulo) |
-| `sat_fato_anotacao` (multiativo) | `texto TEXT (C)`, `hk_usuario` |
+| `sat_fato_anotacao` (multiativo) | `texto TEXT (C)`, `hk_usuario`; rótulo de cifra `anotacao.texto`, o mesmo de `sat_achado_anotacao`, para `v_anotacao` decifrar as duas |
 | `sat_fato_evidencia_vigencia` (satélite de `link_fato_evidencia`) | `vigente BOOLEAN` |
 | `sat_achado_resultado` | `versao_catalogo TEXT`, `resultado TEXT` (enum), `fatos_usados BYTEA[]`, `valores JSONB (C)`, `explicacao TEXT (C)` |
 | `sat_achado_anotacao` (multiativo) | `texto TEXT (C)`, `hk_usuario` |
@@ -75,11 +78,11 @@ O banco é recriado do zero. Convenções que valem para todas as linhas da tabe
 | `sat_processo_responsavel_vigencia` (satélite de `link_processo_responsavel`) | `vigente BOOLEAN` |
 | `sat_conversa_estado` | `encerrada BOOLEAN`, `motivo_encerramento TEXT`, `tokens_entrada BIGINT`, `tokens_saida BIGINT`, `paginas_originais INTEGER`, `citacoes_descartadas INTEGER` |
 | `sat_conversa_mensagem` (multiativo: `sequencia`) | `sequencia INTEGER`, `papel TEXT` (enum), `status TEXT` (enum), `texto TEXT (C)`, `citacoes JSONB`, `avisos JSONB` |
-| `sat_sessao_estado` | `papel TEXT`, `expira_em TIMESTAMPTZ`, `ultimo_acesso_em TIMESTAMPTZ`, `revogada BOOLEAN`, `ip_criacao TEXT` |
-| `sat_desafio_mfa_estado` | `papel TEXT`, `expira_em TIMESTAMPTZ`, `consumido BOOLEAN` |
+| `sat_sessao_estado` | `papel TEXT` (enum `PapelUsuario`), `expira_em TIMESTAMPTZ`, `ultimo_acesso_em TIMESTAMPTZ`, `revogada BOOLEAN`, `ip_criacao TEXT` |
+| `sat_desafio_mfa_estado` | `papel TEXT` (enum `PapelUsuario`), `expira_em TIMESTAMPTZ`, `consumido BOOLEAN` |
 | `sat_chave_login_falha` (multiativo) | sem atributo além dos técnicos; `load_dts` é o instante da falha |
-| `sat_chave_login_bloqueio` | `bloqueado_ate TIMESTAMPTZ` |
-| Views `v_usuario`, `v_processo`, `v_arquivo`, `v_pagina`, `v_peca`, `v_evidencia`, `v_fato`, `v_achado`, `v_parte`, `v_conversa`, `v_sessao`, `v_desafio_mfa`, `v_bloqueio_login` | uma linha por hub com a linha mais recente de cada satélite; `id TEXT` é o hex do `hk`; `v_processo` traz `em_revisao BOOLEAN`; `v_peca` e `v_fato` trazem `vigente` e os `id` do pai |
+| `sat_chave_login_bloqueio` | `bloqueado_ate TIMESTAMPTZ` (nulo: um login certo zerou as falhas) |
+| Views `v_usuario`, `v_processo`, `v_arquivo`, `v_pagina`, `v_peca`, `v_evidencia`, `v_fato`, `v_achado`, `v_parte`, `v_conversa`, `v_sessao`, `v_desafio_mfa`, `v_bloqueio_login` | uma linha por hub com a linha mais recente de cada satélite; `id TEXT` é o hex do `hk`; `v_processo` traz `em_revisao BOOLEAN`; `v_peca` e `v_fato` trazem `vigente` e os `id` do pai (`v_fato.vigente`: o fato tem ao menos uma evidência com vigência corrente verdadeira); `v_bloqueio_login` traz `bloqueado_ate`, `zerado_em` e `falhas TIMESTAMPTZ[]` (instantes das falhas depois do último zeramento) |
 | Views `v_peca_historico`, `v_fato_historico` | todas as linhas do satélite, com `load_dts` e autor |
 | View `v_mensagem` | linhas de `sat_conversa_mensagem` por conversa, em ordem de `sequencia` |
 | View `v_anotacao` | união de `sat_fato_anotacao` e `sat_achado_anotacao`, com `alvo_tipo`, `alvo_id`, autor e data |

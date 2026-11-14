@@ -1,8 +1,12 @@
-"""Fábricas e fixtures comuns aos testes da pipeline e da intranet (todas sintéticas)."""
+"""Fábricas e fixtures comuns aos testes da pipeline e da intranet (todas sintéticas).
+
+O banco de teste é um database próprio no serviço `db`, migrado até a cabeça (Data Vault da
+0.2); `sessao` roda cada teste numa transação desfeita ao final.
+"""
 
 import os
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -11,23 +15,15 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from pydantic import SecretStr
-from sqlalchemy import Engine, create_engine, select, text
+from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 import lupa_pipeline.migrations
 from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.dominio.cnj import calcular_digito_verificador
-from lupa_pipeline.dominio.enums import Materia, PapelUsuario, StatusProcesso, TipoFato, TipoPagina
-from lupa_pipeline.dominio.esquemas import Evidencia, Fato, calcular_hash
-from lupa_pipeline.dominio.tabelas import (
-    ArquivoTabela,
-    EventoAuditoriaTabela,
-    GabineteTabela,
-    PaginaTabela,
-    ProcessoTabela,
-    UsuarioTabela,
-)
+from lupa_pipeline.dominio.enums import TipoFato
+from lupa_pipeline.dominio.esquemas import Evidencia, Fato
 
 VARIAVEIS_FICTICIAS = {
     "LUPA_AMBIENTE": "teste",
@@ -46,7 +42,6 @@ CAMINHO_ALEMBIC_INI = Path(lupa_pipeline.migrations.__file__).parent / "alembic.
 TEXTO_PAGINA = "Certidão: intimado o defensor em 10/03/2025. Recurso interposto em 14/03/2025."
 
 FabricaFato = Callable[..., Fato]
-FabricaProcesso = Callable[[UUID], UUID]
 
 
 @pytest.fixture
@@ -126,16 +121,23 @@ def _url_banco_principal() -> str | None:
     return os.environ.get("LUPA_DATABASE_URL")
 
 
-@pytest.fixture(scope="session")
-def engine_teste() -> Iterator[Engine]:
-    """Banco PostgreSQL efêmero (database próprio no serviço `db` do compose) já migrado.
+@contextmanager
+def banco_vazio(sufixo: str) -> Iterator[Engine]:
+    """Cria um database de teste vazio (`lupa_teste_<sufixo>_<pid>`) e o apaga ao sair.
 
+    Só toca databases com o prefixo `lupa_teste_`; o banco de desenvolvimento fica intacto.
     Pula o teste se o PostgreSQL não estiver acessível.
+
+    Args:
+        sufixo: Distingue o database dos demais da mesma execução.
+
+    Yields:
+        Engine do database novo, sem migração.
     """
     url_principal = _url_banco_principal()
     if url_principal is None:
         pytest.skip("LUPA_DATABASE_URL não definida")
-    nome_banco = f"lupa_teste_{os.getpid()}"
+    nome_banco = f"lupa_teste_{sufixo}_{os.getpid()}"
     admin = create_engine(
         url_principal, isolation_level="AUTOCOMMIT", connect_args={"connect_timeout": 2}
     )
@@ -147,12 +149,21 @@ def engine_teste() -> Iterator[Engine]:
         admin.dispose()
         pytest.skip("PostgreSQL inacessível neste ambiente")
     engine = create_engine(make_url(url_principal).set(database=nome_banco))
-    migrar(engine, "head")
-    yield engine
-    engine.dispose()
-    with admin.connect() as conexao:
-        conexao.execute(text(f'DROP DATABASE IF EXISTS "{nome_banco}" WITH (FORCE)'))
-    admin.dispose()
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+        with admin.connect() as conexao:
+            conexao.execute(text(f'DROP DATABASE IF EXISTS "{nome_banco}" WITH (FORCE)'))
+        admin.dispose()
+
+
+@pytest.fixture(scope="session")
+def engine_teste() -> Iterator[Engine]:
+    """Banco PostgreSQL efêmero (database próprio no serviço `db` do compose) já migrado."""
+    with banco_vazio("sessao") as engine:
+        migrar(engine, "head")
+        yield engine
 
 
 def migrar(engine: Engine, alvo: str, *, descer: bool = False) -> None:
@@ -183,194 +194,10 @@ def sessao(engine_teste: Engine) -> Iterator[Session]:
 
 
 @pytest.fixture
-def fabrica_processo(sessao: Session) -> FabricaProcesso:
-    """Cria gabinete-usuário-processo sintéticos e devolve o id do processo.
-
-    Returns:
-        Função que recebe o id do gabinete e cria (se preciso) gabinete, usuário e processo.
-    """
-    contador = iter(range(1, 10_000))
-
-    def _criar(gabinete_id: UUID) -> UUID:
-        if sessao.get(GabineteTabela, gabinete_id) is None:
-            sessao.add(GabineteTabela(id=gabinete_id, nome=f"Gabinete {gabinete_id.hex[:6]}"))
-            sessao.flush()
-        usuario_id, processo_id = uuid4(), uuid4()
-        sessao.add(
-            UsuarioTabela(
-                id=usuario_id,
-                gabinete_id=gabinete_id,
-                nome_usuario=f"assessor_{usuario_id.hex[:8]}",
-                papel=PapelUsuario.ASSESSOR.value,
-                senha_hash="hash-ficticio",
-            )
-        )
-        sessao.flush()
-        sessao.add(
-            ProcessoTabela(
-                id=processo_id,
-                gabinete_id=gabinete_id,
-                numero_cnj=gerar_numero_cnj(next(contador)),
-                classe="Apelação Criminal",
-                materia=Materia.CRIMINAL.value,
-                sigiloso=False,
-                status=StatusProcesso.CRIADO.value,
-                criado_por=usuario_id,
-            )
-        )
-        sessao.flush()
-        return processo_id
-
-    return _criar
-
-
-@pytest.fixture
-def gabinete_id() -> UUID:
-    """Id do gabinete sintético A."""
-    return uuid4()
-
-
-@pytest.fixture
-def processo_id(fabrica_processo: FabricaProcesso, gabinete_id: UUID) -> UUID:
-    """Processo sintético no gabinete A."""
-    return fabrica_processo(gabinete_id)
-
-
-def criar_pagina(sessao: Session, processo_id: UUID) -> UUID:
-    """Cria arquivo e página sintéticos para o processo.
-
-    Args:
-        sessao: Sessão de teste.
-        processo_id: Processo dono do arquivo.
-
-    Returns:
-        Id da página criada.
-    """
-    processo = sessao.get(ProcessoTabela, processo_id)
-    assert processo is not None
-    arquivo_id, pagina_id = uuid4(), uuid4()
-    sessao.add(
-        ArquivoTabela(
-            id=arquivo_id,
-            gabinete_id=processo.gabinete_id,
-            processo_id=processo_id,
-            sha256=calcular_hash(str(arquivo_id)),
-            tamanho_bytes=1024,
-            nome_original="autos-sinteticos.pdf",
-            mime="application/pdf",
-            chave_storage=f"sintetico/{arquivo_id}",
-            enviado_por=processo.criado_por,
-        )
-    )
-    sessao.flush()
-    sessao.add(
-        PaginaTabela(
-            id=pagina_id,
-            gabinete_id=processo.gabinete_id,
-            arquivo_id=arquivo_id,
-            numero=1,
-            tipo=TipoPagina.NATIVA.value,
-            texto=TEXTO_PAGINA,
-            hash_texto=calcular_hash(TEXTO_PAGINA),
-            flags={},
-        )
-    )
-    sessao.flush()
-    return pagina_id
-
-
-@pytest.fixture
-def pagina_id(sessao: Session, processo_id: UUID) -> UUID:
-    """Página sintética do processo do gabinete A."""
-    return criar_pagina(sessao, processo_id)
-
-
-# --- Etapa 3: acesso e auditoria -------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class UsuarioTeste:
-    """Usuário sintético semeado direto no banco.
-
-    Attributes:
-        id: Id.
-        nome: Nome de usuário.
-        gabinete_id: Gabinete (None para administrador).
-        papel: Papel.
-        segredo: Segredo TOTP (None se MFA ainda não configurado).
-    """
-
-    id: UUID
-    nome: str
-    gabinete_id: UUID | None
-    papel: PapelUsuario
-    segredo: str | None
-
-
-@pytest.fixture
 def fabrica_sessao(engine_teste: Engine) -> sessionmaker[Session]:
     """Fábrica de sessões (com commit real) no banco de teste."""
     return sessionmaker(engine_teste, expire_on_commit=False)
 
-
-def criar_gabinete_teste(engine: Engine) -> UUID:
-    """Cria um gabinete sintético com commit.
-
-    Args:
-        engine: Engine do banco de teste (superusuário, sem RLS).
-
-    Returns:
-        Id do gabinete.
-    """
-    gabinete_id = uuid4()
-    with Session(engine) as session, session.begin():
-        session.add(GabineteTabela(id=gabinete_id, nome=f"Gabinete {gabinete_id.hex[:6]}"))
-    return gabinete_id
-
-
-def criar_processo_teste(engine: Engine, autor: UsuarioTeste) -> UUID:
-    """Cria um processo sintético no gabinete do autor, com commit.
-
-    Args:
-        engine: Engine do banco de teste.
-        autor: Usuário criador do processo.
-
-    Returns:
-        Id do processo.
-    """
-    processo_id = uuid4()
-    with Session(engine) as session, session.begin():
-        session.add(
-            ProcessoTabela(
-                id=processo_id,
-                gabinete_id=autor.gabinete_id,
-                numero_cnj=gerar_numero_cnj(int(processo_id.int % 9_000_000) + 1),
-                classe="Apelação Criminal",
-                materia=Materia.CRIMINAL.value,
-                sigiloso=False,
-                status=StatusProcesso.CRIADO.value,
-                criado_por=autor.id,
-            )
-        )
-    return processo_id
-
-
-def eventos_do_banco(engine: Engine, **filtros: Any) -> list[EventoAuditoriaTabela]:
-    """Lê eventos de auditoria direto do banco (superusuário), filtrando por igualdade.
-
-    Args:
-        engine: Engine do banco de teste.
-        **filtros: Coluna = valor.
-
-    Returns:
-        Eventos em ordem de gravação na cadeia (`sequencia`).
-    """
-    with Session(engine) as session:
-        consulta = select(EventoAuditoriaTabela).filter_by(**filtros)
-        return list(session.scalars(consulta.order_by(EventoAuditoriaTabela.sequencia)))
-
-
-# --- Etapa 4A: ingestão --------------------------------------------------------------------
 
 VARIAVEIS_DE_AMBIENTE_ISOLADAS = ("LUPA_DB_USUARIO_APP", "LUPA_DB_SENHA_APP")
 

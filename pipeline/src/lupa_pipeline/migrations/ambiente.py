@@ -4,11 +4,11 @@ from alembic import context
 from sqlalchemy import Connection, create_engine
 
 from lupa_pipeline.config import get_settings
-from lupa_pipeline.dominio.tabelas import Base
+from lupa_pipeline.dominio.tabelas import metadata
 
 
 def _migrar(conexao: Connection) -> None:
-    context.configure(connection=conexao, target_metadata=Base.metadata)
+    context.configure(connection=conexao, target_metadata=metadata)
     with context.begin_transaction():
         context.run_migrations()
 

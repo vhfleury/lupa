@@ -308,10 +308,10 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 
 - [x] U: `chave_hash` é estável, sensível à ordem e recusa parte vazia (A1). T3.1.
 - [x] U: `hash_diff` com DEK difere do sem DEK para o mesmo conteúdo (D5). T3.1.
-- [ ] I: `test_migracao_0001` sobe e desce.
+- [x] I: `test_migracao_0001` sobe e desce. T3.2.
 - [ ] I: `UPDATE` e `DELETE` em hub, link e satélite são recusados sob `lupa_app` (D6).
 - [ ] I: `gravar_satelite` não insere com `hash_diff` igual e insere com diferente (A2).
-- [ ] I: fato sem evidência é recusado no commit (RF-FAT-01).
+- [x] I: fato sem evidência é recusado no commit (RF-FAT-01). T3.2.
 - [ ] I: login, falha, bloqueio, desafio e sessão (A14; RF-ACE-01, 02).
 - [ ] I: assessor recebe 403 em auditoria e usuários; desembargador não (RF-ACE-03).
 - [ ] I: criação, desativação, reativação e redefinição de assessor (RF-ACE-04).

@@ -121,7 +121,28 @@ a saída resumida (vermelho inicial e verde final).
   - Vermelho (assinaturas vazias): `17 failed, 4 passed` (os 4 comparam dois valores do esboço
     entre si). Verde: `21 passed`. `ruff check`, `ruff format --check` e `mypy` nos dois arquivos:
     ok.
-- [ ] **T3.2** `dominio/tabelas.py` no Data Vault, `migrations/esquema_v0001.py`, `versions/v0001_data_vault.py` e `test_migracao_0001`; remoção das revisões `v0001` a `v0012`. D3, D6, D7, D8, D9, D18. RES-02, RES-03, RES-13.
+- [x] **T3.2** `dominio/tabelas.py` no Data Vault, `migrations/esquema_v0001.py`, `versions/v0001_data_vault.py` e `test_migracao_0001`; remoção das revisões `v0001` a `v0012`. D3, D6, D7, D8, D9, D18. RES-02, RES-03, RES-13.
+  - `tabelas.py` declara as 56 tabelas como `Table` do SQLAlchemy Core (13 hubs, 15 links, 28
+    satélites) com `info` para a gravação; `esquema_v0001.py` cria tabelas, índices, CHECKs
+    gerados dos enums, `<tabela>_imutavel`, `lupa_bloquear_alteracao`,
+    `lupa_fato_exige_evidencia`, `lupa_descartar_processo` (A13, passos 2 a 6), as 20 views e as
+    permissões de `lupa_app`. Enums: `PapelUsuario` sem administrador, `StatusProcesso` sem
+    `bloqueado`, `ClasseProcessual`, `Polo` e `QualidadeParte` (D15); os jurídicos ficam da 0.1
+    até a fase 4. `dominio/sessao.py` fica só com `assumir_papel_aplicacao`.
+  - Saíram com a funcionalidade: as revisões `v0001` a `v0012`, os `esquema_v0002` a `v0010`,
+    `pipeline/tests/seguranca/test_migracao_0010.py`, os testes de RLS, de migração e de nome
+    real de `pipeline/tests/dominio/test_banco.py` (o de fato sem evidência e o de nome em coluna
+    autorizada foram reescritos em `test_migracao_0001.py`; os de UPDATE em achado e DELETE em
+    `fato_evidencia` passam a ser cobertos pelo teste de imutabilidade de T3.3). Os testes de
+    repositório que ficam em `test_banco.py` são reescritos em T3.10.
+  - Desvios registrados no plano: `bloqueado_ate` nulo marca o zeramento das falhas por login
+    certo (sem `DELETE`); `v_bloqueio_login` traz `zerado_em` e `falhas`; `v_fato.vigente` é
+    "tem evidência vigente"; as duas anotações usam o rótulo de cifra `anotacao.texto`;
+    `load_dts` sempre do banco; `papel` de sessão e desafio com CHECK de `PapelUsuario`.
+  - Comando: `docker compose run --rm --no-deps worker python -m pytest -c pipeline/pyproject.toml
+    pipeline/tests/dominio/test_migracao_0001.py --no-cov -q`.
+  - Vermelho (upgrade só com os hubs): `8 failed, 3 passed` (os 3 olham só o modelo ou os hubs).
+    Verde: `11 passed`. `ruff check`, `ruff format --check` e `mypy` nos arquivos da tarefa: ok.
 - [ ] **T3.3** `dominio/gravacao.py` e `dominio/visoes.py`; teste de imutabilidade sob `lupa_app`. A2. D6, D13. RES-13.
 - [ ] **T3.4** Enum `PapelUsuario` com dois papéis; `acesso/` sobre hubs e satélites; `criar_desembargador.py`. A14. D11. RF-ACE-01 a 05.
 - [ ] **T3.5** Cofre com chave única, DEK em `sat_processo_chave`, caminho de objeto novo; cifra dos satélites. D14. RF-SEG-01, RF-SEG-02, RES-08.
