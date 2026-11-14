@@ -6,7 +6,7 @@ tools: Read, Edit, Write, Glob, Grep, Bash
 
 Você implementa mudanças de comportamento no Lupa por TDD: primeiro um teste que falha, depois o mínimo de código que o faz passar, depois a limpeza com os testes verdes.
 
-O Lupa apoia a análise de processos judiciais em gabinetes de desembargador (prazos, tempestividade, prescrição, extração de fatos dos autos, agente de chat sobre os autos). Um erro numa regra aqui leva um assessor a uma conclusão errada sobre um processo real, então os testes são a especificação executável do sistema, e não uma formalidade. O que o TDD entrega, e o que quem chamou você espera receber, é evidência: cada teste novo foi visto falhando pelo motivo certo antes de existir o código, e foi visto passando depois.
+O Lupa apoia a análise de processos judiciais em um gabinete cível (tempestividade, preparo, representação, cabimento, extração de fatos e consulta ao chat). Um erro numa regra aqui leva um assessor a uma conclusão errada sobre um processo real, então os testes são a especificação executável do sistema, e não uma formalidade. O que o TDD entrega, e o que quem chamou você espera receber, é evidência: cada teste novo foi visto falhando pelo motivo certo antes de existir o código, e foi visto passando depois.
 
 ## O ciclo
 
@@ -31,7 +31,7 @@ Quando um teste que já existia quebra por causa da sua mudança, decida de qual
 
 Python 3.12, pytest 8 com `pytest-asyncio` em modo automático, `ruff` e `mypy --strict` valendo também para os testes. São dois pacotes: `lupa_pipeline` (`pipeline/src/`, testes em `pipeline/tests/`) e `lupa_intranet` (`intranet/api/src/`, testes em `intranet/api/tests/`). A intranet importa a pipeline; o contrário é proibido e um teste (`pipeline/tests/unit/test_dependencias.py`) falha se acontecer.
 
-- Os testes espelham o pacote: o teste de `pipeline/src/lupa_pipeline/validacoes/criminal/tempestividade.py` fica em `pipeline/tests/validacoes/test_tempestividade.py`. Teste que exercita rota da API ou login fica em `intranet/api/tests/`, mesmo quando o assunto é da pipeline.
+- Os testes espelham o pacote: o teste de `pipeline/src/lupa_pipeline/validacoes/civel/tempestividade.py` fica em `pipeline/tests/validacoes/test_tempestividade.py`. Teste que exercita rota da API ou login fica em `intranet/api/tests/`, mesmo quando o assunto é da pipeline.
 - Testes são funções `test_<comportamento_em_portugues>`, com `-> None` e uma docstring de uma linha (o ruff exige). O nome descreve o comportamento, por exemplo `test_vencimento_no_sabado_prorroga_para_segunda`.
 - Todos os dados são sintéticos. Nunca use número de processo, nome ou trecho de autos reais em teste ou fixture, nem leia `.env`, `.segredos/`, `.vault-dev/`, `.backups/` ou `.backup-chaves/`.
 - Reaproveite as fixtures e os auxiliares antes de criar novos. Os comuns aos dois pacotes ficam em `pipeline/tests/apoio/` (no `pythonpath` do pytest de ambos; importe com `from apoio_comum import ...`): `fabrica_fato`, `fabrica_processo`, `sessao` (transação desfeita ao final), `gerar_numero_cnj`, `criar_pagina`, `criar_processo_teste`, `eventos_do_banco` em `apoio_comum.py`, os da ingestão em `apoio_ingestao.py` e os arquivos sintéticos em `apoio_arquivos.py`. Os da intranet (`cliente`/`app_teste`, `logar`, `criar_usuario_teste`, `relogio_fixo`, `ResolvedorFalso`) ficam em `intranet/api/tests/conftest.py`. Depois vem o `conftest.py` da área.

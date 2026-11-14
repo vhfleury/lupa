@@ -9,7 +9,7 @@ Regras que valem para todo código do repositório. As seções de "Linguagem e 
 - Cada tarefa cita o requisito que atende (`RF-<ÁREA>-NN` ou `RNF-NN`). Cada teste novo cita o requisito na docstring. Commit e PR citam a tarefa.
 - Escopo: um único gabinete de desembargador, área cível. Não há `gabinete_id`, RLS por gabinete, papel administrador, pseudonimização, bloqueio de sigiloso, Redis, monitoramento nem backup; nada disso é reintroduzido sem mudança de especificação.
 - Tudo do frontend e do back que o atende (API, acesso, auditoria, agente) fica em `intranet/`. Tudo da pipeline de dados (worker, ingestão, eventos, validações, modelo e migrations do Data Vault, sintéticos) fica em `pipeline/`.
-- Transição: a fase 1 do plano (reestruturação) moveu o código para `pipeline/` e `intranet/`; os caminhos e comandos abaixo são os novos. Enquanto a tarefa do plano que remove um componente não for concluída, ele continua valendo como está. A tarefa que move ou remove atualiza este arquivo no mesmo commit.
+- A fila é `v_fila_ingestao`. O advisory lock de sessão e o processamento usam a mesma conexão física. A verificação de responsáveis usa `link_processo_responsavel`, `v_responsavel` e as rotas da intranet.
 
 ## Linguagem e estilo
 
@@ -121,7 +121,7 @@ docs/
   quando as operações forem longas, ficam em
   `pipeline/src/lupa_pipeline/migrations/esquema_vNNNN.py`, como nas existentes. Toda revisão tem
   teste que sobe e desce com o auxiliar `migrar` de `pipeline/tests/apoio/apoio_comum.py`
-  (exemplo: `pipeline/tests/seguranca/test_migracao_0010.py`).
+  (exemplo: `pipeline/tests/dominio/test_migracao_0001.py`).
 - No desenvolvimento a aplicação é feita pelo agente, nunca pelo usuário, no contêiner `api`
   depois do rebuild: `docker compose exec api alembic -c
   pipeline/src/lupa_pipeline/migrations/alembic.ini upgrade head`. No servidor do piloto, pelo
@@ -275,8 +275,7 @@ Antes de concluir uma tarefa:
    toca ingestão, agente, segurança, migrations ou proxy.
 5. Quando alterar `intranet/web/`, rode `docker build --target verificacao intranet/web` (ou `npm
    run verificar` em `intranet/web/`); quando alterar uma tela, reinicie o preview e confira no
-   navegador; quando alterar fluxo coberto pelo E2E, `bash intranet/web/scripts/e2e.sh` (reseta o
-   administrador do banco de desenvolvimento).
+   navegador; quando alterar fluxo coberto pelo E2E, `bash intranet/web/scripts/e2e.sh` (cria um projeto Compose temporário com contas e processos sintéticos).
 6. Quando alterar Python e a suíte não puder rodar, execute ao menos
    `python -m compileall -q pipeline intranet/api`.
 7. Informe claramente qualquer validação que não pôde ser executada.

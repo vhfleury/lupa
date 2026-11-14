@@ -41,7 +41,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     """
     configuracao = settings or get_settings()
     configurar_logging(nivel=configuracao.log_level, estrito=configuracao.ambiente == "teste")
-    app = FastAPI(title="Lupa", version="0.0.1")
+    app = FastAPI(title="Lupa", version="0.2.0")
     app.dependency_overrides[get_settings] = lambda: configuracao
     configurar_banco(app, configuracao)
     app.state.resolvedor = criar_resolvedor(configuracao)

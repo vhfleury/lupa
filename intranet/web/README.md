@@ -2,7 +2,7 @@
 
 Interface web do Lupa: SvelteKit 2 + Svelte 5, TypeScript, gerada como SPA estática e servida por
 Caddy. O documento principal (arquitetura, telas, segurança, E2E) é
-[docs/sistema/front.md](../docs/sistema/front.md).
+[docs/sistema/front.md](../../docs/sistema/front.md).
 
 ## Pastas
 
@@ -22,7 +22,7 @@ Caddy. O documento principal (arquitetura, telas, segurança, E2E) é
 Tudo roda em contêiner. Não é preciso Node na máquina. Os comandos abaixo partem da raiz do repositório.
 
 ```bash
-docker build --target verificacao front
+docker build --target verificacao intranet/web
 ```
 
 Roda lint (Prettier e ESLint), typecheck e testes unitários. O `docker compose up --build` só gera
@@ -33,8 +33,7 @@ contêiner Node.
 bash intranet/web/scripts/e2e.sh
 ```
 
-Roda os testes ponta a ponta contra a stack real. **Reseta o administrador do banco de
-desenvolvimento.**
+Roda os testes ponta a ponta contra um projeto Compose temporário com usuários, processos e volumes sintéticos próprios.
 
 ```bash
 bash intranet/web/scripts/capturas.sh

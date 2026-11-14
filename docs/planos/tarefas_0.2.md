@@ -439,4 +439,9 @@ a saída resumida (vermelho inicial e verde final).
 - [x] **T7.4** ADRs 0013 a 0016 e `docs/decisoes/registro.md`.
   - O índice de ADRs liga as decisões substituídas às vigentes. O histórico registra a view
     adicional de versões do achado e a preservação de T1.7 com verificação de responsáveis na 0.2.
-- [ ] **T7.5** `README.md`, `CONTRIBUTING.md`, `CLAUDE.md`, `docs/README.md`, `CHANGELOG.md` e versão `0.2.0`.
+- [x] **T7.5** `README.md`, `CONTRIBUTING.md`, `CLAUDE.md`, `docs/README.md`, `CHANGELOG.md` e versão `0.2.0`.
+  - A leitura de TOML/JSON inicialmente encontrou cinco valores de versão 0.1.0. Os dois
+    manifestos Python, o front e seus metadados de lock passaram na verificação de 0.2.0 e a
+    API publicada por `app.openapi()` informou 0.2.0. Os quatro locks Python foram regenerados
+    pelos comandos do alvo `make lock`, preservando os pins e hashes. A varredura conferiu
+    108 referências locais em 23 documentos. Doze testes de saúde da API passaram.
