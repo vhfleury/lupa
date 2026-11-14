@@ -1,13 +1,31 @@
-"""Contrato da regra cabimento_agravo no catálogo cível."""
+"""Correspondência da decisão agravada com o inciso do CPC (A10; RF-VAL-05)."""
 
 from datetime import date
 
-from lupa_pipeline.validacoes.modelo import AchadoValidacao, ModeloProcesso
+from lupa_pipeline.dominio.enums import ResultadoAchado
+from lupa_pipeline.validacoes.apoio import Coleta
+from lupa_pipeline.validacoes.dados import cabimento_padrao
+from lupa_pipeline.validacoes.modelo import AchadoValidacao, ModeloProcesso, valor_de
 
 NOME = "cabimento_agravo"
 BASE_LEGAL = "art. 1.015 do CPC"
 
 
 def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
-    """Conferência de cabimento do recorrente."""
-    raise NotImplementedError
+    """Aponta o inciso associado ou encaminha a hipótese para conferência humana."""
+    coleta = Coleta(modelo, NOME, BASE_LEGAL)
+    fato = coleta.unico("hipotese_decisao_agravada")
+    if fato is None:
+        return coleta.verificar()
+    inciso = str(valor_de(fato)).strip().upper()
+    tabela = cabimento_padrao()
+    hipotese = tabela.incisos.get(inciso)
+    if not hipotese:
+        return coleta.verificar("A hipótese da decisão agravada exige conferência pelo magistrado.")
+    return coleta.concluir(
+        ResultadoAchado.CONFORME,
+        f"Inciso {inciso} identificado ({hipotese}).",
+        inciso=inciso,
+        trecho=fato.evidencias[0].trecho,
+        versao_dados=tabela.versao,
+    )
