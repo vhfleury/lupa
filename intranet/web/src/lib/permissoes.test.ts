@@ -1,113 +1,44 @@
 import { describe, expect, it } from 'vitest';
-import { acoesSobre, gereUsuarios, papeisCriaveis } from './permissoes';
-import type { Permissao, Sessao, Usuario } from './tipos';
+import { acoesSobre, gereUsuarios } from './permissoes';
+import { ROTULO_PAPEL, type Sessao, type Usuario } from './tipos';
 
-const GAB = 'gab-a';
+const juiz: Sessao = {
+  usuario_id: 'a'.repeat(64),
+  nome_usuario: 'desembargador',
+  papel: 'desembargador',
+  troca_senha_obrigatoria: false,
+  permissoes: ['ver_auditoria', 'gerir_assessor', 'resetar_assessor'],
+};
+const assessor: Usuario = {
+  id: 'b'.repeat(64),
+  nome_usuario: 'assessor',
+  papel: 'assessor',
+  ativo: true,
+  mfa_confirmado: true,
+  troca_senha_obrigatoria: false,
+};
 
-function sessaoDe(
-  papel: Sessao['papel'],
-  permissoes: Permissao[],
-  gabinete: string | null,
-): Sessao {
-  return {
-    usuario_id: `eu-${papel}`,
-    nome_usuario: papel,
-    papel,
-    gabinete_id: gabinete,
-    troca_senha_obrigatoria: false,
-    permissoes,
-  };
-}
-
-const ASSESSOR = sessaoDe('assessor', ['ver_processo', 'subir_processo', 'anotar'], GAB);
-const DESEMBARGADOR = sessaoDe(
-  'desembargador',
-  [
-    'ver_processo',
-    'subir_processo',
-    'anotar',
-    'ver_auditoria',
-    'gerir_assessor',
-    'resetar_assessor',
-  ],
-  GAB,
-);
-const ADMIN = sessaoDe(
-  'administrador',
-  [
-    'ver_processo',
-    'subir_processo',
-    'anotar',
-    'ver_auditoria',
-    'gerir_assessor',
-    'resetar_assessor',
-    'gerir_desembargador',
-    'gerir_gabinetes',
-  ],
-  null,
-);
-
-function usuario(papel: Usuario['papel'], gabinete: string | null, id = `u-${papel}`): Usuario {
-  return {
-    id,
-    nome_usuario: id,
-    papel,
-    gabinete_id: gabinete,
-    ativo: true,
-    mfa_confirmado: true,
-    troca_senha_obrigatoria: false,
-  };
-}
-
-describe('matriz de permissões na interface', () => {
-  it('assessor não gere ninguém', () => {
-    expect(gereUsuarios(ASSESSOR)).toBe(false);
-    expect(acoesSobre(ASSESSOR, usuario('assessor', GAB))).toEqual({
+describe('RF-ACE-03 e RF-ACE-04 — gestão de assessores', () => {
+  it('usa os dois papéis da intranet', () => {
+    expect(Object.keys(ROTULO_PAPEL).sort()).toEqual(['assessor', 'desembargador']);
+  });
+  it('permite ao desembargador gerir assessores sem a seleção de gabinete', () => {
+    expect(gereUsuarios(juiz)).toBe(true);
+    expect(acoesSobre(juiz, assessor)).toEqual({ gerir: true, resetar: true });
+    expect(acoesSobre(juiz, { ...assessor, papel: 'desembargador' })).toEqual({
+      gerir: false,
+      resetar: false,
+    });
+    expect(acoesSobre(juiz, { ...assessor, id: juiz.usuario_id })).toEqual({
       gerir: false,
       resetar: false,
     });
   });
-
-  it('desembargador gere assessor do próprio gabinete, não de outro, nem desembargador', () => {
-    expect(papeisCriaveis(DESEMBARGADOR)).toEqual(['assessor']);
-    expect(acoesSobre(DESEMBARGADOR, usuario('assessor', GAB))).toEqual({
-      gerir: true,
-      resetar: true,
-    });
-    expect(acoesSobre(DESEMBARGADOR, usuario('assessor', 'gab-b'))).toEqual({
-      gerir: false,
-      resetar: false,
-    });
-    expect(acoesSobre(DESEMBARGADOR, usuario('desembargador', GAB))).toEqual({
-      gerir: false,
-      resetar: false,
-    });
-  });
-
-  it('ninguém age sobre si mesmo nem sobre o administrador', () => {
-    expect(acoesSobre(ADMIN, usuario('administrador', null, ADMIN.usuario_id))).toEqual({
-      gerir: false,
-      resetar: false,
-    });
-    expect(
-      acoesSobre(DESEMBARGADOR, usuario('desembargador', GAB, DESEMBARGADOR.usuario_id)),
-    ).toEqual({
-      gerir: false,
-      resetar: false,
-    });
-  });
-
-  it('administrador cria desembargador e assessor e gere ambos em qualquer gabinete', () => {
-    expect(papeisCriaveis(ADMIN)).toEqual(['desembargador', 'assessor']);
-    expect(acoesSobre(ADMIN, usuario('desembargador', 'gab-b'))).toEqual({
-      gerir: true,
-      resetar: true,
-    });
-    expect(acoesSobre(ADMIN, usuario('assessor', 'gab-c'))).toEqual({ gerir: true, resetar: true });
-  });
-
-  it('sem sessão nada aparece', () => {
-    expect(papeisCriaveis(null)).toEqual([]);
-    expect(acoesSobre(null, usuario('assessor', GAB))).toEqual({ gerir: false, resetar: false });
+  it('assessor não tem acesso à gestão', () => {
+    const sessao: Sessao = { ...juiz, papel: 'assessor', permissoes: ['ver_processo', 'anotar'] };
+    expect(gereUsuarios(sessao)).toBe(false);
+    expect(acoesSobre(sessao, assessor)).toEqual({ gerir: false, resetar: false });
+    expect(gereUsuarios(null)).toBe(false);
+    expect(acoesSobre(null, assessor)).toEqual({ gerir: false, resetar: false });
   });
 });

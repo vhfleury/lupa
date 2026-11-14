@@ -9,7 +9,7 @@
   import SeletorTema from '$lib/componentes/SeletorTema.svelte';
   import { consumirMarcador } from '$lib/marcador';
   import { encerrarSessao, sessao } from '$lib/sessao.svelte';
-  import { visualizacao, type PerfilVisualizacao } from '$lib/visualizacao.svelte';
+  import { visualizacao } from '$lib/visualizacao.svelte';
 
   let { children }: { children: Snippet } = $props();
 
@@ -26,9 +26,9 @@
 
   const atual = $derived(sessao.atual);
   const real = $derived(sessao.real);
-  async function visualizarPerfil(perfil: PerfilVisualizacao): Promise<void> {
+  async function visualizarPerfil(): Promise<void> {
     await goto('/');
-    visualizacao.iniciar(sessao.real, perfil);
+    visualizacao.iniciar(sessao.real);
   }
   const comMoldura = $derived(
     atual !== null && !atual.troca_senha_obrigatoria && page.url.pathname !== '/login',
@@ -53,18 +53,14 @@
   <Cabecalho
     sessao={real}
     aoSair={sair}
-    aoVisualizarAssessor={() => visualizarPerfil('assessor')}
-    aoVisualizarDesembargador={() => visualizarPerfil('desembargador')}
+    aoVisualizarAssessor={visualizarPerfil}
     visualizandoAssessor={visualizacao.ativa}
   />
   {#if visualizacao.ativa}
     <aside class="aviso-visualizacao" aria-label={`Visualização como ${visualizacao.perfil}`}>
       <div>
         <strong>Visualizando como {visualizacao.perfil}</strong>
-        <p>
-          Prévia dos menus e controles, somente para consulta. Os dados são os acessíveis à sua
-          conta, sem simular o gabinete de outro usuário.
-        </p>
+        <p>Consulta dos processos com os controles disponíveis ao assessor.</p>
       </div>
       <button type="button" class="secundario" onclick={() => visualizacao.encerrar()}
         >Voltar ao meu perfil</button

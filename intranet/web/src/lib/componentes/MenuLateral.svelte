@@ -19,11 +19,6 @@
       },
       { href: '/usuarios', rotulo: 'Usuários', visivel: gereUsuarios(sessao) },
       {
-        href: '/gabinetes',
-        rotulo: 'Gabinetes',
-        visivel: sessao.permissoes.includes('gerir_gabinetes'),
-      },
-      {
         href: '/auditoria',
         rotulo: 'Auditoria',
         visivel: sessao.permissoes.includes('ver_auditoria'),

@@ -1,5 +1,5 @@
 // Formatos das respostas da API (intranet/api/src/lupa_intranet/acesso/rotas.py).
-export type Papel = 'assessor' | 'desembargador' | 'administrador';
+export type Papel = 'assessor' | 'desembargador';
 
 export type Permissao =
   | 'ver_processo'
@@ -7,15 +7,12 @@ export type Permissao =
   | 'anotar'
   | 'ver_auditoria'
   | 'gerir_assessor'
-  | 'resetar_assessor'
-  | 'gerir_desembargador'
-  | 'gerir_gabinetes';
+  | 'resetar_assessor';
 
 export interface Sessao {
   usuario_id: string;
   nome_usuario: string;
   papel: Papel;
-  gabinete_id: string | null;
   troca_senha_obrigatoria: boolean;
   permissoes: Permissao[];
 }
@@ -24,7 +21,6 @@ export interface Usuario {
   id: string;
   nome_usuario: string;
   papel: Papel;
-  gabinete_id: string | null;
   ativo: boolean;
   mfa_confirmado: boolean;
   troca_senha_obrigatoria: boolean;
@@ -32,11 +28,6 @@ export interface Usuario {
 
 export interface UsuarioComSenha extends Usuario {
   senha_temporaria: string;
-}
-
-export interface Gabinete {
-  id: string;
-  nome: string;
 }
 
 export type RespostaLogin =
@@ -50,5 +41,4 @@ export interface RespostaMfa {
 export const ROTULO_PAPEL: Record<Papel, string> = {
   assessor: 'Assessor',
   desembargador: 'Desembargador',
-  administrador: 'Administrador',
 };

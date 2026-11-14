@@ -1,52 +1,30 @@
 import type { Permissao, Sessao } from './tipos';
 
-export type PerfilVisualizacao = 'assessor' | 'desembargador';
-let perfil = $state<PerfilVisualizacao | null>(null);
-const permissoes: Record<PerfilVisualizacao, Permissao[]> = {
-  assessor: ['ver_processo', 'subir_processo', 'anotar'],
-  desembargador: [
-    'ver_processo',
-    'subir_processo',
-    'anotar',
-    'ver_auditoria',
-    'gerir_assessor',
-    'resetar_assessor',
-  ],
-};
+const PERMISSOES_ASSESSOR: Permissao[] = ['ver_processo', 'subir_processo', 'anotar'];
+let ativa = $state(false);
 
 export const visualizacao = {
   get ativa(): boolean {
-    return perfil !== null;
+    return ativa;
   },
-  get perfil(): PerfilVisualizacao | null {
-    return perfil;
+  get perfil(): 'assessor' | null {
+    return ativa ? 'assessor' : null;
   },
-  iniciar(sessao: Sessao | null, alvo: PerfilVisualizacao = 'assessor'): void {
-    const permitido =
-      sessao !== null &&
-      !sessao.troca_senha_obrigatoria &&
-      (sessao.papel === 'administrador' ||
-        (sessao.papel === 'desembargador' && alvo === 'assessor'));
-    perfil = permitido ? alvo : null;
+  iniciar(sessao: Sessao | null): void {
+    ativa = sessao?.papel === 'desembargador' && !sessao.troca_senha_obrigatoria;
   },
   encerrar(): void {
-    perfil = null;
+    ativa = false;
   },
   permiteRota(caminho: string): boolean {
-    return (
-      perfil === null ||
-      caminho === '/' ||
-      /^\/processos(?:\/|$)/.test(caminho) ||
-      (perfil === 'desembargador' && /^\/(usuarios|auditoria)(?:\/|$)/.test(caminho))
-    );
+    return !ativa || caminho === '/' || /^\/processos(?:\/|$)/.test(caminho);
   },
   projetar(sessao: Sessao | null): Sessao | null {
-    if (!perfil || !sessao) return sessao;
-    const permitidas = permissoes[perfil];
+    if (!ativa || !sessao) return sessao;
     return {
       ...sessao,
-      papel: perfil,
-      permissoes: sessao.permissoes.filter((p) => permitidas.includes(p)),
+      papel: 'assessor',
+      permissoes: sessao.permissoes.filter((p) => PERMISSOES_ASSESSOR.includes(p)),
     };
   },
 };

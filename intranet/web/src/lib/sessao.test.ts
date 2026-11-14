@@ -7,7 +7,7 @@ const assessor: Sessao = {
   usuario_id: 'u1',
   nome_usuario: 'ana',
   papel: 'assessor',
-  gabinete_id: 'g1',
+
   troca_senha_obrigatoria: true,
   permissoes: ['ver_processo'],
 };

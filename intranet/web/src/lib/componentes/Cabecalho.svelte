@@ -6,29 +6,17 @@
     sessao: Sessao;
     aoSair: () => void;
     aoVisualizarAssessor?: () => void;
-    aoVisualizarDesembargador?: () => void;
     visualizandoAssessor?: boolean;
   }
 
-  let {
-    sessao,
-    aoSair,
-    aoVisualizarAssessor,
-    aoVisualizarDesembargador,
-    visualizandoAssessor = false,
-  }: Props = $props();
+  let { sessao, aoSair, aoVisualizarAssessor, visualizandoAssessor = false }: Props = $props();
 </script>
 
 <header class="cabecalho">
   <a class="marca" href="/">Lupa</a>
   <div class="usuario">
     <SeletorTema id="tema-cabecalho" />
-    {#if aoVisualizarDesembargador && !visualizandoAssessor && sessao.papel === 'administrador'}
-      <button type="button" class="secundario" onclick={aoVisualizarDesembargador}
-        >Visualizar como desembargador</button
-      >
-    {/if}
-    {#if aoVisualizarAssessor && !visualizandoAssessor && sessao.papel !== 'assessor'}
+    {#if aoVisualizarAssessor && !visualizandoAssessor && sessao.papel === 'desembargador'}
       <button type="button" class="secundario" onclick={aoVisualizarAssessor}
         >Visualizar como assessor</button
       >

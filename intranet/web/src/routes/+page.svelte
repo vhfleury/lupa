@@ -4,15 +4,13 @@
   import { sessao, tem } from '$lib/sessao.svelte';
   import { gereUsuarios } from '$lib/permissoes';
   import { visualizacao } from '$lib/visualizacao.svelte';
-  import { ROTULO_PAPEL, type Gabinete, type Usuario } from '$lib/tipos';
+  import { ROTULO_PAPEL, type Usuario } from '$lib/tipos';
   import type { ProcessoNaLista } from '$lib/processos/tipos';
-  import { SITUACAO, formatarData } from '$lib/processos/rotulos';
+  import { SITUACAO, formatarData, legivel } from '$lib/processos/rotulos';
 
   const atual = $derived(sessao.atual);
-  const admin = $derived(atual?.papel === 'administrador');
   let processos = $state<ProcessoNaLista[] | null>(null);
   let usuarios = $state<Usuario[] | null>(null);
-  let gabinetes = $state<Gabinete[] | null>(null);
   let carregando = $state(true);
   let erros = $state<string[]>([]);
   const pendentes = $derived(
@@ -36,36 +34,27 @@
     carregando = true;
     processos = null;
     usuarios = null;
-    gabinetes = null;
     erros = [];
     const pedidos = [
       {
         nome: 'Processos',
-        executar:
-          s.papel !== 'administrador' && tem(s, 'ver_processo')
-            ? chamar<ProcessoNaLista[]>(
-                'GET',
-                s.papel === 'assessor' ? '/processos?meus=true' : '/processos',
-              )
-            : Promise.resolve(null),
+        executar: tem(s, 'ver_processo')
+          ? chamar<ProcessoNaLista[]>(
+              'GET',
+              s.papel === 'assessor' ? '/processos?meus=true' : '/processos',
+            )
+          : Promise.resolve(null),
       },
       {
         nome: 'Usuários',
         executar: gereUsuarios(s) ? chamar<Usuario[]>('GET', '/usuarios') : Promise.resolve(null),
       },
-      {
-        nome: 'Gabinetes',
-        executar: tem(s, 'gerir_gabinetes')
-          ? chamar<Gabinete[]>('GET', '/gabinetes')
-          : Promise.resolve(null),
-      },
     ];
     void Promise.allSettled(pedidos.map((p) => p.executar)).then((resultados) => {
       if (cancelado) return;
-      const [p, u, g] = resultados;
+      const [p, u] = resultados;
       if (p?.status === 'fulfilled') processos = p.value as ProcessoNaLista[] | null;
       if (u?.status === 'fulfilled') usuarios = u.value as Usuario[] | null;
-      if (g?.status === 'fulfilled') gabinetes = g.value as Gabinete[] | null;
       erros = resultados.flatMap((r, i) =>
         r.status === 'rejected' ? [`${pedidos[i]?.nome}: ${mensagemErro(r.reason)}`] : [],
       );
@@ -85,309 +74,180 @@
       <div>
         <span class="sobretitulo">LUPA / {ROTULO_PAPEL[atual.papel]}</span>
         <h1>
-          {admin
-            ? 'Estrutura da plataforma'
-            : atual.papel === 'desembargador'
-              ? 'Visão geral do gabinete'
-              : 'Minha área de trabalho'}
+          {atual.papel === 'desembargador' ? 'Visão geral do gabinete' : 'Minha área de trabalho'}
         </h1>
         <p>
-          {admin
-            ? 'Organize gabinetes, responsáveis e permissões de acesso.'
-            : atual.papel === 'desembargador'
-              ? 'Acompanhe a equipe, o acervo e o processamento do gabinete.'
-              : 'Acompanhe seus processos e as próximas atividades.'}
+          {atual.papel === 'desembargador'
+            ? 'Acompanhe a equipe, o acervo e o processamento do gabinete.'
+            : 'Acompanhe seus processos e as próximas atividades.'}
         </p>
       </div>
-      <a class="acao-principal" href={admin ? '/gabinetes' : '/processos'}
-        >{admin ? 'Gerenciar gabinetes' : 'Acessar processos'} <span aria-hidden="true">↗</span></a
+      <a class="acao-principal" href="/processos"
+        >Acessar processos <span aria-hidden="true">↗</span></a
       >
     </header>
 
     <div class="contexto">
       <span class="ponto" aria-hidden="true"></span>{visualizacao.ativa
         ? 'Prévia de perfil · dados da sua conta'
-        : admin
-          ? 'Visão geral · todos os gabinetes'
-          : atual.papel === 'assessor'
-            ? 'Processos sob sua responsabilidade'
-            : 'Visão do seu gabinete'}<span class="contexto-nota"
+        : atual.papel === 'assessor'
+          ? 'Processos sob sua responsabilidade'
+          : 'Visão do seu gabinete'}<span class="contexto-nota"
         >{carregando ? 'Carregando indicadores…' : 'Resumo dos dados disponíveis'}</span
       >
     </div>
     {#each erros as erro}<Aviso tipo="erro">{erro}</Aviso>{/each}
 
-    {#if admin}
-      <section class="indicadores estrutura" aria-label="Estrutura da plataforma">
-        <article class="indicador">
-          <span>Gabinetes</span><strong>{gabinetes?.length ?? '—'}</strong><small
-            >Unidades cadastradas</small
-          >
-        </article>
-        <article class="indicador">
-          <span>Desembargadores</span><strong
-            >{usuarios?.filter((u) => u.papel === 'desembargador' && u.ativo).length ?? '—'}</strong
-          ><small>Contas ativas</small>
-        </article>
-        <article class="indicador">
-          <span>Assessores</span><strong
-            >{usuarios?.filter((u) => u.papel === 'assessor' && u.ativo).length ?? '—'}</strong
-          ><small>Contas ativas</small>
-        </article>
-        <article class="indicador">
-          <span>Acessos desativados</span><strong
-            >{usuarios?.filter((u) => !u.ativo).length ?? '—'}</strong
-          ><small>Contas sem acesso ao sistema</small>
-        </article>
-      </section>
-      <div class="colunas">
-        <section class="bloco" aria-labelledby="estrutura-titulo">
-          <div class="titulo-bloco">
-            <div>
-              <span class="sobretitulo">ORGANIZAÇÃO</span>
-              <h2 id="estrutura-titulo">Gabinetes e equipes</h2>
-            </div>
-            <a href="/gabinetes">Gerenciar →</a>
-          </div>
-          {#if carregando}<p class="vazio" role="status">Carregando estrutura…</p>
-          {:else if gabinetes === null}<p class="nota">Não foi possível carregar os gabinetes.</p>
-          {:else if gabinetes.length === 0}<div class="vazio">
-              <strong>Cadastre o primeiro gabinete.</strong>
-              <p>Depois, vincule os desembargadores e assessores à unidade.</p>
-              <a href="/gabinetes">Cadastrar gabinete →</a>
-            </div>
-          {:else}<ul class="lista-processos">
-              {#each gabinetes as gabinete (gabinete.id)}<li class="unidade">
-                  <strong>{gabinete.nome}</strong><span
-                    >{usuarios === null
-                      ? 'Equipe indisponível'
-                      : usuarios.filter((u) => u.gabinete_id === gabinete.id && u.ativo).length +
-                        ' usuários ativos'}</span
-                  >
-                  <p class="nota">
-                    Desembargadores: {usuarios === null
-                      ? 'indisponível'
-                      : usuarios
-                          .filter(
-                            (u) =>
-                              u.gabinete_id === gabinete.id &&
-                              u.papel === 'desembargador' &&
-                              u.ativo,
-                          )
-                          .map((u) => u.nome_usuario)
-                          .join(', ') || 'Nenhum vinculado'}
-                  </p>
-                </li>{/each}
-            </ul>{/if}
-        </section>
-        <section class="bloco atalhos" aria-labelledby="admin-acoes">
-          <span class="sobretitulo">ADMINISTRAÇÃO</span>
-          <h2 id="admin-acoes">Configuração e acessos</h2>
-          <a class="atalho" href="/gabinetes"
-            ><div>
-              <strong>Estrutura de gabinetes</strong><span
-                >Cadastre unidades e seus desembargadores</span
-              >
-            </div>
-            <span aria-hidden="true">↗</span></a
-          >
-          <a class="atalho" href="/usuarios"
-            ><div>
-              <strong>Usuários e permissões</strong><span
-                >Gerencie perfis e vínculos com gabinetes</span
-              >
-            </div>
-            <span aria-hidden="true">↗</span></a
-          >
-          <a class="atalho" href="/auditoria"
-            ><div>
-              <strong>Auditoria de acessos</strong><span>Consulte os registros de atividade</span>
-            </div>
-            <span aria-hidden="true">↗</span></a
-          >
-          <p class="nota">
-            Administrador: estrutura da plataforma.<br />Desembargador: gestão do próprio gabinete.<br
-            />Assessor: análise dos processos.
-          </p>
-        </section>
-      </div>
-    {:else}
-      <section class="indicadores" aria-label="Resumo da plataforma">
-        <article class="indicador">
-          <span
-            >{atual.papel === 'assessor'
-              ? 'Sob minha responsabilidade'
-              : 'Processos do gabinete'}</span
-          ><strong>{processos === null ? '—' : processos.length}</strong><small
-            >{admin ? 'Cadastrados na plataforma' : 'Disponíveis para consulta'}</small
-          >
-        </article>
-        {#if admin}
-          <article class="indicador">
-            <span>Gabinetes</span><strong>{gabinetes === null ? '—' : gabinetes.length}</strong
-            ><small>Unidades cadastradas</small>
-          </article>
-          <article class="indicador">
-            <span>Usuários ativos</span><strong
-              >{usuarios === null ? '—' : usuarios.filter((u) => u.ativo).length}</strong
-            ><small>Contas habilitadas</small>
-          </article>
-        {:else}
-          <article class="indicador">
-            <span>Em processamento</span><strong>{processos === null ? '—' : processando}</strong
-            ><small>Arquivos em preparação</small>
-          </article>
-          <article class="indicador">
-            <span>Processamento concluído</span><strong
-              >{processos === null ? '—' : concluidos}</strong
-            ><small>Consulte os resultados da análise</small>
-          </article>
-        {/if}
-        <article class="indicador atencao">
-          <span>Exigem atenção</span><strong>{processos === null ? '—' : pendentes.length}</strong
-          ><small>Pendências, falhas ou quarentena</small>
-        </article>
-      </section>
+    <section class="indicadores" aria-label="Resumo da plataforma">
+      <article class="indicador">
+        <span
+          >{atual.papel === 'assessor'
+            ? 'Sob minha responsabilidade'
+            : 'Processos do gabinete'}</span
+        ><strong>{processos === null ? '—' : processos.length}</strong><small
+          >Disponíveis para consulta</small
+        >
+      </article>
+      <article class="indicador">
+        <span>Em processamento</span><strong>{processos === null ? '—' : processando}</strong><small
+          >Arquivos em preparação</small
+        >
+      </article>
+      <article class="indicador">
+        <span>Processamento concluído</span><strong>{processos === null ? '—' : concluidos}</strong
+        ><small>Consulte os resultados da análise</small>
+      </article>
+      <article class="indicador atencao">
+        <span>Exigem atenção</span><strong>{processos === null ? '—' : pendentes.length}</strong
+        ><small>Pendências, falhas ou quarentena</small>
+      </article>
+    </section>
 
-      <div class="colunas">
-        <section class="bloco" aria-labelledby="recentes-titulo">
-          <div class="titulo-bloco">
-            <div>
-              <span class="sobretitulo">ACOMPANHAMENTO</span>
-              <h2 id="recentes-titulo">
-                {atual.papel === 'assessor' ? 'Meus processos' : 'Processos recentes do gabinete'}
-              </h2>
-            </div>
-            <a href="/processos">Ver todos <span aria-hidden="true">→</span></a>
-          </div>
-          {#if carregando}<p class="vazio" role="status">Carregando processos…</p>
-          {:else if processos === null}<p class="vazio">
-              Não foi possível carregar os processos. Acesse a lista para tentar novamente.
-            </p>
-          {:else if recentes.length === 0}<div class="vazio">
-              <strong>Seu próximo processo começa aqui.</strong>
-              <p>Os processos atribuídos a você aparecerão neste painel.</p>
-              <a href="/processos">Ir para processos →</a>
-            </div>
-          {:else}
-            <ul class="lista-processos">
-              {#each recentes as processo (processo.id)}<li>
-                  <a class="linha-processo" href={`/processos/${processo.id}`}
-                    ><div>
-                      <strong>{processo.numero_cnj}</strong><span
-                        >{processo.classe} · {formatarData(processo.criado_em)}</span
-                      >
-                    </div>
-                    <span
-                      class="situacao"
-                      class:pendente={['pendencias', 'falho', 'quarentena'].includes(
-                        processo.ingestao.situacao,
-                      )}>{SITUACAO[processo.ingestao.situacao]}</span
-                    ></a
-                  >
-                </li>{/each}
-            </ul>
-          {/if}
-        </section>
-
-        <section class="bloco atalhos" aria-labelledby="atalhos-titulo">
-          <span class="sobretitulo">SEU ESPAÇO DE TRABALHO</span>
-          <h2 id="atalhos-titulo">Acesso rápido</h2>
-          <a class="atalho" href="/processos"
-            ><div>
-              <strong>{admin ? 'Consultar processos' : 'Abrir ou cadastrar processo'}</strong><span
-                >Autos, validações, dossiê e chat</span
-              >
-            </div>
-            <span aria-hidden="true">↗</span></a
-          >
-          {#if admin}<a class="atalho" href="/gabinetes"
-              ><div>
-                <strong>Gerenciar gabinetes</strong><span
-                  >Organize as unidades e os responsáveis</span
-                >
-              </div>
-              <span aria-hidden="true">↗</span></a
-            >{/if}
-          {#if gereUsuarios(atual)}<a class="atalho" href="/usuarios"
-              ><div>
-                <strong>{admin ? 'Gerenciar usuários' : 'Equipe do gabinete'}</strong><span
-                  >{admin ? 'Contas, perfis e acessos' : 'Consulte e gerencie os assessores'}</span
-                >
-              </div>
-              <span aria-hidden="true">↗</span></a
-            >{/if}
-          {#if tem(atual, 'ver_auditoria')}<a class="atalho" href="/auditoria"
-              ><div>
-                <strong>Consultar auditoria</strong><span>Acompanhe os registros de atividade</span>
-              </div>
-              <span aria-hidden="true">↗</span></a
-            >{/if}
-          {#if atual.papel === 'assessor'}<p class="nota">
-              Para enviar documentos, abra um processo ou cadastre um novo na página de Processos.
-            </p>{/if}
-        </section>
-      </div>
-
-      {#if atual.papel === 'desembargador'}
-        <section class="bloco equipe-gabinete" aria-labelledby="equipe-titulo">
-          <div class="titulo-bloco">
-            <div>
-              <span class="sobretitulo">PESSOAS E ACERVO</span>
-              <h2 id="equipe-titulo">Equipe do gabinete</h2>
-            </div>
-            <a href="/usuarios">Gerenciar equipe →</a>
-          </div>
-          {#if carregando}<p class="nota">Carregando equipe…</p>{:else if usuarios === null}<p
-              class="nota"
-            >
-              Equipe indisponível.
-            </p>{:else if usuarios.filter((u) => u.papel === 'assessor').length === 0}<p
-              class="nota"
-            >
-              Nenhum assessor cadastrado neste gabinete.
-            </p>{:else}<ul class="lista-processos">
-              {#each usuarios.filter((u) => u.papel === 'assessor') as usuario (usuario.id)}<li
-                  class="unidade"
-                >
-                  <strong>{usuario.nome_usuario}</strong><span
-                    >{usuario.ativo ? 'Ativo' : 'Desativado'}</span
-                  >
-                </li>{/each}
-            </ul>{/if}
-        </section>
-      {/if}
-      <section class="bloco" aria-labelledby="atencao-titulo">
+    <div class="colunas">
+      <section class="bloco" aria-labelledby="recentes-titulo">
         <div class="titulo-bloco">
           <div>
-            <span class="sobretitulo">PRÓXIMOS PASSOS</span>
-            <h2 id="atencao-titulo">Pontos de atenção</h2>
+            <span class="sobretitulo">ACOMPANHAMENTO</span>
+            <h2 id="recentes-titulo">
+              {atual.papel === 'assessor' ? 'Meus processos' : 'Processos recentes do gabinete'}
+            </h2>
           </div>
-          <span class="situacao">{processos === null ? '—' : pendentes.length} processos</span>
+          <a href="/processos">Ver todos <span aria-hidden="true">→</span></a>
         </div>
-        {#if carregando}<p class="nota">Conferindo o processamento dos arquivos…</p>
-        {:else if processos === null}<p class="nota">
-            Indicador indisponível. Consulte os processos para verificar as pendências.
+        {#if carregando}<p class="vazio" role="status">Carregando processos…</p>
+        {:else if processos === null}<p class="vazio">
+            Não foi possível carregar os processos. Acesse a lista para tentar novamente.
           </p>
-        {:else if pendentes.length === 0}<p class="nota">
-            Nenhuma pendência, falha ou quarentena de processamento identificada nos processos
-            disponíveis.
-          </p>
-        {:else}<ul class="lista-processos">
-            {#each pendentes.slice(0, 3) as processo (processo.id)}<li>
+        {:else if recentes.length === 0}<div class="vazio">
+            <strong>Seu próximo processo começa aqui.</strong>
+            <p>Os processos atribuídos a você aparecerão neste painel.</p>
+            <a href="/processos">Ir para processos →</a>
+          </div>
+        {:else}
+          <ul class="lista-processos">
+            {#each recentes as processo (processo.id)}<li>
                 <a class="linha-processo" href={`/processos/${processo.id}`}
                   ><div>
                     <strong>{processo.numero_cnj}</strong><span
-                      >Abra o processo para conferir os arquivos e as pendências.</span
+                      >{legivel(processo.classe)} · {formatarData(processo.criado_em)}</span
                     >
                   </div>
-                  <span class="situacao pendente">{SITUACAO[processo.ingestao.situacao]}</span></a
+                  <span
+                    class="situacao"
+                    class:pendente={['pendencias', 'falho', 'quarentena'].includes(
+                      processo.ingestao.situacao,
+                    )}>{SITUACAO[processo.ingestao.situacao]}</span
+                  ></a
                 >
               </li>{/each}
           </ul>
-          {#if pendentes.length > 3}<a href="/processos">Ver os demais processos →</a>{/if}{/if}
+        {/if}
+      </section>
+
+      <section class="bloco atalhos" aria-labelledby="atalhos-titulo">
+        <span class="sobretitulo">SEU ESPAÇO DE TRABALHO</span>
+        <h2 id="atalhos-titulo">Acesso rápido</h2>
+        <a class="atalho" href="/processos"
+          ><div>
+            <strong>Abrir ou cadastrar processo</strong><span>Autos, validações, dossiê e chat</span
+            >
+          </div>
+          <span aria-hidden="true">↗</span></a
+        >
+        {#if gereUsuarios(atual)}<a class="atalho" href="/usuarios"
+            ><div>
+              <strong>Equipe do gabinete</strong><span>Consulte e gerencie os assessores</span>
+            </div>
+            <span aria-hidden="true">↗</span></a
+          >{/if}
+        {#if tem(atual, 'ver_auditoria')}<a class="atalho" href="/auditoria"
+            ><div>
+              <strong>Consultar auditoria</strong><span>Acompanhe os registros de atividade</span>
+            </div>
+            <span aria-hidden="true">↗</span></a
+          >{/if}
+        {#if atual.papel === 'assessor'}<p class="nota">
+            Para enviar documentos, abra um processo ou cadastre um novo na página de Processos.
+          </p>{/if}
+      </section>
+    </div>
+
+    {#if atual.papel === 'desembargador'}
+      <section class="bloco equipe-gabinete" aria-labelledby="equipe-titulo">
+        <div class="titulo-bloco">
+          <div>
+            <span class="sobretitulo">PESSOAS E ACERVO</span>
+            <h2 id="equipe-titulo">Equipe do gabinete</h2>
+          </div>
+          <a href="/usuarios">Gerenciar equipe →</a>
+        </div>
+        {#if carregando}<p class="nota">Carregando equipe…</p>{:else if usuarios === null}<p
+            class="nota"
+          >
+            Equipe indisponível.
+          </p>{:else if usuarios.filter((u) => u.papel === 'assessor').length === 0}<p class="nota">
+            Nenhum assessor cadastrado neste gabinete.
+          </p>{:else}<ul class="lista-processos">
+            {#each usuarios.filter((u) => u.papel === 'assessor') as usuario (usuario.id)}<li
+                class="unidade"
+              >
+                <strong>{usuario.nome_usuario}</strong><span
+                  >{usuario.ativo ? 'Ativo' : 'Desativado'}</span
+                >
+              </li>{/each}
+          </ul>{/if}
       </section>
     {/if}
+    <section class="bloco" aria-labelledby="atencao-titulo">
+      <div class="titulo-bloco">
+        <div>
+          <span class="sobretitulo">PRÓXIMOS PASSOS</span>
+          <h2 id="atencao-titulo">Pontos de atenção</h2>
+        </div>
+        <span class="situacao">{processos === null ? '—' : pendentes.length} processos</span>
+      </div>
+      {#if carregando}<p class="nota">Conferindo o processamento dos arquivos…</p>
+      {:else if processos === null}<p class="nota">
+          Indicador indisponível. Consulte os processos para verificar as pendências.
+        </p>
+      {:else if pendentes.length === 0}<p class="nota">
+          Nenhuma pendência, falha ou quarentena de processamento identificada nos processos
+          disponíveis.
+        </p>
+      {:else}<ul class="lista-processos">
+          {#each pendentes.slice(0, 3) as processo (processo.id)}<li>
+              <a class="linha-processo" href={`/processos/${processo.id}`}
+                ><div>
+                  <strong>{processo.numero_cnj}</strong><span
+                    >Abra o processo para conferir os arquivos e as pendências.</span
+                  >
+                </div>
+                <span class="situacao pendente">{SITUACAO[processo.ingestao.situacao]}</span></a
+              >
+            </li>{/each}
+        </ul>
+        {#if pendentes.length > 3}<a href="/processos">Ver os demais processos →</a>{/if}{/if}
+    </section>
     <details class="sessao-detalhes">
       <summary>Dados da sessão</summary>
       <dl data-testid="estado-sessao">
@@ -395,8 +255,6 @@
         <dd>{atual.nome_usuario}</dd>
         <dt>Papel</dt>
         <dd>{ROTULO_PAPEL[atual.papel]}</dd>
-        <dt>Gabinete</dt>
-        <dd>{atual.gabinete_id ?? 'todos (administração)'}</dd>
         <dt>Situação</dt>
         <dd>Sessão ativa</dd>
       </dl>
@@ -531,10 +389,6 @@
   .unidade > span {
     font-size: 0.8rem;
     color: var(--texto-suave);
-  }
-  .unidade .nota {
-    grid-column: 1 / -1;
-    overflow-wrap: anywhere;
   }
   .bloco {
     padding: 1.5rem;
