@@ -5,8 +5,9 @@
 #  1. `vault operator init` (1 parte, limiar 1) na primeira vez; a chave de unseal e o token raiz
 #     ficam em .vault-dev/init.json (fora do repositorio, modo 600);
 #  2. unseal automatico com essa chave;
-#  3. habilita o Transit e o AppRole, cria a chave de verificacao `lupa-saude` (GET /saude),
-#     grava a politica minima (vault/politicas/lupa.hcl) e o papel `lupa` (token de 1 h);
+#  3. habilita o Transit e o AppRole, cria a chave de verificacao `lupa-saude` (GET /saude) e a
+#     chave unica `lupa` (DEKs dos processos), grava a politica minima (vault/politicas/lupa.hcl)
+#     e o papel `lupa` (token de 1 h);
 #  4. gera um secret_id novo e grava LUPA_COFRE_BACKEND, LUPA_VAULT_ROLE_ID e LUPA_VAULT_SECRET_ID
 #     so no .env (nunca no .env.example nem em arquivo versionado).
 #
@@ -48,6 +49,9 @@ com_raiz auth list -format=json | grep -q '"approle/"' || com_raiz auth enable a
 # Etapa 8.1: chave de verificacao do GET /saude (componente `cofre`).
 com_raiz list -format=json transit/keys 2>/dev/null | grep -q '"lupa-saude"' ||
   com_raiz write -f transit/keys/lupa-saude >/dev/null
+# Versao 0.2 (D14): chave unica `lupa`, que envolve a DEK de cada processo.
+com_raiz list -format=json transit/keys 2>/dev/null | grep -q '"lupa"' ||
+  com_raiz write -f transit/keys/lupa >/dev/null
 com_raiz policy write lupa - < vault/politicas/lupa.hcl >/dev/null
 com_raiz write auth/approle/role/lupa token_policies=lupa token_ttl=1h token_max_ttl=4h \
   secret_id_ttl=0 >/dev/null
@@ -69,5 +73,5 @@ saida = [l for l in linhas if l.split("=", 1)[0].strip() not in novos]
 saida += [f"{chave}={valor}" for chave, valor in novos.items()]
 caminho.write_bytes(("\n".join(saida) + "\n").encode("utf-8"))
 PYEOF
-echo "vault: Transit, chave lupa-saude, politica 'lupa' e AppRole prontos; role_id/secret_id gravados em $ENV_ARQ"
+echo "vault: Transit, chaves lupa-saude e lupa, politica 'lupa' e AppRole prontos; role_id/secret_id gravados em $ENV_ARQ"
 echo "rode: docker compose up -d api worker"

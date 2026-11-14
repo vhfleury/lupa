@@ -23,11 +23,34 @@ from sqlalchemy.orm import Session, sessionmaker
 import lupa_pipeline.migrations
 from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.dominio.cnj import calcular_digito_verificador
-from lupa_pipeline.dominio.enums import PapelUsuario, TipoFato
-from lupa_pipeline.dominio.esquemas import Evidencia, Fato
-from lupa_pipeline.dominio.gravacao import gravar_hub, gravar_satelite
-from lupa_pipeline.dominio.tabelas import hub_usuario, sat_usuario_cadastro, sat_usuario_credencial
-from lupa_pipeline.dominio.visoes import VisaoAuditoria
+from lupa_pipeline.dominio.enums import (
+    ClasseProcessual,
+    PapelUsuario,
+    StatusProcesso,
+    TipoFato,
+    TipoPagina,
+)
+from lupa_pipeline.dominio.esquemas import Evidencia, Fato, calcular_hash
+from lupa_pipeline.dominio.gravacao import gravar_hub, gravar_link, gravar_satelite
+from lupa_pipeline.dominio.tabelas import (
+    hub_arquivo,
+    hub_pagina,
+    hub_processo,
+    hub_usuario,
+    link_arquivo_pagina,
+    link_processo_arquivo,
+    sat_arquivo_dados,
+    sat_pagina_extracao,
+    sat_pagina_saneamento,
+    sat_processo_dados,
+    sat_processo_estado,
+    sat_usuario_cadastro,
+    sat_usuario_credencial,
+)
+from lupa_pipeline.dominio.visoes import VisaoAuditoria, VisaoProcesso
+from lupa_pipeline.ingestao.storage import chave_objeto
+from lupa_pipeline.seguranca.chaves import criar_chave_processo
+from lupa_pipeline.seguranca.contexto import ativar_processo, limpar_contexto_padrao, obter_cofre
 
 VARIAVEIS_FICTICIAS = {
     "LUPA_AMBIENTE": "teste",
@@ -273,6 +296,104 @@ def eventos_do_banco(engine: Engine, **filtros: Any) -> list[VisaoAuditoria]:
         return list(session.scalars(consulta.order_by(VisaoAuditoria.sequencia)))
 
 
+ORIGEM_TESTE = "teste"
+
+
+def _criador(sessao: Session) -> bytes:
+    hk = gravar_hub(sessao, hub_usuario, {"nome_usuario": f"criador.{uuid4().hex[:10]}"}, "teste")
+    cadastro = {"papel": PapelUsuario.ASSESSOR.value, "ativo": True}
+    gravar_satelite(sessao, sat_usuario_cadastro, hk, cadastro, ORIGEM_TESTE)
+    return hk
+
+
+def criar_processo(
+    sessao: Session,
+    *,
+    classe: ClasseProcessual = ClasseProcessual.APELACAO_CIVEL,
+    criador: bytes | None = None,
+) -> bytes:
+    """Grava um processo sintético no Data Vault, com DEK própria (RF-SEG-01).
+
+    Grava `hub_processo`, `sat_processo_dados`, `sat_processo_estado` (`criado`) e
+    `sat_processo_chave`; a DEK fica aberta no contexto de cifra como a do processo atual.
+
+    Args:
+        sessao: Sessão com transação aberta.
+        classe: Classe processual.
+        criador: `hk_usuario` do criador; sem ele, grava um assessor sintético.
+
+    Returns:
+        O `hk_processo`.
+    """
+    autor = criador or _criador(sessao)
+    numero = gerar_numero_cnj(uuid4().int % 9_000_000 + 1)
+    hk = gravar_hub(sessao, hub_processo, {"numero_cnj": numero}, ORIGEM_TESTE)
+    dados = {"classe": classe.value, "hk_usuario": autor}
+    gravar_satelite(sessao, sat_processo_dados, hk, dados, ORIGEM_TESTE)
+    estado = {"status": StatusProcesso.CRIADO.value}
+    gravar_satelite(sessao, sat_processo_estado, hk, estado, ORIGEM_TESTE)
+    criar_chave_processo(sessao, obter_cofre(), hk, ORIGEM_TESTE)
+    return hk
+
+
+def criar_pagina(sessao: Session, hk_processo: bytes, texto: str = TEXTO_PAGINA) -> bytes:
+    """Grava arquivo e página 1 sintéticos do processo, com o texto cifrado.
+
+    Args:
+        sessao: Sessão com transação aberta.
+        hk_processo: Processo dono do arquivo (ativado no contexto de cifra).
+        texto: Texto da página.
+
+    Returns:
+        O `hk_pagina`.
+    """
+    processo = sessao.scalars(
+        select(VisaoProcesso).where(VisaoProcesso.hk_processo == hk_processo)
+    ).one()
+    ativar_processo(hk_processo, processo.chave_dados_cifrada)
+    sha256 = calcular_hash(uuid4().hex)
+    chave = {"numero_cnj": processo.numero_cnj, "sha256": sha256}
+    hk_arquivo = gravar_hub(sessao, hub_arquivo, chave, ORIGEM_TESTE)
+    ligacao = {"hk_processo": hk_processo, "hk_arquivo": hk_arquivo}
+    gravar_link(sessao, link_processo_arquivo, ligacao, ORIGEM_TESTE)
+    dados = {
+        "tamanho_bytes": 1024,
+        "nome_original": "autos-sinteticos.pdf",
+        "mime": "application/pdf",
+        "chave_storage": chave_objeto(hk_processo, sha256),
+        "hk_usuario": processo.hk_criador,
+    }
+    gravar_satelite(sessao, sat_arquivo_dados, hk_arquivo, dados, ORIGEM_TESTE)
+    hk_pagina = gravar_hub(sessao, hub_pagina, {**chave, "numero": 1}, ORIGEM_TESTE)
+    ligacao = {"hk_arquivo": hk_arquivo, "hk_pagina": hk_pagina}
+    gravar_link(sessao, link_arquivo_pagina, ligacao, ORIGEM_TESTE)
+    gravar_satelite(sessao, sat_pagina_extracao, hk_pagina, _extracao(texto), ORIGEM_TESTE)
+    saneamento = {
+        "texto_normalizado": texto,
+        "flags": {},
+        "trechos_ocultos": [],
+        "trechos_suspeitos": [],
+    }
+    gravar_satelite(sessao, sat_pagina_saneamento, hk_pagina, saneamento, ORIGEM_TESTE)
+    return hk_pagina
+
+
+def _extracao(texto: str) -> dict[str, Any]:
+    return {
+        "tipo": TipoPagina.NATIVA.value,
+        "texto": texto,
+        "hash_texto": calcular_hash(texto),
+        "texto_nativo": None,
+        "texto_ocr": None,
+        "coordenadas": {},
+        "sinais": {},
+        "extracao": {},
+        "versao_extrator": None,
+        "origem_arquivo": None,
+        "pagina_origem": None,
+    }
+
+
 VARIAVEIS_DE_AMBIENTE_ISOLADAS = ("LUPA_DB_USUARIO_APP", "LUPA_DB_SENHA_APP")
 
 
@@ -285,3 +406,11 @@ def _sem_usuario_de_conexao_do_ambiente(monkeypatch: pytest.MonkeyPatch) -> None
     """
     for variavel in VARIAVEIS_DE_AMBIENTE_ISOLADAS:
         monkeypatch.delenv(variavel, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _contexto_de_cifra_limpo() -> Iterator[None]:
+    """Cada teste começa e termina sem DEK aberta no contexto padrão de cifra."""
+    limpar_contexto_padrao()
+    yield
+    limpar_contexto_padrao()

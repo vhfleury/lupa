@@ -1,30 +1,42 @@
-"""Operações de chave: carregador da DEK, chaves do gabinete, rotação e identidades dos réus.
+"""DEK por processo em `sat_processo_chave`, envolvida pela chave única `lupa` do cofre (D14).
 
-- `carregador_sql`: lê `(gabinete_id, chave_dados_cifrada)` pela função `lupa_chave_processo`
-  (SECURITY DEFINER, migração 0010) numa conexão própria; usado pelo contexto de cifra para
-  abrir a DEK de um processo cujo campo foi lido sob a RLS da requisição ou do job.
-- `criar_chaves_gabinete`: chave do envelope e chave das identidades no cofre.
-- `rotacionar_gabinete`: versão nova da chave do gabinete e rewrap de todas as DEKs (o
-  conteúdo dos autos não é tocado; a DEK não sai em claro no Vault).
-- `cifrar_identidade`/`decifrar_identidade`: nome e documento do réu cifrados direto no Transit
-  com a chave `lupa-gabinete-<id>-identidades` (7.6).
+- `criar_chave_processo`: gera a DEK de um processo novo, grava a versão cifrada em
+  `sat_processo_chave` e deixa a DEK aberta no contexto de cifra, como processo das gravações.
+- `carregador_sql`: lê a DEK cifrada pela view `v_processo` numa sessão própria; usado pelo
+  contexto de cifra para abrir a DEK de um processo cujo campo foi lido.
 """
 
 from collections.abc import Callable
-from uuid import UUID
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from lupa_pipeline.seguranca.cofre import (
-    Cofre,
-    TokenInvalidoError,
-    nome_chave_gabinete,
-    nome_chave_identidades,
-)
-from lupa_pipeline.seguranca.contexto import Carregador, ChaveIndisponivelError
+from lupa_pipeline.dominio.gravacao import gravar_satelite
+from lupa_pipeline.dominio.tabelas import sat_processo_chave
+from lupa_pipeline.dominio.visoes import VisaoProcesso
+from lupa_pipeline.seguranca.cofre import Cofre
+from lupa_pipeline.seguranca.contexto import Carregador, nova_dek, registrar_dek
 
-PREFIXOS_TOKEN_COFRE = ("vault:v", "mem:v")
+
+def criar_chave_processo(
+    session: Session, cofre: Cofre, hk_processo: bytes, record_source: str
+) -> bytes:
+    """Cria a DEK do processo e grava a versão cifrada em `sat_processo_chave` (RF-SEG-01).
+
+    Args:
+        session: Sessão com transação aberta (o hub do processo já gravado).
+        cofre: Cofre com a chave `lupa`.
+        hk_processo: Processo.
+        record_source: Origem da gravação.
+
+    Returns:
+        A DEK em claro, já registrada no contexto como a do processo atual.
+    """
+    dek, token = nova_dek(cofre)
+    atributos = {"chave_dados_cifrada": token}
+    gravar_satelite(session, sat_processo_chave, hk_processo, atributos, record_source)
+    registrar_dek(hk_processo, dek)
+    return dek
 
 
 def carregador_sql(fabrica: Callable[[], Session]) -> Carregador:
@@ -34,108 +46,14 @@ def carregador_sql(fabrica: Callable[[], Session]) -> Carregador:
         fabrica: Abre uma sessão nova (conexão própria, fora da transação corrente).
 
     Returns:
-        Função `processo_id -> (gabinete_id, chave_dados_cifrada)`.
+        Função `hk_processo -> chave_dados_cifrada` (None se o processo não tem chave).
     """
 
-    def _carregar(processo_id: UUID) -> tuple[UUID, str | None]:
+    def _carregar(hk_processo: bytes) -> str | None:
+        consulta = select(VisaoProcesso.chave_dados_cifrada).where(
+            VisaoProcesso.hk_processo == hk_processo
+        )
         with fabrica() as session:
-            linha = session.execute(
-                text("SELECT gabinete_id, chave FROM lupa_chave_processo(:id)"),
-                {"id": processo_id},
-            ).first()
-        if linha is None:
-            raise ChaveIndisponivelError(str(processo_id))
-        return linha[0], linha[1]
+            return session.scalar(consulta)
 
     return _carregar
-
-
-def criar_chaves_gabinete(cofre: Cofre, gabinete_id: UUID) -> None:
-    """Cria (idempotente) as duas chaves Transit do gabinete.
-
-    Args:
-        cofre: Cofre.
-        gabinete_id: Gabinete.
-    """
-    cofre.criar_chave(nome_chave_gabinete(gabinete_id))
-    cofre.criar_chave(nome_chave_identidades(gabinete_id))
-
-
-def rotacionar_gabinete(session: Session, cofre: Cofre, gabinete_id: UUID) -> int:
-    """Rotaciona a chave do gabinete e recifra (rewrap) a DEK de cada processo dele.
-
-    Args:
-        session: Sessão com permissão de UPDATE em `processo` do gabinete.
-        cofre: Cofre.
-        gabinete_id: Gabinete.
-
-    Returns:
-        Quantidade de DEKs recifradas.
-    """
-    from lupa_pipeline.dominio.tabelas import ProcessoTabela
-
-    nome = nome_chave_gabinete(gabinete_id)
-    cofre.rotacionar(nome)
-    processos = session.scalars(
-        select(ProcessoTabela).where(
-            ProcessoTabela.gabinete_id == gabinete_id,
-            ProcessoTabela.chave_dados_cifrada.is_not(None),
-        )
-    ).all()
-    for processo in processos:
-        assert processo.chave_dados_cifrada is not None  # noqa: S101 - filtrado acima
-        processo.chave_dados_cifrada = cofre.recifrar(nome, processo.chave_dados_cifrada)
-    session.flush()
-    return len(processos)
-
-
-def identidade_cifrada(valor: str | None) -> bool:
-    """Diz se o valor já é token do cofre.
-
-    Args:
-        valor: Valor da coluna.
-
-    Returns:
-        Verdadeiro se começa com `vault:v` ou `mem:v`.
-    """
-    return valor is not None and valor.startswith(PREFIXOS_TOKEN_COFRE)
-
-
-def cifrar_identidade(cofre: Cofre, gabinete_id: UUID, valor: str | None) -> str | None:
-    """Cifra nome ou documento do réu com a chave de identidades do gabinete.
-
-    Args:
-        cofre: Cofre.
-        gabinete_id: Gabinete.
-        valor: Texto em claro (ou None).
-
-    Returns:
-        Token do cofre (ou None).
-    """
-    if valor is None or identidade_cifrada(valor):
-        return valor
-    nome = nome_chave_identidades(gabinete_id)
-    cofre.criar_chave(nome)
-    return cofre.cifrar(nome, valor.encode())
-
-
-def decifrar_identidade(cofre: Cofre, gabinete_id: UUID, valor: str | None) -> str | None:
-    """Decifra nome ou documento do réu.
-
-    Args:
-        cofre: Cofre.
-        gabinete_id: Gabinete.
-        valor: Token do cofre (ou None).
-
-    Returns:
-        Texto em claro (ou None).
-
-    Raises:
-        TokenInvalidoError: Valor em claro, sem prefixo de token do cofre.
-    """
-    if valor is None:
-        return None
-    nome = nome_chave_identidades(gabinete_id)
-    if not identidade_cifrada(valor):
-        raise TokenInvalidoError(nome)
-    return cofre.decifrar(nome, valor).decode()

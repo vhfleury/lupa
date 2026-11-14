@@ -1,7 +1,8 @@
-"""Formatos de cifra: campo `lupa1:` e objeto `LUPAOBJ` (Etapa 7.3 a 7.5)."""
+"""Formatos de cifra: campo `lupa1:` e objeto `LUPAOBJ` (RF-SEG-01; D14)."""
 
+import base64
 import io
-from uuid import uuid4
+import os
 
 import pytest
 
@@ -21,8 +22,8 @@ from lupa_pipeline.seguranca.envelope import (
 
 
 def test_campo_ida_e_volta_e_cabecalho() -> None:
-    """O campo decifra com a DEK e o rótulo certos e carrega o processo no cabeçalho."""
-    dek, processo = gerar_dek(), uuid4()
+    """RF-SEG-01: o campo decifra com a DEK e o rótulo certos e leva o `hk_processo`."""
+    dek, processo = gerar_dek(), os.urandom(32)
     campo = cifrar_campo(dek, processo, "pagina.texto", "Certidão de intimação")
     assert campo_cifrado(campo) and "Certidão" not in campo
     assert processo_do_campo(campo) == processo
@@ -31,7 +32,7 @@ def test_campo_ida_e_volta_e_cabecalho() -> None:
 
 def test_campo_recusa_chave_rotulo_ou_adulteracao() -> None:
     """DEK de outro processo, outra coluna ou um byte trocado: recusado."""
-    dek, processo = gerar_dek(), uuid4()
+    dek, processo = gerar_dek(), os.urandom(32)
     campo = cifrar_campo(dek, processo, "pagina.texto", "texto")
     with pytest.raises(CifraInvalidaError):
         decifrar_campo(gerar_dek(), campo, "pagina.texto")
@@ -44,6 +45,22 @@ def test_campo_recusa_chave_rotulo_ou_adulteracao() -> None:
         decifrar_campo(dek, "lupa1:@@@", "pagina.texto")
     with pytest.raises(CifraInvalidaError):
         decifrar_campo(dek, "lupa1:AAAA", "pagina.texto")
+
+
+def test_campo_recusa_processo_sem_hk_de_32_bytes() -> None:
+    """D14: o cabeçalho do campo é o `hk_processo`; outro tamanho é recusado."""
+    with pytest.raises(ValueError, match="32 bytes"):
+        cifrar_campo(gerar_dek(), os.urandom(16), "sat_pagina_extracao.texto", "texto")
+
+
+def test_campo_de_outro_processo_nao_decifra_com_o_hk_trocado() -> None:
+    """RF-SEG-01: o `hk` do processo entra no AAD; trocar o cabeçalho invalida o campo."""
+    dek = gerar_dek()
+    campo = cifrar_campo(dek, bytes(32), "sat_pagina_extracao.texto", "texto")
+    bruto = base64.b64decode(campo.removeprefix("lupa1:"))
+    trocado = "lupa1:" + base64.b64encode(bytes([1]) * 32 + bruto[32:]).decode()
+    with pytest.raises(CifraInvalidaError):
+        decifrar_campo(dek, trocado, "sat_pagina_extracao.texto")
 
 
 @pytest.mark.parametrize(

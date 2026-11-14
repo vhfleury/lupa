@@ -1,18 +1,17 @@
 """Object storage com interface própria: S3 (MinIO no piloto) e memória (testes).
 
 A implementação é escolhida por configuração (`LUPA_STORAGE_BACKEND`). As chaves seguem
-`gabinete/<id>/processo/<id>/<sha256>`, de modo que o conteúdo é endereçado pelo hash e
+`processo/<hex do hk_processo>/<sha256>` (D14), de modo que o conteúdo é endereçado pelo hash e
 gravar o mesmo arquivo duas vezes não cria um segundo objeto.
 
-Etapa 7.4: `criar_storage` devolve o storage embrulhado em `StorageCifrado`, que cifra cada
-objeto em stream com a DEK do processo (tirado da chave `.../processo/<id>/...`) e decifra na
+`criar_storage` devolve o storage embrulhado em `StorageCifrado`, que cifra cada objeto em
+stream com a DEK do processo (tirado do segmento `processo/<hex>/` da chave) e decifra na
 leitura. O que está no MinIO nunca é o PDF em claro; o `sha256` da chave continua o do claro.
 """
 
 import io
 import re
 from typing import Any, BinaryIO, Protocol
-from uuid import UUID
 
 import boto3
 from botocore.config import Config
@@ -23,25 +22,36 @@ from lupa_pipeline.seguranca.contexto import dek_de
 from lupa_pipeline.seguranca.envelope import LeitorCifrado, decifrar_objeto
 
 CODIGOS_AUSENTE = frozenset({"404", "NoSuchKey", "NotFound"})
-PROCESSO_NA_CHAVE = re.compile(r"(?:^|/)processo/([0-9a-fA-F-]{36})/")
+PROCESSO_NA_CHAVE = re.compile(r"(?:^|/)processo/([0-9a-f]{64})/")
 
 
 class ObjetoAusenteError(LookupError):
     """O objeto pedido não existe no storage."""
 
 
-def chave_objeto(gabinete_id: UUID, processo_id: UUID, sha256: str) -> str:
+def chave_objeto(hk_processo: bytes, sha256: str) -> str:
     """Monta a chave do objeto de um arquivo.
 
     Args:
-        gabinete_id: Gabinete dono.
-        processo_id: Processo dono.
+        hk_processo: Processo dono.
         sha256: Hash do conteúdo.
 
     Returns:
-        `gabinete/<id>/processo/<id>/<sha256>`.
+        `processo/<hex do hk_processo>/<sha256>`.
     """
-    return f"gabinete/{gabinete_id}/processo/{processo_id}/{sha256}"
+    return f"{prefixo_processo(hk_processo)}{sha256}"
+
+
+def prefixo_processo(hk_processo: bytes) -> str:
+    """Prefixo de todos os objetos de um processo (originais e entradas de ZIP).
+
+    Args:
+        hk_processo: Processo dono.
+
+    Returns:
+        `processo/<hex do hk_processo>/`.
+    """
+    return f"processo/{hk_processo.hex()}/"
 
 
 class ObjectStorage(Protocol):
@@ -217,22 +227,22 @@ class ChaveSemProcessoError(ValueError):
     """A chave do objeto não identifica o processo (não há DEK para cifrar)."""
 
 
-def processo_da_chave(chave: str) -> UUID:
+def processo_da_chave(chave: str) -> bytes:
     """Processo dono do objeto, pela chave.
 
     Args:
-        chave: Chave do objeto (`.../processo/<id>/...`).
+        chave: Chave do objeto (`.../processo/<hex>/...`).
 
     Returns:
-        Id do processo.
+        `hk_processo`.
 
     Raises:
-        ChaveSemProcessoError: Chave sem segmento `processo/<id>/`.
+        ChaveSemProcessoError: Chave sem segmento `processo/<hex do hk>/`.
     """
     achado = PROCESSO_NA_CHAVE.search(chave)
     if achado is None:
         raise ChaveSemProcessoError("chave sem processo")
-    return UUID(achado.group(1))
+    return bytes.fromhex(achado.group(1))
 
 
 class StorageCifrado:

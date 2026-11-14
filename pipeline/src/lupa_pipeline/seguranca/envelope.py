@@ -2,10 +2,10 @@
 
 Campo do banco (texto, versão 1)::
 
-    lupa1:<base64( processo_id[16] | nonce[12] | AES-256-GCM(texto) + tag[16] )>
+    lupa1:<base64( hk_processo[32] | nonce[12] | AES-256-GCM(texto) + tag[16] )>
 
-O AAD é `lupa1|<rotulo>|<processo_id>`: um valor copiado para outra coluna ou atribuído a
-outro processo não decifra. O id do processo no cabeçalho só diz qual DEK usar.
+O AAD é `lupa1|<rotulo>|<hex do hk_processo>`: um valor copiado para outra coluna ou atribuído
+a outro processo não decifra. O `hk` no cabeçalho só diz qual DEK usar.
 
 Objeto do storage (binário, versão 1), cifrado em blocos para não exigir o arquivo inteiro em
 memória na gravação::
@@ -25,7 +25,6 @@ import io
 import os
 from collections.abc import Iterator
 from typing import BinaryIO
-from uuid import UUID
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
@@ -35,6 +34,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 TAMANHO_DEK = 32
 TAMANHO_NONCE = 12
 TAMANHO_TAG = 16
+TAMANHO_HK = 32
 PREFIXO_CAMPO = "lupa1:"
 MAGICO_OBJETO = b"LUPAOBJ"
 VERSAO_OBJETO = 1
@@ -69,25 +69,30 @@ def campo_cifrado(valor: object) -> bool:
     return isinstance(valor, str) and valor.startswith(PREFIXO_CAMPO)
 
 
-def _aad_campo(rotulo: str, processo_id: UUID) -> bytes:
-    return f"lupa1|{rotulo}|{processo_id}".encode()
+def _aad_campo(rotulo: str, hk_processo: bytes) -> bytes:
+    return f"lupa1|{rotulo}|{hk_processo.hex()}".encode()
 
 
-def cifrar_campo(dek: bytes, processo_id: UUID, rotulo: str, texto: str) -> str:
+def cifrar_campo(dek: bytes, hk_processo: bytes, rotulo: str, texto: str) -> str:
     """Cifra um texto para gravar em coluna.
 
     Args:
         dek: Chave de dados do processo.
-        processo_id: Processo dono.
-        rotulo: Coluna (`pagina.texto`...), entra no AAD.
+        hk_processo: Processo dono (32 bytes).
+        rotulo: Coluna (`sat_pagina_extracao.texto`...), entra no AAD.
         texto: Texto em claro.
 
     Returns:
         `lupa1:<base64>`.
+
+    Raises:
+        ValueError: `hk_processo` sem 32 bytes.
     """
+    if len(hk_processo) != TAMANHO_HK:
+        raise ValueError("hk_processo sem 32 bytes")
     nonce = os.urandom(TAMANHO_NONCE)
-    cifrado = AESGCM(dek).encrypt(nonce, texto.encode(), _aad_campo(rotulo, processo_id))
-    return PREFIXO_CAMPO + base64.b64encode(processo_id.bytes + nonce + cifrado).decode()
+    cifrado = AESGCM(dek).encrypt(nonce, texto.encode(), _aad_campo(rotulo, hk_processo))
+    return PREFIXO_CAMPO + base64.b64encode(hk_processo + nonce + cifrado).decode()
 
 
 def _bruto(valor: str) -> bytes:
@@ -97,21 +102,21 @@ def _bruto(valor: str) -> bytes:
         bruto = base64.b64decode(valor.removeprefix(PREFIXO_CAMPO), validate=True)
     except ValueError:
         raise CifraInvalidaError("base64 inválido") from None
-    if len(bruto) < 16 + TAMANHO_NONCE + TAMANHO_TAG:
+    if len(bruto) < TAMANHO_HK + TAMANHO_NONCE + TAMANHO_TAG:
         raise CifraInvalidaError("campo curto demais")
     return bruto
 
 
-def processo_do_campo(valor: str) -> UUID:
+def processo_do_campo(valor: str) -> bytes:
     """Processo cuja DEK abre o campo.
 
     Args:
         valor: Campo `lupa1:...`.
 
     Returns:
-        Id do processo do cabeçalho.
+        `hk_processo` do cabeçalho.
     """
-    return UUID(bytes=_bruto(valor)[:16])
+    return _bruto(valor)[:TAMANHO_HK]
 
 
 def decifrar_campo(dek: bytes, valor: str, rotulo: str) -> str:
@@ -129,10 +134,11 @@ def decifrar_campo(dek: bytes, valor: str, rotulo: str) -> str:
         CifraInvalidaError: Chave errada, coluna errada ou conteúdo adulterado.
     """
     bruto = _bruto(valor)
-    processo_id = UUID(bytes=bruto[:16])
-    nonce, cifrado = bruto[16 : 16 + TAMANHO_NONCE], bruto[16 + TAMANHO_NONCE :]
+    hk_processo = bruto[:TAMANHO_HK]
+    nonce = bruto[TAMANHO_HK : TAMANHO_HK + TAMANHO_NONCE]
+    cifrado = bruto[TAMANHO_HK + TAMANHO_NONCE :]
     try:
-        claro = AESGCM(dek).decrypt(nonce, cifrado, _aad_campo(rotulo, processo_id))
+        claro = AESGCM(dek).decrypt(nonce, cifrado, _aad_campo(rotulo, hk_processo))
     except InvalidTag:
         raise CifraInvalidaError("tag inválida") from None
     return claro.decode()

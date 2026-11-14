@@ -35,8 +35,9 @@ NUMERO = "00012345620258090001"
 SHA256 = "CD" * 32
 
 
-def _contar(sessao: Session, tabela: Table) -> int:
-    return sessao.scalar(select(func.count()).select_from(tabela)) or 0
+def _contar(sessao: Session, tabela: Table, coluna: str, hk: bytes) -> int:
+    consulta = select(func.count()).select_from(tabela).where(tabela.c[coluna] == hk)
+    return sessao.scalar(consulta) or 0
 
 
 def _processo(sessao: Session) -> bytes:
@@ -63,15 +64,17 @@ def test_gravar_hub_devolve_o_hk_da_chave_normalizada(sessao: Session) -> None:
 
 def test_gravar_hub_de_novo_nao_duplica(sessao: Session) -> None:
     """D6: o mesmo hub gravado duas vezes fica numa linha só."""
-    assert _processo(sessao) == _processo(sessao)
-    assert _contar(sessao, hub_processo) == 1
+    hk = _processo(sessao)
+    assert _processo(sessao) == hk
+    assert _contar(sessao, hub_processo, "hk_processo", hk) == 1
 
 
 def test_gravar_hub_poe_hash_em_minusculas(sessao: Session) -> None:
     """RES-02: o `sha256` da chave fica em minúsculas no `hk` e na coluna."""
     hk = _arquivo(sessao)
     assert hk == chave_hash([NUMERO, SHA256.lower()])
-    assert sessao.scalar(select(hub_arquivo.c.sha256)) == SHA256.lower()
+    gravado = sessao.scalar(select(hub_arquivo.c.sha256).where(hub_arquivo.c.hk_arquivo == hk))
+    assert gravado == SHA256.lower()
 
 
 def test_gravar_hub_aceita_sujeito_vazio(sessao: Session) -> None:
@@ -95,7 +98,7 @@ def test_gravar_link_devolve_o_hk_e_nao_duplica(sessao: Session) -> None:
     primeiro = gravar_link(sessao, link_processo_arquivo, hks, ORIGEM)
     assert primeiro == gravar_link(sessao, link_processo_arquivo, hks, ORIGEM)
     assert primeiro == chave_link(hks["hk_processo"], hks["hk_arquivo"])
-    assert _contar(sessao, link_processo_arquivo) == 1
+    assert _contar(sessao, link_processo_arquivo, "hk_processo_arquivo", primeiro) == 1
 
 
 def test_gravar_link_recusa_hub_faltando(sessao: Session) -> None:
@@ -113,7 +116,7 @@ def test_satelite_nao_insere_com_hash_diff_igual(sessao: Session) -> None:
     hk = _processo(sessao)
     assert _estado(sessao, hk, "criado") is True
     assert _estado(sessao, hk, "criado") is False
-    assert _contar(sessao, sat_processo_estado) == 1
+    assert _contar(sessao, sat_processo_estado, "hk_processo", hk) == 1
 
 
 def test_satelite_insere_com_hash_diff_diferente(sessao: Session) -> None:
@@ -123,7 +126,9 @@ def test_satelite_insere_com_hash_diff_diferente(sessao: Session) -> None:
     assert _estado(sessao, hk, "em_ingestao") is True
     assert _estado(sessao, hk, "criado") is True
     estados = sessao.scalars(
-        select(sat_processo_estado.c.status).order_by(sat_processo_estado.c.load_dts)
+        select(sat_processo_estado.c.status)
+        .where(sat_processo_estado.c.hk_processo == hk)
+        .order_by(sat_processo_estado.c.load_dts)
     ).all()
     assert estados == ["criado", "em_ingestao", "criado"]
 
@@ -137,7 +142,7 @@ def test_satelite_multiativo_compara_dentro_da_mesma_subchave(sessao: Session) -
         return gravar_satelite(sessao, sat_arquivo_lote, hk, atributos, ORIGEM)
 
     assert (lote(1), lote(2), lote(1), lote(2)) == (True, True, False, False)
-    assert _contar(sessao, sat_arquivo_lote) == 2
+    assert _contar(sessao, sat_arquivo_lote, "hk_arquivo", hk) == 2
 
 
 def test_satelite_que_sempre_insere_grava_cada_falha(sessao: Session) -> None:
@@ -145,7 +150,7 @@ def test_satelite_que_sempre_insere_grava_cada_falha(sessao: Session) -> None:
     hk = gravar_hub(sessao, hub_chave_login, {"chave": "AB" * 32}, ORIGEM)
     for _ in range(3):
         assert gravar_satelite(sessao, sat_chave_login_falha, hk, {}, ORIGEM) is True
-    assert _contar(sessao, sat_chave_login_falha) == 3
+    assert _contar(sessao, sat_chave_login_falha, "hk_chave_login", hk) == 3
 
 
 def test_satelite_recusa_atributo_faltando(sessao: Session) -> None:
@@ -226,7 +231,7 @@ def test_descarte_libera_delete_so_em_satelite(sessao: Session) -> None:
     processo = _semear(sessao)
     sessao.execute(text("SELECT set_config('lupa.descarte', 'on', true)"))
     sessao.execute(text(COMANDOS["satelite"][1]), {"hk": processo})
-    assert _contar(sessao, sat_processo_estado) == 0
+    assert _contar(sessao, sat_processo_estado, "hk_processo", processo) == 0
     for tipo in ("hub", "link"):
         with pytest.raises(DBAPIError, match="imutável"), sessao.begin_nested():
             sessao.execute(text(COMANDOS[tipo][1]), {"hk": processo})

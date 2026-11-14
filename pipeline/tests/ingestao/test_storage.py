@@ -12,11 +12,13 @@ from lupa_pipeline.config import Settings
 from lupa_pipeline.ingestao.storage import (
     ArmazenamentoMemoria,
     ArmazenamentoS3,
+    ChaveSemProcessoError,
     ObjectStorage,
     ObjetoAusenteError,
     chave_objeto,
     criar_cliente_s3,
     criar_storage,
+    processo_da_chave,
 )
 
 
@@ -88,12 +90,15 @@ def test_gravar_de_novo_substitui(storage: tuple[ObjectStorage, str]) -> None:
     assert implementacao.listar(prefixo) == [chave]
 
 
-def test_chave_por_gabinete_processo_e_hash() -> None:
-    """Formato da chave."""
-    gabinete, processo = uuid4(), uuid4()
-    assert chave_objeto(gabinete, processo, "f" * 64) == (
-        f"gabinete/{gabinete}/processo/{processo}/{'f' * 64}"
-    )
+def test_chave_por_processo_e_hash() -> None:
+    """D14: a chave é `processo/<hex do hk_processo>/<sha256>` e o processo volta dela."""
+    processo = bytes(range(32))
+    chave = chave_objeto(processo, "f" * 64)
+    assert chave == f"processo/{processo.hex()}/{'f' * 64}"
+    assert processo_da_chave(chave) == processo
+    assert processo_da_chave(f"renderizacao/1/{chave}") == processo
+    with pytest.raises(ChaveSemProcessoError):
+        processo_da_chave(f"gabinete/{uuid4()}/processo/{uuid4()}/{'f' * 64}")
 
 
 def test_implementacao_escolhida_pela_configuracao(settings_ficticias: Settings) -> None:

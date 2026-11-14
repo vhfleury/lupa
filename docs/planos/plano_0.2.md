@@ -160,7 +160,8 @@ Removidos da 0.1: as 26 tabelas (`gabinete`, `usuario`, `processo`, `processo_re
 | `scripts/criar_admin.py` | → `intranet/api/scripts/criar_desembargador.py` |
 | `scripts/{e2e_preparar,e2e_processos,e2e_semear_chat,verificar_cabecalhos}.py`, `scripts/validar_caddyfile.sh` | → `intranet/api/scripts/`; sem gabinete e administrador |
 | `scripts/{backup,backup_comum,backup_conteiner,cron_backup,expurgar_backups,restaurar,instalar_piloto}.sh`, `scripts/conferir_piloto.py`, `scripts/preparar_repositorio.md` | remove |
-| `scripts/verificar.sh`, `scripts/vault_inicializar.sh` | altera: dois pacotes; só modo de desenvolvimento do Vault |
+| `scripts/verificar.sh`, `scripts/vault_inicializar.sh` | altera: dois pacotes; só modo de desenvolvimento do Vault; o script cria a chave `lupa` (D14) |
+| `vault/politicas/lupa.hcl` | altera: só a chave `lupa`, sem apagar chave (D14) |
 | `monitoramento/`, `vault/producao/`, `docker-compose.prod.yml` | remove |
 | `pyproject.toml`, `requirements*.txt` (raiz) | remove |
 | `pipeline/pyproject.toml`, `intranet/api/pyproject.toml` e os `requirements*.txt` de cada um (`make lock`) | cria; saem `redis`, `rq`, `prometheus-client`; versão `0.2.0` |
@@ -177,7 +178,8 @@ Removidos da 0.1: as 26 tabelas (`gabinete`, `usuario`, `processo`, `processo_re
 ### O que não muda
 
 - Sandbox de parsing, extração de páginas, OCR, roteador, sinais e saneamento contra injeção.
-- Formato da cifra (`LUPAOBJ`, prefixo `lupa1:`), envelope e recusa de dado em claro.
+- Formato da cifra (`LUPAOBJ`, prefixo `lupa1:`), envelope e recusa de dado em claro; no campo
+  `lupa1:` o cabeçalho e o AAD levam o `hk_processo` (32 bytes) no lugar do UUID (D12, D14).
 - Motor de validações, calendário de dias úteis, formato do achado e templates de frase fixa.
 - Conferência de citações, política de recusa, tetos e cliente roteirizado do agente.
 - Encadeamento por hash da auditoria e formato do evento.

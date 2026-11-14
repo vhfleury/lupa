@@ -1,8 +1,8 @@
-"""Contexto de cifra por requisição (Etapa 7) e configuração do cofre da aplicação.
+"""Contexto de cifra por requisição e configuração do cofre da aplicação (D14; RF-SEG-01).
 
 Cada requisição ganha um `ContextoCifra` vazio. `exige_processo` abre a DEK do processo do
-caminho (`ativar_processo`); campos de outros processos lidos sob a RLS são abertos pelo
-carregador. No fim da requisição as DEKs abertas são descartadas.
+caminho (`ativar_processo`); campos de outros processos lidos pelas views são abertos pelo
+carregador, que lê `v_processo`. No fim da requisição as DEKs abertas são descartadas.
 """
 
 from collections.abc import Awaitable, Callable

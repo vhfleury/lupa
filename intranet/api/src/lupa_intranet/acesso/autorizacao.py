@@ -3,8 +3,8 @@
 `usuario_autenticado` carrega a sessão do cookie (A14, passos 8 e 9) e devolve o `Ator`.
 `exige_papel` confere a matriz de `papeis.py` (RF-ACE-03). `exige_processo` carrega o processo
 do caminho pela view `v_processo` e responde 404 quando ele não existe ou foi descartado,
-registrando a tentativa. Responsável não restringe acesso (RF-PRO-03): qualquer usuário vê
-qualquer processo.
+registrando a tentativa, e depois abre a DEK do processo no contexto de cifra da requisição
+(D14). Responsável não restringe acesso (RF-PRO-03): qualquer usuário vê qualquer processo.
 """
 
 from collections.abc import Callable
@@ -28,6 +28,7 @@ from lupa_intranet.api.banco import obter_sessao_banco
 from lupa_intranet.auditoria.eventos import AcaoAuditoria, ResultadoEvento
 from lupa_pipeline.dominio.enums import PapelUsuario, StatusProcesso
 from lupa_pipeline.dominio.visoes import VisaoProcesso
+from lupa_pipeline.seguranca.contexto import ativar_processo
 
 SessaoBanco = Annotated[Session, Depends(obter_sessao_banco)]
 
@@ -147,7 +148,7 @@ def exige_processo(
     session: SessaoBanco,
     ctx: ContextoReq,
 ) -> VisaoProcesso:
-    """Carrega o processo do caminho pelo hex do `hk_processo` (D12).
+    """Carrega o processo do caminho pelo hex do `hk_processo` (D12) e abre a DEK dele.
 
     A tentativa negada é gravada na transação da requisição, que é confirmada mesmo com o 404
     porque `NaoEncontradoError` é uma recusa prevista.
@@ -164,6 +165,7 @@ def exige_processo(
 
     Raises:
         NaoEncontradoError: Processo inexistente ou descartado.
+        ChaveIndisponivelError: Processo sem DEK.
     """
     consulta = select(VisaoProcesso).where(VisaoProcesso.id == processo_id.lower())
     processo = session.scalars(consulta).one_or_none()
@@ -180,5 +182,6 @@ def exige_processo(
         raise NaoEncontradoError("processo não encontrado")
     if processo.status == StatusProcesso.DESCARTADO.value:
         raise NaoEncontradoError("processo descartado")
+    ativar_processo(processo.hk_processo, processo.chave_dados_cifrada)
     request.state.processo = processo.hk_processo
     return processo

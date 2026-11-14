@@ -1,17 +1,17 @@
 """Cofre de chaves com interface própria: HashiCorp Vault (Transit) e memória (testes).
 
 Mesmo padrão do `ObjectStorage`: a aplicação só conhece o protocolo `Cofre`; a implementação é
-escolhida por configuração (`LUPA_COFRE_BACKEND`). As chaves mestras NUNCA saem do cofre: a
+escolhida por configuração (`LUPA_COFRE_BACKEND`). A chave mestra NUNCA sai do cofre: a
 aplicação manda bytes para cifrar ou decifrar (wrap/unwrap das chaves de dados) e recebe um
-token opaco. Nomes de chave seguem `lupa-gabinete-<id>` (envelope das DEKs dos processos) e
-`lupa-gabinete-<id>-identidades` (tabela de identidades dos réus).
+token opaco. Há uma chave só, `lupa`, que envolve a DEK de cada processo (D14; RES-08); a
+rotação é feita no Vault pelo responsável técnico (D27). A chave `lupa-saude`, criada pelo
+`vault_inicializar.sh`, só serve à verificação de saúde (RF-SEG-02).
 """
 
 import base64
 import os
 import threading
 from typing import Any, Protocol
-from uuid import UUID
 
 import httpx
 from cryptography.exceptions import InvalidTag
@@ -19,10 +19,8 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from lupa_pipeline.config import Settings
 
-PREFIXO_CHAVE = "lupa-gabinete-"
-# Chave Transit só para a verificação de saúde (Etapa 8.1); criada por vault_inicializar.
+CHAVE_DADOS = "lupa"
 CHAVE_SAUDE = "lupa-saude"
-SUFIXO_IDENTIDADES = "-identidades"
 TAMANHO_NONCE = 12
 STATUS_PROIBIDO = 403
 STATUS_AUSENTE = 404
@@ -38,30 +36,6 @@ class ChaveAusenteError(LookupError):
 
 class TokenInvalidoError(ValueError):
     """O token não foi produzido por esta chave (ou foi adulterado)."""
-
-
-def nome_chave_gabinete(gabinete_id: UUID) -> str:
-    """Nome da chave Transit do gabinete (envelope das DEKs).
-
-    Args:
-        gabinete_id: Gabinete.
-
-    Returns:
-        `lupa-gabinete-<id>`.
-    """
-    return f"{PREFIXO_CHAVE}{gabinete_id}"
-
-
-def nome_chave_identidades(gabinete_id: UUID) -> str:
-    """Nome da chave Transit das identidades dos réus do gabinete.
-
-    Args:
-        gabinete_id: Gabinete.
-
-    Returns:
-        `lupa-gabinete-<id>-identidades`.
-    """
-    return f"{nome_chave_gabinete(gabinete_id)}{SUFIXO_IDENTIDADES}"
 
 
 class Cofre(Protocol):

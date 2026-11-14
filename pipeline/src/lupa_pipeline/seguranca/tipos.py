@@ -25,14 +25,14 @@ def cifrar_valor(rotulo: str, texto: str) -> str:
     """Cifra um texto com a DEK do processo ativo.
 
     Args:
-        rotulo: Coluna (`pagina.texto`...).
+        rotulo: Rótulo da coluna (`sat_pagina_extracao.texto`...).
         texto: Texto em claro.
 
     Returns:
         Campo `lupa1:...`.
     """
-    processo_id, dek = dek_para_gravar()
-    return cifrar_campo(dek, processo_id, rotulo, texto)
+    hk_processo, dek = dek_para_gravar()
+    return cifrar_campo(dek, hk_processo, rotulo, texto)
 
 
 def decifrar_valor(rotulo: str, valor: str) -> str:

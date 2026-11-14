@@ -1,13 +1,14 @@
 """Contexto de cifra: as DEKs em claro do escopo corrente (requisição, job ou script).
 
 As DEKs abertas ficam só neste objeto, em memória, e somem com ele no fim do escopo. O
-middleware da API cria um contexto por requisição (`lupa_intranet.api.middleware`); o worker cria um
-por job. Fora desses escopos (testes, scripts) vale um contexto padrão do processo Python.
+middleware da API cria um contexto por requisição (`lupa_intranet.api.cifra`); o worker cria um
+por arquivo. Fora desses escopos (testes, scripts) vale um contexto padrão do processo Python.
 
-Leitura: o campo cifrado traz o id do processo no cabeçalho; a DEK vem do cache do contexto ou
-do `carregador` (que lê a DEK cifrada do banco e abre no cofre). Gravação: usa o processo
-`atual`, definido por `ativar_processo` (rota com `exige_processo`, job do worker) ou pelo
-último processo criado no escopo. Nunca registre DEK em log.
+O processo é identificado pelo `hk_processo` (32 bytes). Leitura: o campo cifrado traz o `hk` no
+cabeçalho; a DEK vem do cache do contexto ou do `carregador` (que lê a DEK cifrada de
+`sat_processo_chave` pela view `v_processo` e abre no cofre com a chave `lupa`). Gravação: usa o
+processo `atual`, definido por `ativar_processo` (rota com `exige_processo`, worker) ou pelo
+último processo cuja DEK foi criada no escopo. Nunca registre DEK em log.
 """
 
 import threading
@@ -15,12 +16,11 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from uuid import UUID
 
-from lupa_pipeline.seguranca.cofre import Cofre, nome_chave_gabinete
+from lupa_pipeline.seguranca.cofre import CHAVE_DADOS, Cofre
 from lupa_pipeline.seguranca.envelope import gerar_dek
 
-Carregador = Callable[[UUID], tuple[UUID, str | None]]
+Carregador = Callable[[bytes], str | None]
 
 
 class ChaveIndisponivelError(LookupError):
@@ -32,13 +32,13 @@ class ContextoCifra:
     """DEKs abertas de um escopo.
 
     Attributes:
-        deks: DEK em claro por processo.
+        deks: DEK em claro por `hk_processo`.
         atual: Processo cujas gravações são cifradas.
-        carregador: `processo_id -> (gabinete_id, dek_cifrada)` lido do banco (ou None).
+        carregador: `hk_processo -> dek_cifrada` lido do banco (ou None).
     """
 
-    deks: dict[UUID, bytes] = field(default_factory=dict)
-    atual: UUID | None = None
+    deks: dict[bytes, bytes] = field(default_factory=dict)
+    atual: bytes | None = None
     carregador: Carregador | None = None
     trava: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
@@ -46,9 +46,9 @@ class ContextoCifra:
         """Nunca mostra as chaves.
 
         Returns:
-            Só a quantidade de DEKs e o processo atual.
+            Só a quantidade de DEKs e se há processo atual.
         """
-        return f"ContextoCifra(deks={len(self.deks)}, atual={self.atual})"
+        return f"ContextoCifra(deks={len(self.deks)}, atual={self.atual is not None})"
 
 
 _PADRAO = ContextoCifra()
@@ -104,7 +104,7 @@ def contexto_cifra(carregador: Carregador | None = None) -> Iterator[ContextoCif
     """Abre um escopo novo; ao sair, as DEKs abertas são descartadas.
 
     Args:
-        carregador: Leitor da DEK cifrada pelo id do processo.
+        carregador: Leitor da DEK cifrada pelo `hk_processo`.
 
     Yields:
         O contexto novo.
@@ -125,87 +125,83 @@ def limpar_contexto_padrao() -> None:
     _PADRAO.atual = None
 
 
-def abrir_dek(cofre: Cofre, gabinete_id: UUID, dek_cifrada: str) -> bytes:
-    """Abre a DEK com a chave do gabinete no cofre.
+def abrir_dek(cofre: Cofre, dek_cifrada: str) -> bytes:
+    """Abre a DEK com a chave única `lupa` do cofre.
 
     Args:
         cofre: Cofre.
-        gabinete_id: Gabinete dono do processo.
-        dek_cifrada: Token de `processo.chave_dados_cifrada`.
+        dek_cifrada: Token de `sat_processo_chave.chave_dados_cifrada`.
 
     Returns:
         DEK em claro.
     """
-    return cofre.decifrar(nome_chave_gabinete(gabinete_id), dek_cifrada)
+    return cofre.decifrar(CHAVE_DADOS, dek_cifrada)
 
 
-def nova_dek(cofre: Cofre, gabinete_id: UUID) -> tuple[bytes, str]:
-    """Gera a DEK de um processo novo e a cifra com a chave do gabinete (criada se faltar).
+def nova_dek(cofre: Cofre) -> tuple[bytes, str]:
+    """Gera a DEK de um processo novo e a cifra com a chave `lupa` (criada se faltar).
 
     Args:
         cofre: Cofre.
-        gabinete_id: Gabinete do processo.
 
     Returns:
-        DEK em claro e token para `processo.chave_dados_cifrada`.
+        DEK em claro e token para `sat_processo_chave.chave_dados_cifrada`.
     """
-    nome = nome_chave_gabinete(gabinete_id)
-    cofre.criar_chave(nome)
+    cofre.criar_chave(CHAVE_DADOS)
     dek = gerar_dek()
-    return dek, cofre.cifrar(nome, dek)
+    return dek, cofre.cifrar(CHAVE_DADOS, dek)
 
 
-def registrar_dek(processo_id: UUID, dek: bytes, *, atual: bool = True) -> None:
+def registrar_dek(hk_processo: bytes, dek: bytes, *, atual: bool = True) -> None:
     """Guarda a DEK aberta no contexto corrente.
 
     Args:
-        processo_id: Processo.
+        hk_processo: Processo.
         dek: DEK em claro.
         atual: Se o processo passa a ser o das gravações.
     """
     contexto = contexto_atual()
     with contexto.trava:
-        contexto.deks[processo_id] = dek
+        contexto.deks[hk_processo] = dek
         if atual:
-            contexto.atual = processo_id
+            contexto.atual = hk_processo
 
 
-def ativar_processo(processo_id: UUID, gabinete_id: UUID, dek_cifrada: str | None) -> None:
+def ativar_processo(hk_processo: bytes, dek_cifrada: str | None) -> None:
     """Abre a DEK do processo e o torna o processo das gravações do escopo.
 
     Args:
-        processo_id: Processo.
-        gabinete_id: Gabinete do processo.
-        dek_cifrada: `processo.chave_dados_cifrada`.
+        hk_processo: Processo.
+        dek_cifrada: Chave corrente de `v_processo.chave_dados_cifrada`.
 
     Raises:
         ChaveIndisponivelError: Processo sem chave (descartado).
     """
     contexto = contexto_atual()
-    if processo_id not in contexto.deks:
+    if hk_processo not in contexto.deks:
         if dek_cifrada is None:
-            raise ChaveIndisponivelError(str(processo_id))
-        registrar_dek(processo_id, abrir_dek(obter_cofre(), gabinete_id, dek_cifrada))
-    contexto.atual = processo_id
+            raise ChaveIndisponivelError(hk_processo.hex())
+        registrar_dek(hk_processo, abrir_dek(obter_cofre(), dek_cifrada))
+    contexto.atual = hk_processo
 
 
-def esquecer_processo(processo_id: UUID) -> None:
+def esquecer_processo(hk_processo: bytes) -> None:
     """Remove a DEK do processo do contexto corrente e do padrão (descarte).
 
     Args:
-        processo_id: Processo.
+        hk_processo: Processo.
     """
     for contexto in {id(contexto_atual()): contexto_atual(), id(_PADRAO): _PADRAO}.values():
-        contexto.deks.pop(processo_id, None)
-        if contexto.atual == processo_id:
+        contexto.deks.pop(hk_processo, None)
+        if contexto.atual == hk_processo:
             contexto.atual = None
 
 
-def dek_de(processo_id: UUID) -> bytes:
+def dek_de(hk_processo: bytes) -> bytes:
     """DEK do processo: do cache do contexto ou pelo carregador.
 
     Args:
-        processo_id: Processo (do cabeçalho do campo cifrado).
+        hk_processo: Processo (do cabeçalho do campo cifrado ou da chave do objeto).
 
     Returns:
         DEK em claro.
@@ -214,25 +210,25 @@ def dek_de(processo_id: UUID) -> bytes:
         ChaveIndisponivelError: Sem DEK no contexto e sem carregador, ou processo sem chave.
     """
     contexto = contexto_atual()
-    dek = contexto.deks.get(processo_id)
+    dek = contexto.deks.get(hk_processo)
     if dek is not None:
         return dek
     carregador = contexto.carregador or (_CARREGADOR_PADRAO[0] if _CARREGADOR_PADRAO else None)
     if carregador is None:
-        raise ChaveIndisponivelError(str(processo_id))
-    gabinete_id, dek_cifrada = carregador(processo_id)
+        raise ChaveIndisponivelError(hk_processo.hex())
+    dek_cifrada = carregador(hk_processo)
     if dek_cifrada is None:
-        raise ChaveIndisponivelError(str(processo_id))
-    dek = abrir_dek(obter_cofre(), gabinete_id, dek_cifrada)
-    registrar_dek(processo_id, dek, atual=False)
+        raise ChaveIndisponivelError(hk_processo.hex())
+    dek = abrir_dek(obter_cofre(), dek_cifrada)
+    registrar_dek(hk_processo, dek, atual=False)
     return dek
 
 
-def dek_para_gravar() -> tuple[UUID, bytes]:
+def dek_para_gravar() -> tuple[bytes, bytes]:
     """Processo e DEK das gravações do escopo.
 
     Returns:
-        `(processo_id, dek)`.
+        `(hk_processo, dek)`.
 
     Raises:
         ChaveIndisponivelError: Nenhum processo ativo no escopo.

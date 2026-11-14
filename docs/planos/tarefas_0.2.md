@@ -181,7 +181,87 @@ a saída resumida (vermelho inicial e verde final).
     desembargador): `8 failed, 48 passed`; registrador sem conferir hash e sem encadear:
     `2 failed`. Verde: `56 passed` e `2 passed`. `ruff check`, `ruff format --check` e `mypy`
     nos arquivos da tarefa: ok.
-- [ ] **T3.5** Cofre com chave única, DEK em `sat_processo_chave`, caminho de objeto novo; cifra dos satélites. D14. RF-SEG-01, RF-SEG-02, RES-08.
+- [x] **T3.5** Cofre com chave única, DEK em `sat_processo_chave`, caminho de objeto novo; cifra dos satélites. D14. RF-SEG-01, RF-SEG-02, RES-08.
+  - `seguranca/cofre.py` com `CHAVE_DADOS = "lupa"` (saem as chaves por gabinete e de
+    identidades); `contexto.py` indexado pelo `hk_processo` (bytes); `envelope.py` com o
+    `hk_processo` de 32 bytes no cabeçalho e no AAD do campo `lupa1:`; `seguranca/chaves.py`
+    reduzido a `criar_chave_processo` (DEK nova em `sat_processo_chave`) e `carregador_sql`
+    (lê `v_processo`); `ingestao/storage.py` com `chave_objeto(hk_processo, sha256)` →
+    `processo/<hex>/<sha256>` e `prefixo_processo`; `exige_processo` abre a DEK
+    (`ativar_processo`). `gravar_satelite` usa HMAC com a DEK do processo ativo nos satélites
+    cifrados (D5). `vault/politicas/lupa.hcl` só com a chave `lupa`; `vault_inicializar.sh` cria
+    `lupa`. `apoio_comum.py` ganhou `criar_processo` e `criar_pagina` no modelo novo e limpa o
+    contexto de cifra padrão a cada teste.
+  - Saíram com a funcionalidade: a rotação por gabinete, a cifra de identidades de réu e os
+    testes deles (`test_cofre.py`, `test_dado_em_claro_recusado.py`). O contrato completo do
+    cofre (rotacionar, recifrar, destruir) fica só no cofre em memória: a política nova não deixa
+    a aplicação apagar a chave `lupa` do Vault.
+  - Testes novos: `pipeline/tests/seguranca/test_cifra_satelites.py` (9),
+    `intranet/api/tests/acesso/test_autorizacao.py` (3) e os de `hk` no campo, chave `lupa` e
+    caminho do objeto em `test_envelope.py`, `test_cofre.py` e `test_storage.py`.
+  - Comandos: `docker compose run --rm --no-deps worker python -m pytest -c
+    pipeline/pyproject.toml pipeline/tests/seguranca/test_cifra_satelites.py
+    pipeline/tests/seguranca/test_dado_em_claro_recusado.py pipeline/tests/seguranca/test_envelope.py
+    pipeline/tests/seguranca/test_cofre.py pipeline/tests/ingestao/test_storage.py --no-cov -q` e
+    `docker compose run --rm --no-deps api python -m pytest -c intranet/api/pyproject.toml
+    intranet/api/tests/acesso/test_autorizacao.py --no-cov -q`.
+  - Vermelho (os testes novos não importam sobre o código de T3.4; com o código novo e quatro
+    mutações: `hash_diff` sem DEK, caminho com `gabinete/`, DEK envolvida por outra chave,
+    cabeçalho sem conferir 32 bytes): `7 failed, 36 passed, 1 skipped`; `exige_processo` sem
+    `ativar_processo`: `1 failed, 2 passed`. Verde, depois de `docker compose build api worker`,
+    cada arquivo sozinho: `9`, `6`, `12`, `7 passed, 1 skipped`, `9` e `3 passed`. O pulado é o
+    contrato com o Vault real: o Vault de desenvolvimento ainda tem a política da 0.1 (sem a
+    chave `lupa`) até `bash scripts/vault_inicializar.sh` rodar de novo (passo 3 da execução do
+    plano), o que não foi feito porque o script regrava o `.env`.
+  - `test_gravacao.py` (T3.3) passou a contar linhas pelo `hk` do teste: com `criar_processo`
+    gravando com commit em outros testes, a contagem da tabela inteira deixava de ser estável.
+  - Não feito: o teste da saúde com cofre selado (RF-SEG-02) depende de `create_app` (T3.14); a
+    varredura pela API (`intranet/api/tests/seguranca/test_cifra_banco.py`) também.
+
+### Notas para as próximas tarefas
+
+- Gravação (`lupa_pipeline.dominio.gravacao`): `gravar_hub(session, tabela, chave, origem)`
+  recebe o dicionário com as colunas da chave de negócio (normaliza `numero_cnj`, `sha256`,
+  `token_sha256`, `chave`) e devolve o `hk`; `chave_do_hub` calcula sem gravar;
+  `gravar_link(session, tabela, {coluna_hk: hk}, origem)` devolve o `hk` do link;
+  `gravar_satelite(session, tabela, hk_pai, atributos, origem)` exige todas as colunas de
+  negócio e devolve se inseriu. Satélites com coluna cifrada pedem o processo ativo no contexto
+  de cifra (`ativar_processo` ou `criar_chave_processo`). Links não historizados
+  (`link_evento_auditoria`, `link_chamada_modelo`) são `insert` direto, como em
+  `auditoria/registrador.py`. Nada de `UPDATE` ou `DELETE`.
+- Leitura (`lupa_pipeline.dominio.visoes`): uma classe `Visao*` por view (`VisaoProcesso`,
+  `VisaoArquivo`, `VisaoPagina`, `VisaoFato`...); `id` é o hex do `hk`. Ao reler uma view
+  depois de gravar na mesma transação, use `atual(select(...))` (o mapa de identidade guardaria a
+  linha antiga). As colunas de cada view estão em `migrations/esquema_v0001.py`
+  (`VISOES_POR_HUB`, `VISOES_DE_HISTORICO`).
+- Tabelas em `lupa_pipeline.dominio.tabelas` (objetos `Table`, com `info` de tipo, chave, pai,
+  subchave multiativa e `sempre_insere`). Mudar enum jurídico na fase 4 muda os CHECKs da mesma
+  revisão `v0001` (gerados de `checar_enum`).
+- Testes: `engine_teste` é um database `lupa_teste_sessao_<pid>` migrado; `banco_vazio(sufixo)`
+  cria outro database vazio. Em `apoio_comum`: `criar_processo(sessao, classe=..., criador=...)`
+  (hub, dados, estado `criado` e DEK), `criar_pagina(sessao, hk_processo, texto)` (arquivo,
+  links, extração e saneamento cifrados), `semear_usuario`, `UsuarioTeste(hk, id, nome, papel,
+  segredo)` e `eventos_do_banco(engine, usuario_id=<hex>, ...)` sobre `v_auditoria`. Na intranet,
+  `criar_usuario_teste(engine, papel, mfa=..., troca_senha=...)` e `logar` como antes, sem
+  gabinete. Contagens em teste filtram pelo `hk` do próprio teste: `criar_processo` com commit
+  deixa linhas no banco da sessão.
+- Provisórios até a suíte voltar (D23): `pipeline/tests/conftest.py` e
+  `intranet/api/tests/conftest.py` carregam só `apoio_comum` (`apoio_ingestao` volta em T3.7 a
+  T3.9, com `criar_assessor`); o `app_teste` da intranet monta só as rotas de acesso, sem
+  `create_app` nem middlewares (volta em T3.14, que também devolve `/auditoria` e
+  `/processos/{id}` ao teste de troca de senha obrigatória).
+- Quebrados à espera das próximas tarefas (não importam ou não funcionam sobre o modelo novo):
+  `dominio/{esquemas,repositorios,correcoes}.py` (T3.10), toda a `ingestao/` exceto `storage.py`
+  (T3.7 a T3.10; `recepcao.py` e `worker.py` ainda usam `chave_objeto` com gabinete),
+  `seguranca/descarte.py` (T3.13), `intranet/api/src/lupa_intranet/api/` (`app.py`, rotas e
+  middleware; T3.6 e T3.11 a T3.14; `request.state.processo` agora é o `hk_processo`),
+  `auditoria/{consulta,rotas}.py` e o resto da auditoria (T3.11; `AcaoAuditoria` ainda tem
+  `ADMIN_ACESSO_CONTEUDO`, `IDENTIDADE_LIDA` e `CHAVE_ROTACIONADA`), `agente/` (T3.12),
+  scripts de `pipeline/scripts/` e `intranet/api/scripts/` além dos de instalação (T3.15) e os
+  testes deles, inclusive o restante de `pipeline/tests/dominio/test_banco.py`.
+- O Vault de desenvolvimento precisa de `bash scripts/vault_inicializar.sh` para ganhar a chave
+  `lupa` e a política nova; o banco de desenvolvimento continua na 0.1 (nenhuma migração rodou
+  nele).
 - [ ] **T3.6** Processos: cadastro com classe, lista, responsáveis, sem `materia`, `sigiloso` e 403. D12, D15 (`ClasseProcessual`, `StatusProcesso`). RF-PRO-01 a 04.
 - [ ] **T3.7** Recepção e estado da ingestão em satélites de `hub_arquivo`. A3. D9. RF-ING-01, 02, 06.
 - [ ] **T3.8** Worker sem Redis e RQ; remoção de `fila.py`, `redis` e `rq`. A4. D10. RF-ING-07, RES-07.

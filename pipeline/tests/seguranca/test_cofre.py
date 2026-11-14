@@ -1,4 +1,4 @@
-"""Contrato do `Cofre` nas duas implementações (Etapa 7.2) e erros do adaptador do Vault."""
+"""Contrato do `Cofre` nas duas implementações, chave única `lupa` e erros do Vault (D14)."""
 
 import base64
 import json
@@ -12,6 +12,7 @@ from pydantic import SecretStr
 
 from lupa_pipeline.config import Settings
 from lupa_pipeline.seguranca.cofre import (
+    CHAVE_DADOS,
     ChaveAusenteError,
     Cofre,
     CofreError,
@@ -19,8 +20,6 @@ from lupa_pipeline.seguranca.cofre import (
     CofreVault,
     TokenInvalidoError,
     criar_cofre,
-    nome_chave_gabinete,
-    nome_chave_identidades,
 )
 
 
@@ -37,7 +36,7 @@ def cofre_vault_do_ambiente() -> CofreVault:
         pytest.skip("Vault não configurado (rode scripts/vault_inicializar.sh)")
     cofre = CofreVault(endereco, role_id, secret_id, timeout=3)
     try:
-        cofre.existe_chave("lupa-gabinete-sondagem")
+        cofre.existe_chave(CHAVE_DADOS)
     except CofreError:
         pytest.skip("Vault inacessível ou selado")
     return cofre
@@ -49,29 +48,40 @@ def cofre(request: pytest.FixtureRequest) -> Iterator[Cofre]:
     yield CofreMemoria() if request.param == "memoria" else cofre_vault_do_ambiente()
 
 
-def test_contrato_cifrar_decifrar_rotacionar_recifrar_destruir(cofre: Cofre) -> None:
-    """Ciclo completo de uma chave de gabinete."""
-    gabinete = uuid4()
-    nome = nome_chave_gabinete(gabinete)
-    assert nome_chave_identidades(gabinete) == f"{nome}-identidades"
+def test_chave_unica_dos_dados_se_chama_lupa() -> None:
+    """D14, RES-08: uma chave Transit só, `lupa`, envolve a DEK de todos os processos."""
+    assert CHAVE_DADOS == "lupa"
+
+
+def test_aplicacao_cria_e_usa_a_chave_lupa(cofre: Cofre) -> None:
+    """RF-SEG-01: a chave `lupa` é criada sem erro se já existe e envolve uma DEK."""
+    cofre.criar_chave(CHAVE_DADOS)
+    cofre.criar_chave(CHAVE_DADOS)
+    assert cofre.existe_chave(CHAVE_DADOS)
+    token = cofre.cifrar(CHAVE_DADOS, b"dek-sintetica-32-bytes-000000000")
+    assert "dek-sintetica" not in token
+    assert cofre.decifrar(CHAVE_DADOS, token) == b"dek-sintetica-32-bytes-000000000"
+
+
+def test_contrato_cifrar_decifrar_rotacionar_recifrar_destruir() -> None:
+    """Ciclo completo de uma chave no cofre em memória (o Vault real não deixa apagar `lupa`)."""
+    cofre = CofreMemoria()
+    nome, outra = f"teste-{uuid4()}", f"teste-{uuid4()}"
     assert not cofre.existe_chave(nome)
     cofre.criar_chave(nome)
     cofre.criar_chave(nome)
     assert cofre.existe_chave(nome)
     token = cofre.cifrar(nome, b"dek-sintetica-32-bytes-000000000")
-    assert "dek-sintetica" not in token
     assert cofre.decifrar(nome, token) == b"dek-sintetica-32-bytes-000000000"
     cofre.rotacionar(nome)
     novo = cofre.recifrar(nome, token)
     assert novo != token and novo.split(":")[1] == "v2"
     assert cofre.decifrar(nome, novo) == cofre.decifrar(nome, token)
-    outra = nome_chave_gabinete(uuid4())
     cofre.criar_chave(outra)
     with pytest.raises(TokenInvalidoError):
         cofre.decifrar(outra, token)
     cofre.destruir_chave(nome)
     cofre.destruir_chave(nome)
-    cofre.destruir_chave(outra)
     assert not cofre.existe_chave(nome)
     with pytest.raises(ChaveAusenteError):
         cofre.decifrar(nome, novo)
@@ -171,25 +181,25 @@ def test_vault_falso_faz_login_renova_em_403_e_mapeia_erros() -> None:
     """Login preguiçoso, novo login após 403, chave ausente e token inválido."""
     falso = VaultFalso()
     cofre = _vault(falso)
-    cofre.criar_chave("lupa-gabinete-a")
+    cofre.criar_chave("lupa")
     assert falso.logins == 1
-    token = cofre.cifrar("lupa-gabinete-a", b"abc")
+    token = cofre.cifrar("lupa", b"abc")
     assert base64.b64encode(b"abc").decode() in token
     falso.negar_proxima = True
-    assert cofre.decifrar("lupa-gabinete-a", token) == b"abc"
+    assert cofre.decifrar("lupa", token) == b"abc"
     assert falso.logins == 2
-    assert cofre.existe_chave("lupa-gabinete-a")
+    assert cofre.existe_chave("lupa")
     with pytest.raises(TokenInvalidoError):
-        cofre.decifrar("lupa-gabinete-a", "lixo")
+        cofre.decifrar("lupa", "lixo")
     with pytest.raises(ChaveAusenteError):
-        cofre.cifrar("lupa-gabinete-b", b"abc")
+        cofre.cifrar("outra-chave", b"abc")
     with pytest.raises(ChaveAusenteError):
-        cofre.decifrar("lupa-gabinete-b", token)
-    cofre.rotacionar("lupa-gabinete-a")
-    assert cofre.recifrar("lupa-gabinete-a", token) == "vault:v2:x"
-    cofre.destruir_chave("lupa-gabinete-a")
-    cofre.destruir_chave("lupa-gabinete-a")
-    assert not cofre.existe_chave("lupa-gabinete-a")
+        cofre.decifrar("outra-chave", token)
+    cofre.rotacionar("lupa")
+    assert cofre.recifrar("lupa", token) == "vault:v2:x"
+    cofre.destruir_chave("lupa")
+    cofre.destruir_chave("lupa")
+    assert not cofre.existe_chave("lupa")
 
 
 def _transporte(resposta: httpx.Response | None) -> httpx.Client:
@@ -206,7 +216,7 @@ def _transporte(resposta: httpx.Response | None) -> httpx.Client:
 def test_vault_falso_login_recusado_inacessivel_e_erro_interno() -> None:
     """Secret ID errado, servidor fora do ar e erro 500 viram `CofreError` sem vazar segredo."""
     with pytest.raises(CofreError) as erro:
-        _vault(VaultFalso(), "errado").existe_chave("lupa-gabinete-a")
+        _vault(VaultFalso(), "errado").existe_chave("lupa")
     assert "errado" not in str(erro.value)
     with pytest.raises(CofreError):
         CofreVault("http://vault:8200", "r", "s", cliente=_transporte(None)).cifrar("k", b"x")
