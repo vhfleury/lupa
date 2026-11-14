@@ -7,7 +7,9 @@ pode mentir). Diretórios são ignorados.
 """
 
 import hashlib
+import json
 import stat
+import sys
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -78,7 +80,7 @@ def caminho_seguro(nome: str) -> bool:
     if not nome or "\\" in nome or "\x00" in nome:
         return False
     caminho = PurePosixPath(nome)
-    if caminho.is_absolute() or ":" in caminho.parts[0]:
+    if not caminho.parts or caminho.is_absolute() or ":" in caminho.parts[0]:
         return False
     return ".." not in caminho.parts
 
@@ -143,6 +145,11 @@ def _extrair(
     return lidos, resumo.hexdigest()
 
 
+def caminho_da_entrada(diretorio: Path, ordem: int) -> Path:
+    """Caminho opaco de uma entrada numerada, independente do nome declarado no ZIP."""
+    return diretorio / f"entrada-{ordem:05d}"
+
+
 def inventariar(caminho: Path, diretorio: Path, limites: LimitesZip) -> list[EntradaExtraida]:
     """Confere e extrai o ZIP, devolvendo o manifesto ordenado por nome.
 
@@ -163,7 +170,7 @@ def inventariar(caminho: Path, diretorio: Path, limites: LimitesZip) -> list[Ent
             restante = limites.max_descomprimido_bytes
             extraidas: list[EntradaExtraida] = []
             for ordem, info in enumerate(entradas, start=1):
-                destino = diretorio / f"entrada-{ordem:05d}"
+                destino = caminho_da_entrada(diretorio, ordem)
                 tamanho, sha256 = _extrair(arquivo, info, destino, restante)
                 restante -= tamanho
                 manifesto = EntradaManifesto(
@@ -175,3 +182,19 @@ def inventariar(caminho: Path, diretorio: Path, limites: LimitesZip) -> list[Ent
         raise ZipRecusadoError(MotivoQuarentena.CORROMPIDO, "ZIP ilegível") from erro
     except NotImplementedError as erro:
         raise ZipRecusadoError(MotivoQuarentena.CORROMPIDO, "compressão não suportada") from erro
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Extrai as entradas no diretório do job e devolve somente o manifesto ou a quarentena."""
+    from lupa_pipeline.ingestao.parser_pdf import EXIT_MEMORIA, bloquear_rede
+
+    bloquear_rede()
+    caminho, destino, quantidade, razao, tamanho = argv or sys.argv[1:]
+    limites = LimitesZip(int(quantidade), float(razao), int(tamanho))
+    try:
+        entradas = inventariar(Path(caminho), Path(destino), limites)
+        json.dump({"entradas": [e.manifesto.model_dump() for e in entradas]}, sys.stdout)
+    except ZipRecusadoError as erro:
+        json.dump({"motivo_quarentena": erro.motivo.value}, sys.stdout)
+    except MemoryError:
+        sys.exit(EXIT_MEMORIA)

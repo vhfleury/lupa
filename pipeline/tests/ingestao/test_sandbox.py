@@ -15,9 +15,11 @@ from apoio_arquivos import (
     pdf_corrompido,
     pdf_minimo,
     pdf_truncado,
+    zip_de,
 )
-from lupa_pipeline.dominio.enums import MotivoFalha
+from lupa_pipeline.dominio.enums import MotivoFalha, MotivoQuarentena
 from lupa_pipeline.ingestao import parser_pdf, sandbox
+from lupa_pipeline.ingestao.inventario import LimitesZip, ZipRecusadoError
 from lupa_pipeline.ingestao.sandbox import LimitesSandbox, ResultadoSandbox, inspecionar_pdf
 
 LIMITES = LimitesSandbox(memoria_mb=512, cpu_segundos=20, tempo_segundos=30)
@@ -154,7 +156,8 @@ def test_saida_que_nao_e_objeto_json_vira_erro_parser(monkeypatch: pytest.Monkey
         assert sandbox.executar("x", [], LIMITES).motivo_falha is MotivoFalha.ERRO_PARSER
 
 
-def test_limites_aplicados_no_filho() -> None:
+@pytest.mark.parametrize("escrita", [0, 4096])
+def test_limites_aplicados_no_filho(escrita: int) -> None:
     """O preexec define os rlimits pedidos (conferido num filho real)."""
     codigo = (
         "import resource; print(resource.getrlimit(resource.RLIMIT_AS)[0], "
@@ -165,9 +168,9 @@ def test_limites_aplicados_no_filho() -> None:
         capture_output=True,
         text=True,
         check=True,
-        preexec_fn=sandbox._aplicar_limites(LimitesSandbox(300, 7, 1)),  # noqa: PLW1509
+        preexec_fn=sandbox._aplicar_limites(LimitesSandbox(300, 7, 1), escrita),  # noqa: PLW1509
     )
-    assert processo.stdout.split() == [str(300 * 1024 * 1024), "7", "0"]
+    assert processo.stdout.split() == [str(300 * 1024 * 1024), "7", str(escrita)]
 
 
 def test_erro_ao_decodificar_pagina(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -215,3 +218,57 @@ def test_grupo_de_um_pdf_usa_a_inspecao_simples(tmp_path: Path) -> None:
     caminho = tmp_path / "a.pdf"
     caminho.write_bytes(pdf_minimo(1))
     assert sandbox.inspecionar_pdfs([caminho], LIMITES)[0].dados["paginas"] == 1
+
+
+@pytest.mark.parametrize(
+    "limites_zip",
+    [LimitesZip(max_entradas=1), LimitesZip(max_razao=1.1), LimitesZip(max_descomprimido_bytes=70)],
+)
+def test_zip_recusado_no_filho_por_limites_globais(tmp_path: Path, limites_zip: LimitesZip) -> None:
+    """Duas entradas pequenas juntas excedem o teto, ainda que cada uma caiba sozinha."""
+    original = tmp_path / "autos.zip"
+    original.write_bytes(zip_de({"1.pdf": b"x" * 40, "2.pdf": b"y" * 40}))
+    with pytest.raises(ZipRecusadoError) as capturado:
+        sandbox.inventariar_zip(original, tmp_path, limites_zip, LIMITES)
+    assert capturado.value.motivo == MotivoQuarentena.ZIP_MALICIOSO
+    assert list(tmp_path.iterdir()) == [original]
+
+
+def test_esgotamento_no_subprocesso_zip_devolve_falha_tecnica(tmp_path: Path) -> None:
+    """O timeout da descompactação deve ir para o motivo de falha do job."""
+    original = tmp_path / "autos.zip"
+    original.write_bytes(zip_de({"1.pdf": b"teste"}))
+    with pytest.raises(sandbox.FalhaSandboxError) as erro:
+        sandbox.inventariar_zip(original, tmp_path, LimitesZip(), LimitesSandbox(512, 20, 0.001))
+    assert erro.value.motivo == MotivoFalha.TEMPO_ESGOTADO
+
+
+@pytest.mark.parametrize("campo", ["caminho", "link", "ordem", "permissao", "tamanho"])
+def test_manifesto_de_zip_nao_autoriza_arquivo_externo_ou_inconsistente(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, campo: str
+) -> None:
+    """O pai reconstrói o nome conhecido e rejeita substituições por path ou link."""
+    privado = tmp_path / "trabalho"
+    privado.mkdir()
+    original = tmp_path / "autos.zip"
+    original.write_bytes(b"segredo-sintetico")
+    destino = privado / "entrada-00001"
+    if campo == "link":
+        destino.symlink_to(original)
+    else:
+        destino.touch(mode=0o644 if campo == "permissao" else 0o600)
+    item = {
+        "nome": "1.pdf",
+        "ordem": 2 if campo == "ordem" else 1,
+        "tamanho_bytes": 99 if campo == "tamanho" else 0,
+        "sha256": "1" * 64,
+    }
+    if campo == "caminho":
+        item["caminho"] = str(original)
+    monkeypatch.setattr(
+        sandbox, "_executar", lambda *a, **kw: ResultadoSandbox({"entradas": [item]})
+    )
+    with pytest.raises(sandbox.FalhaSandboxError) as erro:
+        sandbox.inventariar_zip(original, privado, LimitesZip(), LIMITES)
+    assert erro.value.motivo == MotivoFalha.ERRO_PARSER
+    assert original.read_bytes() == b"segredo-sintetico"

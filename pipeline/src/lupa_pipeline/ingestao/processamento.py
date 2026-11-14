@@ -41,12 +41,7 @@ from lupa_pipeline.ingestao.extracao import (
 )
 from lupa_pipeline.ingestao.extrator_paginas import VERSAO_EXTRATOR
 from lupa_pipeline.ingestao.indice import montar_indice, versoes
-from lupa_pipeline.ingestao.inventario import (
-    EntradaExtraida,
-    LimitesZip,
-    ZipRecusadoError,
-    inventariar,
-)
+from lupa_pipeline.ingestao.inventario import EntradaExtraida, LimitesZip, ZipRecusadoError
 from lupa_pipeline.ingestao.qualidade import relatorio_qualidade
 from lupa_pipeline.ingestao.quarentena import motivo_do_parser
 from lupa_pipeline.ingestao.recepcao import TipoArquivo
@@ -56,7 +51,12 @@ from lupa_pipeline.ingestao.repositorio import (
     mudar_estado,
 )
 from lupa_pipeline.ingestao.repositorio_pecas import gravar_indice
-from lupa_pipeline.ingestao.sandbox import LimitesSandbox, inspecionar_pdfs
+from lupa_pipeline.ingestao.sandbox import (
+    FalhaSandboxError,
+    LimitesSandbox,
+    inspecionar_pdfs,
+    inventariar_zip,
+)
 from lupa_pipeline.ingestao.storage import ObjectStorage, ObjetoAusenteError, chave_objeto
 from lupa_pipeline.logging import get_logger
 
@@ -65,15 +65,6 @@ log = get_logger(__name__)
 
 class ProcessoDescartadoError(Exception):
     """O processo foi descartado enquanto um lote estava no sandbox."""
-
-
-class FalhaSandboxError(Exception):
-    """O sandbox devolveu o motivo técnico para encerrar o processamento."""
-
-    def __init__(self, motivo: MotivoFalha) -> None:
-        """Preserva o motivo enumerado para o satélite de ingestão."""
-        super().__init__(motivo.value)
-        self.motivo = motivo
 
 
 @dataclass(frozen=True)
@@ -100,7 +91,9 @@ class Trabalho:
             atualizar_status_processo(session, self.arquivo.hk_processo)
 
 
-def _entradas(arquivo: VisaoArquivo, original: Path, settings: Settings) -> list[EntradaExtraida]:
+def _entradas(
+    arquivo: VisaoArquivo, original: Path, settings: Settings, sandbox: LimitesSandbox
+) -> list[EntradaExtraida]:
     if arquivo.mime == TipoArquivo.PDF.value:
         entrada = EntradaManifesto(
             ordem=1,
@@ -114,7 +107,7 @@ def _entradas(arquivo: VisaoArquivo, original: Path, settings: Settings) -> list
     limites = LimitesZip(
         settings.zip_max_entradas, settings.zip_max_razao, settings.zip_max_descomprimido_bytes
     )
-    return inventariar(original, original.parent, limites)
+    return inventariar_zip(original, original.parent, limites, sandbox)
 
 
 def _inspecionar(entradas: list[EntradaExtraida], limites: LimitesSandbox) -> list[dict[str, Any]]:
@@ -165,7 +158,7 @@ def _preparar(
     original = diretorio / "original"
     original.touch(mode=0o600, exist_ok=False)
     original.write_bytes(storage.ler(arquivo.chave_storage))
-    entradas = _entradas(arquivo, original, settings)
+    entradas = _entradas(arquivo, original, settings, limites)
     inspecoes = _inspecionar(entradas, limites)
     fontes = []
     manifesto = []

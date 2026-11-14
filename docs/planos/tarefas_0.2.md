@@ -319,6 +319,7 @@ a saída resumida (vermelho inicial e verde final).
     pipeline/tests/dominio/test_migracao_0001.py pipeline/tests/unit/test_config.py`.
     Vermelho em quatro testes de configuração, dois da fila e um de ordenação. Verde em 46 casos.
 - [x] **T3.9** Páginas, diagnóstico, lotes e peças em satélites (conteúdo jurídico ainda da 0.1). A5 passos 1 a 7. RF-ING-03.
+  - O teste de A5 reproduziu a abertura de ZIP no processo do worker. Agora o filho isolado aplica os limites de inventário e expõe os membros temporários com modo 0600. `pytest pipeline/tests/ingestao/test_{sandbox,inventario,worker,processamento}.py --no-cov -q` passou nos 68 casos executados. O limite de escrita foi verificado em subprocessos com tetos de 0 e 4096 bytes.
   - Os testes que importavam os jobs de Redis falhavam na coleta. Na imagem do worker, test_worker.py passou nas recusas de PDF e ZIP e no limite real de memória. test_processamento.py, test_worker_extracao.py e test_observabilidade.py passaram nos 10 casos de lotes, cache entre DEKs, retomada e logs.
 - [x] **T3.10** Evidências, fatos, achados e anotações em hubs, links e satélites; remoção de `reu`, `reu_identidade` e da pseudonimização. A5 passos 8 a 11, A11, A12. RF-FAT-01, RF-FAT-03, RF-PEC-02, RF-DOS-06.
   - A suíte que usava as tabelas da 0.1 falhou na coleta. Três testes de domínio no PostgreSQL e os testes de rotas de fatos e peças passaram. Conferem escopo, vigência, id estável, reprocessamento e anotação em fato e achado. A view v_achado_historico preserva a consulta às versões anteriores aprovada pelo usuário.

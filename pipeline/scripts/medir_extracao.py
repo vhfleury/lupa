@@ -52,11 +52,16 @@ from lupa_pipeline.ingestao.extracao import (
 )
 from lupa_pipeline.ingestao.extrator_paginas import VERSAO_EXTRATOR
 from lupa_pipeline.ingestao.indice import montar_indice, pecas_saida
-from lupa_pipeline.ingestao.inventario import LimitesZip, inventariar
+from lupa_pipeline.ingestao.inventario import LimitesZip
 from lupa_pipeline.ingestao.ocr import ocr_pagina
 from lupa_pipeline.ingestao.qualidade import para_saida_pipeline, relatorio_qualidade
 from lupa_pipeline.ingestao.roteador import rotear
-from lupa_pipeline.ingestao.sandbox import LimitesSandbox, inspecionar_pdf, inspecionar_pdfs
+from lupa_pipeline.ingestao.sandbox import (
+    LimitesSandbox,
+    inspecionar_pdf,
+    inspecionar_pdfs,
+    inventariar_zip,
+)
 from lupa_pipeline.ingestao.saneamento_pagina import mapa_saneado
 from lupa_pipeline.ingestao.sinais import medir_sinais
 from lupa_pipeline.ingestao.texto_nativo import extrair_texto_nativo
@@ -94,7 +99,9 @@ def _gabarito(pasta: Path) -> Gabarito:
 def _diagnosticar(pasta: Path, cenario: Cenario) -> Any:
     if cenario is Cenario.ZIP_POR_PECA:
         with tempfile.TemporaryDirectory() as tmp:
-            extraidas = inventariar(pasta / "autos.zip", Path(tmp), LimitesZip())
+            extraidas = inventariar_zip(
+                pasta / "autos.zip", Path(tmp), LimitesZip(), LIMITES_INSPECAO
+            )
             inspecoes = inspecionar_pdfs([e.caminho for e in extraidas], LIMITES_INSPECAO)
             entradas = [
                 (e.manifesto.nome, r.dados) for e, r in zip(extraidas, inspecoes, strict=False)

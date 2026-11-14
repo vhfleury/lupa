@@ -49,7 +49,7 @@ def test_manifesto_ordenado_por_nome_com_hash_e_tamanho(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     "nome",
-    ["../fora.pdf", "a/../../fora.pdf", "/etc/passwd", "C:/x.pdf", "a\\..\\b.pdf", ""],
+    ["../fora.pdf", "a/../../fora.pdf", "/etc/passwd", "C:/x.pdf", "a\\..\\b.pdf", "", "."],
 )
 def test_caminho_inseguro(nome: str) -> None:
     """Subida de diretório, absoluto, unidade e barra invertida são recusados."""

@@ -1,6 +1,9 @@
 """Integração de A5 com PostgreSQL, cifra e parsers isolados."""
 
+import zipfile
+from pathlib import Path
 from threading import Event
+from typing import Any
 
 import pytest
 from sqlalchemy import func, select, text
@@ -14,6 +17,7 @@ from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoPagina, VisaoPeca, V
 from lupa_pipeline.ingestao import processamento
 from lupa_pipeline.ingestao.cache import copiar_do_cache
 from lupa_pipeline.ingestao.extracao import ResultadoTarefa, Tarefa, executar_tarefa
+from lupa_pipeline.ingestao.inventario import EntradaExtraida
 from lupa_pipeline.ingestao.processamento import processar_arquivo
 from lupa_pipeline.ingestao.sandbox import LimitesSandbox
 from lupa_pipeline.ingestao.storage import StorageCifrado
@@ -160,3 +164,37 @@ def test_cache_recifra_para_a_chave_do_destino_e_exige_a_mesma_versao(
         brutos = [s.execute(consulta, {"hk": a.hk_arquivo}).scalar_one() for a in (fonte, destino)]
         assert brutos[0] != brutos[1]
         assert all("SENTINELA" not in str(b) for b in brutos)
+
+
+def test_abertura_de_zip_so_no_filho_e_membros_temporarios_opacos(
+    fabrica_sessao: sessionmaker[Session],
+    settings_ficticias: Settings,
+    semear_arquivo: SemearArquivo,
+    storage_memoria: StorageCifrado,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A5 confere o ZIP num filho e expõe ao worker somente arquivos opacos com modo 0600."""
+    hk = semear_arquivo(zip_por_peca(2), "autos.zip").hk_arquivo
+    inspecionar = processamento._inspecionar
+    vistos: list[Path] = []
+
+    def proibido(*args: object, **kwargs: object) -> None:
+        pytest.fail("o processo worker abriu o ZIP")
+
+    def inspecao(entradas: list[EntradaExtraida], limites: LimitesSandbox) -> list[dict[str, Any]]:
+        for indice, entrada in enumerate(entradas, start=1):
+            assert entrada.caminho.name == f"entrada-{indice:05d}"
+            assert entrada.caminho.parent.parent == tmp_path
+            assert entrada.caminho.stat().st_mode & 0o777 == 0o600
+            assert entrada.caminho.stat().st_size == entrada.manifesto.tamanho_bytes
+            vistos.append(entrada.caminho)
+        return inspecionar(entradas, limites)
+
+    monkeypatch.setattr(zipfile, "ZipFile", proibido)
+    monkeypatch.setattr(processamento, "_inspecionar", inspecao)
+    settings = settings_ficticias.model_copy(update={"ingestao_dir_temporario": tmp_path})
+    processar_arquivo(fabrica_sessao, settings, storage_memoria, hk, Event())
+    assert len(vistos) == 2 and all(not p.exists() for p in vistos)
+    with fabrica_sessao() as sessao:
+        assert sessao.get_one(VisaoArquivo, hk).estado == "concluido"
