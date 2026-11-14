@@ -43,6 +43,7 @@ class Suspensao(BaseModel):
     fim: date
     descricao: str
     base_legal: str
+    anual: bool = False
 
     @model_validator(mode="after")
     def _validar_intervalo(self) -> Self:
@@ -101,7 +102,7 @@ def montar_calendario(feriados: list[ArquivoFeriados], suspensoes: ArquivoSuspen
     dias = {f.data: f.descricao for arq in feriados for f in arq.feriados}
     fontes = {f.data: f.fonte or arq.fonte for arq in feriados for f in arq.feriados}
     periodos = tuple(
-        Periodo(s.inicio, s.fim, s.descricao, s.base_legal) for s in suspensoes.suspensoes
+        Periodo(s.inicio, s.fim, s.descricao, s.base_legal, s.anual) for s in suspensoes.suspensoes
     )
     return Calendario(feriados=dias, suspensoes=periodos, fontes=fontes)
 

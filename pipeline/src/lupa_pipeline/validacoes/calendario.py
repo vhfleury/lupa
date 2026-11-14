@@ -19,6 +19,7 @@ class Periodo:
     fim: date
     descricao: str
     fonte: str = ""
+    anual: bool = False
 
     def contem(self, dia: date) -> bool:
         """Diz se o dia está no período.
@@ -29,7 +30,14 @@ class Periodo:
         Returns:
             Verdadeiro se ``inicio <= dia <= fim``.
         """
-        return self.inicio <= dia <= self.fim
+        if not self.anual:
+            return self.inicio <= dia <= self.fim
+        inicio = (self.inicio.month, self.inicio.day)
+        fim = (self.fim.month, self.fim.day)
+        atual = (dia.month, dia.day)
+        if inicio > fim:
+            return atual >= inicio or atual <= fim
+        return inicio <= atual <= fim
 
 
 @dataclass(frozen=True)

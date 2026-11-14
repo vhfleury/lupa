@@ -372,6 +372,8 @@ a saída resumida (vermelho inicial e verde final).
   - A regra vazia falhou ao calcular o vencimento. O teste do decreto 5.123/2026 também acusou
     a ausência do feriado transferido para 30/10. No worker, `python -m pytest pipeline/tests/validacoes/test_tempestividade.py --no-cov -q`
     passou nos oito casos de prazo, feriado, suspensão, falta e conflito de fatos.
+  - Regressão de recesso em 2030/31: o resultado anterior vencia em 26/12/2030. Com a repetição
+    anual do art. 220, o vencimento passou a 27/01/2031. A suíte do catálogo passou nos 61 casos.
 - [x] **T4.8** Preparo. A8. RF-VAL-03.
   - A regra vazia falhou ao avaliar comprovante, dispensa e gratuidade. No worker,
     `python -m pytest pipeline/tests/validacoes/test_preparo.py --no-cov -q` passou nos dez casos.

@@ -76,3 +76,12 @@ def test_fato_ausente_identifica_peca_e_conflito_cita_as_duas_fontes() -> None:
         divergente.id,
     }
     assert set(conf.valores["conflitos"][0]["fato_ids"]) <= set(conf.fatos_usados)
+
+
+def test_recesso_do_cpc_repete_anualmente_inclusive_nas_duas_pontas() -> None:
+    """RF-VAL-02: o recesso legal vale também para anos sem feriados locais cadastrados."""
+    modelo = _modelo("embargos_declaracao", "2030-12-19", "2031-01-27", "particular")
+    achado = executar(modelo, REFERENCIA)
+    assert achado.valores["vencimento"] == "2031-01-27"
+    fontes = {d["data"]: d["fonte"] for d in achado.valores["dias_nao_contados"]}
+    assert fontes["2030-12-20"] == fontes["2031-01-20"] == "art. 220 do CPC"

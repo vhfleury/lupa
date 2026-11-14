@@ -52,7 +52,7 @@
       "versoes_dados": {
         "feriados/nacionais.yaml": "2026.11.0",
         "feriados/tjgo.yaml": "2026.11.0",
-        "suspensoes_prazo.yaml": "0.2.0",
+        "suspensoes_prazo.yaml": "0.2.1",
         "prazos_recursos.yaml": "0.2.0"
       },
       "base_legal": "art. 1.003, § 5º, do CPC, arts. 219, 220 e 224 do CPC",
