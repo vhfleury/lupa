@@ -156,7 +156,8 @@ Removidos da 0.1: as 26 tabelas (`gabinete`, `usuario`, `processo`, `processo_re
 | `intranet/web/src/lib/{permissoes,tipos,api,sessao.svelte}.ts`, `lib/processos/{tipos,rotulos,envio}.ts`, `lib/auditoria/auditoria.ts`, `lib/componentes/{MenuLateral,FormNovoUsuario}.svelte`, `routes/processos/**`, `routes/usuarios/`, `routes/auditoria/` | altera: dois papéis, classe, partes, tipos cíveis, ids em texto |
 | `intranet/web/e2e/testes/auditoria-admin.spec.ts` | renomeia para `auditoria.spec.ts`; demais specs e `capturas.spec.ts` adaptados |
 | `proxy/` | → `intranet/proxy/`; ficam `Caddyfile` e `modos/interno.caddy`; saem `acme.caddy`, `fornecido.caddy`, `sem-certificado.pem` |
-| `scripts/{gerar_autos,medir,medir_extracao,ponta_a_ponta,calibrar,limpar_dev,criar_usuario_banco}.py` | → `pipeline/scripts/`; sem gabinete |
+| `scripts/{gerar_autos,medir,medir_extracao,ponta_a_ponta,calibrar}.py` | → `pipeline/scripts/` |
+| `scripts/{limpar_dev,criar_usuario_banco}.py` | → `intranet/api/scripts/` |
 | `scripts/criar_admin.py` | → `intranet/api/scripts/criar_desembargador.py` |
 | `scripts/{e2e_preparar,e2e_processos,e2e_semear_chat,verificar_cabecalhos}.py`, `scripts/validar_caddyfile.sh` | → `intranet/api/scripts/`; sem gabinete e administrador |
 | `scripts/{backup,backup_comum,backup_conteiner,cron_backup,expurgar_backups,restaurar,instalar_piloto}.sh`, `scripts/conferir_piloto.py`, `scripts/preparar_repositorio.md` | remove |
@@ -241,7 +242,7 @@ Removidos da 0.1: as 26 tabelas (`gabinete`, `usuario`, `processo`, `processo_re
 - **D12.** O identificador público de cada objeto é o hex do `hk` (64 caracteres), em rotas, JSON
   e front.
 - **D13.** A API lê só as views e grava só por `lupa_pipeline.dominio.gravacao` e pelos
-  repositórios.
+  repositórios. O histórico de achados usa `v_achado_historico`, complemento aprovado em 14/11/2026.
 - **D14.** Cofre com uma chave Transit, `lupa`; DEK por processo em `sat_processo_chave`. Objetos
   em `processo/<hex do hk_processo>/<sha256>`. Anotação passa a ser cifrada.
 - **D15.** Enums: `ClasseProcessual` (`apelacao_civel`, `agravo_instrumento`,
@@ -304,11 +305,14 @@ Removidos da 0.1: as 26 tabelas (`gabinete`, `usuario`, `processo`, `processo_re
 Na máquina de desenvolvimento, pelo agente.
 
 1. Commit da última tarefa e PR de `feat/versao-0.2` para `develop`.
-2. `docker compose down`, remoção dos volumes `lupa_db-dados`, `lupa_minio-dados`,
-   `lupa_prometheus-dados` e `lupa_grafana-dados` (com confirmação do usuário no momento) e
-   `docker compose up -d --build --wait`.
-3. `bash scripts/vault_inicializar.sh`; no contêiner `api`, `alembic -c
-   pipeline/src/lupa_pipeline/migrations/alembic.ini upgrade head`, `python
-   pipeline/scripts/criar_usuario_banco.py` e `python intranet/api/scripts/criar_desembargador.py`.
+2. Com confirmação do usuário no momento, executar `docker compose down --remove-orphans` e
+   remover os volumes `lupa_db-dados`, `lupa_minio-dados`, `lupa_prometheus-dados` e
+   `lupa_grafana-dados`. Preservar `lupa_vault-dados`.
+3. Construir as imagens, subir `db`, `minio`, `minio-init` e `vault` e executar
+   `bash scripts/vault_inicializar.sh`. Com `docker compose run --rm -T api`, executar
+   `alembic -c pipeline/src/lupa_pipeline/migrations/alembic.ini upgrade head`,
+   `python intranet/api/scripts/criar_usuario_banco.py` e
+   `python intranet/api/scripts/criar_desembargador.py`. Subir os serviços com
+   `docker compose up -d --wait`.
 
 Depois disso o usuário envia os processos de `dados/` pela interface.

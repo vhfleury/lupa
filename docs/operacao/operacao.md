@@ -8,17 +8,18 @@ Os comandos abaixo rodam na raiz do repositório, em host com Docker Compose v2,
 2. Inicialize os serviços internos e configure o Vault:
 
    ```sh
-   docker compose up -d db minio vault
+   docker compose build api worker front
+   docker compose up -d db minio minio-init vault
    bash scripts/vault_inicializar.sh
    ```
 
-3. Construa os serviços e aplique a revisão do Data Vault a um banco novo. Configure o usuário de aplicação e a primeira conta do desembargador:
+3. Aplique a revisão do Data Vault ao banco novo. Configure o usuário da aplicação e a primeira conta do desembargador antes de iniciar a API e o worker.
 
    ```sh
-   docker compose up -d --build --wait
-   docker compose exec api alembic -c pipeline/src/lupa_pipeline/migrations/alembic.ini upgrade head
-   docker compose exec api python intranet/api/scripts/criar_usuario_banco.py
-   docker compose exec api python intranet/api/scripts/criar_desembargador.py
+   docker compose run --rm -T api alembic -c pipeline/src/lupa_pipeline/migrations/alembic.ini upgrade head
+   docker compose run --rm -T api python intranet/api/scripts/criar_usuario_banco.py
+   docker compose run --rm -T api python intranet/api/scripts/criar_desembargador.py
+   docker compose up -d --wait
    ```
 
 4. Abra `https://localhost:8443` ou a porta de `PROXY_PORTA_HOST`, confirme a origem do certificado interno e faça o primeiro login com MFA. Acesse `/api/saude` e confira banco, storage e cofre. Para o cliente real do modelo, forneça a credencial de API pelo ambiente reservado da intranet. A verificação normal usa clientes roteirizados.
