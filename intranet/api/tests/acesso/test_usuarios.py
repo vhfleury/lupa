@@ -1,4 +1,4 @@
-"""Testes da gestão de usuários e gabinetes pela API, conferindo papéis e gabinetes."""
+"""Gestão de assessores pelo desembargador e papéis na API (RF-ACE-03, RF-ACE-04)."""
 
 from uuid import uuid4
 
@@ -7,7 +7,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
-from apoio_comum import UsuarioTeste, criar_gabinete_teste, eventos_do_banco
+from apoio_comum import UsuarioTeste, eventos_do_banco
+from lupa_pipeline.dominio.chaves import chave_hash
 from lupa_pipeline.dominio.enums import PapelUsuario
 from tests.conftest import criar_usuario_teste, logar
 
@@ -26,116 +27,103 @@ def _nome() -> str:
 
 @pytest.fixture
 def desembargador(engine_teste: Engine) -> UsuarioTeste:
-    """Desembargador de um gabinete novo."""
-    return criar_usuario_teste(
-        engine_teste, PapelUsuario.DESEMBARGADOR, criar_gabinete_teste(engine_teste)
-    )
+    """Desembargador com MFA configurado."""
+    return criar_usuario_teste(engine_teste, PapelUsuario.DESEMBARGADOR)
 
 
-@pytest.fixture
-def administrador(engine_teste: Engine) -> UsuarioTeste:
-    """Administrador (sem gabinete)."""
-    return criar_usuario_teste(engine_teste, PapelUsuario.ADMINISTRADOR, None)
-
-
-def test_desembargador_nao_consegue_criar_assessor_em_outro_gabinete(
+def test_desembargador_cria_assessor_com_troca_obrigatoria(
     app_teste: FastAPI, engine_teste: Engine, desembargador: UsuarioTeste
 ) -> None:
-    """403 ao criar em outro gabinete; a tentativa negada fica na auditoria."""
-    cliente = _cliente_logado(app_teste, engine_teste, desembargador)
-    outro = criar_gabinete_teste(engine_teste)
-    resposta = cliente.post(
-        "/usuarios",
-        json={"nome_usuario": _nome(), "papel": "assessor", "gabinete_id": str(outro)},
-    )
-    assert resposta.status_code == 403
-    negados = eventos_do_banco(
-        engine_teste, usuario_id=desembargador.id, acao="usuario_criado", resultado="negado"
-    )
-    assert len(negados) == 1
-    assert negados[0].gabinete_id == desembargador.gabinete_id
-
-
-def test_desembargador_cria_assessor_no_proprio_gabinete_com_troca_obrigatoria(
-    app_teste: FastAPI, engine_teste: Engine, desembargador: UsuarioTeste
-) -> None:
-    """Sem gabinete informado, usa o do desembargador; senha temporária vem uma vez."""
+    """RF-ACE-04: o assessor nasce com senha temporária, exibida uma vez, e troca obrigatória."""
     cliente = _cliente_logado(app_teste, engine_teste, desembargador)
     nome = _nome()
     resposta = cliente.post("/usuarios", json={"nome_usuario": nome, "papel": "assessor"})
     assert resposta.status_code == 201
     corpo = resposta.json()
-    assert corpo["gabinete_id"] == str(desembargador.gabinete_id)
-    assert corpo["troca_senha_obrigatoria"] is True
+    assert (corpo["papel"], corpo["troca_senha_obrigatoria"]) == ("assessor", True)
+    assert corpo["id"] == chave_hash([nome]).hex()
     assert len(corpo["senha_temporaria"]) >= 20
     assert nome in {u["nome_usuario"] for u in cliente.get("/usuarios").json()}
     repetido = cliente.post("/usuarios", json={"nome_usuario": nome, "papel": "assessor"})
     assert repetido.status_code == 409
     invalido = cliente.post("/usuarios", json={"nome_usuario": "A B", "papel": "assessor"})
     assert invalido.status_code == 422
+    criados = eventos_do_banco(engine_teste, usuario_id=desembargador.id, acao="usuario_criado")
+    assert [e.objeto_id for e in criados] == [corpo["id"]]
 
 
-def test_desembargador_nao_cria_desembargador_nem_administrador(
+def test_assessor_criado_entra_e_so_troca_a_senha(
     app_teste: FastAPI, engine_teste: Engine, desembargador: UsuarioTeste
 ) -> None:
-    """Criar desembargador é só do administrador; administrador não é criado pela API."""
+    """RF-ACE-04: com a senha temporária, o login pede MFA e a sessão só troca a senha."""
     cliente = _cliente_logado(app_teste, engine_teste, desembargador)
-    for papel in ("desembargador", "administrador"):
-        resposta = cliente.post("/usuarios", json={"nome_usuario": _nome(), "papel": papel})
-        assert resposta.status_code == 403, papel
+    nome = _nome()
+    temporaria = cliente.post("/usuarios", json={"nome_usuario": nome}).json()["senha_temporaria"]
+    novo = TestClient(app_teste, base_url="https://testserver")
+    passo1 = novo.post("/auth/login", json={"nome_usuario": nome, "senha": temporaria})
+    assert passo1.json()["etapa"] == "configurar_mfa"
 
 
-def test_assessor_nao_gere_usuarios(app_teste: FastAPI, engine_teste: Engine) -> None:
-    """Assessor não lista nem cria usuários."""
-    assessor = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
+def test_desembargador_nao_cria_outro_desembargador_pela_api(
+    app_teste: FastAPI, engine_teste: Engine, desembargador: UsuarioTeste
+) -> None:
+    """RF-ACE-05: desembargador só nasce pelo script; a tentativa negada fica na auditoria."""
+    cliente = _cliente_logado(app_teste, engine_teste, desembargador)
+    resposta = cliente.post("/usuarios", json={"nome_usuario": _nome(), "papel": "desembargador"})
+    assert resposta.status_code == 403
+    negados = eventos_do_banco(
+        engine_teste, usuario_id=desembargador.id, acao="usuario_criado", resultado="negado"
     )
+    assert len(negados) == 1
+    administrador = cliente.post("/usuarios", json={"nome_usuario": _nome(), "papel": "admin"})
+    assert administrador.status_code == 422
+
+
+def test_assessor_recebe_403_na_gestao_de_usuarios(
+    app_teste: FastAPI, engine_teste: Engine
+) -> None:
+    """RF-ACE-03: assessor não lista, não cria e não altera usuários."""
+    assessor = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
+    outro = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
     cliente = _cliente_logado(app_teste, engine_teste, assessor)
     assert cliente.get("/usuarios").status_code == 403
     criar = cliente.post("/usuarios", json={"nome_usuario": _nome(), "papel": "assessor"})
     assert criar.status_code == 403
+    for acao in ("desativar", "reativar", "resetar-senha", "resetar-mfa"):
+        assert cliente.post(f"/usuarios/{outro.id}/{acao}").status_code == 403, acao
 
 
-def test_administrador_cria_gabinete_e_desembargador(
-    app_teste: FastAPI, engine_teste: Engine, administrador: UsuarioTeste
-) -> None:
-    """Admin cria gabinete e desembargador nele; lista usuários de qualquer gabinete."""
-    cliente = _cliente_logado(app_teste, engine_teste, administrador)
-    gabinete = cliente.post("/gabinetes", json={"nome": "Gabinete Sintético"})
-    assert gabinete.status_code == 201
-    gabinete_id = gabinete.json()["id"]
-    novo = cliente.post(
-        "/usuarios",
-        json={"nome_usuario": _nome(), "papel": "desembargador", "gabinete_id": gabinete_id},
-    )
-    assert novo.status_code == 201
-    listados = cliente.get("/usuarios", params={"gabinete_id": gabinete_id}).json()
-    assert [u["papel"] for u in listados] == ["desembargador"]
-    assert len(cliente.get("/usuarios").json()) >= 2
-    sem_gabinete = cliente.post("/usuarios", json={"nome_usuario": _nome(), "papel": "assessor"})
-    assert sem_gabinete.status_code == 404
-    assert eventos_do_banco(engine_teste, acao="gabinete_criado", gabinete_id=gabinete_id)
-
-
-def test_desembargador_nao_cria_gabinete(
+def test_desembargador_recebe_a_lista_de_usuarios(
     app_teste: FastAPI, engine_teste: Engine, desembargador: UsuarioTeste
 ) -> None:
-    """Gerir gabinetes é só do administrador."""
+    """RF-ACE-03: o desembargador vê todos os usuários, sem segredos."""
+    assessor = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
     cliente = _cliente_logado(app_teste, engine_teste, desembargador)
-    assert cliente.post("/gabinetes", json={"nome": "Outro"}).status_code == 403
+    resposta = cliente.get("/usuarios")
+    assert resposta.status_code == 200
+    por_id = {u["id"]: u for u in resposta.json()}
+    assert {desembargador.id, assessor.id} <= set(por_id)
+    assert set(por_id[assessor.id]) == {
+        "id",
+        "nome_usuario",
+        "papel",
+        "ativo",
+        "mfa_confirmado",
+        "troca_senha_obrigatoria",
+    }
 
 
 def test_desembargador_reseta_senha_e_mfa_do_assessor(
     app_teste: FastAPI, engine_teste: Engine, desembargador: UsuarioTeste
 ) -> None:
-    """Reset de senha força troca e derruba as sessões; reset de MFA exige novo cadastro."""
-    assessor = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR, desembargador.gabinete_id)
+    """RF-ACE-04: reset de senha força troca e derruba as sessões; reset de MFA exige cadastro."""
+    assessor = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
     sessao_assessor = _cliente_logado(app_teste, engine_teste, assessor)
     cliente = _cliente_logado(app_teste, engine_teste, desembargador)
     reset = cliente.post(f"/usuarios/{assessor.id}/resetar-senha")
     assert reset.status_code == 200
     assert reset.json()["troca_senha_obrigatoria"] is True
-    assert sessao_assessor.get("/processos/" + str(uuid4())).status_code == 401
+    assert sessao_assessor.get("/auth/sessao").status_code == 401
     temporaria = reset.json()["senha_temporaria"]
     login = sessao_assessor.post(
         "/auth/login", json={"nome_usuario": assessor.nome, "senha": temporaria}
@@ -154,39 +142,29 @@ def test_desembargador_reseta_senha_e_mfa_do_assessor(
 def test_desativar_impede_login_e_reativar_devolve_acesso(
     app_teste: FastAPI, engine_teste: Engine, desembargador: UsuarioTeste
 ) -> None:
-    """Desativado não entra; reativado entra; histórico de auditoria permanece."""
-    assessor = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR, desembargador.gabinete_id)
+    """RF-ACE-04: desativado não entra; reativado entra; a auditoria dele continua lá."""
+    assessor = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
+    sessao_assessor = _cliente_logado(app_teste, engine_teste, assessor)
     cliente = _cliente_logado(app_teste, engine_teste, desembargador)
     assert cliente.post(f"/usuarios/{assessor.id}/desativar").json()["ativo"] is False
+    assert sessao_assessor.get("/auth/sessao").status_code == 401
     tentativa = TestClient(app_teste, base_url="https://testserver")
     with pytest.raises(AssertionError):
         logar(tentativa, engine_teste, assessor)
+    assert eventos_do_banco(engine_teste, usuario_id=assessor.id, acao="mfa_ok")
     assert cliente.post(f"/usuarios/{assessor.id}/reativar").json()["ativo"] is True
     logar(tentativa, engine_teste, assessor)
     assert eventos_do_banco(engine_teste, usuario_id=assessor.id, acao="login_falha")
+    acoes = {e.acao for e in eventos_do_banco(engine_teste, objeto_id=assessor.id)}
+    assert {"usuario_desativado", "usuario_reativado"} <= acoes
 
 
-def test_desembargador_nao_enxerga_usuario_de_outro_gabinete(
+def test_ninguem_gere_a_si_mesmo_nem_outro_desembargador(
     app_teste: FastAPI, engine_teste: Engine, desembargador: UsuarioTeste
 ) -> None:
-    """Usuário de outro gabinete é invisível (404) pela RLS; pedir lista de outro dá 403."""
-    outro_gabinete = criar_gabinete_teste(engine_teste)
-    alheio = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR, outro_gabinete)
-    cliente = _cliente_logado(app_teste, engine_teste, desembargador)
-    assert cliente.post(f"/usuarios/{alheio.id}/desativar").status_code == 404
-    lista = cliente.get("/usuarios", params={"gabinete_id": str(outro_gabinete)})
-    assert lista.status_code == 403
-
-
-def test_ninguem_gere_a_si_mesmo_nem_o_administrador(
-    app_teste: FastAPI,
-    engine_teste: Engine,
-    desembargador: UsuarioTeste,
-    administrador: UsuarioTeste,
-) -> None:
-    """Desativar a si mesmo ou o administrador é recusado."""
-    admin = _cliente_logado(app_teste, engine_teste, administrador)
-    assert admin.post(f"/usuarios/{administrador.id}/desativar").status_code == 403
+    """RF-ACE-04: a gestão alcança só assessores; usuário inexistente dá 404."""
+    outro = criar_usuario_teste(engine_teste, PapelUsuario.DESEMBARGADOR)
     cliente = _cliente_logado(app_teste, engine_teste, desembargador)
     assert cliente.post(f"/usuarios/{desembargador.id}/desativar").status_code == 403
-    assert admin.post(f"/usuarios/{desembargador.id}/resetar-senha").status_code == 200
+    assert cliente.post(f"/usuarios/{outro.id}/resetar-senha").status_code == 403
+    assert cliente.post(f"/usuarios/{'0' * 64}/desativar").status_code == 404

@@ -7,6 +7,7 @@ O banco de teste é um database próprio no serviço `db`, migrado até a cabeç
 import os
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -15,15 +16,18 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from pydantic import SecretStr
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Engine, create_engine, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 import lupa_pipeline.migrations
 from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.dominio.cnj import calcular_digito_verificador
-from lupa_pipeline.dominio.enums import TipoFato
+from lupa_pipeline.dominio.enums import PapelUsuario, TipoFato
 from lupa_pipeline.dominio.esquemas import Evidencia, Fato
+from lupa_pipeline.dominio.gravacao import gravar_hub, gravar_satelite
+from lupa_pipeline.dominio.tabelas import hub_usuario, sat_usuario_cadastro, sat_usuario_credencial
+from lupa_pipeline.dominio.visoes import VisaoAuditoria
 
 VARIAVEIS_FICTICIAS = {
     "LUPA_AMBIENTE": "teste",
@@ -197,6 +201,76 @@ def sessao(engine_teste: Engine) -> Iterator[Session]:
 def fabrica_sessao(engine_teste: Engine) -> sessionmaker[Session]:
     """Fábrica de sessões (com commit real) no banco de teste."""
     return sessionmaker(engine_teste, expire_on_commit=False)
+
+
+@dataclass(frozen=True)
+class UsuarioTeste:
+    """Usuário sintético semeado direto no banco.
+
+    Attributes:
+        hk: `hk_usuario`.
+        id: Hex do `hk_usuario` (identificador público, D12).
+        nome: Nome de usuário.
+        papel: Papel.
+        segredo: Segredo TOTP (None se MFA ainda não configurado).
+    """
+
+    hk: bytes
+    id: str
+    nome: str
+    papel: PapelUsuario
+    segredo: str | None
+
+
+def semear_usuario(
+    engine: Engine,
+    papel: PapelUsuario,
+    senha_hash: str,
+    *,
+    segredo: str | None = None,
+    troca_senha: bool = False,
+) -> UsuarioTeste:
+    """Grava, com commit, hub, cadastro e credencial de um usuário sintético ativo.
+
+    Args:
+        engine: Engine do banco de teste.
+        papel: Papel.
+        senha_hash: Hash Argon2 da senha (quem chama escolhe a senha).
+        segredo: Segredo TOTP já confirmado, ou None para MFA por configurar.
+        troca_senha: Se a troca de senha é obrigatória.
+
+    Returns:
+        Dados do usuário criado.
+    """
+    nome = f"{papel.value[:4]}_{uuid4().hex[:10]}"
+    credencial = {
+        "senha_hash": senha_hash,
+        "troca_senha_obrigatoria": troca_senha,
+        "mfa_segredo": segredo,
+        "mfa_confirmado": segredo is not None,
+        "mfa_ultimo_passo": None,
+    }
+    with Session(engine) as session, session.begin():
+        hk = gravar_hub(session, hub_usuario, {"nome_usuario": nome}, "teste")
+        cadastro = {"papel": papel.value, "ativo": True}
+        gravar_satelite(session, sat_usuario_cadastro, hk, cadastro, "teste")
+        gravar_satelite(session, sat_usuario_credencial, hk, credencial, "teste")
+    return UsuarioTeste(hk, hk.hex(), nome, papel, segredo)
+
+
+def eventos_do_banco(engine: Engine, **filtros: Any) -> list[VisaoAuditoria]:
+    """Lê eventos de auditoria direto do banco pela `v_auditoria`, filtrando por igualdade.
+
+    Args:
+        engine: Engine do banco de teste.
+        **filtros: Coluna da view = valor (`usuario_id` é o hex do `hk_usuario`).
+
+    Returns:
+        Eventos em ordem de gravação na cadeia (`sequencia`).
+    """
+    with Session(engine) as session:
+        consulta = select(VisaoAuditoria).filter_by(**filtros)
+        return list(session.scalars(consulta.order_by(VisaoAuditoria.sequencia)))
 
 
 VARIAVEIS_DE_AMBIENTE_ISOLADAS = ("LUPA_DB_USUARIO_APP", "LUPA_DB_SENHA_APP")

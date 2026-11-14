@@ -1,19 +1,18 @@
-"""Matriz de permissões por papel, como dados.
+"""Matriz de permissões por papel, como dados (seção 2 da especificação; RF-ACE-03).
 
-Cada papel mapeia permissões para um escopo: `PROPRIO_GABINETE` ou `TODOS`. Permissão ausente
-significa negada. A verificação fica em `pode`; nenhum outro módulo decide por `if` de papel.
+Há dois papéis e um gabinete só: a permissão vale para todos os processos e usuários. A
+verificação fica em `tem_permissao`; nenhum outro módulo decide por `if` de papel.
 """
 
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Final
-from uuid import UUID
 
 from lupa_pipeline.dominio.enums import PapelUsuario
 
 
 class Permissao(StrEnum):
-    """Ações sujeitas a autorização (linhas da matriz do plano)."""
+    """Ações sujeitas a autorização."""
 
     VER_PROCESSO = "ver_processo"
     SUBIR_PROCESSO = "subir_processo"
@@ -21,53 +20,22 @@ class Permissao(StrEnum):
     VER_AUDITORIA = "ver_auditoria"
     GERIR_ASSESSOR = "gerir_assessor"
     RESETAR_ASSESSOR = "resetar_assessor"
-    GERIR_DESEMBARGADOR = "gerir_desembargador"
-    GERIR_GABINETES = "gerir_gabinetes"
 
 
-class Escopo(StrEnum):
-    """Alcance de uma permissão."""
-
-    PROPRIO_GABINETE = "proprio_gabinete"
-    TODOS = "todos"
-
-
-_ASSESSOR = {
-    Permissao.VER_PROCESSO: Escopo.PROPRIO_GABINETE,
-    Permissao.SUBIR_PROCESSO: Escopo.PROPRIO_GABINETE,
-    Permissao.ANOTAR: Escopo.PROPRIO_GABINETE,
-}
+_ASSESSOR = frozenset({Permissao.VER_PROCESSO, Permissao.SUBIR_PROCESSO, Permissao.ANOTAR})
 _DESEMBARGADOR = _ASSESSOR | {
-    Permissao.VER_AUDITORIA: Escopo.PROPRIO_GABINETE,
-    Permissao.GERIR_ASSESSOR: Escopo.PROPRIO_GABINETE,
-    Permissao.RESETAR_ASSESSOR: Escopo.PROPRIO_GABINETE,
+    Permissao.VER_AUDITORIA,
+    Permissao.GERIR_ASSESSOR,
+    Permissao.RESETAR_ASSESSOR,
 }
-_ADMINISTRADOR = {permissao: Escopo.TODOS for permissao in Permissao}
 
 MATRIZ: Final = MappingProxyType(
-    {
-        PapelUsuario.ASSESSOR: MappingProxyType(_ASSESSOR),
-        PapelUsuario.DESEMBARGADOR: MappingProxyType(_DESEMBARGADOR),
-        PapelUsuario.ADMINISTRADOR: MappingProxyType(_ADMINISTRADOR),
-    }
-)
-
-PERMISSAO_PARA_GERIR = MappingProxyType(
-    {
-        PapelUsuario.ASSESSOR: Permissao.GERIR_ASSESSOR,
-        PapelUsuario.DESEMBARGADOR: Permissao.GERIR_DESEMBARGADOR,
-    }
-)
-PERMISSAO_PARA_RESETAR = MappingProxyType(
-    {
-        PapelUsuario.ASSESSOR: Permissao.RESETAR_ASSESSOR,
-        PapelUsuario.DESEMBARGADOR: Permissao.GERIR_DESEMBARGADOR,
-    }
+    {PapelUsuario.ASSESSOR: _ASSESSOR, PapelUsuario.DESEMBARGADOR: _DESEMBARGADOR}
 )
 
 
 def tem_permissao(papel: PapelUsuario, permissao: Permissao) -> bool:
-    """Diz se o papel tem a permissão em algum escopo.
+    """Diz se o papel tem a permissão.
 
     Args:
         papel: Papel do usuário.
@@ -77,30 +45,3 @@ def tem_permissao(papel: PapelUsuario, permissao: Permissao) -> bool:
         Verdadeiro se a matriz concede a permissão.
     """
     return permissao in MATRIZ[papel]
-
-
-def pode(
-    papel: PapelUsuario,
-    permissao: Permissao,
-    gabinete_usuario: UUID | None,
-    gabinete_alvo: UUID | None,
-) -> bool:
-    """Diz se o papel pode executar a ação sobre um alvo de determinado gabinete.
-
-    Args:
-        papel: Papel do usuário.
-        permissao: Ação desejada.
-        gabinete_usuario: Gabinete do usuário (None para o administrador).
-        gabinete_alvo: Gabinete do objeto da ação.
-
-    Returns:
-        Verdadeiro se a matriz concede a permissão naquele escopo.
-    """
-    escopo = MATRIZ[papel].get(permissao)
-    if escopo is Escopo.TODOS:
-        return True
-    return (
-        escopo is Escopo.PROPRIO_GABINETE
-        and gabinete_usuario is not None
-        and gabinete_usuario == gabinete_alvo
-    )

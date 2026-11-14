@@ -2,16 +2,16 @@
 
 A API e os repositórios leem por estas classes; gravar é só por `dominio.gravacao`. Os metadados
 ficam separados de `dominio.tabelas.metadata`, para o autogenerate não tomar as views por
-tabelas. Colunas cifradas usam o mesmo tipo e rótulo do satélite de origem, e são decifradas na
-leitura. `id` é o hex do `hk` (D12). Qualquer tentativa de gravar uma view levanta
-`VisaoSomenteLeituraError`.
+tabelas. Use `atual` ao reler uma view depois de gravar na mesma transação. Colunas cifradas
+usam o mesmo tipo e rótulo do satélite de origem, e são decifradas na leitura. `id` é o hex do
+`hk` (D12). Qualquer tentativa de gravar uma view levanta `VisaoSomenteLeituraError`.
 """
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, TypeVar
 from uuid import UUID
 
-from sqlalchemy import ARRAY, DateTime, MetaData, Text, event
+from sqlalchemy import ARRAY, DateTime, MetaData, Select, Text, event
 from sqlalchemy.dialects.postgresql import BYTEA, JSONB
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import DeclarativeBase, Mapped, Mapper, mapped_column
@@ -19,6 +19,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Mapper, mapped_column
 from lupa_pipeline.seguranca.tipos import JsonCifrado, TextoCifrado
 
 Instante = DateTime(timezone=True)
+T = TypeVar("T")
 
 
 class VisaoSomenteLeituraError(RuntimeError):
@@ -42,6 +43,21 @@ def _recusar_gravacao(_mapper: Mapper[Any], _conexao: Connection, alvo: Any) -> 
         VisaoSomenteLeituraError: Sempre.
     """
     raise VisaoSomenteLeituraError(type(alvo).__tablename__)
+
+
+def atual(consulta: Select[tuple[T]]) -> Select[tuple[T]]:
+    """Marca a consulta para reler do banco os objetos que a sessão já carregou.
+
+    A view muda quando um satélite ganha linha nova na mesma transação; sem isto, o mapa de
+    identidade da sessão devolveria a linha lida antes.
+
+    Args:
+        consulta: Consulta sobre uma view.
+
+    Returns:
+        A mesma consulta com `populate_existing`.
+    """
+    return consulta.execution_options(populate_existing=True)
 
 
 def _hk() -> Mapped[bytes]:

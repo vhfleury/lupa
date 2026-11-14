@@ -224,13 +224,16 @@ saída.
 4. Desvio: falha ou usuário inativo. Ação: gravar `hub_chave_login` e `sat_chave_login_falha`;
    se as falhas na janela atingem o limite, gravar `sat_chave_login_bloqueio`; evento
    `login_falha`. Saída: 401.
-5. Entrada: usuário. Ação: gravar `hub_desafio_mfa`, `link_desafio_mfa_usuario` e
-   `sat_desafio_mfa_estado` com validade de 5 min. Saída: token do desafio.
+5. Entrada: usuário com senha certa. Ação: se há falhas do nome desde o último zeramento,
+   gravar `sat_chave_login_bloqueio` com `bloqueado_ate` nulo (zera a contagem sem `DELETE`);
+   gravar `hub_desafio_mfa`, `link_desafio_mfa_usuario` e `sat_desafio_mfa_estado` com validade
+   de 5 min. Saída: token do desafio.
 6. Entrada: token e código TOTP. Ação: ler `v_desafio_mfa`; recusar expirado ou consumido;
    verificar o código e que o passo é maior que `mfa_ultimo_passo`. Saída: válido ou 401.
 7. Entrada: código válido. Ação: gravar `sat_desafio_mfa_estado` com `consumido = true`,
    `sat_usuario_credencial` com o passo novo, `hub_sessao`, `link_sessao_usuario` e
-   `sat_sessao_estado`; evento `login`. Saída: cookie de sessão.
+   `sat_sessao_estado`; zerar as falhas como no passo 5; evento `login`. Saída: cookie de
+   sessão.
 8. Requisição autenticada. Entrada: cookie. Ação: ler `v_sessao`; recusar revogada, expirada ou
    inativa há 30 min. Saída: usuário e papel, ou 401.
 9. Entrada: sessão válida. Ação: se `ultimo_acesso_em` tem 60 s ou mais, gravar
@@ -312,10 +315,11 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [x] I: `UPDATE` e `DELETE` em hub, link e satélite são recusados sob `lupa_app` (D6). T3.3.
 - [x] I: `gravar_satelite` não insere com `hash_diff` igual e insere com diferente (A2). T3.3.
 - [x] I: fato sem evidência é recusado no commit (RF-FAT-01). T3.2.
-- [ ] I: login, falha, bloqueio, desafio e sessão (A14; RF-ACE-01, 02).
+- [x] I: login, falha, bloqueio, desafio e sessão (A14; RF-ACE-01, 02). T3.4.
 - [ ] I: assessor recebe 403 em auditoria e usuários; desembargador não (RF-ACE-03).
-- [ ] I: criação, desativação, reativação e redefinição de assessor (RF-ACE-04).
-- [ ] I: `criar_desembargador.py` cria um e não repete (RF-ACE-05).
+  - Usuários feito em T3.4 (`test_usuarios.py`); auditoria fica com T3.11, que monta a rota.
+- [x] I: criação, desativação, reativação e redefinição de assessor (RF-ACE-04). T3.4.
+- [x] I: `criar_desembargador.py` cria um e não repete (RF-ACE-05). T3.4.
 - [ ] I: cadastro recusa CNJ inválido e duplicado; lista igual para dois usuários (RF-PRO-01, 02).
 - [ ] I: responsável não restringe acesso (RF-PRO-03).
 - [ ] I: arquivo com marca de sigilo é aceito (RF-PRO-04).
@@ -324,7 +328,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [ ] I: worker processa a fila sem Redis; segundo worker encerra (A4; RES-07).
 - [ ] I: interrupção depois de parte dos lotes retoma sem duplicar página (RF-ING-07).
 - [ ] I: estado parcial lista as páginas faltantes (RF-ING-06).
-- [ ] I: cadeia de auditoria única; alteração direta no banco é apontada (A15; RF-AUD-03).
+- [x] I: cadeia de auditoria única; alteração direta no banco é apontada (A15; RF-AUD-03). T3.4 (`test_registrador.py`; o registrador foi reescrito em T3.4 porque o login grava eventos).
 - [ ] I: cada ação da lista gera evento, com localização (RF-AUD-01).
 - [ ] I: varredura de eventos e logs não acha texto sintético (RF-AUD-02).
 - [ ] I: relatório de uso com contagens e custo (RF-AUD-05).

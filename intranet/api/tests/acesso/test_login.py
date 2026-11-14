@@ -1,9 +1,9 @@
-"""Testes do login em dois passos, rate limit, sessões e troca de senha (API + PostgreSQL)."""
+"""Login em dois passos, bloqueio, sessões e troca de senha (A14; RF-ACE-01, 02, 04; D11)."""
 
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pyotp
 import pytest
@@ -12,12 +12,14 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from apoio_comum import UsuarioTeste, criar_gabinete_teste, eventos_do_banco
+from apoio_comum import UsuarioTeste, eventos_do_banco
 from lupa_intranet.acesso import servico, sessoes
-from lupa_intranet.acesso.autorizacao import contexto_requisicao, relogio
+from lupa_intranet.acesso.autorizacao import AtorAutenticado, contexto_requisicao, relogio
 from lupa_intranet.acesso.servico import Contexto
 from lupa_pipeline.dominio.enums import PapelUsuario
-from lupa_pipeline.dominio.tabelas import SessaoTabela, UsuarioTabela
+from lupa_pipeline.dominio.gravacao import gravar_satelite
+from lupa_pipeline.dominio.tabelas import sat_sessao_estado, sat_usuario_cadastro
+from lupa_pipeline.dominio.visoes import VisaoSessao, VisaoUsuario
 from tests.conftest import SENHA_TESTE, codigo_totp, criar_usuario_teste, logar, relogio_fixo
 
 pytestmark = pytest.mark.integracao
@@ -30,15 +32,12 @@ def _login(cliente: TestClient, nome: str, senha: str = SENHA_TESTE) -> dict[str
     return {"status": str(resposta.status_code), **resposta.json()}
 
 
-def _sessoes_ativas(engine: Engine, usuario_id: UUID) -> int:
+def _sessoes_ativas(engine: Engine, hk_usuario: bytes) -> int:
     with Session(engine) as session:
-        return len(
-            session.scalars(
-                select(SessaoTabela).where(
-                    SessaoTabela.usuario_id == usuario_id, SessaoTabela.revogada.is_(False)
-                )
-            ).all()
+        consulta = select(VisaoSessao).where(
+            VisaoSessao.hk_usuario == hk_usuario, VisaoSessao.revogada.is_(False)
         )
+        return len(session.scalars(consulta).all())
 
 
 def _codigo_errado(codigo: str) -> str:
@@ -48,27 +47,23 @@ def _codigo_errado(codigo: str) -> str:
 @pytest.fixture
 def assessor(engine_teste: Engine) -> UsuarioTeste:
     """Assessor com MFA configurado."""
-    return criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
+    return criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
 
 
 def test_login_com_senha_certa_e_totp_errado_nao_cria_sessao(
     cliente: TestClient, engine_teste: Engine
 ) -> None:
     """Senha certa só emite desafio; TOTP errado não cria sessão nem cookie."""
-    usuario = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
     assert usuario.segredo is not None
     passo1 = _login(cliente, usuario.nome)
     assert passo1["etapa"] == "mfa"
-    assert _sessoes_ativas(engine_teste, usuario.id) == 0
-    errado = _codigo_errado(codigo_totp(engine_teste, usuario.id, usuario.segredo))
+    assert _sessoes_ativas(engine_teste, usuario.hk) == 0
+    errado = _codigo_errado(codigo_totp(engine_teste, usuario.hk, usuario.segredo))
     resposta = cliente.post("/auth/mfa", json={"desafio": passo1["desafio"], "codigo": errado})
     assert resposta.status_code == 401
     assert sessoes.NOME_COOKIE not in cliente.cookies
-    assert _sessoes_ativas(engine_teste, usuario.id) == 0
+    assert _sessoes_ativas(engine_teste, usuario.hk) == 0
     assert eventos_do_banco(engine_teste, usuario_id=usuario.id, acao="mfa_falha")
 
 
@@ -76,11 +71,9 @@ def test_codigo_totp_reutilizado_dentro_da_janela_e_rejeitado(
     cliente: TestClient, engine_teste: Engine
 ) -> None:
     """O mesmo código aceito uma vez é recusado num segundo login."""
-    usuario = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
     assert usuario.segredo is not None
-    codigo = codigo_totp(engine_teste, usuario.id, usuario.segredo)
+    codigo = codigo_totp(engine_teste, usuario.hk, usuario.segredo)
     with relogio_fixo(cliente.app):
         primeiro = cliente.post(
             "/auth/mfa",
@@ -92,16 +85,14 @@ def test_codigo_totp_reutilizado_dentro_da_janela_e_rejeitado(
             json={"desafio": _login(cliente, usuario.nome)["desafio"], "codigo": codigo},
         )
     assert segundo.status_code == 401
-    assert _sessoes_ativas(engine_teste, usuario.id) == 1
+    assert _sessoes_ativas(engine_teste, usuario.hk) == 1
 
 
 def test_cinco_falhas_bloqueiam_e_geram_evento_login_bloqueado(
     cliente: TestClient, engine_teste: Engine
 ) -> None:
     """Na quinta falha o nome é bloqueado; nem a senha certa entra depois."""
-    usuario = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
     for _ in range(5):
         assert _login(cliente, usuario.nome, "senha-errada-qualquer")["status"] == "401"
     bloqueado = _login(cliente, usuario.nome)
@@ -115,9 +106,7 @@ def test_primeiro_bloqueio_expira_depois_de_um_minuto(
     app_teste: FastAPI, cliente: TestClient, engine_teste: Engine
 ) -> None:
     """O primeiro bloqueio dura 1 minuto; passado esse prazo o login volta a funcionar."""
-    usuario = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
     for _ in range(5):
         _login(cliente, usuario.nome, "senha-errada-qualquer")
     app_teste.dependency_overrides[relogio] = lambda: datetime.now(UTC) + timedelta(seconds=50)
@@ -134,9 +123,7 @@ def test_bloqueio_por_nome_e_progressivo_1_5_15_minutos(
     app_teste: FastAPI, cliente: TestClient, engine_teste: Engine
 ) -> None:
     """5 falhas: 1 min; 10: 5 min; 15: 15 min. Cada bloqueio gera `login_bloqueado`."""
-    usuario = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
     inicio = datetime.now(UTC)
 
     def falhar_cinco(minuto: int) -> None:
@@ -177,9 +164,7 @@ def test_rate_limit_por_ip_recusa_depois_de_20_falhas_e_registra(
     app_teste: FastAPI, cliente: TestClient, engine_teste: Engine
 ) -> None:
     """20 falhas do mesmo IP em 15 min recusam até login certo desse IP; outro IP entra."""
-    usuario = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
     ip = f"203.0.113.{uuid4().int % 250 + 1}"
     app_teste.dependency_overrides[contexto_requisicao] = _contexto_com_ip(ip)
     for _ in range(20):
@@ -211,9 +196,7 @@ def test_usuario_inexistente_e_senha_errada_tem_resposta_identica(
     cliente: TestClient, engine_teste: Engine
 ) -> None:
     """Mesmo status e mesmo corpo; usuário desconhecido também é bloqueado."""
-    usuario = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
     errada = cliente.post(
         "/auth/login", json={"nome_usuario": usuario.nome, "senha": "senha-errada-qualquer"}
     )
@@ -228,13 +211,10 @@ def test_usuario_inexistente_e_senha_errada_tem_resposta_identica(
 
 def test_usuario_desativado_nao_entra(cliente: TestClient, engine_teste: Engine) -> None:
     """Usuário inativo recebe a mesma resposta de senha errada."""
-    usuario = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
     with Session(engine_teste) as session, session.begin():
-        registro = session.get(UsuarioTabela, usuario.id)
-        assert registro is not None
-        registro.ativo = False
+        cadastro = {"papel": usuario.papel.value, "ativo": False}
+        gravar_satelite(session, sat_usuario_cadastro, usuario.hk, cadastro, "teste")
     assert _login(cliente, usuario.nome)["status"] == "401"
 
 
@@ -242,9 +222,7 @@ def test_primeiro_acesso_cadastra_e_confirma_o_autenticador(
     cliente: TestClient, engine_teste: Engine
 ) -> None:
     """Sem MFA, o login devolve segredo e URI; a confirmação com código válido cria a sessão."""
-    usuario = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste), mfa=False
-    )
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR, mfa=False)
     passo1 = _login(cliente, usuario.nome)
     assert passo1["etapa"] == "configurar_mfa"
     assert passo1["uri_qr"].startswith("otpauth://totp/")
@@ -259,8 +237,8 @@ def test_primeiro_acesso_cadastra_e_confirma_o_autenticador(
         )
     assert confirmado.status_code == 200
     with Session(engine_teste) as session:
-        registro = session.get(UsuarioTabela, usuario.id)
-        assert registro is not None and registro.mfa_confirmado
+        consulta = select(VisaoUsuario.mfa_confirmado).where(VisaoUsuario.hk_usuario == usuario.hk)
+        assert session.scalar(consulta) is True
     reuso = cliente.post(
         "/auth/mfa/confirmar", json={"desafio": passo1["desafio"], "codigo": codigo}
     )
@@ -279,7 +257,7 @@ def test_cookie_de_sessao_tem_flags_de_seguranca(
     """HttpOnly, Secure e SameSite=Strict."""
     assert assessor.segredo is not None
     desafio = _login(cliente, assessor.nome)["desafio"]
-    codigo = codigo_totp(engine_teste, assessor.id, assessor.segredo)
+    codigo = codigo_totp(engine_teste, assessor.hk, assessor.segredo)
     with relogio_fixo(cliente.app):
         resposta = cliente.post("/auth/mfa", json={"desafio": desafio, "codigo": codigo})
     cabecalho = resposta.headers["set-cookie"].lower()
@@ -287,21 +265,26 @@ def test_cookie_de_sessao_tem_flags_de_seguranca(
         assert flag in cabecalho
 
 
+def _com_rota_protegida(app: FastAPI) -> str:
+    def _protegida(ator: AtorAutenticado) -> dict[str, str]:
+        return {"usuario_id": ator.usuario_id}
+
+    app.add_api_route("/teste/protegida", _protegida, methods=["GET"])
+    return "/teste/protegida"
+
+
 def test_usuario_com_troca_senha_obrigatoria_so_acessa_rota_de_troca(
-    cliente: TestClient, engine_teste: Engine
+    app_teste: FastAPI, cliente: TestClient, engine_teste: Engine
 ) -> None:
-    """Com troca pendente, tudo devolve 403, exceto `/auth/trocar-senha`."""
-    gabinete = criar_gabinete_teste(engine_teste)
-    usuario = criar_usuario_teste(
-        engine_teste, PapelUsuario.DESEMBARGADOR, gabinete, troca_senha=True
-    )
+    """RF-ACE-04: com troca pendente, tudo devolve 403, exceto `/auth/trocar-senha`.
+
+    Fase 3 (D23): `/auditoria` e `/processos/{id}` voltam à lista quando a aplicação de teste
+    montar essas rotas (T3.14); até lá a rota protegida de teste representa as demais.
+    """
+    protegida = _com_rota_protegida(app_teste)
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.DESEMBARGADOR, troca_senha=True)
     logar(cliente, engine_teste, usuario)
-    for metodo, rota in (
-        ("get", "/usuarios"),
-        ("get", "/auditoria"),
-        ("post", "/auth/logout"),
-        ("get", f"/processos/{gabinete}"),
-    ):
+    for metodo, rota in (("get", "/usuarios"), ("post", "/auth/logout"), ("get", protegida)):
         resposta = cliente.request(metodo, rota)
         assert resposta.status_code == 403, rota
         assert resposta.json()["detail"] == "troca de senha obrigatória"
@@ -314,9 +297,7 @@ def test_usuario_com_troca_senha_obrigatoria_so_acessa_rota_de_troca(
 
 def test_troca_de_senha_revoga_as_demais_sessoes(app_teste: FastAPI, engine_teste: Engine) -> None:
     """A sessão que trocou continua; a outra é revogada."""
-    usuario = criar_usuario_teste(
-        engine_teste, PapelUsuario.DESEMBARGADOR, criar_gabinete_teste(engine_teste)
-    )
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.DESEMBARGADOR)
     primeiro = TestClient(app_teste, base_url="https://testserver")
     segundo = TestClient(app_teste, base_url="https://testserver")
     logar(primeiro, engine_teste, usuario)
@@ -328,7 +309,7 @@ def test_troca_de_senha_revoga_as_demais_sessoes(app_teste: FastAPI, engine_test
     assert troca.status_code == 204
     assert primeiro.get("/usuarios").status_code == 200
     assert segundo.get("/usuarios").status_code == 401
-    assert _sessoes_ativas(engine_teste, usuario.id) == 1
+    assert _sessoes_ativas(engine_teste, usuario.hk) == 1
     assert eventos_do_banco(engine_teste, usuario_id=usuario.id, acao="senha_trocada")
 
 
@@ -348,9 +329,7 @@ def test_troca_de_senha_recusa_senha_atual_errada_e_senha_fraca(
 
 def test_logout_revoga_a_sessao(cliente: TestClient, engine_teste: Engine) -> None:
     """Depois do logout o cookie antigo não vale mais."""
-    usuario = criar_usuario_teste(
-        engine_teste, PapelUsuario.DESEMBARGADOR, criar_gabinete_teste(engine_teste)
-    )
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.DESEMBARGADOR)
     logar(cliente, engine_teste, usuario)
     token = cliente.cookies[sessoes.NOME_COOKIE]
     assert cliente.post("/auth/logout").status_code == 204
@@ -364,9 +343,7 @@ def test_sessao_expira_por_inatividade_e_por_prazo_absoluto(
     app_teste: FastAPI, cliente: TestClient, engine_teste: Engine, minutos: int
 ) -> None:
     """30 minutos sem uso, ou 8 horas desde a criação, encerram a sessão."""
-    usuario = criar_usuario_teste(
-        engine_teste, PapelUsuario.DESEMBARGADOR, criar_gabinete_teste(engine_teste)
-    )
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.DESEMBARGADOR)
     logar(cliente, engine_teste, usuario)
     app_teste.dependency_overrides[relogio] = lambda: datetime.now(UTC) + timedelta(minutes=minutos)
     assert cliente.get("/usuarios").status_code == 401
@@ -375,3 +352,40 @@ def test_sessao_expira_por_inatividade_e_por_prazo_absoluto(
 def test_sem_cookie_nao_autentica(cliente: TestClient) -> None:
     """Rota protegida sem cookie responde 401."""
     assert cliente.get("/usuarios").status_code == 401
+
+
+def _ultimos_acessos(engine: Engine, hk_usuario: bytes) -> list[datetime]:
+    with Session(engine) as session:
+        sessao = session.scalars(
+            select(VisaoSessao).where(VisaoSessao.hk_usuario == hk_usuario)
+        ).one()
+        coluna = sat_sessao_estado.c.ultimo_acesso_em
+        consulta = select(coluna).where(sat_sessao_estado.c.hk_sessao == sessao.hk_sessao)
+        return list(session.scalars(consulta.order_by(sat_sessao_estado.c.load_dts)))
+
+
+def test_ultimo_acesso_so_ganha_linha_nova_depois_de_60_segundos(
+    app_teste: FastAPI, cliente: TestClient, engine_teste: Engine
+) -> None:
+    """D11: uso da sessão a menos de 60 s do último registro não grava estado novo."""
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.DESEMBARGADOR)
+    logar(cliente, engine_teste, usuario)
+    (criado,) = _ultimos_acessos(engine_teste, usuario.hk)
+    for segundos, linhas in ((30, 1), (61, 2), (61 + 29 * 60, 3)):
+        instante = criado + timedelta(seconds=segundos)
+        with relogio_fixo(app_teste, instante):
+            assert cliente.get("/usuarios").status_code == 200, segundos
+        acessos = _ultimos_acessos(engine_teste, usuario.hk)
+        assert (len(acessos), acessos[-1]) == (linhas, criado if linhas == 1 else instante)
+
+
+def test_login_certo_zera_as_falhas_do_nome(cliente: TestClient, engine_teste: Engine) -> None:
+    """RF-ACE-02: as falhas que não chegaram a bloquear somem com um login certo."""
+    usuario = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
+    for _ in range(4):
+        assert _login(cliente, usuario.nome, "senha-errada-qualquer")["status"] == "401"
+    assert _login(cliente, usuario.nome)["status"] == "200"
+    for _ in range(4):
+        assert _login(cliente, usuario.nome, "senha-errada-qualquer")["status"] == "401"
+    assert _login(cliente, usuario.nome)["status"] == "200"
+    assert eventos_do_banco(engine_teste, usuario_id=usuario.id, acao="login_bloqueado") == []

@@ -1,8 +1,9 @@
-"""Tarefas de instalação chamadas pelos scripts: usuário de conexão do banco e administrador.
+"""Tarefas de instalação chamadas pelos scripts: usuário de conexão e primeiro desembargador.
 
 `garantir_usuario_conexao` cria (ou atualiza a senha de) um papel PostgreSQL com LOGIN, sem
-superusuário e sem BYPASSRLS, membro de `lupa_app`. É o usuário que a API usa em produção;
-o dono das tabelas (usuário das migrações) fica restrito às migrações e a estes scripts.
+superusuário, membro de `lupa_app` (só SELECT e INSERT). É o usuário que a API usa; o dono das
+tabelas (usuário das migrações) fica restrito às migrações e a estes scripts.
+`criar_desembargador_inicial` cria o primeiro desembargador (A14, passo 11; RF-ACE-05).
 """
 
 import re
@@ -13,15 +14,15 @@ from psycopg import sql
 from sqlalchemy import Connection, create_engine
 from sqlalchemy.orm import Session
 
-from lupa_intranet.acesso.erros import DadosInvalidosError
-from lupa_intranet.acesso.servico import Contexto, criar_administrador
+from lupa_intranet.acesso.erros import RecusaAcessoError
+from lupa_intranet.acesso.servico import Contexto, criar_desembargador
 from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.sessao import PAPEL_APLICACAO, assumir_papel_aplicacao
 from lupa_pipeline.logging import get_logger
 
 PADRAO_PAPEL = re.compile(r"^[a-z_][a-z0-9_]{2,62}$")
-VARIAVEL_ADMIN_USUARIO = "LUPA_ADMIN_USUARIO"
-VARIAVEL_ADMIN_SENHA = "LUPA_ADMIN_SENHA"  # noqa: S105
+VARIAVEL_USUARIO = "LUPA_DESEMBARGADOR_USUARIO"
+VARIAVEL_SENHA = "LUPA_DESEMBARGADOR_SENHA"
 
 
 def garantir_usuario_conexao(conexao: Connection, nome: str, senha: str) -> None:
@@ -76,10 +77,11 @@ def criar_usuario_banco(settings: Settings) -> int:
     return 0
 
 
-def criar_admin(settings: Settings, ambiente: Mapping[str, str]) -> int:
-    """Cria o único administrador a partir de `LUPA_ADMIN_USUARIO` e `LUPA_ADMIN_SENHA`.
+def criar_desembargador_inicial(settings: Settings, ambiente: Mapping[str, str]) -> int:
+    """Cria o primeiro desembargador a partir de `LUPA_DESEMBARGADOR_USUARIO` e `_SENHA`.
 
-    Não faz nada se já existir administrador. A senha exige troca no primeiro acesso.
+    Não faz nada se já existir desembargador. A senha exige troca no primeiro acesso e o MFA é
+    cadastrado no primeiro login.
 
     Args:
         settings: Configuração da aplicação.
@@ -89,21 +91,21 @@ def criar_admin(settings: Settings, ambiente: Mapping[str, str]) -> int:
         Código de saída (0 criado ou já existente, 2 configuração ausente ou inválida).
     """
     logger = get_logger(__name__)
-    nome, senha = ambiente.get(VARIAVEL_ADMIN_USUARIO), ambiente.get(VARIAVEL_ADMIN_SENHA)
+    nome, senha = ambiente.get(VARIAVEL_USUARIO), ambiente.get(VARIAVEL_SENHA)
     if not nome or not senha:
-        logger.error("admin_sem_configuracao")
+        logger.error("desembargador_sem_configuracao")
         return 2
     engine = create_engine(settings.url_banco_aplicacao())
     try:
         with Session(engine) as session, session.begin():
             assumir_papel_aplicacao(session)
-            criado = criar_administrador(
+            criado = criar_desembargador(
                 session, nome, senha, Contexto(None, None, datetime.now(UTC))
             )
-    except DadosInvalidosError as erro:
-        logger.error("admin_invalido", motivo=erro.mensagem)
+    except RecusaAcessoError as erro:
+        logger.error("desembargador_invalido", motivo=erro.mensagem)
         return 2
     finally:
         engine.dispose()
-    logger.info("admin_criado" if criado else "admin_ja_existe")
+    logger.info("desembargadores_criados", total=int(criado))
     return 0

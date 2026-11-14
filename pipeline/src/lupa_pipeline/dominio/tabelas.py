@@ -651,6 +651,7 @@ sat_chave_login_bloqueio = satelite(
     "hk_chave_login",
     "hub_chave_login",
     _instante("bloqueado_ate", nulo=True),
+    sempre_insere=True,
 )
 
 HUBS = tuple(t for t in metadata.tables.values() if t.info["tipo"] == "hub")

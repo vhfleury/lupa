@@ -6,6 +6,9 @@ confirmada mesmo assim, para que o evento de auditoria da recusa não se perca.
 
 from typing import ClassVar
 
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
 
 class RecusaAcessoError(Exception):
     """Base dos erros esperados; `status` vira o código HTTP e a mensagem vai no `detail`."""
@@ -59,7 +62,7 @@ class NaoEncontradoError(RecusaAcessoError):
 
 
 class ConflitoError(RecusaAcessoError):
-    """Conflito com estado existente (nome de usuário em uso, admin já criado)."""
+    """Conflito com estado existente (nome de usuário em uso)."""
 
     status = 409
 
@@ -68,3 +71,18 @@ class DadosInvalidosError(RecusaAcessoError):
     """Entrada recusada por regra de negócio (senha fraca, papel inválido)."""
 
     status = 422
+
+
+async def tratar_erro_acesso(_request: Request, erro: Exception) -> JSONResponse:
+    """Converte recusas previstas em resposta JSON com o status do erro.
+
+    Args:
+        _request: Requisição (não usada).
+        erro: `RecusaAcessoError` lançado pelo caso de uso.
+
+    Returns:
+        Resposta `{"detail": mensagem}`.
+    """
+    if not isinstance(erro, RecusaAcessoError):
+        raise erro
+    return JSONResponse(status_code=erro.status, content={"detail": erro.mensagem})

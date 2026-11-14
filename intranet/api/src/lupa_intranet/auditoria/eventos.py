@@ -5,14 +5,14 @@ Não existe campo livre; por isso conteúdo dos autos, senhas e perguntas não t
 """
 
 import json
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from lupa_pipeline.dominio.esquemas import EventoAuditoria, calcular_hash
+from lupa_pipeline.dominio.esquemas import calcular_hash
 
 
 class AcaoAuditoria(StrEnum):
@@ -30,7 +30,6 @@ class AcaoAuditoria(StrEnum):
     USUARIO_CRIADO = "usuario_criado"
     USUARIO_DESATIVADO = "usuario_desativado"
     USUARIO_REATIVADO = "usuario_reativado"
-    GABINETE_CRIADO = "gabinete_criado"
     PROCESSO_CRIADO = "processo_criado"
     RESPONSAVEL_ADICIONADO = "responsavel_adicionado"
     RESPONSAVEL_REMOVIDO = "responsavel_removido"
@@ -69,11 +68,10 @@ class NovoEvento(BaseModel):
     Attributes:
         acao: Ação auditada.
         resultado: Desfecho.
-        usuario_id: Quem agiu (None se desconhecido, como em login de usuário inexistente).
-        gabinete_id: Cadeia onde o evento entra (None para a cadeia global).
-        processo_id: Processo envolvido, se houver.
+        hk_usuario: Quem agiu (None se desconhecido, como em login de usuário inexistente).
+        hk_processo: Processo envolvido, se houver.
         objeto_tipo: Tipo do objeto (`usuario`, `pagina`, `fato`...), nunca conteúdo.
-        objeto_id: Identificador do objeto.
+        objeto_id: Identificador do objeto (hex do `hk`, D12).
         ip: IP de origem.
         localizacao: Localização aproximada derivada do IP.
         versao_modelo: Versão do modelo, quando há chamada ao agente.
@@ -84,9 +82,8 @@ class NovoEvento(BaseModel):
 
     acao: AcaoAuditoria
     resultado: ResultadoEvento = ResultadoEvento.OK
-    usuario_id: UUID | None = None
-    gabinete_id: UUID | None = None
-    processo_id: UUID | None = None
+    hk_usuario: bytes | None = None
+    hk_processo: bytes | None = None
     objeto_tipo: str | None = Field(default=None, max_length=40)
     objeto_id: str | None = Field(default=None, max_length=200)
     ip: str | None = Field(default=None, max_length=64)
@@ -96,12 +93,10 @@ class NovoEvento(BaseModel):
 
 
 CAMPOS_CANONICOS = (
-    "id",
     "sequencia",
     "ocorrido_em",
-    "usuario_id",
-    "gabinete_id",
-    "processo_id",
+    "hk_usuario",
+    "hk_processo",
     "acao",
     "objeto_tipo",
     "objeto_id",
@@ -116,12 +111,12 @@ CAMPOS_CANONICOS = (
 def _normalizar(valor: Any) -> Any:
     if isinstance(valor, datetime):
         return valor.astimezone(UTC).isoformat(timespec="microseconds")
-    if isinstance(valor, UUID):
-        return str(valor)
+    if isinstance(valor, bytes):
+        return valor.hex()
     return valor
 
 
-def serializar_canonico(campos: dict[str, Any]) -> str:
+def serializar_canonico(campos: Mapping[str, Any]) -> str:
     """Serializa os campos canônicos em JSON com chaves ordenadas e sem espaços.
 
     Args:
@@ -134,11 +129,11 @@ def serializar_canonico(campos: dict[str, Any]) -> str:
     return json.dumps(dados, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
-def calcular_hash_evento(hash_anterior: str | None, campos: dict[str, Any]) -> str:
-    """Calcula `sha256(hash_anterior + JSON canônico)`.
+def calcular_hash_evento(hash_anterior: str | None, campos: Mapping[str, Any]) -> str:
+    """Calcula `sha256(hash_anterior + JSON canônico)` (A15, passo 4).
 
     Args:
-        hash_anterior: Hash do evento anterior da mesma cadeia, ou None no primeiro.
+        hash_anterior: Hash do evento anterior da cadeia, ou None no primeiro.
         campos: Campos canônicos do evento.
 
     Returns:
@@ -147,13 +142,14 @@ def calcular_hash_evento(hash_anterior: str | None, campos: dict[str, Any]) -> s
     return calcular_hash((hash_anterior or "") + serializar_canonico(campos))
 
 
-def hash_confere(evento: EventoAuditoria) -> bool:
-    """Recalcula o hash do evento e compara com o gravado.
+def hash_confere(campos: Mapping[str, Any]) -> bool:
+    """Recalcula o hash de um evento gravado e compara com o `hash_evento` dele.
 
     Args:
-        evento: Evento lido do banco.
+        campos: Colunas do evento lido do banco (`hash_anterior`, `hash_evento` e as canônicas).
 
     Returns:
         Verdadeiro se o hash gravado corresponde aos campos.
     """
-    return calcular_hash_evento(evento.hash_anterior, evento.model_dump()) == evento.hash_evento
+    gravado: str = campos["hash_evento"]
+    return calcular_hash_evento(campos["hash_anterior"], campos) == gravado

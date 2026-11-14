@@ -152,7 +152,35 @@ a saída resumida (vermelho inicial e verde final).
   - Vermelho (assinaturas vazias): `24 failed, 3 passed` (os 3 são os de `lupa_app` sem UPDATE e
     DELETE, que dependem só das permissões criadas em T3.2). Verde: `27 passed`. `ruff check`,
     `ruff format --check` e `mypy` nos quatro arquivos: ok.
-- [ ] **T3.4** Enum `PapelUsuario` com dois papéis; `acesso/` sobre hubs e satélites; `criar_desembargador.py`. A14. D11. RF-ACE-01 a 05.
+- [x] **T3.4** Enum `PapelUsuario` com dois papéis; `acesso/` sobre hubs e satélites; `criar_desembargador.py`. A14. D11. RF-ACE-01 a 05.
+  - `acesso/{papeis,sessoes,servico,autorizacao,rotas,instalacao}.py` reescritos: dois papéis
+    sem escopo de gabinete; leitura por `v_usuario`, `v_sessao`, `v_desafio_mfa` e
+    `v_bloqueio_login`; gravação por `dominio.gravacao`; `ultimo_acesso_em` só a cada 60 s
+    (D11); falhas e bloqueios em `hub_chave_login` com zeramento por linha nova; a API cria só
+    assessor e a gestão alcança só assessores; ids em hex (D12). `criar_admin.py` virou
+    `intranet/api/scripts/criar_desembargador.py` (`LUPA_DESEMBARGADOR_USUARIO` e `_SENHA`, também
+    em `.env.example`). `tratar_erro_acesso` passou de `api/app.py` para `acesso/erros.py`.
+    `exige_processo` lê `v_processo` pelo id em hex; a abertura da DEK entra em T3.5.
+  - Ajustes fora de `acesso/` necessários ao login: `auditoria/eventos.py` (`NovoEvento` com
+    `hk_usuario` e `hk_processo`, sem `gabinete_id`; sai `GABINETE_CRIADO`) e
+    `auditoria/registrador.py` (cadeia única em `link_evento_auditoria`, A15 passos 2 a 6);
+    `apoio_comum.py` ganhou `UsuarioTeste` (com `hk`), `semear_usuario` e `eventos_do_banco`
+    sobre `v_auditoria`; o `conftest.py` da intranet monta `app_teste` só com as rotas de acesso.
+  - Testes removidos com a funcionalidade: gabinetes, administrador, escopo de gabinete e RLS
+    (`test_usuarios.py`, `test_unidades.py`, `test_banco_acesso.py`) e a lista de gabinetes
+    (`test_sessao_e_gabinetes.py`, renomeado `test_sessao.py`). Testes novos:
+    `test_ultimo_acesso_so_ganha_linha_nova_depois_de_60_segundos`,
+    `test_login_certo_zera_as_falhas_do_nome`, os de gestão por dois papéis, os de
+    `criar_desembargador` e `intranet/api/tests/auditoria/test_registrador.py`.
+  - Comando: `docker compose run --rm --no-deps api python -m pytest -c
+    intranet/api/pyproject.toml intranet/api/tests/acesso
+    intranet/api/tests/auditoria/test_registrador.py --no-cov -q`.
+  - Vermelho: os testes reescritos não importam sobre o código da 0.1 (sem `UsuarioTabela`); com
+    o código novo e seis mutações (sem o intervalo de 60 s, sem zerar falhas, sem a recusa de
+    segundo desembargador, assessor com `GERIR_ASSESSOR`, logout sem revogar, API criando
+    desembargador): `8 failed, 48 passed`; registrador sem conferir hash e sem encadear:
+    `2 failed`. Verde: `56 passed` e `2 passed`. `ruff check`, `ruff format --check` e `mypy`
+    nos arquivos da tarefa: ok.
 - [ ] **T3.5** Cofre com chave única, DEK em `sat_processo_chave`, caminho de objeto novo; cifra dos satélites. D14. RF-SEG-01, RF-SEG-02, RES-08.
 - [ ] **T3.6** Processos: cadastro com classe, lista, responsáveis, sem `materia`, `sigiloso` e 403. D12, D15 (`ClasseProcessual`, `StatusProcesso`). RF-PRO-01 a 04.
 - [ ] **T3.7** Recepção e estado da ingestão em satélites de `hub_arquivo`. A3. D9. RF-ING-01, 02, 06.

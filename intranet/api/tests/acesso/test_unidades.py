@@ -1,14 +1,13 @@
 """Testes unitários de senhas, TOTP e matriz de permissões (sem banco)."""
 
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
 
 import pyotp
 import pytest
 from argon2 import PasswordHasher
 
 from lupa_intranet.acesso import mfa, senhas
-from lupa_intranet.acesso.papeis import MATRIZ, Escopo, Permissao, pode, tem_permissao
+from lupa_intranet.acesso.papeis import MATRIZ, Permissao, tem_permissao
 from lupa_pipeline.dominio.enums import PapelUsuario
 
 AGORA = datetime(2026, 10, 20, 12, 0, 0, tzinfo=UTC)
@@ -92,42 +91,28 @@ def test_provisionamento_traz_uri_otpauth() -> None:
     assert "issuer=Lupa" in dados.uri
 
 
-def test_matriz_segue_a_tabela_do_plano() -> None:
-    """Cada linha da tabela de permissões do plano, por papel."""
+def test_matriz_segue_a_tabela_da_especificacao() -> None:
+    """RF-ACE-03: assessor trabalha nos processos; desembargador também vê auditoria e gere."""
     esperado = {
-        Permissao.VER_PROCESSO: (True, True, True),
-        Permissao.SUBIR_PROCESSO: (True, True, True),
-        Permissao.ANOTAR: (True, True, True),
-        Permissao.VER_AUDITORIA: (False, True, True),
-        Permissao.GERIR_ASSESSOR: (False, True, True),
-        Permissao.RESETAR_ASSESSOR: (False, True, True),
-        Permissao.GERIR_DESEMBARGADOR: (False, False, True),
-        Permissao.GERIR_GABINETES: (False, False, True),
+        Permissao.VER_PROCESSO: (True, True),
+        Permissao.SUBIR_PROCESSO: (True, True),
+        Permissao.ANOTAR: (True, True),
+        Permissao.VER_AUDITORIA: (False, True),
+        Permissao.GERIR_ASSESSOR: (False, True),
+        Permissao.RESETAR_ASSESSOR: (False, True),
     }
-    papeis = (PapelUsuario.ASSESSOR, PapelUsuario.DESEMBARGADOR, PapelUsuario.ADMINISTRADOR)
+    papeis = (PapelUsuario.ASSESSOR, PapelUsuario.DESEMBARGADOR)
     for permissao, linha in esperado.items():
         assert tuple(tem_permissao(p, permissao) for p in papeis) == linha, permissao
-    assert set(MATRIZ[PapelUsuario.ADMINISTRADOR].values()) == {Escopo.TODOS}
+    assert set(esperado) == set(Permissao)
 
 
-def test_escopo_de_gabinete_so_vale_no_proprio() -> None:
-    """Desembargador gere assessores só do próprio gabinete; admin em todos."""
-    proprio, outro = uuid4(), uuid4()
-    gerir = Permissao.GERIR_ASSESSOR
-    assert pode(PapelUsuario.DESEMBARGADOR, gerir, proprio, proprio)
-    assert not pode(PapelUsuario.DESEMBARGADOR, gerir, proprio, outro)
-    assert not pode(PapelUsuario.ASSESSOR, gerir, proprio, proprio)
-    assert pode(PapelUsuario.ADMINISTRADOR, gerir, None, outro)
-    assert not pode(PapelUsuario.DESEMBARGADOR, gerir, None, None)
+def test_so_existem_dois_papeis() -> None:
+    """RF-ACE-03: a matriz tem exatamente assessor e desembargador."""
+    assert set(MATRIZ) == {PapelUsuario.ASSESSOR, PapelUsuario.DESEMBARGADOR}
+    assert set(PapelUsuario) == {PapelUsuario.ASSESSOR, PapelUsuario.DESEMBARGADOR}
 
 
-@pytest.mark.parametrize("permissao", list(Permissao))
-def test_desembargador_nunca_tem_permissao_fora_do_gabinete(permissao: Permissao) -> None:
-    """Toda permissão do desembargador exige um gabinete próprio válido."""
-    proprio, outro = uuid4(), uuid4()
-    papel = PapelUsuario.DESEMBARGADOR
-    assert not pode(papel, permissao, proprio, outro)
-    assert not pode(papel, permissao, proprio, None)
-    assert not pode(papel, permissao, None, outro)
-    assert not pode(papel, permissao, None, None)
-    assert pode(papel, permissao, proprio, proprio) == tem_permissao(papel, permissao)
+def test_desembargador_tem_tudo_o_que_o_assessor_tem() -> None:
+    """RF-ACE-03: o desembargador faz o mesmo que o assessor, mais a gestão."""
+    assert MATRIZ[PapelUsuario.ASSESSOR] < MATRIZ[PapelUsuario.DESEMBARGADOR]

@@ -1,7 +1,6 @@
-"""Endpoints de autenticação, usuários e gabinetes."""
+"""Endpoints de autenticação e de gestão de assessores (RF-ACE-01 a 04)."""
 
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, Field
@@ -11,13 +10,12 @@ from lupa_intranet.acesso.autorizacao import (
     AtorAutenticado,
     ContextoReq,
     SessaoBanco,
-    exige_papel,
     usuario_autenticado_permitindo_troca,
 )
-from lupa_intranet.acesso.papeis import MATRIZ, Permissao
+from lupa_intranet.acesso.papeis import MATRIZ
 from lupa_intranet.acesso.servico import Ator, Contexto
 from lupa_pipeline.dominio.enums import PapelUsuario
-from lupa_pipeline.dominio.tabelas import UsuarioTabela
+from lupa_pipeline.dominio.visoes import VisaoUsuario
 
 router = APIRouter()
 
@@ -44,26 +42,18 @@ class EntradaTrocaSenha(BaseModel):
 
 
 class EntradaUsuario(BaseModel):
-    """Criação de usuário."""
+    """Criação de usuário (só assessor pela API)."""
 
     nome_usuario: str = Field(min_length=1, max_length=64)
-    papel: PapelUsuario
-    gabinete_id: UUID | None = None
-
-
-class EntradaGabinete(BaseModel):
-    """Criação de gabinete."""
-
-    nome: str = Field(min_length=1, max_length=200)
+    papel: PapelUsuario = PapelUsuario.ASSESSOR
 
 
 class SaidaUsuario(BaseModel):
-    """Usuário sem segredos."""
+    """Usuário sem segredos; `id` é o hex do `hk_usuario` (D12)."""
 
-    id: UUID
+    id: str
     nome_usuario: str
     papel: PapelUsuario
-    gabinete_id: UUID | None
     ativo: bool
     mfa_confirmado: bool
     troca_senha_obrigatoria: bool
@@ -75,15 +65,14 @@ class SaidaUsuarioComSenha(SaidaUsuario):
     senha_temporaria: str
 
 
-def _saida(usuario: UsuarioTabela) -> SaidaUsuario:
+def _saida(usuario: VisaoUsuario) -> SaidaUsuario:
     return SaidaUsuario(
         id=usuario.id,
         nome_usuario=usuario.nome_usuario,
-        papel=PapelUsuario(usuario.papel),
-        gabinete_id=usuario.gabinete_id,
-        ativo=usuario.ativo,
-        mfa_confirmado=usuario.mfa_confirmado,
-        troca_senha_obrigatoria=usuario.troca_senha_obrigatoria,
+        papel=PapelUsuario(str(usuario.papel)),
+        ativo=bool(usuario.ativo),
+        mfa_confirmado=bool(usuario.mfa_confirmado),
+        troca_senha_obrigatoria=bool(usuario.troca_senha_obrigatoria),
     )
 
 
@@ -181,10 +170,9 @@ def logout(
 class SaidaSessao(BaseModel):
     """Quem está logado e o que o papel pode fazer (para a interface esconder botões)."""
 
-    usuario_id: UUID
+    usuario_id: str
     nome_usuario: str
     papel: PapelUsuario
-    gabinete_id: UUID | None
     troca_senha_obrigatoria: bool
     permissoes: list[str]
 
@@ -207,7 +195,6 @@ def sessao_atual(
         usuario_id=ator.usuario_id,
         nome_usuario=ator.nome_usuario,
         papel=ator.papel,
-        gabinete_id=ator.gabinete_id,
         troca_senha_obrigatoria=ator.troca_senha_obrigatoria,
         permissoes=sorted(p.value for p in MATRIZ[ator.papel]),
     )
@@ -232,27 +219,24 @@ def trocar_senha(
 
 
 @router.get("/usuarios")
-def listar_usuarios(
-    ator: AtorAutenticado, session: SessaoBanco, gabinete_id: UUID | None = None
-) -> list[SaidaUsuario]:
-    """Lista usuários do gabinete (administrador: de qualquer gabinete ou de todos).
+def listar_usuarios(ator: AtorAutenticado, session: SessaoBanco) -> list[SaidaUsuario]:
+    """Lista os usuários (só desembargador; RF-ACE-03).
 
     Args:
         ator: Usuário autenticado.
         session: Sessão do banco.
-        gabinete_id: Gabinete desejado.
 
     Returns:
         Usuários sem segredos.
     """
-    return [_saida(u) for u in servico.listar_usuarios(session, ator, gabinete_id)]
+    return [_saida(u) for u in servico.listar_usuarios(session, ator)]
 
 
 @router.post("/usuarios", status_code=201)
 def criar_usuario(
     entrada: EntradaUsuario, ator: AtorAutenticado, session: SessaoBanco, ctx: ContextoReq
 ) -> SaidaUsuarioComSenha:
-    """Cria assessor (desembargador ou admin) ou desembargador (admin).
+    """Cria assessor (só desembargador; RF-ACE-04).
 
     Args:
         entrada: Dados do novo usuário.
@@ -263,20 +247,18 @@ def criar_usuario(
     Returns:
         O usuário e a senha temporária.
     """
-    resultado = servico.criar_usuario(
-        session, ator, entrada.nome_usuario, entrada.papel, entrada.gabinete_id, ctx
-    )
+    resultado = servico.criar_usuario(session, ator, entrada.nome_usuario, entrada.papel, ctx)
     return _saida_com_senha(resultado)
 
 
 @router.post("/usuarios/{usuario_id}/desativar")
 def desativar(
-    usuario_id: UUID, ator: AtorAutenticado, session: SessaoBanco, ctx: ContextoReq
+    usuario_id: str, ator: AtorAutenticado, session: SessaoBanco, ctx: ContextoReq
 ) -> SaidaUsuario:
     """Desativa o usuário (não apaga nada) e revoga as sessões dele.
 
     Args:
-        usuario_id: Usuário alvo.
+        usuario_id: Hex do `hk_usuario` do assessor.
         ator: Usuário autenticado.
         session: Sessão do banco.
         ctx: Contexto da requisição.
@@ -289,12 +271,12 @@ def desativar(
 
 @router.post("/usuarios/{usuario_id}/reativar")
 def reativar(
-    usuario_id: UUID, ator: AtorAutenticado, session: SessaoBanco, ctx: ContextoReq
+    usuario_id: str, ator: AtorAutenticado, session: SessaoBanco, ctx: ContextoReq
 ) -> SaidaUsuario:
     """Reativa o usuário.
 
     Args:
-        usuario_id: Usuário alvo.
+        usuario_id: Hex do `hk_usuario` do assessor.
         ator: Usuário autenticado.
         session: Sessão do banco.
         ctx: Contexto da requisição.
@@ -307,12 +289,12 @@ def reativar(
 
 @router.post("/usuarios/{usuario_id}/resetar-senha")
 def resetar_senha(
-    usuario_id: UUID, ator: AtorAutenticado, session: SessaoBanco, ctx: ContextoReq
+    usuario_id: str, ator: AtorAutenticado, session: SessaoBanco, ctx: ContextoReq
 ) -> SaidaUsuarioComSenha:
     """Gera senha temporária com troca obrigatória.
 
     Args:
-        usuario_id: Usuário alvo.
+        usuario_id: Hex do `hk_usuario` do assessor.
         ator: Usuário autenticado.
         session: Sessão do banco.
         ctx: Contexto da requisição.
@@ -325,12 +307,12 @@ def resetar_senha(
 
 @router.post("/usuarios/{usuario_id}/resetar-mfa")
 def resetar_mfa(
-    usuario_id: UUID, ator: AtorAutenticado, session: SessaoBanco, ctx: ContextoReq
+    usuario_id: str, ator: AtorAutenticado, session: SessaoBanco, ctx: ContextoReq
 ) -> SaidaUsuario:
     """Apaga o autenticador do usuário; o próximo login cadastra outro.
 
     Args:
-        usuario_id: Usuário alvo.
+        usuario_id: Hex do `hk_usuario` do assessor.
         ator: Usuário autenticado.
         session: Sessão do banco.
         ctx: Contexto da requisição.
@@ -339,39 +321,3 @@ def resetar_mfa(
         O usuário alterado.
     """
     return _saida(servico.resetar_mfa(session, ator, usuario_id, ctx))
-
-
-@router.post("/gabinetes", status_code=201)
-def criar_gabinete(
-    entrada: EntradaGabinete, ator: AtorAutenticado, session: SessaoBanco, ctx: ContextoReq
-) -> dict[str, object]:
-    """Cria gabinete (só administrador).
-
-    Args:
-        entrada: Nome do gabinete.
-        ator: Usuário autenticado.
-        session: Sessão do banco.
-        ctx: Contexto da requisição.
-
-    Returns:
-        Id e nome do gabinete.
-    """
-    gabinete = servico.criar_gabinete(session, ator, entrada.nome, ctx)
-    return {"id": str(gabinete.id), "nome": gabinete.nome}
-
-
-@router.get("/gabinetes")
-def listar_gabinetes(
-    _ator: Annotated[Ator, Depends(exige_papel(Permissao.GERIR_GABINETES))],
-    session: SessaoBanco,
-) -> list[dict[str, object]]:
-    """Lista os gabinetes (só administrador), para criar desembargadores.
-
-    Args:
-        _ator: Administrador autenticado.
-        session: Sessão do banco.
-
-    Returns:
-        Id e nome de cada gabinete, por nome.
-    """
-    return [{"id": str(g.id), "nome": g.nome} for g in servico.listar_gabinetes(session)]

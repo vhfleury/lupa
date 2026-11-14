@@ -1,10 +1,10 @@
-"""Testes dos pontos herdados da Etapa 1: usuário sem superusuário, login sob RLS, admin, grants."""
+"""Usuário de conexão, papel `lupa_app` e scripts de instalação (RF-ACE-05; RES-13)."""
 
 import os
-import subprocess
-import sys
+import runpy
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import SecretStr
@@ -13,18 +13,16 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from apoio_comum import criar_gabinete_teste, migrar
+from apoio_comum import banco_vazio, migrar
 from lupa_intranet.acesso import instalacao
-from lupa_intranet.acesso.servico import definir_contexto
-from lupa_pipeline.config import Settings
-from lupa_pipeline.dominio.enums import PapelUsuario
+from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao
-from lupa_pipeline.dominio.tabelas import UsuarioTabela
-from tests.conftest import criar_usuario_teste
+from lupa_pipeline.dominio.visoes import VisaoAuditoria, VisaoUsuario
 
 pytestmark = pytest.mark.integracao
 
-SENHA_PAPEL = "senha-do-papel-de-teste"  # noqa: S105
+SENHA_PAPEL = "senha-do-papel-de-teste"
+SENHA_DESEMBARGADOR = "frase-longa-do-desembargador"
 RAIZ = Path(__file__).resolve().parents[2]
 
 
@@ -45,88 +43,33 @@ def papel_conexao(engine_teste: Engine) -> Iterator[Engine]:
 
 
 def test_usuario_de_conexao_nao_e_superusuario_e_assume_lupa_app(papel_conexao: Engine) -> None:
-    """Sem superusuário nem BYPASSRLS, mas membro de `lupa_app`: `SET LOCAL ROLE` funciona."""
+    """RES-13: sem superusuário, mas membro de `lupa_app`: `SET LOCAL ROLE` funciona."""
     with papel_conexao.begin() as conexao:
         atributos = conexao.execute(
-            text("SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user")
+            text("SELECT rolsuper FROM pg_roles WHERE rolname = current_user")
         ).one()
-        assert tuple(atributos) == (False, False)
+        assert tuple(atributos) == (False,)
         conexao.execute(text("SET LOCAL ROLE lupa_app"))
         assert conexao.execute(text("SELECT current_user")).scalar() == "lupa_app"
 
 
-def test_login_sob_rls_localiza_usuario_pela_funcao_e_nao_lista_os_demais(
-    papel_conexao: Engine, engine_teste: Engine
-) -> None:
-    """Sem contexto, nenhuma linha de `usuario` aparece; a função devolve só id/gabinete/papel."""
-    usuario = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
+def test_lupa_app_nao_altera_a_auditoria(papel_conexao: Engine) -> None:
+    """RF-AUD-03, RES-13: `lupa_app` não tem UPDATE em `link_evento_auditoria`."""
     with Session(papel_conexao) as session, session.begin():
         assumir_papel_aplicacao(session)
-        assert session.scalars(select(UsuarioTabela)).all() == []
-        linha = session.execute(
-            text("SELECT * FROM lupa_localizar_usuario(:n)"), {"n": usuario.nome}
-        ).one()
-        assert set(linha._mapping) == {"id", "gabinete_id", "papel"}
-        definir_contexto(session, linha.papel, linha.gabinete_id)
-        assert session.get(UsuarioTabela, usuario.id) is not None
-
-
-def test_politica_do_administrador_libera_todos_os_gabinetes(
-    papel_conexao: Engine, engine_teste: Engine
-) -> None:
-    """Com `lupa.papel = administrador`, usuários de gabinetes distintos aparecem."""
-    a = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste))
-    b = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste))
-    with Session(papel_conexao) as session, session.begin():
-        assumir_papel_aplicacao(session)
-        definir_contexto(session, PapelUsuario.ADMINISTRADOR.value, None)
-        ids = set(session.scalars(select(UsuarioTabela.id)))
-    assert {a.id, b.id} <= ids
-
-
-def test_tabelas_novas_tem_grant_para_lupa_app(engine_teste: Engine) -> None:
-    """Toda tabela do esquema (inclusive as da 0002) tem SELECT para `lupa_app`."""
-    with engine_teste.connect() as conexao:
-        sem_grant = (
-            conexao.execute(
-                text(
-                    "SELECT c.relname FROM pg_class c "
-                    "JOIN pg_namespace n ON n.oid = c.relnamespace "
-                    "WHERE n.nspname = 'public' AND c.relkind = 'r' "
-                    "AND c.relname <> 'alembic_version' "
-                    "AND NOT has_table_privilege('lupa_app', c.oid, 'SELECT')"
-                )
-            )
-            .scalars()
-            .all()
-        )
-        padrao = conexao.execute(
-            text(
-                "SELECT count(*) FROM pg_default_acl, unnest(defaclacl) AS item "
-                "WHERE defaclobjtype = 'r' AND item::text LIKE 'lupa_app=arwd/%'"
-            )
-        ).scalar()
-    assert sem_grant == []
-    assert padrao == 1
+        with pytest.raises(DBAPIError, match="permission denied"):
+            session.execute(text("UPDATE link_evento_auditoria SET resultado = 'x'"))
 
 
 @pytest.fixture
-def banco_vazio(engine_teste: Engine) -> Iterator[Engine]:
-    """Banco recém-migrado só para este teste (sem administradores semeados)."""
-    nome = f"{engine_teste.url.database}_vazio"
-    with engine_teste.connect().execution_options(isolation_level="AUTOCOMMIT") as conexao:
-        conexao.execute(text(f'CREATE DATABASE "{nome}"'))
-    engine = create_engine(engine_teste.url.set(database=nome))
-    migrar(engine, "head")
-    yield engine
-    engine.dispose()
-    with engine_teste.connect().execution_options(isolation_level="AUTOCOMMIT") as conexao:
-        conexao.execute(text(f'DROP DATABASE "{nome}" WITH (FORCE)'))
+def banco_migrado() -> Iterator[Engine]:
+    """Banco recém-migrado só para este teste (sem usuários semeados)."""
+    with banco_vazio("desembargador") as engine:
+        migrar(engine, "head")
+        yield engine
 
 
-def _settings(engine: Engine, **extra: object) -> Settings:
+def _settings(engine: Engine, **extra: Any) -> Settings:
     return Settings(
         ambiente="teste",
         database_url=SecretStr(engine.url.render_as_string(hide_password=False)),
@@ -134,12 +77,12 @@ def _settings(engine: Engine, **extra: object) -> Settings:
         minio_bucket="lupa-autos",
         minio_access_key=SecretStr("x"),
         minio_secret_key=SecretStr("y"),
-        **extra,  # type: ignore[arg-type]
+        **extra,
     )
 
 
 def test_url_da_aplicacao_troca_usuario_quando_configurado(engine_teste: Engine) -> None:
-    """Com usuário e senha da aplicação, a URL muda só nas credenciais."""
+    """RES-13: com usuário e senha da aplicação, a URL muda só nas credenciais."""
     sem = _settings(engine_teste)
     assert sem.url_banco_aplicacao() == sem.database_url.get_secret_value()
     com = _settings(engine_teste, db_usuario_app="lupa_api", db_senha_app=SecretStr("s3"))
@@ -152,7 +95,7 @@ def test_url_da_aplicacao_troca_usuario_quando_configurado(engine_teste: Engine)
 
 
 def test_scripts_de_instalacao(engine_teste: Engine) -> None:
-    """`criar_usuario_banco` e `criar_admin` validam a configuração e são idempotentes."""
+    """RES-13: `criar_usuario_banco` valida a configuração e é idempotente."""
     nome = f"lupa_api_script_{os.getpid()}"
     assert instalacao.criar_usuario_banco(_settings(engine_teste)) == 2
     configurado = _settings(engine_teste, db_usuario_app=nome, db_senha_app=SecretStr("s-123456"))
@@ -165,50 +108,42 @@ def test_scripts_de_instalacao(engine_teste: Engine) -> None:
         conexao.execute(text(f'DROP ROLE "{nome}"'))
 
 
-def test_criar_admin_cria_um_unico_administrador(banco_vazio: Engine) -> None:
-    """Sem variáveis: 2. Senha fraca: 2. Válido: cria; repetir não cria outro."""
-    configuracao = _settings(banco_vazio)
-    assert instalacao.criar_admin(configuracao, {}) == 2
-    fraco = {"LUPA_ADMIN_USUARIO": "adm_fraco", "LUPA_ADMIN_SENHA": "curta"}
-    assert instalacao.criar_admin(configuracao, fraco) == 2
-    nome_ruim = {"LUPA_ADMIN_USUARIO": "Adm Ruim", "LUPA_ADMIN_SENHA": "frase-longa-do-admin"}
-    assert instalacao.criar_admin(configuracao, nome_ruim) == 2
-    for nome in ("adm_principal", "adm_segundo"):
-        valido = {"LUPA_ADMIN_USUARIO": nome, "LUPA_ADMIN_SENHA": "frase-longa-do-admin"}
-        assert instalacao.criar_admin(configuracao, valido) == 0
-    with banco_vazio.connect() as conexao:
-        admins = conexao.execute(
-            text("SELECT nome_usuario, troca_senha_obrigatoria FROM usuario")
-        ).all()
-        eventos = conexao.execute(text("SELECT acao, gabinete_id FROM evento_auditoria")).all()
-    assert [tuple(a) for a in admins] == [("adm_principal", True)]
-    assert [tuple(e) for e in eventos] == [("usuario_criado", None)]
+def _variaveis(nome: str, senha: str = SENHA_DESEMBARGADOR) -> dict[str, str]:
+    return {instalacao.VARIAVEL_USUARIO: nome, instalacao.VARIAVEL_SENHA: senha}
 
 
-def test_script_criar_admin_roda_como_programa(engine_teste: Engine) -> None:
-    """O script lê o ambiente e termina com código 2 sem as variáveis."""
-    ambiente = {
-        k: v for k, v in os.environ.items() if k not in {"LUPA_ADMIN_USUARIO", "LUPA_ADMIN_SENHA"}
-    }
-    ambiente["LUPA_DATABASE_URL"] = engine_teste.url.render_as_string(hide_password=False)
-    ambiente.setdefault(
-        "PYTHONPATH",
-        os.pathsep.join([str(RAIZ / "src"), str(RAIZ.parents[1] / "pipeline" / "src")]),
+def test_criar_desembargador_cria_um_e_nao_repete(banco_migrado: Engine) -> None:
+    """RF-ACE-05: banco sem usuários ganha um desembargador temporário; o segundo não é criado."""
+    configuracao = _settings(banco_migrado)
+    assert instalacao.criar_desembargador_inicial(configuracao, {}) == 2
+    assert (
+        instalacao.criar_desembargador_inicial(configuracao, _variaveis("des.fraco", "curta")) == 2
     )
-    for script in ("criar_admin.py", "criar_usuario_banco.py"):
-        processo = subprocess.run(  # noqa: S603
-            [sys.executable, str(RAIZ / "scripts" / script)],
-            env=ambiente | {"LUPA_DB_USUARIO_APP": ""},
-            capture_output=True,
-            check=False,
-        )
-        assert processo.returncode == 2, processo.stdout
+    assert instalacao.criar_desembargador_inicial(configuracao, _variaveis("Des Ruim")) == 2
+    for nome in ("des.principal", "des.segundo"):
+        assert instalacao.criar_desembargador_inicial(configuracao, _variaveis(nome)) == 0
+    with Session(banco_migrado) as session:
+        usuarios = session.execute(
+            select(
+                VisaoUsuario.nome_usuario, VisaoUsuario.papel, VisaoUsuario.troca_senha_obrigatoria
+            )
+        ).all()
+        eventos = session.execute(select(VisaoAuditoria.acao, VisaoAuditoria.nome_usuario)).all()
+    assert [tuple(u) for u in usuarios] == [("des.principal", "desembargador", True)]
+    assert [tuple(e) for e in eventos] == [("usuario_criado", "des.principal")]
 
 
-def test_lupa_app_nao_altera_auditoria_mesmo_com_contexto_de_admin(papel_conexao: Engine) -> None:
-    """O privilégio de UPDATE em `evento_auditoria` foi revogado de `lupa_app`."""
-    with Session(papel_conexao) as session, session.begin():
-        assumir_papel_aplicacao(session)
-        definir_contexto(session, PapelUsuario.ADMINISTRADOR.value, None)
-        with pytest.raises(DBAPIError, match="permission denied"):
-            session.execute(text("UPDATE evento_auditoria SET resultado = 'x'"))
+@pytest.mark.parametrize("script", ["criar_desembargador.py", "criar_usuario_banco.py"])
+def test_scripts_rodam_como_programa(
+    engine_teste: Engine, monkeypatch: pytest.MonkeyPatch, script: str
+) -> None:
+    """RF-ACE-05: os scripts leem o ambiente e terminam com código 2 sem as variáveis."""
+    for variavel in (instalacao.VARIAVEL_USUARIO, instalacao.VARIAVEL_SENHA):
+        monkeypatch.delenv(variavel, raising=False)
+    monkeypatch.setenv("LUPA_DATABASE_URL", engine_teste.url.render_as_string(hide_password=False))
+    monkeypatch.setenv("LUPA_DB_USUARIO_APP", "")
+    get_settings.cache_clear()
+    with pytest.raises(SystemExit) as saida:
+        runpy.run_path(str(RAIZ / "scripts" / script), run_name="__main__")
+    get_settings.cache_clear()
+    assert saida.value.code == 2

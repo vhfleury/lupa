@@ -1,28 +1,31 @@
-"""Fixtures da intranet (aplicação, login e MFA); as comuns vêm de `pipeline/tests/apoio/`."""
+"""Fixtures da intranet (aplicação, login e MFA); as comuns vêm de `pipeline/tests/apoio/`.
+
+Fase 3 (D23): até as rotas de processos, ingestão, auditoria e agente importarem sobre o Data
+Vault (T3.6 a T3.14), `app_teste` monta só as rotas de acesso, sem `create_app`, e
+`apoio_ingestao` fica fora de `pytest_plugins` (volta em T3.7 a T3.9).
+"""
 
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID, uuid4
 
 import pyotp
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from apoio_comum import UsuarioTeste, criar_gabinete_teste
-from apoio_ingestao import CriarAssessor
+from apoio_comum import UsuarioTeste, semear_usuario
+from lupa_intranet.acesso import rotas as rotas_acesso
 from lupa_intranet.acesso import senhas
 from lupa_intranet.acesso.autorizacao import relogio
-from lupa_intranet.api.app import create_app
-from lupa_pipeline.config import Settings
+from lupa_intranet.acesso.erros import RecusaAcessoError, tratar_erro_acesso
 from lupa_pipeline.dominio.enums import PapelUsuario
-from lupa_pipeline.dominio.tabelas import UsuarioTabela
+from lupa_pipeline.dominio.visoes import VisaoUsuario
 
-pytest_plugins = ["apoio_comum", "apoio_ingestao"]
+pytest_plugins = ["apoio_comum"]
 
 SENHA_TESTE = "cavalo-bateria-grampo-correto"  # noqa: S105
 
@@ -54,15 +57,13 @@ def resolvedor_falso() -> ResolvedorFalso:
 
 
 @pytest.fixture
-def app_teste(
-    settings_ficticias: Settings,
-    fabrica_sessao: sessionmaker[Session],
-    resolvedor_falso: ResolvedorFalso,
-) -> FastAPI:
-    """Aplicação ligada ao banco de teste e ao resolvedor falso."""
-    app = create_app(settings_ficticias)
+def app_teste(fabrica_sessao: sessionmaker[Session], resolvedor_falso: ResolvedorFalso) -> FastAPI:
+    """Aplicação com as rotas de acesso, ligada ao banco de teste e ao resolvedor falso."""
+    app = FastAPI()
     app.state.fabrica_sessao = fabrica_sessao
     app.state.resolvedor = resolvedor_falso
+    app.add_exception_handler(RecusaAcessoError, tratar_erro_acesso)
+    app.include_router(rotas_acesso.router)
     return app
 
 
@@ -75,7 +76,6 @@ def cliente(app_teste: FastAPI) -> TestClient:
 def criar_usuario_teste(
     engine: Engine,
     papel: PapelUsuario,
-    gabinete_id: UUID | None,
     *,
     mfa: bool = True,
     troca_senha: bool = False,
@@ -85,47 +85,21 @@ def criar_usuario_teste(
     Args:
         engine: Engine do banco de teste.
         papel: Papel.
-        gabinete_id: Gabinete (None para administrador).
         mfa: Se o MFA já está confirmado.
         troca_senha: Se a troca de senha é obrigatória.
 
     Returns:
         Dados do usuário criado.
     """
-    usuario_id = uuid4()
     segredo = pyotp.random_base32() if mfa else None
-    nome = f"{papel.value[:4]}_{usuario_id.hex[:10]}"
-    with Session(engine) as session, session.begin():
-        session.add(
-            UsuarioTabela(
-                id=usuario_id,
-                gabinete_id=gabinete_id,
-                nome_usuario=nome,
-                papel=papel.value,
-                senha_hash=senhas.gerar_hash(SENHA_TESTE),
-                mfa_segredo=segredo,
-                mfa_confirmado=mfa,
-                ativo=True,
-                troca_senha_obrigatoria=troca_senha,
-            )
-        )
-    return UsuarioTeste(usuario_id, nome, gabinete_id, papel, segredo)
-
-
-def _assessor_com_login(engine: Engine) -> UsuarioTeste:
-    return criar_usuario_teste(engine, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine))
-
-
-@pytest.fixture(scope="session")
-def criar_assessor() -> CriarAssessor:
-    """Assessor da extração da sessão com senha e MFA, para os testes que fazem login."""
-    return _assessor_com_login
+    hash_senha = senhas.gerar_hash(SENHA_TESTE)
+    return semear_usuario(engine, papel, hash_senha, segredo=segredo, troca_senha=troca_senha)
 
 
 PERIODO_TOTP = 30
 
 
-def codigo_totp_e_instante(engine: Engine, usuario_id: UUID, segredo: str) -> tuple[str, datetime]:
+def codigo_totp_e_instante(engine: Engine, hk_usuario: bytes, segredo: str) -> tuple[str, datetime]:
     """Gera um código TOTP ainda não usado e o instante em que o servidor deve conferi-lo.
 
     Etapa 6.10: o relógio da requisição é injetado (`relogio`), então o passo não pode virar
@@ -134,16 +108,17 @@ def codigo_totp_e_instante(engine: Engine, usuario_id: UUID, segredo: str) -> tu
 
     Args:
         engine: Engine do banco de teste.
-        usuario_id: Usuário.
+        hk_usuario: Usuário.
         segredo: Segredo TOTP.
 
     Returns:
         Código de 6 dígitos e instante (UTC) a injetar na conferência.
     """
     with Session(engine) as session:
-        usuario = session.get(UsuarioTabela, usuario_id)
-        assert usuario is not None
-        ultimo = usuario.mfa_ultimo_passo
+        consulta = select(VisaoUsuario.mfa_ultimo_passo).where(
+            VisaoUsuario.hk_usuario == hk_usuario
+        )
+        ultimo = session.scalar(consulta)
     totp = pyotp.TOTP(segredo)
     agora = datetime.now(UTC)
     atual = totp.timecode(agora)
@@ -154,18 +129,18 @@ def codigo_totp_e_instante(engine: Engine, usuario_id: UUID, segredo: str) -> tu
     return totp.generate_otp(passo), instante
 
 
-def codigo_totp(engine: Engine, usuario_id: UUID, segredo: str) -> str:
+def codigo_totp(engine: Engine, hk_usuario: bytes, segredo: str) -> str:
     """Gera um código TOTP ainda não usado pelo usuário (use com `relogio_fixo`).
 
     Args:
         engine: Engine do banco de teste.
-        usuario_id: Usuário.
+        hk_usuario: Usuário.
         segredo: Segredo TOTP.
 
     Returns:
         Código de 6 dígitos.
     """
-    return codigo_totp_e_instante(engine, usuario_id, segredo)[0]
+    return codigo_totp_e_instante(engine, hk_usuario, segredo)[0]
 
 
 @contextmanager
@@ -207,7 +182,7 @@ def logar(cliente: TestClient, engine: Engine, usuario: UsuarioTeste) -> None:
         "/auth/login", json={"nome_usuario": usuario.nome, "senha": SENHA_TESTE}
     )
     assert resposta.status_code == 200, resposta.text
-    codigo, instante = codigo_totp_e_instante(engine, usuario.id, usuario.segredo)
+    codigo, instante = codigo_totp_e_instante(engine, usuario.hk, usuario.segredo)
     with relogio_fixo(cliente.app, instante):
         resposta = cliente.post(
             "/auth/mfa", json={"desafio": resposta.json()["desafio"], "codigo": codigo}
