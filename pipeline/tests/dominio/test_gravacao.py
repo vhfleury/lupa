@@ -5,7 +5,7 @@ from sqlalchemy import Table, func, select, text
 from sqlalchemy.exc import DBAPIError, IntegrityError, ProgrammingError
 from sqlalchemy.orm import Session
 
-from lupa_pipeline.dominio.chaves import chave_hash, chave_link
+from lupa_pipeline.dominio.chaves import chave_hash, chave_link, hash_diff
 from lupa_pipeline.dominio.gravacao import (
     GravacaoInvalidaError,
     gravar_hub,
@@ -109,6 +109,25 @@ def test_gravar_link_recusa_hub_faltando(sessao: Session) -> None:
 
 def _estado(sessao: Session, hk: bytes, status: str) -> bool:
     return gravar_satelite(sessao, sat_processo_estado, hk, {"status": status}, ORIGEM)
+
+
+def test_estado_mais_novo_continua_vigente_apos_recuo_do_relogio(sessao: Session) -> None:
+    """RF-ING-07, RES-13: uma mudança permanece vigente se o relógio do banco recuar."""
+    hk = _processo(sessao)
+    anterior = {"status": "criado"}
+    sessao.execute(
+        sat_processo_estado.insert().values(
+            hk_processo=hk,
+            **anterior,
+            record_source=ORIGEM,
+            hash_diff=hash_diff(anterior),
+            load_dts=text("clock_timestamp() + interval '1 day'"),
+        )
+    )
+    assert _estado(sessao, hk, "em_ingestao")
+    consulta = select(sat_processo_estado.c.status).where(sat_processo_estado.c.hk_processo == hk)
+    assert sessao.scalar(consulta.order_by(sat_processo_estado.c.load_dts.desc())) == "em_ingestao"
+    assert not _estado(sessao, hk, "em_ingestao")
 
 
 def test_satelite_nao_insere_com_hash_diff_igual(sessao: Session) -> None:

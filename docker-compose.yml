@@ -39,8 +39,6 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
       vault:
         condition: service_healthy
     # Processos sinteticos de referencia (4B.9), so leitura, para as medicoes da Etapa 4C.
@@ -126,13 +124,12 @@ services:
     environment:
       LUPA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       LUPA_MINIO_ENDPOINT: minio:9000
-      LUPA_REDIS_URL: redis://redis:6379/0
       LUPA_VAULT_ENDERECO: http://vault:8200
     # Processos sinteticos de referencia (4B.9), so leitura, para a regressao de injecao.
     volumes:
       - ./.sinteticos:/app/.sinteticos:ro
     healthcheck:
-      test: ["CMD", "python", "-c", "import os,redis; redis.Redis.from_url(os.environ['LUPA_REDIS_URL']).ping()"]
+      test: ["CMD", "python", "-m", "lupa_pipeline.ingestao.worker", "--saude"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -141,24 +138,9 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
       vault:
         condition: service_healthy
     networks: [ingestao]
-    security_opt: ["no-new-privileges:true"]
-
-  # Fila da ingestao. Sem persistencia: o banco e a fonte da verdade e o varredor do worker
-  # reenfileira jobs parados. Sem porta publicada no host.
-  redis:
-    image: redis:7.4-alpine
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    networks: [interna, ingestao]
     security_opt: ["no-new-privileges:true"]
 
   # Cofre de chaves (Etapa 7.2): HashiCorp Vault em modo servidor (storage em arquivo, sem modo

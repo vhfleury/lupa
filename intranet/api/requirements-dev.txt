@@ -575,7 +575,6 @@ click==8.5.0 \
     --hash=sha256:ba0d2089de75ea0310e2dde03160e6ca10009947fb95a182f9b54021bb272e34
     # via
     #   -c intranet/api/requirements.txt
-    #   rq
     #   uvicorn
 coverage==7.16.2 \
     --hash=sha256:00d3eb96e9988c45f50cccd1f1496571ac5c1f91386ac02c4d55516eeda19a24 \
@@ -2156,13 +2155,6 @@ pyyaml==6.0.2 \
     # via
     #   -c intranet/api/requirements.txt
     #   lupa-pipeline (pipeline/pyproject.toml)
-redis==5.2.1 \
-    --hash=sha256:16f2e22dff21d5125e8481515e386711a34cbec50f0e44413dd7d9c060a54e0f \
-    --hash=sha256:ee7e1056b9aea0f04c6c2ed59452947f34c4940ee025f5dd83e6a6418b6989e4
-    # via
-    #   -c intranet/api/requirements.txt
-    #   lupa-pipeline (pipeline/pyproject.toml)
-    #   rq
 referencing==0.37.0 \
     --hash=sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231 \
     --hash=sha256:44aefc3142c5b842538163acb373e24cce6632bd54bdb01b21ad5863489f50d8
@@ -2309,12 +2301,6 @@ rpds-py==2026.9.1 \
     #   -c intranet/api/requirements.txt
     #   jsonschema
     #   referencing
-rq==2.1.0 \
-    --hash=sha256:3c6892c6ca848e5fb47c1875399a66f13656bf0e123bf725d9aa9a12718e2fdf \
-    --hash=sha256:764585b6cab69ef1412f4aee523347e5aa7ece3ca175c118b1d92223dd8c2826
-    # via
-    #   -c intranet/api/requirements.txt
-    #   lupa-pipeline (pipeline/pyproject.toml)
 ruff==0.8.4 \
     --hash=sha256:0d5f89f254836799af1615798caa5f80b7f935d7a670fad66c5007928e57ace8 \
     --hash=sha256:13e9ec6d6b55f6da412d59953d65d66e760d583dd3c1c72bf1f26435b5bfdbae \

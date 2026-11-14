@@ -209,7 +209,7 @@ docs/
 - Toda lógica nova ou alterada tem teste. Exceções admitidas: componente Svelte só de
   apresentação, chamada real ao modelo (marcador `llm`), teste de carga (marcador `carga`) e fluxo
   E2E do Playwright; cada uma entra em "revisão manual" do relatório final.
-- Teste unitário valida o comportamento de função pura, sem rede, banco, Redis, MinIO, Vault nem
+- Teste unitário valida o comportamento de função pura, sem rede, banco, MinIO, Vault nem
   modelo.
 - Teste de integração (marcador `integracao`) valida o fluxo inteiro com os serviços do
   `docker-compose.yml`: PostgreSQL e MinIO reais; modelo, cofre e resolução de nomes por dublês

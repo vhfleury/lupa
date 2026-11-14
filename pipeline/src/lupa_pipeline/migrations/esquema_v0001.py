@@ -136,6 +136,30 @@ def _sat(nome: str, pai: str, alvo: str, *atributos: Any, multiativo: str | None
         *atributos,
         sa.PrimaryKeyConstraint(*chave),
     )
+    parametros = ", ".join(f"'{coluna}'" for coluna in chave[:-1])
+    op.execute(
+        f"CREATE TRIGGER {nome}_ordenar BEFORE INSERT ON {nome} "
+        f"FOR EACH ROW EXECUTE FUNCTION lupa_ordenar_carga({parametros})"
+    )
+
+
+SQL_ORDENAR_CARGA = """
+CREATE FUNCTION lupa_ordenar_carga() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE
+    consulta text;
+    anterior timestamptz;
+BEGIN
+    consulta := format('SELECT load_dts FROM %I.%I WHERE %I = ($1).%I',
+                       TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_ARGV[0], TG_ARGV[0]);
+    IF TG_NARGS = 2 THEN
+        consulta := consulta || format(' AND %I = ($1).%I', TG_ARGV[1], TG_ARGV[1]);
+    END IF;
+    EXECUTE consulta || ' ORDER BY load_dts DESC LIMIT 1' INTO anterior USING NEW;
+    NEW.load_dts := greatest(NEW.load_dts, anterior + interval '1 microsecond');
+    RETURN NEW;
+END $$;
+"""
 
 
 PROCESSO = ("hk_processo", "hub_processo")
@@ -966,6 +990,7 @@ def upgrade() -> None:
     _criar_hubs()
     _criar_links()
     _criar_links_nao_historizados()
+    op.execute(SQL_ORDENAR_CARGA)
     _criar_satelites_acesso()
     _criar_satelites_processo()
     _criar_satelites_arquivo()
@@ -990,6 +1015,7 @@ def downgrade() -> None:
     )
     tabelas = ", ".join(linha[0] for linha in linhas)
     op.execute(f"DROP TABLE {tabelas}")
+    op.execute("DROP FUNCTION lupa_ordenar_carga()")
     op.execute("DROP FUNCTION lupa_fato_exige_evidencia()")
     op.execute("DROP FUNCTION lupa_bloquear_alteracao()")
     op.execute(f"REVOKE USAGE ON SCHEMA public FROM {PAPEL_APLICACAO}")

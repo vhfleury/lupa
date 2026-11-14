@@ -28,8 +28,7 @@ class Settings(BaseSettings):
     geoip_caminho: Path | None = None
     storage_backend: Literal["s3", "memoria"] = "s3"
     storage_regiao: str = "us-east-1"
-    redis_url: SecretStr = SecretStr("redis://redis:6379/0")
-    fila_ingestao: str = "ingestao"
+    fila_intervalo_s: float = Field(default=2.0, gt=0, allow_inf_nan=False)
     upload_limite_bytes: int = Field(default=512 * 1024 * 1024, gt=0)
     ingestao_dir_temporario: Path | None = None
     sandbox_memoria_mb: int = Field(default=1024, ge=64)
@@ -38,7 +37,6 @@ class Settings(BaseSettings):
     zip_max_entradas: int = Field(default=2000, ge=1)
     zip_max_razao: float = Field(default=100.0, gt=1)
     zip_max_descomprimido_bytes: int = Field(default=4 * 1024 * 1024 * 1024, gt=0)
-    lease_segundos: int = Field(default=300, ge=1)
     max_tentativas: int = Field(default=3, ge=1)
     max_retentativas: int = Field(default=2, ge=0)
     extracao_paginas_por_lote: int = Field(default=8, ge=1)

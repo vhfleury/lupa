@@ -300,12 +300,9 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 
 ### Fase 2
 
-- [ ] U: `config` não aceita mais as chaves de Redis, métricas e backup.
-  - Métricas e backup feitos em T2.1 (`test_configuracao_ignora_chaves_de_metricas_e_backup`);
-    as chaves de Redis saem em T3.8, junto com o Redis.
+- [x] U: `config` ignora as chaves removidas de Redis, métricas e backup (T2.1, T3.8).
 - [x] I: `GET /metricas/servico` responde 404 (`test_rotas_de_metricas_nao_existem`, T2.1).
-- [ ] `docker compose config` lista só os serviços de D22.
-  - Depois da fase 2 lista os de D22 mais `redis`, que sai em T3.8.
+- [x] `docker compose --profile e2e config --services` lista os nove serviços de D22 (T3.8).
 
 ### Fase 3
 
@@ -325,7 +322,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [x] I: arquivo com marca de sigilo é aceito (RF-PRO-04, T3.7).
 - [x] I: upload lacra, detecta duplicado e deixa `recebido` (A3; RF-ING-01, T3.7).
 - [ ] I: PDF com senha vai a quarentena (RF-ING-02).
-- [ ] I: worker processa a fila sem Redis; segundo worker encerra (A4; RES-07).
+- [x] I: worker processa a fila sem Redis; segundo worker encerra (A4; RES-07, T3.8).
 - [ ] I: interrupção depois de parte dos lotes retoma sem duplicar página (RF-ING-07).
 - [ ] I: estado parcial lista as páginas faltantes (RF-ING-06).
 - [x] I: cadeia de auditoria única; alteração direta no banco é apontada (A15; RF-AUD-03). T3.4 (`test_registrador.py`; o registrador foi reescrito em T3.4 porque o login grava eventos).

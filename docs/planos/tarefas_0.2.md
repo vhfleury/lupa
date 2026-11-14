@@ -305,7 +305,17 @@ a saída resumida (vermelho inicial e verde final).
     `python -m pytest -c intranet/api/pyproject.toml intranet/api/tests/ingestao/test_rotas.py
     --no-cov -q` passou em 9 casos, inclusive rollback se a auditoria falhar. As regressões de
     cadastro e listagem passaram em 19 casos. O teste da trava em duas conexões passou.
-- [ ] **T3.8** Worker sem Redis e RQ; remoção de `fila.py`, `redis` e `rq`. A4. D10. RF-ING-07, RES-07.
+- [x] **T3.8** Worker sem Redis e RQ; remoção de `fila.py`, `redis` e `rq`. A4. D10. RF-ING-07, RES-07.
+  - O worker mantém o advisory lock na mesma conexão usada por A5 e confirma a tentativa antes
+    de processar. O segundo worker sai com código 1. Os quatro arquivos de dependências foram
+    regenerados com `uv`. O Compose com o perfil `e2e` lista os nove serviços de D22.
+  - O teste de recuo do relógio reproduziu um arquivo recebido que voltava à frente da fila
+    mesmo depois do processamento. A revisão inicial ordena o instante de carga no PostgreSQL
+    por pai e subchave quando o relógio recua.
+  - Na imagem worker, `python -m pytest -c pipeline/pyproject.toml --no-cov -q
+    pipeline/tests/ingestao/test_fila_banco.py pipeline/tests/dominio/test_gravacao.py
+    pipeline/tests/dominio/test_migracao_0001.py pipeline/tests/unit/test_config.py`.
+    Vermelho em quatro testes de configuração, dois da fila e um de ordenação. Verde em 46 casos.
 - [ ] **T3.9** Páginas, diagnóstico, lotes e peças em satélites (conteúdo jurídico ainda da 0.1). A5 passos 1 a 7. RF-ING-03.
 - [ ] **T3.10** Evidências, fatos, achados e anotações em hubs, links e satélites; remoção de `reu`, `reu_identidade` e da pseudonimização. A5 passos 8 a 11, A11, A12. RF-FAT-01, RF-FAT-03, RF-PEC-02, RF-DOS-06.
 - [ ] **T3.11** Auditoria como link não historizado, cadeia única, consulta, relatório de uso com custo. A15. D8, D26. RF-AUD-01 a 05.

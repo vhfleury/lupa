@@ -23,7 +23,6 @@ from lupa_intranet.api.rotas import revisao as rotas_revisao
 from lupa_intranet.auditoria import rotas as rotas_auditoria
 from lupa_intranet.auditoria.geoip import criar_resolvedor
 from lupa_pipeline.config import Settings, get_settings
-from lupa_pipeline.ingestao.fila import criar_fila
 from lupa_pipeline.ingestao.storage import criar_storage
 from lupa_pipeline.logging import configurar_logging, get_logger
 
@@ -48,7 +47,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.resolvedor = criar_resolvedor(configuracao)
     configurar_cifra(app, configuracao)
     app.state.storage = criar_storage(configuracao)
-    app.state.fila = criar_fila(configuracao)
     app.state.cliente_agente = criar_cliente(configuracao)
     app.add_exception_handler(RecusaAcessoError, tratar_erro_acesso)
     app.middleware("http")(auditoria_middleware)

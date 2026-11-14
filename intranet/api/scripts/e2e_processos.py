@@ -38,7 +38,6 @@ from lupa_pipeline.dominio.cnj import calcular_digito_verificador
 from lupa_pipeline.dominio.enums import Materia, PapelUsuario, StatusProcesso
 from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao
 from lupa_pipeline.dominio.tabelas import ProcessoTabela, UsuarioTabela
-from lupa_pipeline.ingestao.fila import criar_fila
 from lupa_pipeline.ingestao.recepcao import ArquivoRecebido, TipoArquivo, lacrar
 from lupa_pipeline.ingestao.storage import criar_storage
 from lupa_pipeline.sinteticos.empacotamento import exportar
@@ -119,14 +118,13 @@ def preparar() -> tuple[str, str, str]:
                 recebido = ArquivoRecebido(
                     caminho, hashlib.sha256(dados).hexdigest(), len(dados), TipoArquivo.PDF
                 )
-                lacre = lacrar(
+                lacrar(
                     session, storage, recebido, gabinete_id=gabinete_id, processo_id=processo.id,
                     enviado_por=assessor_id, nome_original="autos-sinteticos.pdf",
                 )  # fmt: skip
             processo_id = processo.id
     finally:
         engine.dispose()
-    criar_fila(settings).enfileirar(lacre.job_id, gabinete_id)
     return nome, senha, str(processo_id)
 
 
