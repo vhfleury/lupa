@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from apoio_comum import eventos_do_banco
@@ -13,7 +13,7 @@ from lupa_intranet.agente.cliente import ClienteFalso, Roteiro, resposta_json
 from lupa_intranet.agente.revisao import MSG_EM_REVISAO
 from lupa_intranet.auditoria.eventos import AcaoAuditoria
 from lupa_pipeline.dominio.enums import PapelUsuario, StatusProcesso
-from lupa_pipeline.dominio.tabelas import ProcessoTabela, RevisaoProcessoTabela
+from lupa_pipeline.dominio.visoes import VisaoProcesso
 from tests.agente.conftest import ProcessoAgente, semear_processo_agente
 from tests.conftest import criar_usuario_teste, logar
 
@@ -36,8 +36,8 @@ def _http(app: FastAPI, engine: Engine, usuario: Any) -> TestClient:
 
 def _status(engine: Engine, processo: ProcessoAgente) -> str:
     with Session(engine) as session:
-        linha = session.get(ProcessoTabela, processo.processo_id)
-        assert linha is not None
+        linha = session.get(VisaoProcesso, bytes.fromhex(processo.processo_id))
+        assert linha is not None and linha.status is not None
         return linha.status
 
 
@@ -65,18 +65,18 @@ def test_resposta_bloqueada_poe_o_processo_em_revisao_visivel(
     ficha = assessor.get(f"/processos/{processo.processo_id}/dossie").json()["ficha"]
     assert ficha["em_revisao"] is True and ficha["aviso_revisao"] == MSG_EM_REVISAO
     with Session(engine_teste) as session:
-        revisao = session.scalars(
-            select(RevisaoProcessoTabela).where(
-                RevisaoProcessoTabela.processo_id == processo.processo_id
-            )
-        ).one()
-        assert revisao.status_anterior == anterior and revisao.liberada_em is None
+        revisao = session.get(VisaoProcesso, bytes.fromhex(processo.processo_id))
+        assert (
+            revisao is not None
+            and revisao.em_revisao
+            and revisao.status_anterior_revisao == anterior
+        )
     eventos = eventos_do_banco(
         engine_teste,
         acao=AcaoAuditoria.PROCESSO_EM_REVISAO.value,
         processo_id=processo.processo_id,
     )
-    assert [e.objeto_id for e in eventos] == ["instrucao_refletida"]
+    assert [e.objeto_id for e in eventos] == [processo.processo_id]
 
 
 def test_em_revisao_o_chat_recusa_sem_chamar_o_modelo_e_o_dossie_nao_resume(
@@ -98,14 +98,12 @@ def test_em_revisao_o_chat_recusa_sem_chamar_o_modelo_e_o_dossie_nao_resume(
 def test_assessor_nao_libera_e_desembargador_libera_com_auditoria(
     app_teste: FastAPI, engine_teste: Engine, processo: ProcessoAgente
 ) -> None:
-    """Só desembargador (ou admin) libera; a liberação volta o status anterior e é auditada."""
+    """Só o desembargador libera; a liberação volta o status anterior e é auditada."""
     anterior = _status(engine_teste, processo)
     assessor = _incidente(app_teste, engine_teste, processo)
     rota = f"/processos/{processo.processo_id}/liberar-revisao"
     assert assessor.post(rota).status_code == 403
-    desembargador = criar_usuario_teste(
-        engine_teste, PapelUsuario.DESEMBARGADOR, processo.gabinete_id
-    )
+    desembargador = criar_usuario_teste(engine_teste, PapelUsuario.DESEMBARGADOR)
     cliente = _http(app_teste, engine_teste, desembargador)
     resposta = cliente.post(rota)
     assert resposta.status_code == 200, resposta.text
@@ -118,20 +116,6 @@ def test_assessor_nao_libera_e_desembargador_libera_com_auditoria(
         processo_id=processo.processo_id,
     )
     assert [e.usuario_id for e in eventos] == [desembargador.id]
-
-
-def test_desembargador_de_outro_gabinete_e_admin(
-    app_teste: FastAPI, engine_teste: Engine, processo: ProcessoAgente
-) -> None:
-    """Desembargador de outro gabinete recebe 404; o administrador libera qualquer gabinete."""
-    _incidente(app_teste, engine_teste, processo)
-    rota = f"/processos/{processo.processo_id}/liberar-revisao"
-    estranho = criar_usuario_teste(
-        engine_teste, PapelUsuario.DESEMBARGADOR, processo.outro_assessor.gabinete_id
-    )
-    assert _http(app_teste, engine_teste, estranho).post(rota).status_code == 404
-    admin = criar_usuario_teste(engine_teste, PapelUsuario.ADMINISTRADOR, None)
-    assert _http(app_teste, engine_teste, admin).post(rota).status_code == 200
 
 
 def test_identificador_de_outro_processo_tambem_abre_revisao(

@@ -23,8 +23,11 @@ from lupa_intranet.acesso import senhas
 from lupa_intranet.acesso.autorizacao import relogio
 from lupa_intranet.acesso.erros import RecusaAcessoError, tratar_erro_acesso
 from lupa_intranet.api.middleware import auditoria_middleware
+from lupa_intranet.api.rotas import chat as rotas_chat
 from lupa_intranet.api.rotas import descarte as rotas_descarte
+from lupa_intranet.api.rotas import dossie as rotas_dossie
 from lupa_intranet.api.rotas import processos as rotas_processos
+from lupa_intranet.api.rotas import revisao as rotas_revisao
 from lupa_intranet.auditoria import rotas as rotas_auditoria
 from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.dominio.visoes import VisaoUsuario
@@ -72,6 +75,9 @@ def app_teste(fabrica_sessao: sessionmaker[Session], resolvedor_falso: Resolvedo
     app.include_router(rotas_processos.router)
     app.include_router(rotas_auditoria.router)
     app.include_router(rotas_descarte.router)
+    app.include_router(rotas_chat.router)
+    app.include_router(rotas_revisao.router)
+    app.include_router(rotas_dossie.router)
     return app
 
 

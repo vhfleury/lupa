@@ -1,253 +1,232 @@
-"""Persistência do chat: conversa, mensagem e chamada ao modelo (migração 0007)."""
+"""Histórico de conversas do usuário e metadados das chamadas ao modelo no Data Vault."""
 
 import re
-from datetime import UTC, datetime
+from dataclasses import asdict, dataclass
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from lupa_pipeline.dominio.enums import PapelMensagem, ResultadoChamada, StatusMensagem
+from lupa_pipeline.dominio.chaves import chave_hash
+from lupa_pipeline.dominio.enums import PapelMensagem, StatusMensagem
+from lupa_pipeline.dominio.gravacao import gravar_hub, gravar_link, gravar_satelite
 from lupa_pipeline.dominio.tabelas import (
-    AchadoTabela,
-    ArquivoTabela,
-    ChamadaModeloTabela,
-    ConversaTabela,
-    EvidenciaTabela,
-    FatoTabela,
-    MensagemTabela,
-    PaginaTabela,
-    PecaTabela,
+    hub_conversa,
+    link_chamada_modelo,
+    link_processo_conversa,
+    sat_conversa_estado,
+    sat_conversa_mensagem,
 )
+from lupa_pipeline.dominio.visoes import (
+    VisaoAchado,
+    VisaoArquivo,
+    VisaoAuditoria,
+    VisaoConversa,
+    VisaoEvidencia,
+    VisaoFato,
+    VisaoMensagem,
+    VisaoPagina,
+    VisaoParte,
+    VisaoPeca,
+)
+from lupa_pipeline.seguranca.tipos import cifrar_valor, decifrar_valor
+
+ORIGEM = "intranet.agente"
+ROTULO_TRECHO = "sat_conversa_mensagem.citacoes.trecho"
 
 
-def conversa_aberta(
-    session: Session, gabinete_id: UUID, processo_id: UUID, usuario_id: UUID
-) -> ConversaTabela:
-    """Conversa aberta do usuário no processo; cria uma se não houver.
+@dataclass
+class EstadoConversa:
+    """Contadores correntes que serão gravados em uma nova versão do satélite."""
 
-    Args:
-        session: Sessão (RLS do gabinete).
-        gabinete_id: Gabinete do processo.
-        processo_id: Processo.
-        usuario_id: Usuário.
+    encerrada: bool = False
+    motivo_encerramento: str | None = None
+    tokens_entrada: int = 0
+    tokens_saida: int = 0
+    paginas_originais: int = 0
+    citacoes_descartadas: int = 0
 
-    Returns:
-        Conversa não encerrada.
-    """
+
+@dataclass
+class Conversa:
+    """Conversa do processo e do usuário autenticado, sob a trava do processo."""
+
+    hk: bytes
+    estado: EstadoConversa
+
+
+def conversa_do_usuario(session: Session, hk_processo: bytes, hk_usuario: bytes) -> Conversa:
+    """Abre a conversa mais recente, inclusive quando já atingiu o teto, ou cria a primeira."""
     consulta = (
-        select(ConversaTabela)
+        select(VisaoConversa)
         .where(
-            ConversaTabela.processo_id == processo_id,
-            ConversaTabela.usuario_id == usuario_id,
-            ConversaTabela.encerrada.is_(False),
+            VisaoConversa.hk_processo == hk_processo,
+            VisaoConversa.hk_usuario == hk_usuario,
         )
-        .order_by(ConversaTabela.criada_em.desc())
+        .order_by(VisaoConversa.criada_em.desc(), VisaoConversa.id)
         .limit(1)
     )
-    conversa = session.scalar(consulta)
-    if conversa is None:
-        conversa = ConversaTabela(
-            id=uuid4(),
-            gabinete_id=gabinete_id,
-            processo_id=processo_id,
-            usuario_id=usuario_id,
-            encerrada=False,
-            tokens_entrada=0,
-            tokens_saida=0,
-            paginas_originais=0,
-            citacoes_descartadas=0,
+    linha = session.scalar(consulta)
+    if linha is not None:
+        return Conversa(
+            linha.hk_conversa,
+            EstadoConversa(
+                bool(linha.encerrada),
+                linha.motivo_encerramento,
+                linha.tokens_entrada or 0,
+                linha.tokens_saida or 0,
+                linha.paginas_originais or 0,
+                linha.citacoes_descartadas or 0,
+            ),
         )
-        session.add(conversa)
-        session.flush()
+    hk = gravar_hub(session, hub_conversa, {"conversa_id": uuid4()}, ORIGEM)
+    gravar_link(
+        session,
+        link_processo_conversa,
+        {
+            "hk_processo": hk_processo,
+            "hk_conversa": hk,
+            "hk_usuario": hk_usuario,
+        },
+        ORIGEM,
+    )
+    conversa = Conversa(hk, EstadoConversa())
+    gravar_estado(session, conversa)
     return conversa
 
 
-def tokens_do_processo(session: Session, processo_id: UUID) -> int:
-    """Tokens (entrada + saída) já gastos em todas as conversas do processo.
+def gravar_estado(session: Session, conversa: Conversa) -> None:
+    """Insere o estado da conversa quando algum contador ou indicador mudou."""
+    gravar_satelite(session, sat_conversa_estado, conversa.hk, asdict(conversa.estado), ORIGEM)
 
-    Args:
-        session: Sessão.
-        processo_id: Processo.
 
-    Returns:
-        Total.
-    """
-    consulta = select(
-        func.coalesce(func.sum(ConversaTabela.tokens_entrada + ConversaTabela.tokens_saida), 0)
-    ).where(ConversaTabela.processo_id == processo_id)
+def tokens_do_processo(session: Session, hk_processo: bytes) -> int:
+    """Soma tokens de todas as chamadas auditadas do processo, inclusive dos resumos."""
+    consulta = select(func.sum(VisaoAuditoria.tokens_entrada + VisaoAuditoria.tokens_saida)).where(
+        VisaoAuditoria.hk_processo == hk_processo, VisaoAuditoria.acao == "chamada_modelo"
+    )
     return int(session.scalar(consulta) or 0)
+
+
+def id_mensagem(mensagem: VisaoMensagem) -> str:
+    """Identificador público derivado da chave do satélite multiativo, para auditoria e API."""
+    return chave_hash([mensagem.hk_conversa, mensagem.sequencia]).hex()
 
 
 def gravar_mensagem(
     session: Session,
-    conversa: ConversaTabela,
+    conversa: Conversa,
     papel: PapelMensagem,
     status: StatusMensagem,
     texto: str,
     citacoes: list[dict[str, Any]] | None = None,
     avisos: list[str] | None = None,
-) -> MensagemTabela:
-    """Grava uma mensagem.
-
-    Args:
-        session: Sessão.
-        conversa: Conversa.
-        papel: Usuário ou agente.
-        status: Desfecho.
-        texto: Texto.
-        citacoes: Citações conferidas.
-        avisos: Avisos mostrados com a mensagem.
-
-    Returns:
-        Mensagem gravada.
-    """
-    mensagem = MensagemTabela(
-        id=uuid4(),
-        gabinete_id=conversa.gabinete_id,
-        conversa_id=conversa.id,
-        papel=papel.value,
-        status=status.value,
-        texto=texto,
-        citacoes=citacoes or [],
-        avisos=avisos or [],
-        criado_em=datetime.now(UTC),
+) -> VisaoMensagem:
+    """Acrescenta mensagem com sequência crescente e cifra cada trecho de autos nas citações."""
+    ultima = session.scalar(
+        select(func.max(VisaoMensagem.sequencia)).where(VisaoMensagem.hk_conversa == conversa.hk)
     )
-    session.add(mensagem)
-    session.flush()
-    return mensagem
+    sequencia = (ultima or 0) + 1
+    referencias = [c | {"trecho": cifrar_valor(ROTULO_TRECHO, c["trecho"])} for c in citacoes or []]
+    dados = {
+        "sequencia": sequencia,
+        "papel": papel.value,
+        "status": status.value,
+        "texto": texto,
+        "citacoes": referencias,
+        "avisos": avisos or [],
+    }
+    gravar_satelite(session, sat_conversa_mensagem, conversa.hk, dados, ORIGEM)
+    return session.scalars(
+        select(VisaoMensagem).where(
+            VisaoMensagem.hk_conversa == conversa.hk,
+            VisaoMensagem.sequencia == sequencia,
+        )
+    ).one()
 
 
-def gravar_chamada(session: Session, **campos: Any) -> ChamadaModeloTabela:
-    """Grava os metadados de uma chamada ao modelo (sem conteúdo).
-
-    Args:
-        session: Sessão.
-        **campos: Colunas de `chamada_modelo` (sem `id`).
-
-    Returns:
-        Linha gravada.
-    """
-    resultado = campos.pop("resultado")
-    chamada = ChamadaModeloTabela(id=uuid4(), resultado=ResultadoChamada(resultado).value, **campos)
-    session.add(chamada)
-    session.flush()
-    return chamada
+def gravar_chamada(session: Session, **campos: Any) -> bytes:
+    """Grava chamada não historizada, com identificador único até para tentativas idênticas."""
+    hk = chave_hash([campos["hk_processo"], uuid4()])
+    session.execute(
+        link_chamada_modelo.insert().values(hk_chamada=hk, record_source=ORIGEM, **campos)
+    )
+    return hk
 
 
-def ids_do_processo(session: Session, processo_id: UUID) -> set[str]:
-    """Todos os UUIDs que pertencem ao processo (para detectar identificador estranho).
-
-    Args:
-        session: Sessão.
-        processo_id: Processo.
-
-    Returns:
-        Ids em minúsculas: processo, arquivos, páginas, peças, evidências, fatos, achados.
-    """
-    arquivos = select(ArquivoTabela.id).where(ArquivoTabela.processo_id == processo_id)
-    paginas = select(PaginaTabela.id).where(PaginaTabela.arquivo_id.in_(arquivos))
-    consultas = [
-        arquivos,
-        paginas,
-        select(PecaTabela.id).where(PecaTabela.arquivo_id.in_(arquivos)),
-        select(EvidenciaTabela.id).where(EvidenciaTabela.pagina_id.in_(paginas)),
-        select(FatoTabela.id).where(FatoTabela.processo_id == processo_id),
-        select(AchadoTabela.id).where(AchadoTabela.processo_id == processo_id),
-    ]
-    ids = {str(processo_id)}
-    for consulta in consultas:
-        ids.update(str(i) for i in session.scalars(consulta))
+def ids_do_processo(session: Session, hk_processo: bytes) -> set[str]:
+    """Identificadores do próprio processo que podem aparecer no texto da resposta."""
+    ids = {hk_processo.hex()}
+    for view in (
+        VisaoArquivo,
+        VisaoPagina,
+        VisaoPeca,
+        VisaoEvidencia,
+        VisaoFato,
+        VisaoAchado,
+        VisaoParte,
+    ):
+        ids.update(session.scalars(select(view.id).where(view.hk_processo == hk_processo)))
     return ids
 
 
 def paginas_citadas(
-    session: Session, processo_id: UUID, ids: list[UUID]
-) -> dict[UUID, tuple[str, str | None]]:
-    """Texto gravado das páginas citadas que pertencem ao processo.
-
-    Args:
-        session: Sessão.
-        processo_id: Processo.
-        ids: Páginas citadas pelo modelo.
-
-    Returns:
-        `{pagina_id: (texto, texto_normalizado)}`; páginas de fora ficam de fora.
-    """
+    session: Session, hk_processo: bytes, ids: list[str]
+) -> dict[str, tuple[str, str | None]]:
+    """Textos de conferência das páginas solicitadas e pertencentes ao processo."""
     if not ids:
         return {}
-    consulta = (
-        select(PaginaTabela.id, PaginaTabela.texto, PaginaTabela.texto_normalizado)
-        .join(ArquivoTabela, ArquivoTabela.id == PaginaTabela.arquivo_id)
-        .where(ArquivoTabela.processo_id == processo_id, PaginaTabela.id.in_(ids))
+    consulta = select(VisaoPagina.id, VisaoPagina.texto, VisaoPagina.texto_normalizado).where(
+        VisaoPagina.hk_processo == hk_processo,
+        VisaoPagina.id.in_(ids),
     )
-    return {linha[0]: (linha[1], linha[2]) for linha in session.execute(consulta)}
+    return {
+        i: (texto, saneado) for i, texto, saneado in session.execute(consulta) if texto is not None
+    }
 
 
-def historico(session: Session, processo_id: UUID, usuario_id: UUID) -> list[dict[str, Any]]:
-    """Conversas do usuário no processo, com as mensagens em ordem.
-
-    Args:
-        session: Sessão.
-        processo_id: Processo.
-        usuario_id: Usuário.
-
-    Returns:
-        Conversas serializadas, da mais antiga para a mais recente.
-    """
-    conversas = list(
-        session.scalars(
-            select(ConversaTabela)
-            .where(
-                ConversaTabela.processo_id == processo_id, ConversaTabela.usuario_id == usuario_id
-            )
-            .order_by(ConversaTabela.criada_em, ConversaTabela.id)
-        )
+def historico(session: Session, hk_processo: bytes, hk_usuario: bytes) -> list[dict[str, Any]]:
+    """Conversas do usuário no processo e mensagens ordenadas por sequência."""
+    conversas = session.scalars(
+        select(VisaoConversa)
+        .where(VisaoConversa.hk_processo == hk_processo, VisaoConversa.hk_usuario == hk_usuario)
+        .order_by(VisaoConversa.criada_em, VisaoConversa.id)
     )
-    saida = []
+    historico = []
     for conversa in conversas:
         mensagens = session.scalars(
-            select(MensagemTabela)
-            .where(MensagemTabela.conversa_id == conversa.id)
-            .order_by(MensagemTabela.criado_em, MensagemTabela.papel.desc(), MensagemTabela.id)
+            select(VisaoMensagem)
+            .where(VisaoMensagem.hk_conversa == conversa.hk_conversa)
+            .order_by(VisaoMensagem.sequencia)
         )
-        saida.append(
+        historico.append(
             {
-                "conversa_id": str(conversa.id),
+                "conversa_id": conversa.id,
                 "criada_em": conversa.criada_em.isoformat(),
                 "encerrada": conversa.encerrada,
                 "motivo_encerramento": conversa.motivo_encerramento,
                 "citacoes_descartadas": conversa.citacoes_descartadas,
-                "mensagens": [
-                    serializar_mensagem(m)
-                    | {"citacoes": localizar_citacoes(session, processo_id, list(m.citacoes))}
-                    for m in mensagens
-                ],
+                "mensagens": [serializar_mensagem(session, hk_processo, m) for m in mensagens],
             }
         )
-    return saida
+    return historico
 
 
-def serializar_mensagem(mensagem: MensagemTabela) -> dict[str, Any]:
-    """Mensagem para a API; resposta do agente leva o rótulo de conteúdo gerado.
-
-    Args:
-        mensagem: Mensagem.
-
-    Returns:
-        Dicionário.
-    """
+def serializar_mensagem(
+    session: Session, hk_processo: bytes, mensagem: VisaoMensagem
+) -> dict[str, Any]:
+    """Decifra e localiza as citações e rotula a mensagem gerada pelo agente."""
     return {
-        "mensagem_id": str(mensagem.id),
+        "mensagem_id": id_mensagem(mensagem),
         "papel": mensagem.papel,
         "status": mensagem.status,
         "texto": mensagem.texto,
-        "citacoes": mensagem.citacoes,
+        "citacoes": localizar_citacoes(session, hk_processo, mensagem.citacoes),
         "avisos": mensagem.avisos,
         "citacoes_descartadas": descartadas_dos_avisos(mensagem.avisos),
         "rotulo": "gerado por IA" if mensagem.papel == PapelMensagem.AGENTE.value else None,
-        "criado_em": mensagem.criado_em.isoformat() if mensagem.criado_em else None,
+        "criado_em": mensagem.criada_em.isoformat(),
     }
 
 
@@ -271,34 +250,23 @@ def descartadas_dos_avisos(avisos: list[str]) -> int:
 
 
 def localizar_citacoes(
-    session: Session, processo_id: UUID, citacoes: list[dict[str, Any]]
+    session: Session, hk_processo: bytes, citacoes: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Acrescenta a cada citação o número da página e o arquivo, para o link do visualizador.
-
-    Args:
-        session: Sessão.
-        processo_id: Processo.
-        citacoes: Citações gravadas (`pagina_id`, `trecho`, `hash_trecho`).
-
-    Returns:
-        Citações com `pagina_numero` e `arquivo_id` (None se a página não for do processo).
-    """
-    ids = []
-    for citacao in citacoes:
-        try:
-            ids.append(UUID(str(citacao.get("pagina_id"))))
-        except ValueError:
-            continue
-    locais: dict[str, tuple[int, str]] = {}
-    if ids:
-        consulta = (
-            select(PaginaTabela.id, PaginaTabela.numero, PaginaTabela.arquivo_id)
-            .join(ArquivoTabela, ArquivoTabela.id == PaginaTabela.arquivo_id)
-            .where(ArquivoTabela.processo_id == processo_id, PaginaTabela.id.in_(ids))
-        )
-        locais = {str(i): (n, str(a)) for i, n, a in session.execute(consulta)}
-    saida = []
-    for citacao in citacoes:
-        numero, arquivo = locais.get(str(citacao.get("pagina_id")), (None, None))
-        saida.append(citacao | {"pagina_numero": numero, "arquivo_id": arquivo})
-    return saida
+    """Recupera o trecho e a posição de cada citação conferida no processo."""
+    if not citacoes:
+        return []
+    ids = [c["pagina_id"] for c in citacoes]
+    consulta = select(VisaoPagina.id, VisaoPagina.numero, VisaoPagina.arquivo_id).where(
+        VisaoPagina.hk_processo == hk_processo, VisaoPagina.id.in_(ids)
+    )
+    locais = {i: (n, arquivo) for i, n, arquivo in session.execute(consulta)}
+    return [
+        c
+        | {
+            "trecho": decifrar_valor(ROTULO_TRECHO, c["trecho"]),
+            "pagina_numero": locais[c["pagina_id"]][0],
+            "arquivo_id": locais[c["pagina_id"]][1],
+        }
+        for c in citacoes
+        if c["pagina_id"] in locais
+    ]

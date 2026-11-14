@@ -1,17 +1,11 @@
-"""Caso de uso do chat (Etapas 5.5 a 5.9): pergunta → recusa, resposta conferida ou teto.
-
-Ordem: conversa aberta → teto do processo → grava a pergunta (`pergunta_chat`) → recusa por
-regras → monta contexto e ferramentas → chama o cliente (uma nova tentativa se a saída vier
-fora do esquema) → registra `chamada_modelo` → confere citações → grava a resposta → aplica os
-tetos de conversa e de processo.
-"""
+"""Ciclo do chat do gabinete cível e conferência das respostas antes da entrega (A16)."""
 
 import asyncio
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
-from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from lupa_intranet.acesso.servico import Contexto, auditar
@@ -31,26 +25,23 @@ from lupa_intranet.agente.cliente import (
 )
 from lupa_intranet.agente.contexto import (
     Delimitador,
-    Pseudonimizador,
     montar_mensagem,
     prompt_sistema,
-    pseudonimizador_do_processo,
 )
 from lupa_intranet.agente.ferramentas.registro import criar_ferramentas
 from lupa_intranet.agente.ferramentas.sessao import SessaoAgente
 from lupa_intranet.agente.recusa import classificar
+from lupa_intranet.agente.repositorio import Conversa
 from lupa_intranet.auditoria.eventos import AcaoAuditoria, ResultadoEvento
 from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.enums import PapelMensagem, ResultadoChamada, StatusMensagem
 from lupa_pipeline.dominio.esquemas import calcular_hash
-from lupa_pipeline.dominio.tabelas import ConversaTabela, ProcessoTabela, ReuTabela
+from lupa_pipeline.dominio.visoes import VisaoMensagem, VisaoParte, VisaoProcesso
 
-MSG_TETO_CONVERSA = (
-    "Esta conversa atingiu o limite de uso e foi encerrada. Uma nova pergunta abre outra conversa."
-)
+MSG_TETO_CONVERSA = "Esta conversa atingiu o limite de uso e foi encerrada."
 MSG_TETO_PROCESSO = (
     "O limite de uso do assistente para este processo foi atingido; o chat fica indisponível "
-    "neste processo. Fale com o administrador se precisar ampliar."
+    "neste processo. Consulte o responsável técnico."
 )
 MSG_TETO_CHAMADA = "A resposta passou do limite de tamanho por chamada e foi descartada."
 MSG_INDISPONIVEL = "O assistente está indisponível no momento. Tente de novo em instantes."
@@ -110,7 +101,7 @@ class ContextoChat:
     Attributes:
         session: Sessão da requisição.
         processo: Processo autorizado por `exige_processo`.
-        usuario_id: Usuário.
+        hk_usuario: Usuário.
         ctx: Contexto da requisição (auditoria).
         cliente: Cliente do modelo.
         limites: Limites.
@@ -118,8 +109,8 @@ class ContextoChat:
     """
 
     session: Session
-    processo: ProcessoTabela
-    usuario_id: UUID
+    processo: VisaoProcesso
+    hk_usuario: bytes
     ctx: Contexto
     cliente: ClienteAgente
     limites: LimitesAgente
@@ -149,45 +140,30 @@ def auditar_agente(
         chat.ctx,
         acao,
         resultado,
-        usuario_id=chat.usuario_id,
-        gabinete_id=chat.processo.gabinete_id,
-        processo_id=chat.processo.id,
+        hk_usuario=chat.hk_usuario,
+        hk_processo=chat.processo.hk_processo,
         objeto_tipo=objeto_tipo,
         objeto_id=objeto_id,
         **extra,
     )
 
 
-def ficha_do_processo(session: Session, processo: ProcessoTabela) -> dict[str, Any]:
-    """Ficha enviada ao modelo: número, classe, matéria e pseudônimos dos réus.
-
-    Args:
-        session: Sessão.
-        processo: Processo.
-
-    Returns:
-        Ficha.
-    """
-    reus = sorted(
-        r.pseudonimo
-        for r in session.query(ReuTabela).filter(ReuTabela.processo_id == processo.id).all()
+def ficha_do_processo(session: Session, processo: VisaoProcesso) -> dict[str, Any]:
+    """Ficha limitada às partes do processo autorizado, identificadas por nome e polo."""
+    consulta = (
+        select(VisaoParte.nome, VisaoParte.polo)
+        .where(VisaoParte.hk_processo == processo.hk_processo)
+        .order_by(VisaoParte.id)
     )
-    return {
-        "numero_cnj": processo.numero_cnj,
-        "classe": processo.classe,
-        "materia": processo.materia,
-        "reus": reus,
-    }
+    partes = [{"nome": nome, "polo": polo} for nome, polo in session.execute(consulta) if nome]
+    return {"numero_cnj": processo.numero_cnj, "classe": processo.classe, "partes": partes}
 
 
-def nova_sessao_agente(
-    chat: ContextoChat, pseudonimizador: Pseudonimizador, paginas_originais: int
-) -> SessaoAgente:
+def nova_sessao_agente(chat: ContextoChat, paginas_originais: int) -> SessaoAgente:
     """Sessão das ferramentas, travada no processo do contexto.
 
     Args:
         chat: Contexto.
-        pseudonimizador: Pseudonimizador do processo.
         paginas_originais: Páginas originais já usadas na conversa.
 
     Returns:
@@ -195,11 +171,9 @@ def nova_sessao_agente(
     """
     return SessaoAgente(
         session=chat.session,
-        gabinete_id=chat.processo.gabinete_id,
-        processo_id=chat.processo.id,
-        materia=chat.processo.materia,
+        processo_id=chat.processo.hk_processo,
+        classe=chat.processo.classe or "",
         numero_cnj=chat.processo.numero_cnj,
-        pseudonimizador=pseudonimizador,
         delimitador=Delimitador(),
         registrar=lambda acao, tipo, ident: auditar_agente(chat, acao, tipo, ident),
         referencia=chat.referencia,
@@ -240,7 +214,7 @@ def _evento_da(resultado: ResultadoChamada) -> ResultadoEvento:
 
 def registrar_chamada(
     chat: ContextoChat,
-    conversa_id: UUID | None,
+    conversa_id: bytes | None,
     pedido: PedidoAgente,
     saidas: list[str],
     resposta: RespostaAgente | None,
@@ -259,9 +233,8 @@ def registrar_chamada(
     prompt = prompt_sistema()
     chamada = repositorio.gravar_chamada(
         chat.session,
-        gabinete_id=chat.processo.gabinete_id,
-        processo_id=chat.processo.id,
-        conversa_id=conversa_id,
+        hk_processo=chat.processo.hk_processo,
+        hk_conversa=conversa_id,
         modelo=resposta.modelo if resposta else pedido.modelo,
         versao_prompt=prompt.identificador,
         hash_prompt_sistema=calcular_hash(pedido.prompt_sistema),
@@ -277,39 +250,36 @@ def registrar_chamada(
         chat,
         AcaoAuditoria.CHAMADA_MODELO,
         "chamada_modelo",
-        str(chamada.id),
+        chamada.hex(),
         _evento_da(resultado),
-        versao_modelo=chamada.modelo[:100],
+        versao_modelo=(resposta.modelo if resposta else pedido.modelo)[:100],
         versao_prompt=prompt.identificador,
     )
 
 
-def conferir_resposta(
-    chat: ContextoChat, texto: str, pseudonimizador: Pseudonimizador, extra_ids: set[str]
-) -> Conferencia:
+def conferir_resposta(chat: ContextoChat, texto: str, extra_ids: set[str]) -> Conferencia:
     """Confere a saída do modelo contra o banco.
 
     Args:
         chat: Contexto.
         texto: Saída do modelo.
-        pseudonimizador: Pseudonimizador usado no envio.
         extra_ids: Ids próprios a aceitar (conversa).
 
     Returns:
         Conferência.
     """
-    ids = repositorio.ids_do_processo(chat.session, chat.processo.id) | extra_ids
+    ids = repositorio.ids_do_processo(chat.session, chat.processo.hk_processo) | extra_ids
     citados = _ids_citados(texto)
     paginas = {
         pid: PaginaConferencia(t, n)
         for pid, (t, n) in repositorio.paginas_citadas(
-            chat.session, chat.processo.id, citados
+            chat.session, chat.processo.hk_processo, citados
         ).items()
     }
-    return conferir(texto, paginas, chat.processo.numero_cnj, ids, pseudonimizador.aplicar)
+    return conferir(texto, paginas, chat.processo.numero_cnj, ids)
 
 
-def _ids_citados(texto: str) -> list[UUID]:
+def _ids_citados(texto: str) -> list[str]:
     try:
         return [c.pagina_id for c in interpretar(texto).citacoes]
     except ValueError:
@@ -318,7 +288,7 @@ def _ids_citados(texto: str) -> list[UUID]:
 
 def chamar(
     chat: ContextoChat,
-    conversa: ConversaTabela | None,
+    conversa: Conversa | None,
     pergunta_ou_mensagem: str,
     sessao: SessaoAgente,
     *,
@@ -336,15 +306,14 @@ def chamar(
     Returns:
         Última tentativa.
     """
-    pseudonimizador = sessao.pseudonimizador
     ficha = ficha_do_processo(chat.session, chat.processo)
-    extra = {str(conversa.id)} if conversa else set()
+    extra = {conversa.hk.hex()} if conversa else set()
     tentativa = Tentativa(None, None, ResultadoChamada.ERRO)
     for _ in range(2):
         sessao.delimitador = Delimitador()
         sessao.saidas.clear()
         mensagem = (
-            montar_mensagem(sessao.delimitador, ficha, pergunta_ou_mensagem, pseudonimizador)
+            montar_mensagem(sessao.delimitador, ficha, pergunta_ou_mensagem)
             if com_ferramentas
             else pergunta_ou_mensagem
         )
@@ -355,38 +324,56 @@ def chamar(
             max_turnos=chat.limites.max_turnos,
             ferramentas=criar_ferramentas(sessao) if com_ferramentas else (),
         )
-        tentativa = _uma_tentativa(chat, conversa, pedido, sessao, pseudonimizador, extra)
-        if tentativa.resultado is not ResultadoChamada.INVALIDA:
+        tentativa = _uma_tentativa(chat, conversa, pedido, sessao, extra)
+        if tentativa.resultado is ResultadoChamada.INVALIDA:
+            if (
+                repositorio.tokens_do_processo(chat.session, chat.processo.hk_processo)
+                >= chat.limites.max_tokens_processo
+            ):
+                break
+            if (
+                conversa
+                and conversa.estado.tokens_entrada + conversa.estado.tokens_saida
+                >= chat.limites.max_tokens_conversa
+            ):
+                break
+        else:
             break
     return tentativa
 
 
 def _uma_tentativa(
     chat: ContextoChat,
-    conversa: ConversaTabela | None,
+    conversa: Conversa | None,
     pedido: PedidoAgente,
     sessao: SessaoAgente,
-    pseudonimizador: Pseudonimizador,
     extra: set[str],
 ) -> Tentativa:
-    conversa_id = conversa.id if conversa else None
+    conversa_id = conversa.hk if conversa else None
     try:
         resposta = asyncio.run(chat.cliente.responder(pedido))
     except ClienteAgenteError:
         registrar_chamada(chat, conversa_id, pedido, sessao.saidas, None, ResultadoChamada.ERRO)
         return Tentativa(None, None, ResultadoChamada.ERRO)
     if conversa is not None:
-        conversa.tokens_entrada += resposta.tokens_entrada
-        conversa.tokens_saida += resposta.tokens_saida
+        conversa.estado.tokens_entrada += resposta.tokens_entrada
+        conversa.estado.tokens_saida += resposta.tokens_saida
     if resposta.tokens_entrada + resposta.tokens_saida > chat.limites.max_tokens_chamada:
         registrar_chamada(chat, conversa_id, pedido, sessao.saidas, resposta, ResultadoChamada.TETO)
         return Tentativa(resposta, None, ResultadoChamada.TETO)
-    conferencia = conferir_resposta(chat, resposta.texto, pseudonimizador, extra)
+    conferencia = conferir_resposta(chat, resposta.texto, extra)
     resultado = _resultado_da(conferencia)
     registrar_chamada(chat, conversa_id, pedido, sessao.saidas, resposta, resultado)
+    for _ in range(conferencia.descartadas):
+        auditar_agente(
+            chat,
+            AcaoAuditoria.CITACAO_DESCARTADA,
+            "conversa" if conversa else "processo",
+            conversa.hk.hex() if conversa else chat.processo.id,
+        )
     if resultado is ResultadoChamada.BLOQUEADA:
         motivo = conferencia.motivos[0] if conferencia.motivos else "bloqueada"
-        revisao.abrir(chat.session, chat.ctx, chat.processo, motivo, chat.usuario_id)
+        revisao.abrir(chat.session, chat.ctx, chat.processo, motivo, chat.hk_usuario)
     return Tentativa(resposta, conferencia, resultado)
 
 
@@ -419,39 +406,39 @@ def _desfecho(tentativa: Tentativa) -> tuple[StatusMensagem, str, list[dict[str,
     return status, conferencia.texto, citacoes, _avisos(conferencia)
 
 
-def _encerrar(conversa: ConversaTabela, motivo: str) -> None:
-    conversa.encerrada = True
-    conversa.motivo_encerramento = motivo
+def _encerrar(conversa: Conversa, motivo: str) -> None:
+    conversa.estado.encerrada = True
+    conversa.estado.motivo_encerramento = motivo
 
 
-def _aplicar_tetos(chat: ContextoChat, conversa: ConversaTabela) -> list[str]:
+def _aplicar_tetos(chat: ContextoChat, conversa: Conversa) -> list[str]:
     avisos = []
-    if repositorio.tokens_do_processo(chat.session, chat.processo.id) >= (
+    if repositorio.tokens_do_processo(chat.session, chat.processo.hk_processo) >= (
         chat.limites.max_tokens_processo
     ):
         _encerrar(conversa, "teto_processo")
         avisos.append(MSG_TETO_PROCESSO)
-    elif conversa.tokens_entrada + conversa.tokens_saida >= chat.limites.max_tokens_conversa:
+    elif (
+        conversa.estado.tokens_entrada + conversa.estado.tokens_saida
+        >= chat.limites.max_tokens_conversa
+    ):
         _encerrar(conversa, "teto_conversa")
         avisos.append(MSG_TETO_CONVERSA)
     return avisos
 
 
-def _resposta(chat: ContextoChat, conversa: ConversaTabela, mensagem: Any) -> dict[str, Any]:
-    dados = repositorio.serializar_mensagem(mensagem)
-    dados["citacoes"] = repositorio.localizar_citacoes(
-        chat.session, chat.processo.id, dados["citacoes"]
-    )
+def _resposta(chat: ContextoChat, conversa: Conversa, mensagem: VisaoMensagem) -> dict[str, Any]:
+    dados = repositorio.serializar_mensagem(chat.session, chat.processo.hk_processo, mensagem)
     return {
-        "conversa_id": str(conversa.id),
-        "conversa_encerrada": conversa.encerrada,
-        "citacoes_descartadas_na_conversa": conversa.citacoes_descartadas,
+        "conversa_id": conversa.hk.hex(),
+        "conversa_encerrada": conversa.estado.encerrada,
+        "citacoes_descartadas_na_conversa": conversa.estado.citacoes_descartadas,
         "processo_em_revisao": revisao.em_revisao(chat.processo),
     } | dados
 
 
 def _responder_sem_modelo(
-    chat: ContextoChat, conversa: ConversaTabela, status: StatusMensagem, texto: str
+    chat: ContextoChat, conversa: Conversa, status: StatusMensagem, texto: str
 ) -> dict[str, Any]:
     mensagem = repositorio.gravar_mensagem(
         chat.session, conversa, PapelMensagem.AGENTE, status, texto
@@ -469,39 +456,46 @@ def perguntar(chat: ContextoChat, pergunta: str) -> dict[str, Any]:
     Returns:
         Mensagem do agente serializada, com a conversa e o contador de descartes.
     """
-    sessao_bd, processo = chat.session, chat.processo
-    conversa = repositorio.conversa_aberta(
-        sessao_bd, processo.gabinete_id, processo.id, chat.usuario_id
-    )
+    sessao_bd = chat.session
+    processo = revisao.processo_para_escrita(sessao_bd, chat.processo.hk_processo)
+    conversa = repositorio.conversa_do_usuario(sessao_bd, processo.hk_processo, chat.hk_usuario)
+    if revisao.em_revisao(processo):
+        return _responder_sem_modelo(chat, conversa, StatusMensagem.RECUSA, revisao.MSG_EM_REVISAO)
+    if (
+        repositorio.tokens_do_processo(sessao_bd, processo.hk_processo)
+        >= chat.limites.max_tokens_processo
+    ):
+        _encerrar(conversa, "teto_processo")
+        repositorio.gravar_estado(sessao_bd, conversa)
+    if conversa.estado.encerrada:
+        aviso = (
+            MSG_TETO_PROCESSO
+            if conversa.estado.motivo_encerramento == "teto_processo"
+            else MSG_TETO_CONVERSA
+        )
+        return _responder_sem_modelo(chat, conversa, StatusMensagem.TETO, aviso)
     pergunta_gravada = repositorio.gravar_mensagem(
         sessao_bd, conversa, PapelMensagem.USUARIO, StatusMensagem.PERGUNTA, pergunta
     )
-    auditar_agente(chat, AcaoAuditoria.PERGUNTA_CHAT, "mensagem", str(pergunta_gravada.id))
-    if repositorio.tokens_do_processo(sessao_bd, processo.id) >= chat.limites.max_tokens_processo:
-        _encerrar(conversa, "teto_processo")
-        return _responder_sem_modelo(chat, conversa, StatusMensagem.TETO, MSG_TETO_PROCESSO)
-    if revisao.em_revisao(processo):
-        return _responder_sem_modelo(chat, conversa, StatusMensagem.RECUSA, revisao.MSG_EM_REVISAO)
+    auditar_agente(
+        chat, AcaoAuditoria.PERGUNTA_CHAT, "mensagem", repositorio.id_mensagem(pergunta_gravada)
+    )
     recusa = classificar(pergunta)
     if recusa is not None:
         return _responder_sem_modelo(chat, conversa, StatusMensagem.RECUSA, recusa.mensagem)
-    sessao = nova_sessao_agente(
-        chat,
-        pseudonimizador_do_processo(sessao_bd, processo.id, chat.usuario_id),
-        conversa.paginas_originais,
-    )
+    sessao = nova_sessao_agente(chat, conversa.estado.paginas_originais)
     tentativa = chamar(chat, conversa, pergunta, sessao)
-    conversa.paginas_originais = sessao.paginas_originais
+    conversa.estado.paginas_originais = sessao.paginas_originais
     if tentativa.conferencia is not None:
-        conversa.citacoes_descartadas += tentativa.conferencia.descartadas
+        conversa.estado.citacoes_descartadas += tentativa.conferencia.descartadas
     status, texto, citacoes, avisos = _desfecho(tentativa)
     if tentativa.resultado is ResultadoChamada.BLOQUEADA:
         avisos.append(revisao.MSG_EM_REVISAO)
     avisos += _aplicar_tetos(chat, conversa)
-    if conversa.encerrada and status is StatusMensagem.DESCARTADA:
+    if conversa.estado.encerrada and status is StatusMensagem.DESCARTADA:
         status = StatusMensagem.TETO
     mensagem = repositorio.gravar_mensagem(
         sessao_bd, conversa, PapelMensagem.AGENTE, status, texto, citacoes, avisos
     )
-    sessao_bd.flush()
+    repositorio.gravar_estado(sessao_bd, conversa)
     return _resposta(chat, conversa, mensagem)

@@ -637,7 +637,9 @@ LEFT JOIN LATERAL (
     "v_processo": """
 SELECT encode(h.hk_processo, 'hex') AS id, h.hk_processo, h.numero_cnj, h.load_dts AS criado_em,
        d.classe, d.hk_usuario AS hk_criador, encode(d.hk_usuario, 'hex') AS criador_id,
-       e.status, k.chave_dados_cifrada, coalesce(r.situacao = 'aberta', false) AS em_revisao
+       e.status, k.chave_dados_cifrada, coalesce(r.situacao = 'aberta', false) AS em_revisao,
+       r.motivo AS motivo_revisao, r.status_anterior AS status_anterior_revisao,
+       r.load_dts AS revisao_em
 FROM hub_processo h
 LEFT JOIN LATERAL (
     SELECT classe, hk_usuario
@@ -658,7 +660,7 @@ LEFT JOIN LATERAL (
     ORDER BY s.load_dts DESC LIMIT 1
 ) k ON true
 LEFT JOIN LATERAL (
-    SELECT situacao
+    SELECT situacao, motivo, status_anterior, load_dts
     FROM sat_processo_revisao s
     WHERE s.hk_processo = h.hk_processo
     ORDER BY s.load_dts DESC LIMIT 1

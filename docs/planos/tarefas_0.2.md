@@ -325,7 +325,13 @@ a saída resumida (vermelho inicial e verde final).
     o assessor recebia 404 e a tabela aceitava TRUNCATE. Após montar as rotas e proteger a
     cadeia, 35 testes passaram. O relatório consulta chamadas e tokens pela view.
     `test_carga.py` passou com um milhão de eventos e mediana inferior a 200 ms.
-- [ ] **T3.12** Conversa, mensagens, chamada ao modelo e processo em revisão. A16. D26. RF-CHA-06, 07, 08.
+- [x] **T3.12** Conversa, mensagens, chamada ao modelo e processo em revisão. A16. D26. RF-CHA-06, 07, 08.
+  - O POST do chat devolvia 404. Com as rotas e satélites em uso, o teste autenticado
+    `tests/api/test_chat_limites.py` confirma que a segunda pergunta mantém a conversa e o
+    contador de chamadas. `tests/api/test_revisao.py` cobre dois motivos de bloqueio, a
+    recusa do assessor e a liberação pelo desembargador no estado anterior.
+  - A auditoria guarda os hashes e tokens de cada chamada. O histórico decifra as mensagens
+    e as citações da conversa do usuário. A bateria compartilhada com T4.12 passou em 63 casos.
 - [x] **T3.13** Descarte. A13. RF-PRO-05.
   - `python -m pytest intranet/api/tests/seguranca/test_descarte.py --no-cov`
     contra PostgreSQL e MinIO. Vermelho: a rota devolvia 404. Verde: os três testes passaram,

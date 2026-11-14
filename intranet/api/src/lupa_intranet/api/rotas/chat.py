@@ -1,13 +1,5 @@
-"""Rotas do chat sobre os autos (Etapa 5).
+"""Chat e histórico do usuário autenticado sobre os autos de um único processo (A16)."""
 
-`POST /processos/{id}/chat` recebe a pergunta e devolve a resposta com citações conferidas, a
-recusa explicada ou a mensagem de teto; registra `pergunta_chat` e `chamada_modelo`.
-`GET /processos/{id}/chat` devolve o histórico das conversas do usuário no processo (leitura de
-conteúdo: `processo_aberto`, com `admin_acesso_conteudo` para o administrador). Processo de
-outro gabinete responde 404 (`exige_processo`).
-"""
-
-from datetime import date
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
@@ -26,11 +18,11 @@ from lupa_intranet.agente.servico import ContextoChat, limites_de, perguntar
 from lupa_intranet.api.middleware import auditar_rota
 from lupa_intranet.auditoria.eventos import AcaoAuditoria
 from lupa_pipeline.config import Settings, get_settings
-from lupa_pipeline.dominio.tabelas import ProcessoTabela
+from lupa_pipeline.dominio.visoes import VisaoProcesso
 
 router = APIRouter()
 
-Processo = Annotated[ProcessoTabela, Depends(exige_processo)]
+Processo = Annotated[VisaoProcesso, Depends(exige_processo)]
 Configuracao = Annotated[Settings, Depends(get_settings)]
 
 
@@ -82,11 +74,11 @@ def contexto_chat(
     return ContextoChat(
         session=sessao,
         processo=processo,
-        usuario_id=ator.usuario_id,
+        hk_usuario=ator.hk_usuario,
         ctx=ctx,
         cliente=cliente,
         limites=limites_de(settings),
-        referencia=date.today(),
+        referencia=ctx.agora.date(),
     )
 
 
@@ -133,5 +125,5 @@ def historico_do_chat(
     """
     return {
         "processo_id": str(processo.id),
-        "conversas": repositorio.historico(sessao, processo.id, ator.usuario_id),
+        "conversas": repositorio.historico(sessao, processo.hk_processo, ator.hk_usuario),
     }

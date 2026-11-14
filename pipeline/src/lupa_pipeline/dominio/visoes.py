@@ -97,6 +97,9 @@ class VisaoProcesso(BaseVisao):
     status: Mapped[str | None]
     chave_dados_cifrada: Mapped[str | None]
     em_revisao: Mapped[bool]
+    motivo_revisao: Mapped[str | None]
+    status_anterior_revisao: Mapped[str | None]
+    revisao_em: Mapped[datetime | None]
 
 
 class VisaoArquivo(BaseVisao):
