@@ -140,15 +140,15 @@ passo "6. subida completa"
 docker compose up -d --wait
 
 passo "7. migracoes"
-docker compose exec -T api alembic -c src/lupa/migrations/alembic.ini upgrade head
-docker compose exec -T api alembic -c src/lupa/migrations/alembic.ini current
+docker compose exec -T api alembic -c pipeline/src/lupa_pipeline/migrations/alembic.ini upgrade head
+docker compose exec -T api alembic -c pipeline/src/lupa_pipeline/migrations/alembic.ini current
 
 passo "8. usuario de banco restrito"
-docker compose exec -T api python scripts/criar_usuario_banco.py
+docker compose exec -T api python intranet/api/scripts/criar_usuario_banco.py
 docker compose up -d --wait api worker
 
 passo "9. administrador"
-docker compose exec -T api python scripts/criar_admin.py
+docker compose exec -T api python intranet/api/scripts/criar_admin.py
 if confirmar "  apagar LUPA_ADMIN_SENHA do .env agora (recomendado, depois de anotada)?"; then
   "$PY" - <<'PYEOF'
 from pathlib import Path

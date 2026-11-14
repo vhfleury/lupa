@@ -8,11 +8,11 @@ O diretório ainda não é repositório git. Antes do primeiro commit:
 2. `git init` e `git add --renormalize .` (aplica o fim de linha a tudo que já existe).
 3. Rode `git status --ignored` e confira que estão como **ignorados** e nunca entram:
    - `.env` (senhas, `LUPA_VAULT_SECRET_ID`); só `.env.example`, com valores fictícios, entra;
-   - `.sinteticos/` (autos sintéticos grandes, regeneráveis por `scripts/gerar_autos.py`);
+   - `.sinteticos/` (autos sintéticos grandes, regeneráveis por `pipeline/scripts/gerar_autos.py`);
    - `.backups/` (backups cifrados) e `.backup-chaves/` (chaves `age` dos períodos);
    - `.vault-dev/` (chave de unseal e token raiz do Vault de desenvolvimento);
    - `.venv/`, caches (`.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `__pycache__`), `.coverage`;
-   - `front/node_modules/`, `front/build/`, `front/.svelte-kit/`, resultados do Playwright.
+   - `intranet/web/node_modules/`, `intranet/web/build/`, `intranet/web/.svelte-kit/`, resultados do Playwright.
 4. Os PDFs e o DOCX da raiz (relatórios de pesquisa) não são código: decida um a um se entram.
    Nenhum documento com dado real de processo, pessoa ou tribunal entra no repositório.
 5. Procure segredos antes de commitar:
