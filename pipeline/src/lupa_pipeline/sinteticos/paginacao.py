@@ -162,7 +162,7 @@ class _Paginador:
                        True, "cabecalho")
         )  # fmt: skip
         pagina.linhas.append(
-            LinhaTexto(f"Vara Criminal - Processo nº {self.numero_processo}", MARGEM_ESQUERDA,
+            LinhaTexto(f"Vara Cível - Processo nº {self.numero_processo}", MARGEM_ESQUERDA,
                        64, 9, False, "cabecalho")
         )  # fmt: skip
         self.paginas.append(pagina)

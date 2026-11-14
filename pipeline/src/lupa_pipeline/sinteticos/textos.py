@@ -123,7 +123,8 @@ def renderizar_peca(
     """
     titulo, _, corpo = carregar_template(nome).partition("\n")
     paragrafos = renderizar_texto(corpo, variaveis, rng)
-    return titulo.strip(), [Paragrafo(titulo.strip(), papel="titulo"), *paragrafos]
+    cabecalho = extrair_marcas(titulo.strip())
+    return cabecalho.texto, [Paragrafo(cabecalho.texto, cabecalho.marcas, "titulo"), *paragrafos]
 
 
 def enchimento(variaveis: dict[str, str], rng: random.Random, quantidade: int) -> list[Paragrafo]:

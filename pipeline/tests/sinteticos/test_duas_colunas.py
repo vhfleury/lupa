@@ -11,7 +11,7 @@ from lupa_pipeline.sinteticos.render import TEXTO_MARCA_DAGUA
 from lupa_pipeline.sinteticos.roteiro import Configuracao
 
 SO_NATIVA = {Composicao.NATIVA: 1.0}
-TIPOS = (TipoPeca.LAUDO, TipoPeca.TERMO_DEPOIMENTO)
+TIPOS = (TipoPeca.LAUDO_PERICIAL, TipoPeca.OUTROS)
 
 
 def _conteudo(duas: tuple[TipoPeca, ...]):  # type: ignore[no-untyped-def]

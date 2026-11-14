@@ -11,6 +11,7 @@ import random
 from datetime import date
 
 from lupa_pipeline.dominio.cnj import calcular_digito_verificador
+from lupa_pipeline.dominio.enums import QualidadeParte
 
 JUSTICA_TESTE = "8"
 TRIBUNAL_TESTE = "99"
@@ -43,6 +44,20 @@ def gerar_nome(rng: random.Random) -> str:
     """
     sobrenomes = rng.sample(_SOBRENOMES, 2)
     return f"{rng.choice(_PRENOMES)} {sobrenomes[0]} {sobrenomes[1]}"
+
+
+def gerar_partes(rng: random.Random, qualidade: QualidadeParte) -> tuple[str, str]:
+    """Gera nomes distintos de autor e réu e identifica os entes da comarca fictícia."""
+    entes = {
+        QualidadeParte.FAZENDA_PUBLICA: "Fazenda Pública de Vila Esperança",
+        QualidadeParte.MINISTERIO_PUBLICO: "Ministério Público de Vila Esperança",
+        QualidadeParte.DEFENSORIA_PUBLICA: "Defensoria Pública de Vila Esperança",
+    }
+    autor = entes.get(qualidade) or gerar_nome(rng)
+    reu = gerar_nome(rng)
+    while reu == autor:
+        reu = gerar_nome(rng)
+    return autor, reu
 
 
 def _digito_cpf(digitos: list[int]) -> int:

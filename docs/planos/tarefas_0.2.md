@@ -346,7 +346,13 @@ a saída resumida (vermelho inicial e verde final).
   - Os dois testes do vocabulário falharam com os tipos criminais da 0.1. Na imagem do worker,
     `python -m pytest pipeline/tests/dominio/test_enums_civeis.py pipeline/tests/dominio/test_esquemas.py --no-cov -q`
     passou nos 19 testes, incluindo o vínculo de fatos e achados ao sujeito por hash.
-- [ ] **T4.2** Sintéticos das cinco classes, com templates e gabarito. RNF-04, RNF-05.
+- [x] **T4.2** Sintéticos das cinco classes, com templates e gabarito. RNF-04, RNF-05.
+  - O gerador anterior dependia de `Materia.CRIMINAL` e não aceitava a classe cível. No primeiro
+    ciclo de regressão, duas páginas com colunas desiguais tiveram leitura invertida e o teste
+    do texto fora da página leu somente a área visível. No worker,
+    `python -m pytest pipeline/tests/sinteticos pipeline/tests/ingestao/test_extracao.py --no-cov -q`
+    passou nos 104 casos dos sintéticos e nos oito da extração. Cada classe teve PDF e gabarito
+    relido com qualificação, evidências literais, peças e resultados cabíveis.
 - [ ] **T4.3** Classificação e fronteiras de peças cíveis. RF-PEC-01.
 - [ ] **T4.4** Partes. A6 passos 1 e 2. RF-FAT-04.
 - [ ] **T4.5** Extratores de fatos cíveis. A6 passos 3 a 8. D17. RF-FAT-01, RF-FAT-02.

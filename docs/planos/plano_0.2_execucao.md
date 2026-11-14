@@ -353,7 +353,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [x] U: cabimento: inciso identificado e não identificado; nunca `atenção` (A10; RF-VAL-05).
 - [x] U: catálogo aplica a tabela 3.1; ação originária não gera achado (RF-VAL-01).
 - [x] U: linha de comando sobre `fatos_exemplo.json` reproduz o gabarito (RF-VAL-06).
-- [ ] U: gerador produz as cinco classes com gabarito (RNF-04).
+- [x] U: gerador produz as cinco classes com gabarito (RNF-04).
 - [ ] I: ponta a ponta de cada classe contra o gabarito: páginas, peças, partes, fatos e achados
   (RF-ING-03, RF-FAT-04, RNF-01, RNF-02).
 - [ ] I: correção de fato preservada no reprocessamento e usada pela validação (A11; RF-FAT-03,

@@ -2,8 +2,8 @@
 
 O gabarito descreve, para um arquivo gerado, o que uma ingestão perfeita deveria encontrar: as
 peças (tipo, origem, páginas, data), cada página (tipo, composição, degradação, texto), os
-eventos (tipo de fato, valor, página, trecho literal e offsets) e o resultado esperado das três
-validações criminais. Páginas são numeradas pela folha de conteúdo (1 a N), igual nos três
+partes e eventos (valor, página, trecho literal e offsets) e os achados da classe processual.
+Páginas são numeradas pela folha de conteúdo (1 a N), igual nos três
 cenários; ``arquivos`` diz em que arquivo e posição física cada folha ficou.
 """
 
@@ -15,16 +15,18 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from lupa_pipeline.dominio.cnj import validar_numero_cnj
 from lupa_pipeline.dominio.enums import (
-    Materia,
+    ClasseProcessual,
     OrigemPeca,
+    Polo,
+    QualidadeParte,
     ResultadoAchado,
     TipoFato,
     TipoPagina,
     TipoPeca,
 )
+from lupa_pipeline.validacoes.catalogo import validacoes_de
 
-VERSAO_ESQUEMA = "1"
-VALIDACOES_CRIMINAIS = ("tempestividade_recurso", "prescricao_abstrata", "revisao_preventiva")
+VERSAO_ESQUEMA = "2"
 
 
 class Cenario(StrEnum):
@@ -185,7 +187,7 @@ class ProcessoGabarito(_Base):
     """Identificação do processo sintético e do cenário."""
 
     numero_cnj: str
-    materia: Materia = Materia.CRIMINAL
+    classe: ClasseProcessual
     cenario: Cenario
     diagnostico_esperado: str
     semente: int
@@ -254,11 +256,9 @@ class PaginaGabarito(_Base):
         return self
 
 
-class EventoGabarito(_Base):
-    """Fato que a extração deve encontrar, com a evidência literal."""
+class ComEvidencia(_Base):
+    """Origem esperada no texto visível de uma página."""
 
-    tipo: TipoFato
-    valor: Any
     pagina: int = Field(ge=1)
     trecho: str = Field(min_length=1)
     inicio: int = Field(ge=0)
@@ -271,10 +271,27 @@ class EventoGabarito(_Base):
         return self
 
 
+class ParteGabarito(ComEvidencia):
+    """Qualificação da parte tal como aparece na peça."""
+
+    nome: str = Field(min_length=1)
+    polo: Polo
+    qualidade: QualidadeParte
+
+
+class EventoGabarito(ComEvidencia):
+    """Fato cível, com o nome do sujeito ou vazio para fato comum."""
+
+    tipo: TipoFato
+    valor: Any
+    sujeito: str = ""
+
+
 class ResultadoEsperado(_Base):
     """Resultado que o motor de validações deve dar com os eventos do gabarito."""
 
     validacao: str
+    sujeito: str = ""
     resultado: ResultadoAchado
     valores: dict[str, Any]
     explicacao: str
@@ -307,6 +324,7 @@ class Gabarito(_Base):
     processo: ProcessoGabarito
     pecas: tuple[PecaGabarito, ...] = Field(min_length=1)
     paginas: tuple[PaginaGabarito, ...] = Field(min_length=1)
+    partes: tuple[ParteGabarito, ...] = Field(min_length=1)
     eventos: tuple[EventoGabarito, ...]
     resultado_esperado: tuple[ResultadoEsperado, ...]
     arquivos: tuple[ArquivoGabarito, ...] = Field(min_length=1)
@@ -320,9 +338,18 @@ class Gabarito(_Base):
         self._conferir_pecas()
         self._conferir_eventos()
         self._conferir_arquivos()
-        nomes = sorted(r.validacao for r in self.resultado_esperado)
-        if nomes != sorted(VALIDACOES_CRIMINAIS):
-            raise ValueError("resultado esperado deve cobrir as três validações criminais")
+        recorrentes = {
+            e.sujeito
+            for e in self.eventos
+            if e.tipo == TipoFato.TIPO_RECURSO and e.valor == self.processo.classe
+        }
+        esperados = sorted(
+            (regra.nome, nome)
+            for regra in validacoes_de(self.processo.classe)
+            for nome in recorrentes
+        )
+        if sorted((r.validacao, r.sujeito) for r in self.resultado_esperado) != esperados:
+            raise ValueError("resultado esperado deve cobrir cada regra e recorrente da classe")
         return self
 
     def _conferir_paginas(self) -> None:
@@ -342,7 +369,10 @@ class Gabarito(_Base):
             raise ValueError("peças não cobrem todas as páginas")
 
     def _conferir_eventos(self) -> None:
-        for evento in self.eventos:
+        nomes = {parte.nome for parte in self.partes}
+        if any(e.sujeito and e.sujeito not in nomes for e in self.eventos):
+            raise ValueError("sujeito do evento não consta da qualificação")
+        for evento in (*self.partes, *self.eventos):
             if evento.pagina > len(self.paginas):
                 raise ValueError("evento aponta para página inexistente")
             texto = self.paginas[evento.pagina - 1].texto

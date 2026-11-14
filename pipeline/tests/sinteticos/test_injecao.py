@@ -59,7 +59,8 @@ def test_texto_fora_da_pagina_so_aparece_sem_recorte(
     instrucao = INJECOES[VetorInjecao.FORA_DA_PAGINA].texto
     pagina = documento[numero - 1]
     assert instrucao not in pagina.get_text()
-    assert instrucao in pagina.get_text(clip=fitz.INFINITE_RECT())
+    sem_recorte = fitz.TEXTFLAGS_TEXT & ~fitz.TEXT_MEDIABOX_CLIP
+    assert instrucao in pagina.get_text(clip=fitz.INFINITE_RECT(), flags=sem_recorte)
 
 
 def test_metadado_xmp_e_anotacao(gabarito: Gabarito, documento: fitz.Document) -> None:

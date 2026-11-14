@@ -10,10 +10,11 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from lupa_pipeline.dominio.enums import ClasseProcessual, QualidadeParte
 from lupa_pipeline.sinteticos.empacotamento import exportar
 from lupa_pipeline.sinteticos.gabarito import TODOS_VETORES, Cenario, Composicao
 from lupa_pipeline.sinteticos.gerador import gerar_conteudo
-from lupa_pipeline.sinteticos.roteiro import Configuracao
+from lupa_pipeline.sinteticos.roteiro import Configuracao, PreparoSintetico
 
 
 def mistura(digitalizada: float) -> dict[Composicao, float]:
@@ -34,25 +35,33 @@ def mistura(digitalizada: float) -> dict[Composicao, float]:
 
 
 _PLANO = (
-    (200, 0.90, True, False, "atencao"),
-    (300, 0.80, False, True, "conforme"),
-    (450, 0.70, True, True, "ausente"),
-    (650, 0.60, False, False, "atencao"),
-    (900, 0.50, True, False, "conforme"),
-    (1200, 0.40, False, True, "atencao"),
-    (1600, 0.30, True, False, "ausente"),
-    (2200, 0.20, False, False, "conforme"),
-    (3200, 0.15, True, True, "atencao"),
-    (5000, 0.02, False, False, "conforme"),
+    (200, 0.90, "apelacao_civel", True, "pago", True, "particular"),
+    (300, 0.80, "agravo_instrumento", False, "pedido", True, "particular"),
+    (450, 0.70, "embargos_declaracao", True, "ausente", False, "fazenda_publica"),
+    (650, 0.60, "agravo_interno", False, "ausente", False, "particular"),
+    (900, 0.50, "acao_originaria", True, "ausente", False, "particular"),
+    (1200, 0.40, "apelacao_civel", False, "deferido", True, "particular"),
+    (1600, 0.30, "agravo_instrumento", True, "ausente", False, "defensoria_publica"),
+    (2200, 0.20, "embargos_declaracao", False, "ausente", False, "particular"),
+    (3200, 0.15, "agravo_interno", True, "ausente", False, "ministerio_publico"),
+    (5000, 0.02, "acao_originaria", False, "ausente", False, "particular"),
 )
 
 REFERENCIAS: dict[str, Configuracao] = {
     f"semente_{n:02d}": Configuracao(
-        semente=1000 + n, paginas_alvo=paginas, mistura=mistura(dig), tempestivo=tempestivo,
-        prescrito=prescrito, preventiva=preventiva,
+        semente=1000 + n,
+        paginas_alvo=paginas,
+        mistura=mistura(dig),
+        tempestivo=tempestivo,
+        classe=ClasseProcessual(classe),
+        preparo=PreparoSintetico(preparo),
+        mandato=mandato,
+        qualidade=QualidadeParte(qualidade),
     )
-    for n, (paginas, dig, tempestivo, prescrito, preventiva) in enumerate(_PLANO, start=1)
-}  # fmt: skip
+    for n, (paginas, dig, classe, tempestivo, preparo, mandato, qualidade) in enumerate(
+        _PLANO, start=1
+    )
+}
 
 
 @dataclass(frozen=True)

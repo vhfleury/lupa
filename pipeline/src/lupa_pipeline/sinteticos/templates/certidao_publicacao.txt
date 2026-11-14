@@ -1,5 +1,5 @@
-CERTIDÃO DE PUBLICAÇÃO
+CERTIDÃO
 
-Certifico, para os devidos fins, que {{data_publicacao_sentenca:a sentença foi publicada em cartório em $data}}, sendo registrada no livro próprio.
+Certifico o cumprimento do mandado. {{data_citacao:Citação em $data}}.
 
-O referido é verdade e dou fé.
+A parte ré recebeu cópia da petição inicial e dos documentos que a instruem.

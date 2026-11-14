@@ -12,9 +12,10 @@ from lupa_pipeline.sinteticos.roteiro import Configuracao, montar_roteiro
 from lupa_pipeline.sinteticos.textos import carregar_template, extrair_marcas, renderizar_texto
 
 TEMPLATES = (
-    "denuncia", "recebimento", "decisao_prisao", "revisao_prisao", "laudo", "termo_depoimento",
-    "sentenca", "certidao_publicacao", "certidao_intimacao_mp", "certidao_intimacao_defesa",
-    "certidao_intimacao_reu", "recurso", "contrarrazoes", "acordao", "juntada", "enchimento",
+    "peticao_inicial", "contestacao", "replica", "decisao_interlocutoria", "laudo", "parecer_mp",
+    "sentenca", "certidao_publicacao", "certidao_intimacao", "procuracao", "comprovante_preparo",
+    "agravo_instrumento", "apelacao", "agravo_interno", "embargos_declaracao",
+    "contrarrazoes", "acordao", "juntada", "enchimento",
 )  # fmt: skip
 
 
@@ -63,7 +64,7 @@ def test_mesma_semente_gera_mesmo_texto_e_semente_diferente_varia() -> None:
 
 def test_marcas_sao_removidas_e_offsets_apontam_o_trecho() -> None:
     """Marcas sao removidas e offsets apontam o trecho."""
-    paragrafo = extrair_marcas("Antes {{data_fato:em 01/02/2020}} e {{data_denuncia:hoje}}.")
+    paragrafo = extrair_marcas("Antes {{data_ajuizamento:em 01/02/2020}} e {{data_citacao:hoje}}.")
     assert paragrafo.texto == "Antes em 01/02/2020 e hoje."
     trechos = [paragrafo.texto[m.inicio : m.fim] for m in paragrafo.marcas]
     assert trechos == ["em 01/02/2020", "hoje"]

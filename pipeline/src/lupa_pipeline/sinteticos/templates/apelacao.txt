@@ -1,0 +1,15 @@
+{{tipo_recurso:APELAÇÃO}}
+
+Recorrente: $autor
+
+Recorrido: $reu
+
+{{qualidade_recorrente:Qualidade do recorrente: $qualidade}}
+
+{{data_interposicao:Recurso interposto em $data}}.
+
+Interpõe apelação e pede a reforma da sentença quanto ao custo dos reparos.
+
+$pedido
+
+{{advogado_subscritor:Advogado subscritor: $advogado, OAB/GO $oab}}

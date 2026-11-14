@@ -9,11 +9,11 @@ do Lupa a partir dos eventos do gabarito.
 import random
 from dataclasses import dataclass
 from datetime import date
-from uuid import NAMESPACE_URL, UUID, uuid5
 
 import fitz
 
-from lupa_pipeline.dominio.enums import TipoFato
+from lupa_pipeline.dominio.chaves import chave_hash, normalizar_cnj
+from lupa_pipeline.dominio.enums import ClasseProcessual, Polo, QualidadeParte, TipoFato
 from lupa_pipeline.dominio.esquemas import Evidencia, Fato
 from lupa_pipeline.sinteticos import render
 from lupa_pipeline.sinteticos.gabarito import (
@@ -25,6 +25,7 @@ from lupa_pipeline.sinteticos.gabarito import (
     EventoGabarito,
     InjecaoGabarito,
     PaginaGabarito,
+    ParteGabarito,
     PecaGabarito,
     ResultadoEsperado,
     VetorInjecao,
@@ -56,7 +57,8 @@ class Conteudo:
         pecas: Peças do gabarito.
         paginas: Folhas do gabarito.
         eventos: Eventos do gabarito.
-        resultado_esperado: Resultado das três validações.
+        partes: Partes e página da qualificação.
+        resultado_esperado: Validações aplicáveis ao recurso.
         injecoes: Injeções plantadas.
     """
 
@@ -64,6 +66,7 @@ class Conteudo:
     documento: fitz.Document
     pecas: tuple[PecaGabarito, ...]
     paginas: tuple[PaginaGabarito, ...]
+    partes: tuple[ParteGabarito, ...]
     eventos: tuple[EventoGabarito, ...]
     resultado_esperado: tuple[ResultadoEsperado, ...]
     injecoes: tuple[InjecaoGabarito, ...]
@@ -201,99 +204,140 @@ def _valor_json(valor: object) -> object:
     return valor.isoformat() if isinstance(valor, date) else valor
 
 
-def _eventos_e_injecoes(
-    planos: list[PaginaPlano], ocultas: dict[int, VetorInjecao]
-) -> tuple[tuple[EventoGabarito, ...], tuple[InjecaoGabarito, ...]]:
+_FATOS_DO_RECORRENTE = {
+    TipoFato.TIPO_RECURSO,
+    TipoFato.DATA_INTIMACAO,
+    TipoFato.DATA_INTERPOSICAO,
+    TipoFato.QUALIDADE_RECORRENTE,
+    TipoFato.COMPROVANTE_PREPARO,
+    TipoFato.GRATUIDADE_PEDIDO,
+    TipoFato.GRATUIDADE_DECISAO,
+    TipoFato.ADVOGADO_SUBSCRITOR,
+    TipoFato.PROCURACAO,
+}
+
+
+def _ler_marcas(
+    roteiro: Roteiro, planos: list[PaginaPlano], ocultas: dict[int, VetorInjecao]
+) -> tuple[tuple[ParteGabarito, ...], tuple[EventoGabarito, ...], tuple[InjecaoGabarito, ...]]:
+    partes: list[ParteGabarito] = []
     eventos: list[EventoGabarito] = []
     injecoes: list[InjecaoGabarito] = []
     for plano in planos:
-        texto = plano.texto
         for marca in plano.marcas:
-            trecho = texto[marca.inicio : marca.fim]
+            trecho = plano.texto[marca.inicio : marca.fim]
             if marca.rotulo == ROTULO:
                 vetor = next(v for v in VISIVEIS if texto_visivel(v) == trecho.replace("\n", " "))
                 injecoes.append(
                     InjecaoGabarito(
-                        vetor=vetor, objetivo=INJECOES[vetor].objetivo, pagina=plano.numero,
-                        texto=INJECOES[vetor].texto, visivel=True,
+                        vetor=vetor,
+                        objetivo=INJECOES[vetor].objetivo,
+                        pagina=plano.numero,
+                        texto=INJECOES[vetor].texto,
+                        visivel=True,
                     )
-                )  # fmt: skip
+                )
+            elif marca.rotulo in ("parte_autora", "parte_re"):
+                autora = marca.rotulo == "parte_autora"
+                partes.append(
+                    ParteGabarito(
+                        nome=marca.valor,
+                        polo=Polo.ATIVO if autora else Polo.PASSIVO,
+                        qualidade=roteiro.configuracao.qualidade
+                        if autora
+                        else QualidadeParte.PARTICULAR,
+                        trecho=trecho,
+                        pagina=plano.numero,
+                        inicio=marca.inicio,
+                        fim=marca.fim,
+                    )
+                )
             elif marca.rotulo in _TIPOS_FATO:
+                tipo = TipoFato(marca.rotulo)
                 eventos.append(
                     EventoGabarito(
-                        tipo=TipoFato(marca.rotulo), valor=_valor_json(marca.valor),
-                        pagina=plano.numero, trecho=trecho, inicio=marca.inicio, fim=marca.fim,
+                        tipo=tipo,
+                        valor=_valor_json(marca.valor),
+                        sujeito=roteiro.partes.autor if tipo in _FATOS_DO_RECORRENTE else "",
+                        pagina=plano.numero,
+                        trecho=trecho,
+                        inicio=marca.inicio,
+                        fim=marca.fim,
                     )
-                )  # fmt: skip
+                )
     for folha, vetor in sorted(ocultas.items()):
         injecoes.append(
             InjecaoGabarito(
-                vetor=vetor, objetivo=INJECOES[vetor].objetivo, pagina=folha,
-                texto=INJECOES[vetor].texto, visivel=vetor == VetorInjecao.IMAGEM_COM_TEXTO,
+                vetor=vetor,
+                objetivo=INJECOES[vetor].objetivo,
+                pagina=folha,
+                texto=INJECOES[vetor].texto,
+                visivel=vetor == VetorInjecao.IMAGEM_COM_TEXTO,
             )
-        )  # fmt: skip
-    return tuple(eventos), tuple(injecoes)
+        )
+    return tuple(partes), tuple(eventos), tuple(injecoes)
+
+
+def _sujeito(numero: str, nome: str) -> str:
+    return chave_hash([numero, "parte-sintetica", nome]).hex() if nome else ""
 
 
 def fatos_do_gabarito(numero: str, eventos: tuple[EventoGabarito, ...]) -> list[Fato]:
-    """Converte eventos do gabarito em fatos do domínio (ids determinísticos).
-
-    Args:
-        numero: Número CNJ (base dos ids).
-        eventos: Eventos do gabarito.
-
-    Returns:
-        Fatos prontos para o motor de validações.
-    """
-    processo_id = uuid5(NAMESPACE_URL, f"lupa-sintetico:{numero}")
+    """Converte eventos literais em fatos com ids de 64 dígitos e sujeito determinístico."""
+    processo_id = id_processo(numero)
     fatos = []
-    for i, evento in enumerate(eventos):
-        pagina_id = uuid5(processo_id, f"folha:{evento.pagina}")
+    for indice, evento in enumerate(eventos):
+        pagina_id = chave_hash([processo_id, "folha", evento.pagina]).hex()
         evidencia = Evidencia(
-            id=uuid5(processo_id, f"evidencia:{i}"), pagina_id=pagina_id, trecho=evento.trecho,
-            inicio=evento.inicio, fim=evento.fim,
-        )  # fmt: skip
+            id=chave_hash([pagina_id, evento.inicio, evento.fim]).hex(),
+            pagina_id=pagina_id,
+            trecho=evento.trecho,
+            inicio=evento.inicio,
+            fim=evento.fim,
+        )
+        valor = evento.valor
+        if evento.tipo == TipoFato.PROCURACAO and valor.get("tipo") == "procuracao":
+            valor = {**valor, "outorgante": _sujeito(numero, valor["outorgante"])}
         fatos.append(
             Fato(
-                id=uuid5(processo_id, f"fato:{i}"), processo_id=processo_id, tipo=evento.tipo,
-                valor=evento.valor, evidencias=(evidencia,), extraido_por="gabarito-sintetico",
-                versao_extrator="1", confianca=1.0,
+                id=chave_hash([processo_id, "fato", indice]).hex(),
+                processo_id=processo_id,
+                tipo=evento.tipo,
+                sujeito=_sujeito(numero, evento.sujeito),
+                valor=valor,
+                evidencias=(evidencia,),
+                extraido_por="gabarito-sintetico",
+                versao_extrator="2",
+                confianca=1.0,
             )
-        )  # fmt: skip
+        )
     return fatos
 
 
 def resultado_esperado(
-    numero: str, eventos: tuple[EventoGabarito, ...], referencia: date
+    numero: str, classe: ClasseProcessual, eventos: tuple[EventoGabarito, ...], referencia: date
 ) -> tuple[ResultadoEsperado, ...]:
-    """Executa o catálogo criminal sobre os eventos do gabarito.
-
-    Args:
-        numero: Número CNJ.
-        eventos: Eventos do gabarito.
-        referencia: Data de referência.
-
-    Returns:
-        Um resultado esperado por validação.
-    """
-    achados = executar_catalogo(
-        para_modelo(fatos_do_gabarito(numero, eventos)), "criminal", referencia
-    )
+    """Aplica o catálogo da classe aos eventos conhecidos pelo gerador antes da extração."""
+    por_sujeito = {_sujeito(numero, e.sujeito): e.sujeito for e in eventos}
+    achados = executar_catalogo(para_modelo(fatos_do_gabarito(numero, eventos)), classe, referencia)
     return tuple(
         ResultadoEsperado(
-            validacao=a.validacao, resultado=a.resultado, valores=a.valores,
+            validacao=a.validacao,
+            sujeito=por_sujeito[a.sujeito],
+            resultado=a.resultado,
+            valores=a.valores,
             explicacao=a.explicacao,
         )
         for a in achados
-    )  # fmt: skip
+    )
 
 
 def _folhas_com_carimbo(
     roteiro: Roteiro, planos: list[PaginaPlano], rng: random.Random
 ) -> set[int]:
     escolhidas = {p.numero for p in planos if not p.vazia and rng.random() < 0.12}
-    recebimento = next(i for i, p in enumerate(roteiro.pecas, start=1) if p.tipo == "recebimento")
-    escolhidas.add(next(p.numero for p in planos if p.peca == recebimento))
+    inicial = next(i for i, p in enumerate(roteiro.pecas, start=1) if p.tipo == "peticao_inicial")
+    escolhidas.add(next(p.numero for p in planos if p.peca == inicial))
     return escolhidas
 
 
@@ -326,7 +370,7 @@ def gerar_conteudo(config: Configuracao) -> Conteudo:
         _desenhar_pagina(documento, p, config, rng, ocultas.get(p.numero), p.numero in carimbos)
         for p in planos
     )
-    eventos, injecoes = _eventos_e_injecoes(planos, ocultas)
+    partes, eventos, injecoes = _ler_marcas(roteiro, planos, ocultas)
     if VetorInjecao.METADADO_XMP in config.injecoes:
         injecoes += (
             InjecaoGabarito(
@@ -339,18 +383,11 @@ def gerar_conteudo(config: Configuracao) -> Conteudo:
         )
     numero = roteiro.partes.numero
     return Conteudo(
-        roteiro, documento, _pecas(roteiro, planos), paginas, eventos,
-        resultado_esperado(numero, eventos, roteiro.linha.referencia), injecoes,
+        roteiro, documento, _pecas(roteiro, planos), paginas, partes, eventos,
+        resultado_esperado(numero, config.classe, eventos, roteiro.linha.referencia), injecoes,
     )  # fmt: skip
 
 
-def id_processo(numero: str) -> UUID:
-    """UUID determinístico do processo sintético.
-
-    Args:
-        numero: Número CNJ.
-
-    Returns:
-        UUID v5.
-    """
-    return uuid5(NAMESPACE_URL, f"lupa-sintetico:{numero}")
+def id_processo(numero: str) -> str:
+    """Id público do processo no Data Vault a partir do número CNJ sintético."""
+    return chave_hash([normalizar_cnj(numero)]).hex()

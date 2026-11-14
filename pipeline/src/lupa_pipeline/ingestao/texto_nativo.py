@@ -148,6 +148,22 @@ def _ordenar_regiao(faixas: list[list[Bloco]]) -> list[Bloco]:
     return [b for faixa in faixas for b in ordenar_blocos(faixa)]
 
 
+def _cabe_na_regiao(regiao: list[list[Bloco]], faixa: list[Bloco]) -> bool:
+    """Prolonga colunas desiguais quando uma faixa só ocupa uma coluna já identificada."""
+    colunas = _cortes([b for f in regiao for b in f], eixo=0)
+    if len(colunas) < 2:
+        return False
+    inicios = [min(b.bbox[0] for b in coluna) for coluna in colunas]
+    limites = [*inicios[1:], float("inf")]
+    return all(
+        any(
+            abs(bloco.bbox[0] - inicio) <= SOBREPOSICAO_TOLERADA and bloco.bbox[2] < fim
+            for inicio, fim in zip(inicios, limites, strict=True)
+        )
+        for bloco in faixa
+    )
+
+
 def ordenar_blocos(blocos: list[Bloco]) -> list[Bloco]:
     """Ordena blocos horizontais em ordem de leitura.
 
@@ -170,7 +186,9 @@ def ordenar_blocos(blocos: list[Bloco]) -> list[Bloco]:
     ordenados: list[Bloco] = []
     regiao: list[list[Bloco]] = []
     for faixa in faixas:
-        if len(faixa) > 1 and len(_cortes(faixa, eixo=0)) > 1:
+        if (len(faixa) > 1 and len(_cortes(faixa, eixo=0)) > 1) or (
+            regiao and _cabe_na_regiao(regiao, faixa)
+        ):
             regiao.append(faixa)
             continue
         if regiao:

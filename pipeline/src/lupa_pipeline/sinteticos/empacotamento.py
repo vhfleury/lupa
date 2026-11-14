@@ -115,6 +115,7 @@ def _paginas_indice(documento: fitz.Document, conteudo: Conteudo) -> int:
 def _gabarito(conteudo: Conteudo, cenario: Cenario, arquivos: list[ArquivoGabarito]) -> Gabarito:
     processo = ProcessoGabarito(
         numero_cnj=conteudo.numero,
+        classe=conteudo.roteiro.configuracao.classe,
         cenario=cenario,
         diagnostico_esperado=DIAGNOSTICO_ESPERADO[cenario],
         semente=conteudo.roteiro.configuracao.semente,
@@ -122,8 +123,9 @@ def _gabarito(conteudo: Conteudo, cenario: Cenario, arquivos: list[ArquivoGabari
     )
     return Gabarito(
         processo=processo, pecas=conteudo.pecas, paginas=conteudo.paginas,
-        eventos=conteudo.eventos, resultado_esperado=conteudo.resultado_esperado,
-        arquivos=tuple(arquivos), injecoes=conteudo.injecoes,
+        partes=conteudo.partes, eventos=conteudo.eventos,
+        resultado_esperado=conteudo.resultado_esperado, arquivos=tuple(arquivos),
+        injecoes=conteudo.injecoes,
     )  # fmt: skip
 
 

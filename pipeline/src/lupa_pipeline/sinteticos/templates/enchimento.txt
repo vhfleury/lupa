@@ -1,23 +1,9 @@
-Consta do relatório de investigação que a equipe compareceu ao local e realizou diligências na vizinhança, sem localizar câmeras de monitoramento em funcionamento.
+Os documentos do contrato detalham a área da cobertura, as condições de acesso e os materiais utilizados. A planilha apresenta as quantidades medidas durante a vistoria.
 
-A testemunha $testemunha relatou que o movimento na $local era intenso naquele período e que não se recorda de detalhes adicionais.
+No ofício nº $numero_oficio, recebido em $data_distracao, a secretaria solicitou cópia dos comprovantes apresentados à administração do condomínio.
 
-Foram juntados aos autos o ofício nº $numero_oficio, recebido em $data_distracao, e a resposta da operadora de telefonia, sem informações relevantes para o caso.
+A inspeção registrada em $data_distracao descreve o estado da pintura e das estruturas de apoio. O relatório tem fotografias com referência ao pavimento e à fachada examinada.
 
-O acusado $reu, ouvido em sede policial, preferiu permanecer em silêncio, direito que lhe foi assegurado.
+As partes consultaram os anexos e pediram cópia dos quadros de medição. O levantamento discrimina as horas de mão de obra e os materiais necessários ao reparo.
 
-O exame complementar foi agendado e posteriormente realizado, conforme termo de comparecimento lavrado em $data_distracao.
-
-[[A defesa requereu vista dos autos fora de cartório, o que foi deferido.||A defesa constituída pediu cópia integral dos autos, deferida pela secretaria.]]
-
-O laudo de avaliação indireta estimou o valor dos bens em quantia compatível com a nota fiscal apresentada pela vítima $vitima.
-
-Certifica-se que o mandado foi cumprido e devolvido em cartório, sem intercorrências, em $data_distracao.
-
-Na análise do aparelho celular apreendido, não foram encontradas mensagens trocadas com a vítima no período investigado.
-
-A audiência designada para $data_distracao foi redesignada em razão da ausência justificada de testemunha arrolada pela acusação.
-
-Tabela de bens apreendidos: item 1, aparelho celular; item 2, mochila preta; item 3, documentos pessoais em nome de terceiro.
-
-O relatório final da autoridade policial concluiu pela existência de indícios suficientes de autoria e materialidade.
+[[A planilha de custos foi juntada aos autos.||A secretaria certificou o recebimento da planilha de custos.]] As notas fiscais permitem conferir os preços unitários e a extensão do serviço.

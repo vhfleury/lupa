@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
 
-from lupa_pipeline.dominio.enums import TipoPeca
+from lupa_pipeline.dominio.enums import ClasseProcessual, TipoPeca
 from lupa_pipeline.logging import configurar_logging, get_logger
 from lupa_pipeline.sinteticos.gabarito import TODOS_VETORES, Cenario, Gabarito, VetorInjecao
 from lupa_pipeline.sinteticos.medicao import medir, para_markdown
@@ -53,6 +53,7 @@ def _gerar(args: argparse.Namespace) -> int:
     )  # fmt: skip
     config = Configuracao(
         semente=args.semente, paginas_alvo=args.paginas, mistura=mistura(args.digitalizada),
+        classe=ClasseProcessual(args.classe),
         injecoes=injecoes,
         duas_colunas=tuple(TipoPeca(t) for t in args.duas_colunas.split(",") if t),
     )  # fmt: skip
@@ -95,6 +96,9 @@ def _parser_gerar() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="comando", required=True)
     um = sub.add_parser("processo", help="gera um processo nos três cenários")
     um.add_argument("--semente", type=int, required=True)
+    um.add_argument(
+        "--classe", choices=list(ClasseProcessual), default=ClasseProcessual.APELACAO_CIVEL
+    )
     um.add_argument("--paginas", type=int, default=40)
     um.add_argument("--digitalizada", type=float, default=0.25)
     um.add_argument("--cenarios", default=",".join(c.value for c in Cenario))

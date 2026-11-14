@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from lupa_pipeline.dominio.enums import ClasseProcessual
 from lupa_pipeline.sinteticos.gabarito import TODOS_VETORES, Cenario, Composicao
 from lupa_pipeline.sinteticos.referencia import (
     REFERENCIAS,
@@ -21,7 +22,13 @@ def test_dez_referencias_com_tamanhos_crescentes_e_misturas_extremas() -> None:
     nativas = [c.mistura[Composicao.NATIVA] for c in REFERENCIAS.values()]
     assert max(digitalizadas) >= 0.9 and max(nativas) >= 0.9
     assert len({c.semente for c in REFERENCIAS.values()}) == 10
-    assert {c.preventiva for c in REFERENCIAS.values()} == {"conforme", "atencao", "ausente"}
+    assert {c.classe for c in REFERENCIAS.values()} == set(ClasseProcessual)
+    assert {c.preparo.value for c in REFERENCIAS.values()} == {
+        "pago",
+        "pedido",
+        "deferido",
+        "ausente",
+    }
 
 
 def test_mistura_soma_um() -> None:

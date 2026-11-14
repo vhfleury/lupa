@@ -1,0 +1,5 @@
+CONTESTAÇÃO
+
+{{data_contestacao:Contestação apresentada em $data}}.
+
+A parte ré impugna especificamente o custo dos reparos. Requer que a perícia apure quais serviços constavam do contrato.

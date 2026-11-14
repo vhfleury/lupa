@@ -6,7 +6,8 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from lupa_pipeline.sinteticos.gabarito import VALIDACOES_CRIMINAIS, Gabarito
+from lupa_pipeline.sinteticos.gabarito import Gabarito
+from lupa_pipeline.validacoes.catalogo import validacoes_de
 
 Mutacao = Callable[[dict[str, Any]], None]
 
@@ -19,7 +20,9 @@ def _mutado(gabarito: Gabarito, mutacao: Mutacao) -> dict[str, Any]:
 
 def test_gabarito_gerado_passa_no_esquema_e_cobre_as_tres_validacoes(gabarito: Gabarito) -> None:
     """Gabarito gerado passa no esquema e cobre as tres validacoes."""
-    assert sorted(r.validacao for r in gabarito.resultado_esperado) == sorted(VALIDACOES_CRIMINAIS)
+    assert [r.validacao for r in gabarito.resultado_esperado] == [
+        v.nome for v in validacoes_de(gabarito.processo.classe)
+    ]
     assert gabarito.pagina(1).numero == 1
     assert Gabarito.model_validate_json(gabarito.model_dump_json()) == gabarito
 
