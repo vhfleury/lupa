@@ -9,7 +9,7 @@ Regras que valem para todo código do repositório. As seções de "Linguagem e 
 - Cada tarefa cita o requisito que atende (`RF-<ÁREA>-NN` ou `RNF-NN`). Cada teste novo cita o requisito na docstring. Commit e PR citam a tarefa.
 - Escopo: um único gabinete de desembargador, área cível. Não há `gabinete_id`, RLS por gabinete, papel administrador, pseudonimização, bloqueio de sigiloso, Redis, monitoramento nem backup; nada disso é reintroduzido sem mudança de especificação.
 - Tudo do frontend e do back que o atende (API, acesso, auditoria, agente) fica em `intranet/`. Tudo da pipeline de dados (worker, ingestão, eventos, validações, modelo e migrations do Data Vault, sintéticos) fica em `pipeline/`.
-- Transição: enquanto a tarefa do plano que move um diretório ou remove um componente não for concluída, os caminhos e comandos citados abaixo (`src/lupa/`, `tests/`, `front/`, `make verificar`) valem como estão. A tarefa que move ou remove atualiza este arquivo no mesmo commit.
+- Transição: a fase 1 do plano (reestruturação) moveu o código para `pipeline/` e `intranet/`; os caminhos e comandos abaixo são os novos. Enquanto a tarefa do plano que remove um componente não for concluída, ele continua valendo como está. A tarefa que move ou remove atualiza este arquivo no mesmo commit.
 
 ## Linguagem e estilo
 
@@ -20,14 +20,16 @@ Regras que valem para todo código do repositório. As seções de "Linguagem e 
 
 ## Testes
 
-- `pytest` com cobertura mínima de 90% em `lupa`, medida por `pytest-cov`.
+- `pytest` com cobertura mínima de 90% em cada pacote (`lupa_pipeline` e `lupa_intranet`), medida
+  por `pytest-cov`.
 - Testes nomeados pelo comportamento: `test_apelacao_interposta_no_sexto_dia_e_intempestiva`.
-- `scripts/verificar.sh` roda lint, formatação, tipagem e testes, parando no primeiro erro.
+- `scripts/verificar.sh` roda no host lint, formatação, tipagem e testes dos dois pacotes nos
+  contêineres, parando no primeiro erro.
 
 ## Contêineres
 
 - Tudo roda via `docker compose`. Nenhuma instrução de execução depende de instalação na máquina do desenvolvedor.
-- Imagens com usuário não root, `python:3.12-slim` como base, dependências fixadas em `requirements.txt` com hashes.
+- Imagens com usuário não root, `python:3.12-slim` como base, dependências fixadas em `pipeline/requirements*.txt` e `intranet/api/requirements*.txt` com hashes.
 
 ## Segurança
 
@@ -105,7 +107,8 @@ docs/
   `docs/planos/plano_<tema>_execucao.md`, junto com a lista de arquivos e o checklist de testes.
 - Se o algoritmo mudar durante a implementação, atualize a seção.
 - Execução (subida no servidor do piloto) em no máximo 3 etapas, por exemplo: commit e PR;
-  `docker compose up -d --build --wait`; `alembic upgrade head` no contêiner `api`, na ordem de
+  `docker compose up -d --build --wait`; `alembic -c pipeline/src/lupa_pipeline/migrations/alembic.ini
+  upgrade head` no contêiner `api`, na ordem de
   `docs/operacao/operacao.md` (Atualização de versão). Sem passo de conferência manual no banco;
   o risco real é coberto por teste de integração antes.
 - Revisão de plano a partir de comentários do usuário: altere só os itens citados, mantendo a
@@ -114,13 +117,15 @@ docs/
 ### Banco de dados
 
 - Migration só quando prevista no plano. Revisão Alembic em
-  `src/lupa/migrations/versions/vNNNN_<tema>.py`, com `upgrade` e `downgrade`; quando as
-  operações forem longas, ficam em `src/lupa/migrations/esquema_vNNNN.py`, como nas existentes.
-  Toda revisão tem teste que sobe e desce com o auxiliar `migrar` de `tests/conftest.py`
-  (exemplo: `tests/seguranca/test_migracao_0010.py`).
+  `pipeline/src/lupa_pipeline/migrations/versions/vNNNN_<tema>.py`, com `upgrade` e `downgrade`;
+  quando as operações forem longas, ficam em
+  `pipeline/src/lupa_pipeline/migrations/esquema_vNNNN.py`, como nas existentes. Toda revisão tem
+  teste que sobe e desce com o auxiliar `migrar` de `pipeline/tests/apoio/apoio_comum.py`
+  (exemplo: `pipeline/tests/seguranca/test_migracao_0010.py`).
 - No desenvolvimento a aplicação é feita pelo agente, nunca pelo usuário, no contêiner `api`
-  depois do rebuild: `docker compose exec api alembic -c src/lupa/migrations/alembic.ini upgrade
-  head`. No servidor do piloto, pelo responsável técnico, na ordem de `docs/operacao/operacao.md`.
+  depois do rebuild: `docker compose exec api alembic -c
+  pipeline/src/lupa_pipeline/migrations/alembic.ini upgrade head`. No servidor do piloto, pelo
+  responsável técnico, na ordem de `docs/operacao/operacao.md`.
 - Modelagem em Data Vault 2.0: toda tabela é hub, link ou satélite, inclusive autenticação,
   estado da ingestão e auditoria. Chave por hash da chave de negócio; só raw vault; a API lê por
   views. Correção de fato ou de peça é linha nova de satélite, nunca `UPDATE`.
@@ -132,7 +137,7 @@ docs/
 - Os nomes de tabelas, colunas e views são os do plano aprovado da 0.2; depois de criados, só
   mudam por plano.
 - Antes de alterar um modelo, uma view ou uma consulta existente, verifique quem consome o
-  resultado: rotas da API, `front/src/lib` e auditoria.
+  resultado: rotas da API, `intranet/web/src/lib` e auditoria.
 
 ### Qualidade do código
 
@@ -181,15 +186,16 @@ docs/
 
 - SvelteKit 2 com Svelte 5 e TypeScript. Prettier e ESLint sem avisos, `svelte-check` com
   `--fail-on-warnings`.
-- Lógica reaproveitada fica em `front/src/lib/`, por assunto; componente usado por mais de uma
-  tela, em `front/src/lib/componentes/`. Tela só em `front/src/routes/`.
+- Lógica reaproveitada fica em `intranet/web/src/lib/`, por assunto; componente usado por mais de
+  uma tela, em `intranet/web/src/lib/componentes/`. Tela só em `intranet/web/src/routes/`.
 
 ### Padrão de script
 
-- Script novo em `scripts/` segue os existentes: docstring de módulo com o uso (`python
-  scripts/<nome>.py ...`, no contêiner `api`), recusa a rodar fora do `LUPA_AMBIENTE` que lhe
+- Script novo vai em `pipeline/scripts/` (quando só usa `lupa_pipeline`) ou em
+  `intranet/api/scripts/` e segue os existentes: docstring de módulo com o uso (`python
+  <pacote>/scripts/<nome>.py ...`, no contêiner `api`), recusa a rodar fora do `LUPA_AMBIENTE` que lhe
   cabe quando apaga ou altera dados, saída com contagens e nunca com conteúdo de autos. Teste em
-  `tests/unit/`.
+  `tests/unit/` do pacote.
 
 ### Desenvolvimento orientado a testes
 
@@ -215,16 +221,23 @@ docs/
 
 #### Onde ficam
 
-- Os testes espelham `src/lupa/`: `tests/<pacote>/test_<modulo>.py`. `tests/unit/` guarda os
-  testes de `config.py`, `logging.py` e dos scripts.
+- Os testes espelham o pacote: `pipeline/tests/<subpacote>/test_<modulo>.py` para
+  `lupa_pipeline` e `intranet/api/tests/<subpacote>/test_<modulo>.py` para `lupa_intranet`. Teste
+  que exercita rota da API ou login fica em `intranet/api/tests/`, mesmo quando o assunto é da
+  pipeline. O `tests/unit/` de cada pacote guarda os testes de `config.py`, `logging.py` e dos
+  scripts.
+- `lupa_intranet` importa `lupa_pipeline`; o contrário é proibido e
+  `pipeline/tests/unit/test_dependencias.py` falha se acontecer.
 - Teste de migration fica na área do assunto, como `test_migracao_NNNN.py`. Backup e restauração
-  em `tests/backup/` (marcador `backup`, só com `LUPA_VERIFICAR_BACKUP=1`).
-- Front: unitários ao lado do módulo, `front/src/lib/**/<nome>.test.ts`; ponta a ponta em
-  `front/e2e/testes/`, fora do ciclo.
-- Fixtures e auxiliares compartilhados ficam em `tests/conftest.py` e no `conftest.py` da área
-  (`fabrica_fato`, `fabrica_processo`, `sessao`, `cliente`/`app_teste`, `logar`,
-  `gerar_numero_cnj`, `criar_pagina`, `relogio_fixo`, `resolvedor_falso`); ponto de partida
-  obrigatório antes de criar outro.
+  em `intranet/api/tests/backup/` (marcador `backup`, só com `LUPA_VERIFICAR_BACKUP=1`).
+- Front: unitários ao lado do módulo, `intranet/web/src/lib/**/<nome>.test.ts`; ponta a ponta em
+  `intranet/web/e2e/testes/`, fora do ciclo.
+- Fixtures e auxiliares comuns aos dois pacotes ficam em `pipeline/tests/apoio/` (no `pythonpath`
+  do pytest de ambos: `apoio_comum`, `apoio_ingestao`, `apoio_arquivos`); os da intranet, em
+  `intranet/api/tests/conftest.py`; depois vem o `conftest.py` da área (`fabrica_fato`,
+  `fabrica_processo`, `sessao`, `cliente`/`app_teste`, `logar`, `gerar_numero_cnj`,
+  `criar_pagina`, `relogio_fixo`, `resolvedor_falso`); ponto de partida obrigatório antes de criar
+  outro.
 - Marcadores: `integracao`, `injecao`, `agente`, `carga`, `llm`, `backup`. A configuração padrão
   exclui `carga` e `llm`.
 
@@ -234,9 +247,11 @@ docs/
   só na suíte completa.
 - Teste pulado não é verde. No `scripts/verificar.sh` as suítes com serviço rodam com
   `LUPA_EXIGIR_INTEGRACAO=1`, sem skip.
-- Interpretador: Python 3.12 único. O ambiente completo é o contêiner `api`, que copia `src/` e
-  `tests/` no build: `docker compose up -d --build --wait api` antes de rodar, senão o contêiner
-  testa código antigo. O `.venv` local serve só a testes sem banco.
+- Interpretador: Python 3.12 único. Os testes da pipeline rodam na imagem do `worker` e os da
+  intranet na da `api`, a partir de `/app` e com o `pyproject.toml` do pacote (`python -m pytest -c
+  pipeline/pyproject.toml pipeline/tests`; `-c intranet/api/pyproject.toml intranet/api/tests`). As
+  imagens copiam o código no build: `docker compose up -d --build --wait api worker` antes de
+  rodar, senão o contêiner testa código antigo. O `.venv` local serve só a testes sem banco.
 - Nunca apagar teste, afrouxar asserção, marcar `skip` ou `xfail` para chegar ao verde. Teste de
   funcionalidade que o plano aprovado remove sai no mesmo commit do código removido, citando a
   tarefa.
@@ -249,16 +264,20 @@ Antes de concluir uma tarefa:
 
 1. Revise o diff completo.
 2. Verifique se apenas arquivos relacionados ao escopo foram alterados.
-3. Confirme que não foram criadas migrations acidentalmente em `src/lupa/migrations/` e que
-   `requirements*.txt` só mudou por `make lock`.
-4. Quando alterar `src/` ou `tests/`, rode no contêiner `api`, depois do rebuild: `ruff check`,
-   `ruff format --check` e `mypy` sobre `src tests` e `python -m pytest` com cobertura, incluindo
-   os testes criados na tarefa. `make verificar` (integração, injeção, front e cabeçalhos) é
-   obrigatório quando a mudança toca ingestão, agente, segurança, migrations ou proxy.
-5. Quando alterar `front/`, rode `docker build --target verificacao front` (ou `npm run verificar`
-   em `front/`); quando alterar uma tela, reinicie o preview e confira no navegador; quando alterar
-   fluxo coberto pelo E2E, `bash front/scripts/e2e.sh` (reseta o administrador do banco de
-   desenvolvimento).
+3. Confirme que não foram criadas migrations acidentalmente em
+   `pipeline/src/lupa_pipeline/migrations/` e que os `requirements*.txt` só mudaram por `make lock`
+   (ou pelos mesmos `uv pip compile` do alvo `lock`, onde não houver `make`).
+4. Quando alterar `pipeline/` ou `intranet/api/`, rode depois do rebuild, no contêiner do pacote
+   (`worker` para a pipeline, `api` para a intranet): `ruff check`, `ruff format --check` e `mypy
+   --config-file <pacote>/pyproject.toml` sobre `src` e `tests` do pacote, e `python -m pytest -c
+   <pacote>/pyproject.toml <pacote>/tests` com cobertura, incluindo os testes criados na tarefa.
+   Mudança na pipeline também roda a suíte da intranet, que a importa. `bash scripts/verificar.sh`
+   (ou `make verificar`: integração, injeção, front e cabeçalhos) é obrigatório quando a mudança
+   toca ingestão, agente, segurança, migrations ou proxy.
+5. Quando alterar `intranet/web/`, rode `docker build --target verificacao intranet/web` (ou `npm
+   run verificar` em `intranet/web/`); quando alterar uma tela, reinicie o preview e confira no
+   navegador; quando alterar fluxo coberto pelo E2E, `bash intranet/web/scripts/e2e.sh` (reseta o
+   administrador do banco de desenvolvimento).
 6. Quando alterar Python e a suíte não puder rodar, execute ao menos
-   `python -m compileall -q src tests scripts`.
+   `python -m compileall -q pipeline intranet/api`.
 7. Informe claramente qualquer validação que não pôde ser executada.

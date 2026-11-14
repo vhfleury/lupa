@@ -4,6 +4,7 @@ services:
   api:
     build:
       context: .
+      dockerfile: intranet/api/Dockerfile
       args:
         INSTALAR_DEV: "true"
     env_file: .env
@@ -22,7 +23,7 @@ services:
     # (sub-rede fixa abaixo), para o rate limit por IP e a auditoria.
     command:
       - uvicorn
-      - lupa.api.app:create_app
+      - lupa_intranet.api.app:create_app
       - --factory
       - --host
       - 0.0.0.0
@@ -52,7 +53,7 @@ services:
   # rede `borda`. A imagem so e gerada se lint, typecheck e testes unitarios passarem.
   front:
     build:
-      context: ./front
+      context: ./intranet/web
     read_only: true
     tmpfs: [/tmp]
     networks: [borda]
@@ -69,7 +70,7 @@ services:
       XDG_DATA_HOME: /tmp/data
     volumes:
       # Etapa 8.1: a pasta inteira (Caddyfile + modos/ de certificado, LUPA_TLS_MODO).
-      - ./proxy:/etc/caddy:ro
+      - ./intranet/proxy:/etc/caddy:ro
     read_only: true
     tmpfs: [/tmp]
     ports:
@@ -88,10 +89,10 @@ services:
     security_opt: ["no-new-privileges:true"]
 
   # Testes ponta a ponta (Playwright) contra a stack real, pelo proxy. So sobe sob demanda:
-  # `docker compose run --rm e2e` (ver docs/sistema/front.md e front/scripts/e2e.sh).
+  # `docker compose run --rm e2e` (ver docs/sistema/front.md e intranet/web/scripts/e2e.sh).
   e2e:
     build:
-      context: ./front/e2e
+      context: ./intranet/web/e2e
     profiles: [e2e]
     environment:
       LUPA_E2E_URL: https://proxy:8443
@@ -113,16 +114,23 @@ services:
 
   # Worker da ingestao (Etapa 4A): so na rede interna `ingestao`, sem saida para fora e sem porta
   # publicada. Os parsers rodam em subprocesso com limites e sem variaveis LUPA_* (sandbox.py).
+  # Versao 0.2 (D21): a imagem do worker tambem roda a suite da pipeline (dependencias de dev).
   worker:
     build:
       context: .
-    command: ["python", "-m", "lupa.ingestao.worker"]
+      dockerfile: pipeline/Dockerfile
+      args:
+        INSTALAR_DEV: "true"
+    command: ["python", "-m", "lupa_pipeline.ingestao.worker"]
     env_file: .env
     environment:
       LUPA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       LUPA_MINIO_ENDPOINT: minio:9000
       LUPA_REDIS_URL: redis://redis:6379/0
       LUPA_VAULT_ENDERECO: http://vault:8200
+    # Processos sinteticos de referencia (4B.9), so leitura, para a regressao de injecao.
+    volumes:
+      - ./.sinteticos:/app/.sinteticos:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import os,redis; redis.Redis.from_url(os.environ['LUPA_REDIS_URL']).ping()"]
       interval: 10s

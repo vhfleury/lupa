@@ -19,12 +19,12 @@ htmlcov/
 # Autos sinteticos (Etapa 4B), grandes e fora do repositorio
 .sinteticos/
 # Front (Etapa 6)
-front/node_modules/
-front/build/
-front/.svelte-kit/
-front/e2e/node_modules/
-front/e2e/test-results/
-front/e2e/playwright-report/
+intranet/web/node_modules/
+intranet/web/build/
+intranet/web/.svelte-kit/
+intranet/web/e2e/node_modules/
+intranet/web/e2e/test-results/
+intranet/web/e2e/playwright-report/
 # Backups cifrados e chaves do periodo (Etapa 7.8), nunca no repositorio
 .backups/
 .backup-chaves/

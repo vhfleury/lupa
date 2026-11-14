@@ -31,7 +31,9 @@ a saída resumida (vermelho inicial e verde final).
   - Junto com T1.1 e T1.2. `criar_usuario_banco.py` ficou em `intranet/api/scripts/` (importa
     `lupa_intranet.acesso.instalacao`); scripts de backup, piloto e Vault ficam na raiz até a
     fase 2.
-- [ ] **T1.6** `pipeline/Dockerfile`, `intranet/api/Dockerfile`, `docker-compose.yml`, `Makefile`, `scripts/verificar.sh`, `.dockerignore`, `.gitignore`, `.env.example` e `.claude/agents/tdd.md` nos caminhos novos; `CLAUDE.md` atualizado. D21, D22. RNF-06, RNF-08.
+- [x] **T1.6** `pipeline/Dockerfile`, `intranet/api/Dockerfile`, `docker-compose.yml`, `Makefile`, `scripts/verificar.sh`, `.dockerignore`, `.gitignore`, `.env.example` e `.claude/agents/tdd.md` nos caminhos novos; `CLAUDE.md` atualizado. D21, D22. RNF-06, RNF-08.
+  - Comandos: `docker compose up -d --build --wait` → todos os serviços `healthy`;
+    `docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q` → ok.
 - [ ] **T1.7** Suíte completa da 0.1 verde nos dois pacotes, com 90% de cobertura em cada, e `docker build --target verificacao intranet/web` verde.
 
 ## Fase 2 — Remoções de infraestrutura
