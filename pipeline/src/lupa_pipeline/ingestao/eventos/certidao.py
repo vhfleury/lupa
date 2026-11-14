@@ -1,18 +1,12 @@
-"""Extrator da certidão: publicação da sentença e intimações da defesa, do MP e do réu."""
+"""Marcos de intimação e citação em certidões."""
 
-from lupa_pipeline.ingestao.eventos.base import regras_da_peca
-from lupa_pipeline.ingestao.eventos.modelo import Candidato, PecaTexto
-from lupa_pipeline.ingestao.eventos.padroes import Padroes
+from collections.abc import Iterator
+
+from lupa_pipeline.dominio.enums import TipoFato
+from lupa_pipeline.ingestao.eventos.base import Fonte
+from lupa_pipeline.ingestao.eventos.modelo import Candidato
 
 
-def extrair(peca: PecaTexto, padroes: Padroes) -> list[Candidato]:
-    """Eventos da peça pelas regras de ``dados/eventos.yaml``.
-
-    Args:
-        peca: Peça.
-        padroes: Padrões.
-
-    Returns:
-        Candidatos.
-    """
-    return regras_da_peca(peca, padroes)
+def extrair(fonte: Fonte) -> Iterator[Candidato]:
+    """Extrai os marcos distintos documentados na certidão."""
+    yield from fonte.datas(TipoFato.DATA_INTIMACAO, TipoFato.DATA_CITACAO)

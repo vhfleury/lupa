@@ -343,7 +343,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 ### Fase 4
 
 - [x] U: classificação de cada tipo de peça da seção 3.2 e `outros` (RF-PEC-01).
-- [ ] U: cada extrator de A6 com trecho que confere e que não confere (RF-FAT-01).
+- [x] U: cada extrator de A6 com trecho que confere e que não confere (RF-FAT-01).
 - [x] U: tempestividade: 15º e 16º dia útil, prazo em dobro, feriado local, recesso, embargos em
   5 dias, fato ausente, conflito (A7; RF-VAL-02, RF-FAT-02).
 - [x] U: preparo: comprovante, dispensa, gratuidade deferida, pedido sem decisão, ausência (A8;

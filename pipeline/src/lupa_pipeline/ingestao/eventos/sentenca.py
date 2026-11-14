@@ -1,55 +1,14 @@
-"""Extrator da sentença: data da sentença e reincidência.
+"""Data da decisão recorrida e decisão de gratuidade."""
 
-A pena aplicada não é extraída: ``TipoFato`` não tem tipo para ela e nenhuma validação a usa
-(registrado no relatório da 4F.2). A pena máxima pelo artigo citado na sentença serve só de
-reserva quando a denúncia não a trouxe (decidido em ``lupa_pipeline.ingestao.eventos.fatos``).
-"""
-
-import re
-from dataclasses import replace
+from collections.abc import Iterator
 
 from lupa_pipeline.dominio.enums import TipoFato
-from lupa_pipeline.ingestao.eventos import denuncia
-from lupa_pipeline.ingestao.eventos.base import buscar, candidato_do_trecho, regras_da_peca
-from lupa_pipeline.ingestao.eventos.modelo import Candidato, PecaTexto
-from lupa_pipeline.ingestao.eventos.padroes import Padroes
-
-REINCIDENCIA = re.compile(r"\b(?:reu|acusado|sentenciado)\s+e\s+(?P<v>reincidente|primario)\b")
-CONFIANCA_REINCIDENCIA = 0.85
-REGRA_PENA_SENTENCA = "pena#sentenca"
+from lupa_pipeline.ingestao.eventos import preparo
+from lupa_pipeline.ingestao.eventos.base import Fonte
+from lupa_pipeline.ingestao.eventos.modelo import Candidato
 
 
-def reincidencia(peca: PecaTexto) -> list[Candidato]:
-    """Reincidência declarada na dosimetria.
-
-    Args:
-        peca: Sentença.
-
-    Returns:
-        Candidatos com valor booleano.
-    """
-    return [
-        candidato_do_trecho(
-            pagina,
-            TipoFato.REINCIDENTE,
-            casamento.group("v") == "reincidente",
-            casamento.span(),
-            CONFIANCA_REINCIDENCIA,
-            "reincidente",
-        )
-        for pagina, casamento in buscar(REINCIDENCIA, peca)
-    ]
-
-
-def extrair(peca: PecaTexto, padroes: Padroes) -> list[Candidato]:
-    """Eventos da sentença.
-
-    Args:
-        peca: Sentença.
-        padroes: Padrões.
-
-    Returns:
-        Candidatos (a pena máxima vem marcada como reserva).
-    """
-    reserva = [replace(c, regra=REGRA_PENA_SENTENCA) for c in denuncia.pena_maxima(peca, padroes)]
-    return [*regras_da_peca(peca, padroes), *reincidencia(peca), *reserva]
+def extrair(fonte: Fonte) -> Iterator[Candidato]:
+    """Localiza a decisão recorrida e o dispositivo sobre gratuidade."""
+    yield from fonte.datas(TipoFato.DATA_DECISAO_RECORRIDA)
+    yield from preparo.decisao(fonte)

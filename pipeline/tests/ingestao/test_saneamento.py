@@ -115,19 +115,12 @@ def test_evidencia_sobre_o_normalizado_resolve_para_o_original_com_hash_do_domin
     inicio, fim, digest = hash_trecho_normalizado(original, alvo, alvo + 7)
     assert original[inicio:fim] == "Ѕistema"
     evidencia = Evidencia(
-        pagina_id=fitz_uuid(), trecho=original[inicio:fim], inicio=inicio, fim=fim
+        id="0" * 64, pagina_id="1" * 64, trecho=original[inicio:fim], inicio=inicio, fim=fim
     )
     assert evidencia.hash_trecho == digest == hash_trecho(original, inicio, fim)
     assert hash_trecho(original, 0, 5) == hash_trecho(original, 0, 5)
     with pytest.raises(ValueError, match="inválido"):
         hash_trecho(original, 5, 5)
-
-
-def fitz_uuid() -> Any:
-    """UUID qualquer para montar uma evidência."""
-    from uuid import uuid4
-
-    return uuid4()
 
 
 def test_substituir_mantem_o_mapa() -> None:
