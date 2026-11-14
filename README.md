@@ -7,12 +7,13 @@ O Lupa 0.2 auxilia um gabinete cível de segundo grau a localizar peças e prova
 Instale Docker com Compose v2, Bash e Python 3 no host. No Windows, execute os scripts em Git Bash. Em uma instalação nova, copie `.env.example` para `.env` e configure as credenciais de desenvolvimento. O procedimento completo, incluindo a criação das contas de banco e do primeiro desembargador, está no [manual de operação](docs/operacao/operacao.md#primeira-instalação).
 
 ```sh
-docker compose up -d db minio vault
+docker compose build api worker front
+docker compose up -d db minio minio-init vault
 bash scripts/vault_inicializar.sh
-docker compose up -d --build --wait
-docker compose exec api alembic -c pipeline/src/lupa_pipeline/migrations/alembic.ini upgrade head
-docker compose exec api python intranet/api/scripts/criar_usuario_banco.py
-docker compose exec api python intranet/api/scripts/criar_desembargador.py
+docker compose run --rm -T api alembic -c pipeline/src/lupa_pipeline/migrations/alembic.ini upgrade head
+docker compose run --rm -T api python intranet/api/scripts/criar_usuario_banco.py
+docker compose run --rm -T api python intranet/api/scripts/criar_desembargador.py
+docker compose up -d --wait
 ```
 
 Abra `https://localhost:8443`. Em `/api/saude`, os campos `api`, `db`, `minio` e `cofre` indicam a saúde dos componentes. O primeiro login conduz ao cadastro do autenticador e à troca de senha temporária.

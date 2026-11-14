@@ -24,6 +24,8 @@ Em **Auditoria**, filtre por período, usuário, processo ou ação. Consulte a 
 
 No relatório de uso, escolha o usuário ou processo e confira contagens, tokens e custo estimado. Para prestação de informações, exporte o período em CSV e registre a versão da ferramenta e do modelo. Use o [modelo de relatório](../conformidade/CONFORMIDADE.md#relatorio-uso-tribunal) para identificar o período, a finalidade e as medidas de supervisão humana.
 
+![Relatório por processo com contagens, tokens e custo estimado](../imagens/relatorio-uso.png)
+
 ## Descartar um processo
 
 Antes de acionar o descarte, confira o número CNJ e o processo selecionado. O descarte torna o conteúdo, as correções, as anotações e as conversas inacessíveis e elimina o envelope da chave. Os eventos e os vínculos técnicos permanecem para auditoria. Se houver aviso de limpeza pendente no storage, acione novamente a operação para concluir a remoção dos objetos. A implantação de desenvolvimento não dispõe de backup. [Procedimento operacional](../operacao/operacao.md#descarte).

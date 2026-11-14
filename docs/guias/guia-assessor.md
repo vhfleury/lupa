@@ -16,6 +16,8 @@ No **Dossiê**, localize a parte, o polo, a peça ou o fato da linha do tempo. A
 
 ![Dossiê do processo sintético](../imagens/dossie.png)
 
+![Trecho selecionado no visualizador de uma página sintética](../imagens/visualizador.png)
+
 ## Conferir uma validação
 
 **Conforme** indica que a regra encontrou os requisitos documentais e os valores compatíveis. **Atenção** aponta uma divergência identificada, como interposição após o vencimento ou ausência de comprovante. **Verificar** pede exame humano por ausência, conflito de fontes ou hipótese jurídica indeterminada. Leia a regra, o recorrente, os valores, a base legal e as páginas. Uma ação originária tem dossiê e fatos, com catálogo de validações vazio.
@@ -38,5 +40,7 @@ Se encontrar uma peça classificada incorretamente no índice do dossiê, anote 
 ## Conversar sobre os autos
 
 Perguntas como “Em que página está a procuração do recorrente?” e “Quais datas foram usadas para calcular o prazo da apelação?” permitem conferir a resposta diretamente na fonte. Abra cada citação relevante. Se a resposta indicar falta de evidência, procure o documento no índice. O chat recusa pedidos de minuta, estratégia ou conclusão sobre o mérito. Atingir um teto de uso gera aviso. Se o chat entrar em revisão, informe o desembargador.
+
+![Chat com citação de página e recusa de pedido de minuta](../imagens/chat.png)
 
 Os trechos consultados podem incluir nomes reais e dados de processo sigiloso e podem ser enviados ao fornecedor externo do modelo. Siga as condições de uso acordadas com o tribunal. A auditoria registra atos, horários, identificadores e uso do modelo. Mensagens e páginas têm armazenamento cifrado próprio. [Condições de tratamento](../conformidade/CONFORMIDADE.md).
