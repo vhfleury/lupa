@@ -18,6 +18,7 @@ class Periodo:
     inicio: date
     fim: date
     descricao: str
+    fonte: str = ""
 
     def contem(self, dia: date) -> bool:
         """Diz se o dia está no período.
@@ -37,6 +38,16 @@ class Calendario:
 
     feriados: Mapping[date, str] = field(default_factory=dict)
     suspensoes: Sequence[Periodo] = ()
+    fontes: Mapping[date, str] = field(default_factory=dict)
+
+    def fonte_em(self, dia: date) -> str:
+        """Identifica a origem da exclusão de um dia da contagem."""
+        if dia in self.feriados:
+            return self.fontes.get(dia, self.feriados[dia])
+        for periodo in self.suspensoes:
+            if periodo.contem(dia):
+                return periodo.fonte or periodo.descricao
+        return "art. 216 do CPC"
 
 
 @dataclass(frozen=True)

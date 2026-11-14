@@ -353,7 +353,10 @@ a saída resumida (vermelho inicial e verde final).
 - [x] **T4.6** Catálogo por classe e dados do CPC (`prazos_recursos.yaml`, `preparo.yaml`, `cabimento_art1015.yaml`). D16. RF-VAL-01.
   - As cinco consultas por classe falharam no catálogo por matéria da 0.1. No worker,
     `python -m pytest pipeline/tests/validacoes/test_catalogo_civel.py --no-cov -q` passou nos cinco casos da tabela 3.1.
-- [ ] **T4.7** Tempestividade. A7. RF-VAL-02.
+- [x] **T4.7** Tempestividade. A7. RF-VAL-02.
+  - A regra vazia falhou ao calcular o vencimento. O teste do decreto 5.123/2026 também acusou
+    a ausência do feriado transferido para 30/10. No worker, `python -m pytest pipeline/tests/validacoes/test_tempestividade.py --no-cov -q`
+    passou nos oito casos de prazo, feriado, suspensão, falta e conflito de fatos.
 - [ ] **T4.8** Preparo. A8. RF-VAL-03.
 - [ ] **T4.9** Representação. A9. RF-VAL-04.
 - [ ] **T4.10** Cabimento do agravo. A10. RF-VAL-05.
