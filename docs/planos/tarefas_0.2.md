@@ -427,7 +427,10 @@ a saída resumida (vermelho inicial e verde final).
   - A documentação descreve a conexão que detém a fila, a evidência na página, o sujeito do achado,
     o histórico e o descarte. A conferência de links e âncoras locais incluiu os nove documentos
     de arquitetura e sistema. Os exemplos de CLI usam o gabarito verificado em T4.11.
-- [ ] **T7.2** Guias do assessor e do desembargador. RF-DOC-01.
+- [x] **T7.2** Guias do assessor e do desembargador. RF-DOC-01.
+  - Os guias descrevem os dois papéis, trazem a conta de prazo de 03/08 a 24/08/2026, a fonte
+    das citações, os limites do chat e o uso da auditoria. Links internos e destinos das capturas
+    foram conferidos contra os arquivos da suíte de telas.
 - [ ] **T7.3** `docs/conformidade/CONFORMIDADE.md` e `docs/operacao/operacao.md`. RF-DOC-02.
 - [ ] **T7.4** ADRs 0013 a 0016 e `docs/decisoes/registro.md`.
 - [ ] **T7.5** `README.md`, `CONTRIBUTING.md`, `CLAUDE.md`, `docs/README.md`, `CHANGELOG.md` e versão `0.2.0`.
