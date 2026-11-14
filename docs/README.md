@@ -11,10 +11,17 @@
 
 ## Especificação
 
-- [especificacao/requisitos-v1.md](especificacao/requisitos-v1.md): decisões de produto da primeira versão.
+- [especificacao/0.2/especificacao.md](especificacao/0.2/especificacao.md): especificação da versão 0.2 (gabinete único, área cível), em revisão; fonte da verdade da 0.2.
+- [especificacao/requisitos-v1.md](especificacao/requisitos-v1.md): decisões de produto da primeira versão; substituído na 0.2.
 - [especificacao/arquitetura.md](especificacao/arquitetura.md): desenho original do sistema e princípios.
-- [especificacao/catalogo-validacoes.md](especificacao/catalogo-validacoes.md): regras jurídicas das validações.
+- [especificacao/catalogo-validacoes.md](especificacao/catalogo-validacoes.md): regras jurídicas das validações criminais; substituído na 0.2.
 - [especificacao/prompt-injection.md](especificacao/prompt-injection.md): controles contra injeção de instruções nos autos.
+
+## Planos
+
+- [planos/plano_0.2.md](planos/plano_0.2.md): plano da 0.2 (o que muda, problemas, decisões, fases e execução), em revisão.
+- [planos/plano_0.2_execucao.md](planos/plano_0.2_execucao.md): passo a passo dos algoritmos e checklist de testes da 0.2.
+- [planos/tarefas_0.2.md](planos/tarefas_0.2.md): tarefas da 0.2, cada uma ligada ao requisito que atende.
 
 ## Como o sistema funciona
 

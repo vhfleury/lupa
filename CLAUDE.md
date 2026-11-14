@@ -1,6 +1,15 @@
 # Lupa — Convenções do projeto
 
-Regras que valem para todo código do repositório. As seções até "Entrega de cada etapa" vieram do plano de execução da v1; "Desenvolvimento" rege o trabalho posterior ao piloto.
+Regras que valem para todo código do repositório. As seções de "Linguagem e estilo" a "Segurança" vieram do plano de execução da v1; "Versão 0.2" e "Desenvolvimento" regem o trabalho atual.
+
+## Versão 0.2
+
+- A fonte da verdade é [a especificação da 0.2](docs/especificacao/0.2/especificacao.md); o código deriva dela. Divergência entre código e especificação é bug do código ou mudança de especificação aprovada antes.
+- Ordem fixa, cada fase só começa com a anterior aprovada pelo usuário: especificação, plano (`docs/planos/`), tarefas (`docs/planos/tarefas_0.2.md`), implementação tarefa por tarefa com TDD.
+- Cada tarefa cita o requisito que atende (`RF-<ÁREA>-NN` ou `RNF-NN`). Cada teste novo cita o requisito na docstring. Commit e PR citam a tarefa.
+- Escopo: um único gabinete de desembargador, área cível. Não há `gabinete_id`, RLS por gabinete, papel administrador, pseudonimização, bloqueio de sigiloso, Redis, monitoramento nem backup; nada disso é reintroduzido sem mudança de especificação.
+- Tudo do frontend e do back que o atende (API, acesso, auditoria, agente) fica em `intranet/`. Tudo da pipeline de dados (worker, ingestão, eventos, validações, modelo e migrations do Data Vault, sintéticos) fica em `pipeline/`.
+- Transição: enquanto a tarefa do plano que move um diretório ou remove um componente não for concluída, os caminhos e comandos citados abaixo (`src/lupa/`, `tests/`, `front/`, `make verificar`) valem como estão. A tarefa que move ou remove atualiza este arquivo no mesmo commit.
 
 ## Linguagem e estilo
 
@@ -25,10 +34,11 @@ Regras que valem para todo código do repositório. As seções até "Entrega de
 - Segredos só por arquivo `.env` ignorado pelo git ou pelo Vault. Nunca em código ou em imagem.
 - Nenhum conteúdo de autos, senha, token ou texto de pergunta entra em log.
 
-## Entrega de cada etapa
+## Entrega de cada tarefa
 
-- Registre a entrega na seção correspondente de [Etapas da primeira versão](docs/etapas/ETAPAS.md#etapas-e-pendencias). Inclua o que foi feito, as decisões que o roteiro não previa, o que ficou de fora e por quê, o comando para rodar os testes e a saída resumida.
-- Não alterar arquivos de outras etapas sem registrar a mudança na seção da entrega.
+- Marque a tarefa em `docs/planos/tarefas_0.2.md` com o requisito atendido, o comando para rodar os testes e a saída resumida (vermelho inicial e verde final).
+- Decisão que o plano não previa para a tarefa e volta ao usuário antes de seguir.
+- `docs/etapas/ETAPAS.md` é o histórico da v1 e não recebe entregas novas.
 
 ## Desenvolvimento
 
@@ -40,15 +50,15 @@ docs/
     arquitetura.md  limite do sistema, componentes e uma execução de ponta a ponta, como está hoje
     adr/            registros de decisão de arquitetura, um arquivo NNNN-titulo.md por decisão
     runbooks/       procedimentos operacionais, um arquivo <verbo>-<objeto>.md por operação
-    planos/         planos de mudança, escritos antes da implementação
-    especificacao/  requisitos, arquitetura, catálogo de validações, prompt injection
+    planos/         planos de mudança, escritos antes da implementação; tarefas_0.2.md
+    especificacao/  0.2/especificacao.md é a vigente; os demais arquivos são da v1
     sistema/        como cada parte funciona hoje (modelo de dados, ingestão, agente, front...)
     decisoes/       registro.md: decisões tomadas e o que cada uma substitui
     dividas/        análises de bugs e dívidas técnicas e os registros das correções
     analises/       análises exploratórias, levantamentos e relatórios datados (md ou pdf)
     incidentes/     post-mortems: data, sintoma, causa, correção e pendências
     operacao/       manual do responsável técnico, backup e runbooks
-    etapas/         ETAPAS.md reúne relatórios, pendências e conformidade por etapa
+    etapas/         ETAPAS.md reúne relatórios, pendências e conformidade por etapa da v1
     conformidade/   CONFORMIDADE.md reúne as minutas LGPD e Res. CNJ 615/2025
     guias/          guias dos usuários; capturas de tela em imagens/
     contexto/       pesquisa usada no desenho
@@ -57,8 +67,10 @@ docs/
 - Todo plano novo deve ser criado em `docs/planos/`.
 - Criar um plano não abre branch, commit nem PR: o arquivo fica na branch atual, sem commit;
   branch e PR só na implementação.
-- Documento de arquitetura novo: em `docs/especificacao/` quando define requisito ou desenho, em
-  `docs/sistema/` quando descreve como uma parte funciona. Mudança em comportamento já descrito
+- Requisito novo ou alterado entra em `docs/especificacao/0.2/especificacao.md`, com
+  identificador e critério de aceite, e é aprovado pelo usuário antes do plano. Documento de
+  desenho novo: em `docs/especificacao/0.2/` quando define requisito, em `docs/sistema/` quando
+  descreve como uma parte funciona. Mudança em comportamento já descrito
   atualiza o documento de `docs/sistema/` correspondente.
 - Decisão nova vai em `docs/decisoes/registro.md`, na seção de decisões posteriores à v1, dizendo
   o que substitui. Decisão que define a arquitetura ganha também um ADR em
@@ -81,8 +93,10 @@ docs/
   sai com decisão "pendente: usuário (fase N)"; adiamento só por decisão explícita dele,
   registrada.
 - O plano abre com a seção "O que muda": tabela `Objeto | Antes | Depois` (cada tabela, coluna,
-  índice, função ou política RLS do banco, com o tipo), tabela `Arquivo | Ação` e lista "O que
-  não muda".
+  índice, função ou view do banco, com o tipo), tabela `Arquivo | Ação` e lista "O que
+  não muda". No plano que recria o banco do zero a tabela é `Objeto | Depois`, e o que existia na
+  0.1 entra numa lista única de objetos removidos.
+- Cada fase do plano cita os requisitos da especificação que atende.
 - Cada fato aparece uma vez. Problemas e decisões numerados; fases de uma linha que citam P/D.
   Sem seção de motivação, história, justificativa ou resultado previsto.
 - Seção "Passo a passo do algoritmo": passos numerados, na ordem de execução, um por linha; cada
@@ -107,14 +121,18 @@ docs/
 - No desenvolvimento a aplicação é feita pelo agente, nunca pelo usuário, no contêiner `api`
   depois do rebuild: `docker compose exec api alembic -c src/lupa/migrations/alembic.ini upgrade
   head`. No servidor do piloto, pelo responsável técnico, na ordem de `docs/operacao/operacao.md`.
-- Tabela nova com `gabinete_id` nasce com RLS (`ENABLE` e `FORCE`) e a política de gabinete; os
-  privilégios do papel `lupa_app` seguem `docs/sistema/modelo-de-dados.md`.
+- Modelagem em Data Vault 2.0: toda tabela é hub, link ou satélite, inclusive autenticação,
+  estado da ingestão e auditoria. Chave por hash da chave de negócio; só raw vault; a API lê por
+  views. Correção de fato ou de peça é linha nova de satélite, nunca `UPDATE`.
+- Não há `gabinete_id` nem RLS. A aplicação opera sob o papel `lupa_app`, só com DML; os
+  privilégios seguem `docs/sistema/modelo-de-dados.md`.
 - Coluna nova com conteúdo de autos, identidade de parte ou mensagem do chat é cifrada conforme
   `docs/sistema/criptografia.md`; nunca em claro.
 - Ao escrever SQL, priorize queries legíveis e evite `SELECT *` quando não for necessário.
-- Preserve os nomes atuais das tabelas e colunas.
-- Antes de alterar um modelo ou uma consulta existente, verifique quem consome o resultado: rotas
-  da API, `front/src/lib`, auditoria e backup.
+- Os nomes de tabelas, colunas e views são os do plano aprovado da 0.2; depois de criados, só
+  mudam por plano.
+- Antes de alterar um modelo, uma view ou uma consulta existente, verifique quem consome o
+  resultado: rotas da API, `front/src/lib` e auditoria.
 
 ### Qualidade do código
 
@@ -127,7 +145,8 @@ docs/
   código.
 - Não remova código aparentemente não utilizado sem verificar suas dependências.
 - Não modifique configurações globais do projeto (`pyproject.toml`, `docker-compose*.yml`,
-  `Dockerfile`, `Caddyfile`, `eslint.config.js`) sem necessidade. Nunca baixe o mínimo de
+  `Dockerfile`, `Caddyfile`, `eslint.config.js`) sem necessidade; a reestruturação prevista no
+  plano da 0.2 é necessidade, limitada ao que o plano lista. Nunca baixe o mínimo de
   cobertura nem use `# type: ignore`, `# noqa` ou exclusão de cobertura para silenciar um erro que
   o código deveria resolver.
 
@@ -190,7 +209,8 @@ docs/
   `docker-compose.yml`: PostgreSQL e MinIO reais; modelo, cofre e resolução de nomes por dublês
   que já existem (cliente roteirizado do agente, cofre em memória, `ResolvedorFalso`).
 - Todos os dados são sintéticos. Nunca número de processo, nome ou trecho de autos reais em teste
-  ou fixture; nunca ler `.env`, `.segredos/`, `.vault-dev/`, `.backups/` ou `.backup-chaves/`.
+  ou fixture; nunca ler `.env`, `.segredos/`, `.vault-dev/`, `.backups/`, `.backup-chaves/` ou
+  `dados/` (processos reais, fora do git).
 - Tempo é injetado (`relogio_fixo`, datas fixas), nunca esperado com `sleep` ou relógio real.
 
 #### Onde ficam
@@ -217,7 +237,9 @@ docs/
 - Interpretador: Python 3.12 único. O ambiente completo é o contêiner `api`, que copia `src/` e
   `tests/` no build: `docker compose up -d --build --wait api` antes de rodar, senão o contêiner
   testa código antigo. O `.venv` local serve só a testes sem banco.
-- Nunca apagar teste, afrouxar asserção, marcar `skip` ou `xfail` para chegar ao verde.
+- Nunca apagar teste, afrouxar asserção, marcar `skip` ou `xfail` para chegar ao verde. Teste de
+  funcionalidade que o plano aprovado remove sai no mesmo commit do código removido, citando a
+  tarefa.
 - Teste existente só muda junto com a regra que ele fixa, no mesmo commit, com o motivo no plano;
   divergência sem mudança de regra é bug e para a tarefa.
 

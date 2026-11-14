@@ -788,6 +788,11 @@ Tomadas depois da Etapa 8, ao simplificar o projeto. Cada uma diz o que substitu
 
 - **SemVer com tag `vX.Y.Z` no `main`.** A primeira versão publicada é a `0.1.0`. A versão vale para o monorepo inteiro e é declarada no `pyproject.toml` e no `front/package.json`. O bump e o `CHANGELOG.md` entram por PR no `develop`; depois do PR `develop` → `main`, o responsável técnico cria a tag e a release no GitHub. Substitui a versão `0.0.1` sem tag e o esquema em aberto no `CHANGELOG.md`.
 
+### Versão 0.2 (novembro de 2026)
+
+- **Escopo da 0.2: um gabinete, área cível, Data Vault, `intranet/` e `pipeline/`.** As 22 decisões de escopo, com a resposta de cada uma, estão na seção 7 da [especificação da 0.2](../especificacao/0.2/especificacao.md); o que sai da 0.1.0 está na seção 8. Substitui os ADRs 0001 (isolamento por gabinete com RLS) e 0002 (fila RQ) e as decisões da v1 sobre pseudonimização, bloqueio de sigiloso, monitoramento e backup. Os ADRs novos são escritos na implementação, depois do plano aprovado.
+- **Método: especificação, plano, tarefas, implementação.** A especificação é a fonte da verdade e cada fase depende da aprovação da anterior. Substitui a entrega por etapa registrada em `docs/etapas/ETAPAS.md`.
+
 ## Resultado das revisões
 
 | Revisão | Resultado |
