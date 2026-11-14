@@ -59,7 +59,7 @@ docs/
     dividas/        análises de bugs e dívidas técnicas e os registros das correções
     analises/       análises exploratórias, levantamentos e relatórios datados (md ou pdf)
     incidentes/     post-mortems: data, sintoma, causa, correção e pendências
-    operacao/       manual do responsável técnico, backup e runbooks
+    operacao/       manual do responsável técnico e runbooks
     etapas/         ETAPAS.md reúne relatórios, pendências e conformidade por etapa da v1
     conformidade/   CONFORMIDADE.md reúne as minutas LGPD e Res. CNJ 615/2025
     guias/          guias dos usuários; capturas de tela em imagens/
@@ -228,8 +228,7 @@ docs/
   scripts.
 - `lupa_intranet` importa `lupa_pipeline`; o contrário é proibido e
   `pipeline/tests/unit/test_dependencias.py` falha se acontecer.
-- Teste de migration fica na área do assunto, como `test_migracao_NNNN.py`. Backup e restauração
-  em `intranet/api/tests/backup/` (marcador `backup`, só com `LUPA_VERIFICAR_BACKUP=1`).
+- Teste de migration fica na área do assunto, como `test_migracao_NNNN.py`.
 - Front: unitários ao lado do módulo, `intranet/web/src/lib/**/<nome>.test.ts`; ponta a ponta em
   `intranet/web/e2e/testes/`, fora do ciclo.
 - Fixtures e auxiliares comuns aos dois pacotes ficam em `pipeline/tests/apoio/` (no `pythonpath`
@@ -238,7 +237,7 @@ docs/
   `fabrica_processo`, `sessao`, `cliente`/`app_teste`, `logar`, `gerar_numero_cnj`,
   `criar_pagina`, `relogio_fixo`, `resolvedor_falso`); ponto de partida obrigatório antes de criar
   outro.
-- Marcadores: `integracao`, `injecao`, `agente`, `carga`, `llm`, `backup`. A configuração padrão
+- Marcadores: `integracao`, `injecao`, `agente`, `carga`, `llm`. A configuração padrão
   exclui `carga` e `llm`.
 
 #### Regras

@@ -77,7 +77,20 @@ a saída resumida (vermelho inicial e verde final).
     já na linha de base), cobertura 93,98%; intranet 282 passed, 1 failed
     (`test_remove_dados_em_cascata_do_processo`, já na linha de base), 2 skipped, 3 deselected,
     cobertura 98,71%. `ruff check`, `ruff format --check` e `mypy` nos dois pacotes: ok.
-- [ ] **T2.2** Remover backup: serviços do compose, scripts, `tests/backup/`, marcador `backup` e `docs/operacao/backup.md`. Decisão 16.
+- [x] **T2.2** Remover backup: serviços do compose, scripts, `tests/backup/`, marcador `backup` e `docs/operacao/backup.md`. Decisão 16.
+  - Saíram os serviços `backup` e `backup-agendado` (e o bloco de `backup-agendado` em
+    `docker-compose.prod.yml`), `scripts/{backup,backup_comum,backup_conteiner,cron_backup,expurgar_backups,restaurar}.sh`,
+    `intranet/api/tests/backup/` (com o registro do marcador `backup`, feito no `conftest.py` da
+    pasta), o passo de backup de `scripts/verificar.sh`, as variáveis `LUPA_BACKUP_*` de
+    `.env.example`, as menções em `CLAUDE.md` e `docs/operacao/backup.md`. `.backups/` e
+    `.backup-chaves/` continuam em `.gitignore` e `.dockerignore`, porque as pastas podem existir
+    na máquina.
+  - Sem teste novo além do de T2.1 (`Settings` não tem chave de backup; já verde antes).
+    Comandos: `bash -n scripts/verificar.sh` → ok; `docker compose config -q` e
+    `docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q` → ok; depois de
+    `docker compose up -d --build --wait api`, `docker compose exec api python -m pytest -c
+    intranet/api/pyproject.toml intranet/api/tests` → 282 passed, 1 failed (o da linha de base),
+    3 deselected, sem os 2 skipped de backup; cobertura 98,71%.
 - [ ] **T2.3** Remover o perfil de produção: `docker-compose.prod.yml`, `instalar_piloto.sh`, `conferir_piloto.py`, `preparar_repositorio.md`, `vault/producao/` e os modos `acme` e `fornecido` do proxy. D25. RES-11.
 
 ## Fase 3 — Data Vault e gabinete único

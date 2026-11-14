@@ -25,7 +25,7 @@ intranet/web/.svelte-kit/
 intranet/web/e2e/node_modules/
 intranet/web/e2e/test-results/
 intranet/web/e2e/playwright-report/
-# Backups cifrados e chaves do periodo (Etapa 7.8), nunca no repositorio
+# Backups cifrados e chaves da 0.1 (backup removido na 0.2), nunca no repositorio
 .backups/
 .backup-chaves/
 # Vault de desenvolvimento (Etapa 7.2): chave de unseal e token raiz, nunca no repositorio

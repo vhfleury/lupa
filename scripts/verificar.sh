@@ -45,13 +45,3 @@ if [ "${LUPA_VERIFICAR_E2E:-0}" = "1" ]; then
 else
   echo "== e2e == (pulado; defina LUPA_VERIFICAR_E2E=1 para rodar a suite Playwright)"
 fi
-# Etapa 7.8: backup cifrado, restauracao em ambiente limpo e expurgo, opcional e so no host (precisa
-# de docker). Usa banco e bucket de TESTE criados pelo proprio teste. Ative com LUPA_VERIFICAR_BACKUP=1.
-if [ "${LUPA_VERIFICAR_BACKUP:-0}" = "1" ]; then
-  echo "== backup cifrado e restauracao =="
-  PY="${PYTHON:-python}"
-  "$PY" -m pytest -c intranet/api/pyproject.toml -m backup intranet/api/tests/backup --no-cov -q \
-    --confcutdir=intranet/api/tests/backup
-else
-  echo "== backup == (pulado; defina LUPA_VERIFICAR_BACKUP=1 para testar backup e restauracao)"
-fi

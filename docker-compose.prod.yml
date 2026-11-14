@@ -5,11 +5,10 @@
 # - Nenhuma porta publicada alem do proxy: 443 (HTTPS) e 80 (so desafio ACME e redirecionamento).
 #   A porta direta da API (API_PORTA_HOST) e o console do MinIO deixam de existir.
 # - restart: unless-stopped, limites de memoria e CPU e logs com rotacao em todos os servicos.
-# - read_only onde a imagem ja permite (front, proxy, redis, backup-agendado).
+# - read_only onde a imagem ja permite (front, proxy, redis).
 # - Vault com mlock (cap IPC_LOCK, vault/producao/lupa.hcl).
 # - Dados em LUPA_DADOS_DIR (de preferencia outro disco), um subdiretorio por volume; o
 #   instalar_piloto.sh cria os subdiretorios com o dono certo de cada imagem.
-# - backup-agendado sempre ligado (diario + expurgo semanal) gravando em LUPA_BACKUP_DIR.
 # Limites: padroes para o host recomendado (8 CPUs, 16 GB); ajuste por variavel se preciso.
 
 x-comum: &comum
@@ -102,13 +101,6 @@ services:
     logging:
       driver: json-file
       options: {max-size: 1m, max-file: "2"}
-
-  backup-agendado:
-    <<: *comum
-    profiles: !reset []
-    deploy:
-      resources:
-        limits: {cpus: "1", memory: 512m}
 
 volumes:
   db-dados:
