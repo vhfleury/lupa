@@ -48,6 +48,7 @@ class Processado:
 
     nome: str
     processo_id: str
+    numero_cnj: str
     assessor: UsuarioTeste
     gabarito: Gabarito
     nomes: set[str]
@@ -95,6 +96,7 @@ def _carregar(
         return Processado(
             nome,
             processo.hex(),
+            dados.numero_cnj,
             assessor,
             gabarito,
             nomes,
@@ -131,6 +133,7 @@ def ingeridos(
             pasta = destino / nome / cenario.value
             gabarito = Gabarito.model_validate_json((pasta / "gabarito.json").read_text("utf-8"))
             assessor = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
+            # A fixture compartilha o MinIO entre bancos efêmeros; cada execução usa seu prefixo.
             execucao = enviar_e_processar(
                 fabrica,
                 settings,
@@ -139,7 +142,6 @@ def ingeridos(
                 pasta / "autos.pdf",
                 gabarito.processo.classe,
                 "teste.injecao",
-                numero=gabarito.processo.numero_cnj,
             )
             alvos.append(execucao.processo_id)
             assert execucao.estado.value == "concluido"
@@ -173,6 +175,7 @@ def _proibidos(alvo: Processado, outro: Processado) -> list[str]:
     return [
         *(outro.nomes - alvo.nomes),
         outro.processo_id,
+        outro.numero_cnj,
         outro.gabarito.processo.numero_cnj,
         *ocultos,
     ]
