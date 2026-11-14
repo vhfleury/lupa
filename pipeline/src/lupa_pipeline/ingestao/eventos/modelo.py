@@ -1,103 +1,62 @@
-"""Estruturas da extração de eventos: páginas e peças de entrada, candidatos de saída."""
+"""Textos e candidatos com posição verificável na página de origem (A6)."""
 
-from dataclasses import dataclass, field
-from datetime import date
-from functools import cached_property
+from dataclasses import dataclass
 from typing import Any
-from uuid import UUID
 
-from lupa_pipeline.dominio.enums import OrigemPeca, TipoFato, TipoPeca
-from lupa_pipeline.ingestao.datas import OcorrenciaData, TextoAnalise
+from lupa_pipeline.dominio.chaves import chave_hash
+from lupa_pipeline.dominio.enums import TipoFato, TipoPeca
+from lupa_pipeline.dominio.esquemas import Evidencia
 
 
 @dataclass(frozen=True)
 class PaginaTexto:
-    """Página com o texto original (``pagina.texto``).
+    """Página de peça e versões original e normalizada de seu texto."""
 
-    Attributes:
-        id: Id da página.
-        numero: Número da página no arquivo.
-        texto: Texto original; offsets de evidência referem-se a ele.
-        origem_arquivo: Arquivo de origem (entrada do ZIP ou o PDF).
-        pagina_origem: Página dentro do arquivo de origem.
-    """
-
-    id: UUID
+    id: str
     numero: int
     texto: str
-    origem_arquivo: str | None = None
-    pagina_origem: int | None = None
-
-    @cached_property
-    def analise(self) -> TextoAnalise:
-        """Normalizado e dobrado do texto, calculados uma vez."""
-        return TextoAnalise.de(self.texto)
-
-    @cached_property
-    def datas(self) -> list[OcorrenciaData]:
-        """Datas do texto, com offsets no dobrado."""
-        return self.analise.datas()
+    normalizado: str
+    suspeitos: tuple[tuple[int, int], ...] = ()
 
 
 @dataclass(frozen=True)
 class PecaTexto:
-    """Peça com o tipo, a origem e as páginas.
-
-    Attributes:
-        tipo: Tipo da peça (4E.4 ou correção manual).
-        origem: Origem da peça (4E.5).
-        paginas: Páginas da peça, em ordem.
-    """
+    """Tipo vigente com suas páginas na ordem do arquivo."""
 
     tipo: TipoPeca
-    origem: OrigemPeca
     paginas: tuple[PaginaTexto, ...]
 
 
 @dataclass(frozen=True)
-class ReuQualificado:
-    """Réu identificado pela qualificação na denúncia.
-
-    Attributes:
-        pseudonimo: ``REU-01``, ``REU-02``...
-        nome: Nome como está na denúncia (só vai para ``reu_identidade``).
-        documento: CPF como está na denúncia, se houver.
-        pagina_id: Página da qualificação.
-        inicio: Offset do nome no texto original da página.
-    """
-
-    pseudonimo: str
-    nome: str
-    documento: str | None
-    pagina_id: UUID
-    inicio: int
-
-
-@dataclass(frozen=True)
 class Candidato:
-    """Valor encontrado por um extrator, antes de virar ``Fato``.
-
-    Attributes:
-        tipo: Tipo de fato.
-        valor: Valor no formato das validações (data ISO, meses, objeto de recurso).
-        pagina: Página da evidência.
-        inicio: Início da evidência no texto original da página.
-        fim: Fim da evidência no texto original.
-        confianca: Confiança da regra.
-        data: Data a reconferir no trecho (None para valores que não são data).
-        por_reu: Se o valor é de um réu específico.
-        reu: Pseudônimo do réu, quando conhecido.
-        regra: Identificação da regra (para relatório; nunca texto).
-    """
+    """Fato candidato com o trecho literal e seu intervalo na página normalizada."""
 
     tipo: TipoFato
     valor: Any
     pagina: PaginaTexto
     inicio: int
     fim: int
-    confianca: float
-    data: date | None = None
-    por_reu: bool = False
-    reu: str | None = None
-    regra: str = ""
-    extras: dict[str, Any] = field(default_factory=dict)
+    trecho: str
+    sujeito: str = ""
+
+
+def evidencia_de(pagina: PaginaTexto, inicio: int, fim: int, trecho: str) -> Evidencia | None:
+    """Reconfere o texto normalizado e mapeia os offsets para a página original."""
+    from lupa_pipeline.ingestao.saneamento_pagina import mapa_saneado
+
+    if not 0 <= inicio < fim <= len(pagina.normalizado) or pagina.normalizado[inicio:fim] != trecho:
+        return None
+    if pagina.texto != pagina.normalizado:
+        mapa = mapa_saneado(pagina.texto)
+        if mapa.texto != pagina.normalizado:
+            return None
+        inicio, fim = mapa.inicios[inicio], mapa.fins[fim - 1]
+    if any(a < fim and b > inicio for a, b in pagina.suspeitos):
+        return None
+    return Evidencia(
+        id=chave_hash([pagina.id, inicio, fim]).hex(),
+        pagina_id=pagina.id,
+        inicio=inicio,
+        fim=fim,
+        trecho=pagina.texto[inicio:fim],
+    )

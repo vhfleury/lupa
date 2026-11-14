@@ -357,7 +357,8 @@ a saída resumida (vermelho inicial e verde final).
     relido com qualificação, evidências literais, peças e resultados cabíveis.
 - [x] **T4.3** Classificação e fronteiras de peças cíveis. RF-PEC-01.
   - O caso cível substituiu as antigas expectativas de denúncia e defesa. test_tipos_civeis.py cobriu os tipos de peça. test_indice.py e test_fronteiras.py conferiram a segmentação, o título, a origem e a data com gabarito sintético.
-- [ ] **T4.4** Partes. A6 passos 1 e 2. RF-FAT-04.
+- [x] **T4.4** Partes. A6 passos 1 e 2. RF-FAT-04.
+  - Os modelos anteriores esperavam réu e pseudônimo. Os testes de qualificação e a integração em test_eventos_banco.py conferiram nome literal, polo, qualidade, evidência e persistência da identidade com DEK do processo.
 - [ ] **T4.5** Extratores de fatos cíveis. A6 passos 3 a 8. D17. RF-FAT-01, RF-FAT-02.
 - [x] **T4.6** Catálogo por classe e dados do CPC (`prazos_recursos.yaml`, `preparo.yaml`, `cabimento_art1015.yaml`). D16. RF-VAL-01.
   - As cinco consultas por classe falharam no catálogo por matéria da 0.1. No worker,

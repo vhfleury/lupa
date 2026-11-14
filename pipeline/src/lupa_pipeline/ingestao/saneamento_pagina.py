@@ -116,6 +116,13 @@ def _remover_blocos(normalizado: TextoNormalizado) -> tuple[list[Ocorrencia], in
     return ocorrencias, rodapes
 
 
+def mapa_saneado(texto: str) -> TextoNormalizado:
+    """Reconstrói o mapa de offsets usado tanto na análise como na evidência."""
+    normalizado = normalizar(texto)
+    _remover_blocos(normalizado)
+    return normalizado
+
+
 def _flags(
     ocorrencias: list[Ocorrencia], normalizado: TextoNormalizado, densa: bool
 ) -> dict[str, bool]:
