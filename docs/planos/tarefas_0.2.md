@@ -359,6 +359,9 @@ a saída resumida (vermelho inicial e verde final).
     `python -m pytest pipeline/tests/sinteticos pipeline/tests/ingestao/test_extracao.py --no-cov -q`
     passou nos 104 casos dos sintéticos e nos oito da extração. Cada classe teve PDF e gabarito
     relido com qualificação, evidências literais, peças e resultados cabíveis.
+  - A regressão `test_duas_colunas_sao_lidas_coluna_por_coluna` colocou o rodapé antes da coluna
+    direita. O corte XY passou a conferir o vão entre a faixa e a linha anterior. Os 26 testes
+    de páginas, colunas sintéticas e CLI passaram juntos no worker.
 - [x] **T4.3** Classificação e fronteiras de peças cíveis. RF-PEC-01.
   - O caso cível substituiu as antigas expectativas de denúncia e defesa. test_tipos_civeis.py cobriu os tipos de peça. test_indice.py e test_fronteiras.py conferiram a segmentação, o título, a origem e a data com gabarito sintético.
 - [x] **T4.4** Partes. A6 passos 1 e 2. RF-FAT-04.

@@ -149,7 +149,15 @@ def _ordenar_regiao(faixas: list[list[Bloco]]) -> list[Bloco]:
 
 
 def _cabe_na_regiao(regiao: list[list[Bloco]], faixa: list[Bloco]) -> bool:
-    """Prolonga colunas desiguais quando uma faixa só ocupa uma coluna já identificada."""
+    """Prolonga uma coluna desigual se a faixa começa perto das linhas de texto anteriores."""
+    anterior = regiao[-1]
+    vao = min(b.bbox[1] for b in faixa) - max(b.bbox[3] for b in anterior)
+    altura_linha = max(
+        (linha.bbox[3] - linha.bbox[1] for bloco in anterior for linha in bloco.linhas),
+        default=0.0,
+    )
+    if vao > altura_linha:
+        return False
     colunas = _cortes([b for f in regiao for b in f], eixo=0)
     if len(colunas) < 2:
         return False

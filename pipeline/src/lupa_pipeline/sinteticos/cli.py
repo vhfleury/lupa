@@ -104,7 +104,9 @@ def _parser_gerar() -> argparse.ArgumentParser:
     um.add_argument("--cenarios", default=",".join(c.value for c in Cenario))
     um.add_argument("--injecoes", default="", help="'todas' ou vetores separados por vírgula")
     um.add_argument("--nome", default=None)
-    um.add_argument("--duas-colunas", default="", help="tipos de peça em duas colunas: laudo,...")
+    um.add_argument(
+        "--duas-colunas", default="", help="tipos de peça em duas colunas, como laudo_pericial"
+    )
     um.set_defaults(funcao=_gerar)
     ref = sub.add_parser("referencia", help="gera os dez processos de referência")
     ref.add_argument("--somente", default=None, help="ex.: semente_01,semente_02")
