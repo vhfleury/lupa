@@ -9,7 +9,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Never
 from uuid import uuid4
 
 import pytest
@@ -150,8 +150,11 @@ def fabrica_fato() -> FabricaFato:
     return _criar
 
 
-def _url_banco_principal() -> str | None:
-    return os.environ.get("LUPA_DATABASE_URL")
+def integracao_indisponivel(motivo: str) -> Never:
+    """Falha no gate de integração e permite pular o teste local sem o serviço."""
+    if os.environ.get("LUPA_EXIGIR_INTEGRACAO") == "1":
+        pytest.fail(motivo, pytrace=False)
+    pytest.skip(motivo)
 
 
 @contextmanager
@@ -159,7 +162,7 @@ def banco_vazio(sufixo: str) -> Iterator[Engine]:
     """Cria um database de teste vazio com nome único e o apaga ao sair.
 
     Só toca databases com o prefixo `lupa_teste_`; o banco de desenvolvimento fica intacto.
-    Pula o teste se o PostgreSQL não estiver acessível.
+    O gate exige PostgreSQL. A execução local pode pular a integração sem o serviço.
 
     Args:
         sufixo: Distingue o database dos demais da mesma execução.
@@ -167,9 +170,9 @@ def banco_vazio(sufixo: str) -> Iterator[Engine]:
     Yields:
         Engine do database novo, sem migração.
     """
-    url_principal = _url_banco_principal()
-    if url_principal is None:
-        pytest.skip("LUPA_DATABASE_URL não definida")
+    url_principal = os.environ.get("LUPA_DATABASE_URL")
+    if not url_principal:
+        integracao_indisponivel("LUPA_DATABASE_URL não definida")
     nome_banco = f"lupa_teste_{sufixo}_{uuid4().hex}"
     admin = create_engine(
         url_principal, isolation_level="AUTOCOMMIT", connect_args={"connect_timeout": 2}
@@ -179,7 +182,7 @@ def banco_vazio(sufixo: str) -> Iterator[Engine]:
             conexao.execute(text(f'CREATE DATABASE "{nome_banco}"'))
     except Exception:
         admin.dispose()
-        pytest.skip("PostgreSQL inacessível neste ambiente")
+        integracao_indisponivel("PostgreSQL inacessível neste ambiente")
     engine = create_engine(make_url(url_principal).set(database=nome_banco))
     try:
         yield engine

@@ -10,6 +10,7 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
+from apoio_comum import integracao_indisponivel
 from lupa_pipeline.config import Settings
 from lupa_pipeline.seguranca.cofre import (
     CHAVE_DADOS,
@@ -24,7 +25,7 @@ from lupa_pipeline.seguranca.cofre import (
 
 
 def cofre_vault_do_ambiente() -> CofreVault:
-    """Cofre Vault das variáveis `LUPA_VAULT_*` do contêiner, ou pula o teste.
+    """Cofre Vault das variáveis `LUPA_VAULT_*` do contêiner.
 
     Returns:
         O cofre, já com login conferido.
@@ -33,12 +34,12 @@ def cofre_vault_do_ambiente() -> CofreVault:
     secret_id = os.environ.get("LUPA_VAULT_SECRET_ID", "")
     endereco = os.environ.get("LUPA_VAULT_ENDERECO", "http://vault:8200")
     if not role_id or not secret_id or role_id.startswith("preenchido"):
-        pytest.skip("Vault não configurado (rode scripts/vault_inicializar.sh)")
+        integracao_indisponivel("Vault não configurado (rode scripts/vault_inicializar.sh)")
     cofre = CofreVault(endereco, role_id, secret_id, timeout=3)
     try:
         cofre.existe_chave(CHAVE_DADOS)
     except CofreError:
-        pytest.skip("Vault inacessível ou selado")
+        integracao_indisponivel("Vault inacessível ou selado")
     return cofre
 
 

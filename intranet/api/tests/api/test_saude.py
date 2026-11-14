@@ -7,11 +7,13 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
+from apoio_comum import integracao_indisponivel
 from lupa_intranet.api import saude
 from lupa_intranet.api.app import create_app
 from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.logging import get_logger
 from lupa_pipeline.seguranca.cofre import CHAVE_SAUDE, CofreError, CofreMemoria
+from lupa_pipeline.seguranca.contexto import definir_cofre, obter_cofre
 
 CREDENCIAL_FICTICIA = "valor-ficticio-de-metricas"
 
@@ -115,15 +117,17 @@ def test_log_dentro_da_requisicao_carrega_request_id(
 @pytest.mark.integracao
 @pytest.mark.usefixtures("ambiente_ficticio")
 def test_saude_integracao_com_servicos_reais() -> None:
-    """Com PostgreSQL e MinIO acessíveis (compose), /saude responde 200 de verdade."""
-    settings = get_settings()
-    if not (
-        saude.verificar_db(settings)
-        and saude.verificar_minio(settings)
-        and saude.verificar_cofre(settings)
-    ):
-        pytest.skip("PostgreSQL, MinIO ou cofre inacessível neste ambiente")
-    resposta = TestClient(create_app(settings)).get("/saude")
+    """RNF-06. A rota verifica o PostgreSQL, o MinIO e o Vault reais da implantação."""
+    settings = get_settings().model_copy(update={"cofre_backend": "vault"})
+    cofre_anterior = obter_cofre()
+    try:
+        with TestClient(create_app(settings)) as cliente:
+            resposta = cliente.get("/saude")
+    finally:
+        definir_cofre(cofre_anterior)
+    if resposta.status_code == 503:
+        falhas = [servico for servico, estado in resposta.json().items() if estado == "falha"]
+        integracao_indisponivel("Serviços indisponíveis na rota /saude: " + ", ".join(falhas))
     assert resposta.status_code == 200
     assert resposta.json() == {"api": "ok", "db": "ok", "minio": "ok", "cofre": "ok"}
 

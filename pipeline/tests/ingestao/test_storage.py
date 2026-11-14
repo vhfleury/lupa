@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 from pydantic import SecretStr
 
+from apoio_comum import integracao_indisponivel
 from lupa_pipeline.config import Settings
 from lupa_pipeline.ingestao.storage import (
     ArmazenamentoMemoria,
@@ -31,12 +32,12 @@ def _settings_s3() -> Settings | None:
 def _storage_s3() -> ArmazenamentoS3:
     settings = _settings_s3()
     if settings is None:
-        pytest.skip("MinIO não configurado")
+        integracao_indisponivel("MinIO não configurado")
     cliente = criar_cliente_s3(settings)
     try:
         cliente.head_bucket(Bucket=settings.minio_bucket)
     except Exception:
-        pytest.skip("MinIO inacessível")
+        integracao_indisponivel("MinIO inacessível")
     return ArmazenamentoS3(cliente, settings.minio_bucket)
 
 
