@@ -17,7 +17,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 PY="${PYTHON:-python}"
 command -v "$PY" >/dev/null 2>&1 || PY=python3
-DIR=.vault-dev
+DIR="${LUPA_VAULT_DEV_DIR:-.vault-dev}"
 INIT="$DIR/init.json"
 ENV_ARQ="${LUPA_ENV_ARQUIVO:-.env}"
 SO_UNSEAL=0

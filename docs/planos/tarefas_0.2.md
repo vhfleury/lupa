@@ -420,7 +420,9 @@ a saída resumida (vermelho inicial e verde final).
 - [x] **T6.1** Corpus de injeção e suíte do agente sobre os sintéticos cíveis. RF-ING-05, RF-CHA-05, RNF-03.
   - A suíte anterior referenciava tabelas e peças criminais. No worker, `pytest pipeline/tests/ingestao/test_injecao_corpus.py --no-cov -q` passou nos dois testes, com dez variantes, recall mínimo de 90% e até 5% de páginas limpas sinalizadas.
   - Na API, `pytest intranet/api/tests/agente/test_injecao_agente.py --no-cov -q` passou nos 11 testes. Dois autos com nove vetores passaram por ingestão, ferramentas, chat e dossiê. Nos 16 ataques roteirizados, nenhum achado foi criado ou suprimido, nenhum dado de outro processo foi exposto e nenhuma ferramenta embutida executou. Uma resposta legítima com citação literal foi aceita.
-- [ ] **T6.2** E2E e capturas adaptados. RNF-09.
+- [x] **T6.2** E2E e capturas adaptados. RNF-09.
+  - `bash intranet/web/scripts/e2e.sh` passou nos 35 testes de navegador em 3 min 24 s. O fluxo percorreu os dois papéis, PDF de 500 MB, dossiê, destaque da página, correção com histórico, chat, auditoria e exportação de custo. A varredura de dez telas em cada tema registrou zero violações de acessibilidade graves ou críticas.
+  - `bash intranet/web/scripts/capturas.sh` passou nos dez cenários de acesso e captura. As 11 imagens em `docs/imagens/` mostram autos sintéticos da classe apelação cível. O chat usa o cliente roteirizado. Cada script cria seu projeto Compose com PostgreSQL, MinIO e Vault e remove seus próprios volumes ao sair.
 - [x] **T6.3** Cabeçalhos do proxy e saída de rede do worker. RF-SEG-03, RF-SEG-04.
   - verificar_cabecalhos.py --exigir passou nas quatro rotas HTTPS no proxy real. No worker, PostgreSQL aceitou a conexão interna e o kernel devolveu ENETUNREACH para TCP externo. verificar.sh executa a prova de isolamento.
 - [ ] **T6.4** `scripts/verificar.sh` completo verde.

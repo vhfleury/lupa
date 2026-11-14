@@ -1,7 +1,7 @@
 // Etapa 6.10: segurança do front. (1) Cabeçalhos do proxy, com a CSP sem afrouxar; (2) nenhuma
 // violação de CSP nas telas (nada inline); (3) texto hostil dos autos (processo sintético com
-// `<script>`, link Markdown e URL crua numa página) aparece como texto puro: nada executa e
-// nenhuma URL do texto vira link clicável (docs/especificacao/prompt-injection.md, seção 6).
+// marcação HTML e Markdown) aparece como texto puro. A URL refletida de outra página é
+// descartada pela conferência do chat (docs/especificacao/prompt-injection.md, seções 5 e 6).
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { contextoComo } from './credenciais';
 
@@ -99,7 +99,7 @@ test.describe('6.10 segurança do front', () => {
           `/processos/${PROC}/validacoes`,
         ],
       ],
-      ['desembargador-chat', [`/processos/${CHAT}/chat`, '/auditoria', '/usuarios']],
+      ['desembargador', [`/processos/${CHAT}/chat`, '/auditoria', '/usuarios']],
     ] as const) {
       const { contexto, page } = await contextoComo(browser, papel);
       await vigiarCsp(contexto);
@@ -130,12 +130,14 @@ test.describe('6.10 segurança do front', () => {
   test('texto hostil dos autos sai como texto: sem script executado, sem link externo', async ({
     browser,
   }) => {
-    const { contexto, page } = await contextoComo(browser, 'desembargador-chat');
+    const { contexto, page } = await contextoComo(browser, 'desembargador');
     await vigiarCsp(contexto);
     try {
       await page.goto(`/processos/${HOSTIL}/chat`);
       await expect(page.getByRole('heading', { name: 'Conversa atual' })).toBeVisible();
-      await page.getByLabel('Pergunta', { exact: true }).fill('Quando a defesa foi intimada?');
+      await page
+        .getByLabel('Pergunta', { exact: true })
+        .fill('Quando a parte apelada foi intimada?');
       await page.getByRole('button', { name: 'Perguntar' }).click();
       const resposta = page.getByTestId('conversa-atual').getByTestId('mensagem').last();
       await expect(resposta).toHaveAttribute('data-status', 'respondida', { timeout: 30_000 });
@@ -143,22 +145,29 @@ test.describe('6.10 segurança do front', () => {
       await expect(citacao).toBeVisible({ timeout: 30_000 });
       // O trecho citado traz os padrões hostis literalmente, como texto.
       await expect(citacao).toContainText('<script>window.__lupaXss = 1</script>');
-      await expect(citacao).toContainText('[link](http://x)');
-      await expect(citacao).toContainText('http://exemplo');
+      await expect(citacao).toContainText('[link](#externo-e2e)');
       // Nada executou e nenhum elemento foi criado a partir do texto.
       expect(
         await page.evaluate(() => (window as unknown as { __lupaXss?: number }).__lupaXss),
       ).toBeUndefined();
       expect(await page.locator('main script').count()).toBe(0);
       expect(await page.locator('a[href^="http"]').count()).toBe(0);
-      expect(await page.locator('a[href*="exemplo"], a[href="http://x"]').count()).toBe(0);
+      expect(await page.locator('a[href$="#externo-e2e"]').count()).toBe(0);
       // O único link da citação é interno (ids), sem texto dos autos na URL.
       const destino = (await citacao.getAttribute('href')) ?? '';
       expect(destino).toMatch(new RegExp(`^/processos/${HOSTIL}/visualizador\\?`));
       expect(destino).not.toMatch(/script|exemplo|link/);
       // Recarregando, o histórico também vem como texto.
       await page.reload();
-      await expect(page.getByTestId('citacao').first()).toContainText('[link](http://x)');
+      await expect(page.getByTestId('citacao').first()).toContainText('[link](#externo-e2e)');
+      // RF-CHA-05: a segunda página tem uma URL. A conferência recusa sua reflexão,
+      // oculta essa citação e deixa o processo em revisão.
+      await page.getByLabel('Pergunta', { exact: true }).fill('Qual é o endereço da certidão?');
+      await page.getByRole('button', { name: 'Perguntar' }).click();
+      await expect(resposta).toHaveAttribute('data-status', 'descartada');
+      await expect(resposta.getByTestId('citacao')).toHaveCount(0);
+      await expect(page.getByTestId('processo-em-revisao')).toBeVisible();
+      await expect(page.locator('main')).not.toContainText('http://exemplo.invalid');
       expect(await page.locator('a[href^="http"]').count()).toBe(0);
       expect(await violacoes(page)).toEqual([]);
     } finally {

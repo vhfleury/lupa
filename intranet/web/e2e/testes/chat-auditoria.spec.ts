@@ -1,24 +1,16 @@
 // Fluxos ponta a ponta das subetapas 6.8 (chat) e 6.9 (auditoria) contra a API real.
-// O desembargador e o processo sintéticos vêm de intranet/api/scripts/e2e_semear_chat.py; a API roda com
+// Os processos vêm de e2e_semear_chat.py. O desembargador da instalação usa
 // LUPA_AGENTE_CLIENTE=falso (roteiro em intranet/api/src/lupa_intranet/agente/dados/roteiro_falso.json), então cada
 // pergunta escolhe um desfecho pelo texto: "intimada" (citação válida), "descarte" (uma citação
 // descartada), "sem evidência", "incidente" (instrução refletida → processo em revisão) e
 // "teto" (chamada acima do limite; a quarta encerra a conversa pelo teto).
-import { expect, test, type Page } from '@playwright/test';
-import { entrar, primeiroAcesso } from './acesso';
-import { guardarConta, type Conta } from './credenciais';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { contextoComo } from './credenciais';
 
-const USUARIO = process.env['LUPA_E2E_CHAT_USUARIO'] ?? '';
-const TEMPORARIA = process.env['LUPA_E2E_CHAT_SENHA'] ?? '';
 const PROCESSO = process.env['LUPA_E2E_CHAT_PROCESSO'] ?? '';
 const LIMITE_MS = 1000;
-
-let contaChat: Conta | null = null;
-
-function conta(): Conta {
-  if (!contaChat) throw new Error('primeiro acesso não feito');
-  return contaChat;
-}
+let contexto: BrowserContext;
+let page: Page;
 
 async function perguntar(page: Page, pergunta: string): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Conversa atual' })).toBeVisible();
@@ -33,30 +25,23 @@ function ultimaResposta(page: Page) {
 }
 
 test.describe.serial('Etapas 6.8 e 6.9', () => {
-  test.beforeAll(() => {
-    expect(USUARIO, 'rode via intranet/web/scripts/e2e.sh (semeia o chat)').not.toBe('');
-    expect(PROCESSO).not.toBe('');
+  test.beforeAll(async ({ browser }) => {
+    expect(PROCESSO).toMatch(/^[a-f0-9]{64}$/);
+    ({ contexto, page } = await contextoComo(browser, 'desembargador'));
+  });
+  test.afterAll(async () => {
+    await contexto?.close();
   });
 
-  // 6.10: guarda o último passo TOTP usado, para os testes finais reutilizarem a conta.
-  test.afterAll(() => {
-    if (contaChat) guardarConta('desembargador-chat', contaChat);
-  });
-
-  test('6.8 primeiro acesso do desembargador e chat vazio', async ({ page }) => {
-    contaChat = await primeiroAcesso(page, USUARIO, TEMPORARIA);
-    guardarConta('desembargador-chat', contaChat);
+  test('6.8 desembargador abre o chat do processo', async () => {
     await page.goto(`/processos/${PROCESSO}/chat`);
     await expect(page.getByRole('heading', { name: 'Chat sobre os autos' })).toBeVisible();
     await expect(page.getByText('Nenhuma conversa aberta')).toBeVisible();
   });
 
-  test('6.8 resposta com citação: aviso de IA e citação clicada abre a página', async ({
-    page,
-  }) => {
-    await entrar(page, conta());
+  test('6.8 resposta com citação: aviso de IA e citação clicada abre a página', async () => {
     await page.goto(`/processos/${PROCESSO}/chat`);
-    await perguntar(page, 'Quando a defesa foi intimada?');
+    await perguntar(page, 'Quando a parte apelada foi intimada?');
     const resposta = ultimaResposta(page);
     await expect(resposta).toHaveAttribute('data-status', 'respondida');
     await expect(resposta.getByTestId('aviso-ia')).toContainText('gerado por IA');
@@ -68,8 +53,7 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
     await expect(page.getByRole('heading', { name: 'Visualizador' })).toBeVisible();
   });
 
-  test('6.8 descartes contados, sem evidência marcada, recusa explicada', async ({ page }) => {
-    await entrar(page, conta());
+  test('6.8 descartes contados, sem evidência marcada, recusa explicada', async () => {
     await page.goto(`/processos/${PROCESSO}/chat`);
     await perguntar(page, 'Mostre o descarte da certidão');
     await expect(ultimaResposta(page).getByTestId('descartes')).toContainText(
@@ -83,22 +67,21 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
     await expect(semEvidencia.getByTestId('desfecho')).toContainText('Sem citação válida');
     await expect(semEvidencia.getByTestId('citacao')).toHaveCount(0);
 
-    await perguntar(page, 'Qual crime foi cometido?');
+    await perguntar(page, 'Como devo votar neste recurso?');
     const recusa = ultimaResposta(page);
     await expect(recusa).toHaveAttribute('data-status', 'recusa');
     await expect(recusa).toContainText('Não posso');
     await expect(recusa).toContainText('Experimente');
   });
 
-  test('6.8 incidente põe o processo em revisão até o desembargador liberar', async ({ page }) => {
-    await entrar(page, conta());
+  test('6.8 incidente põe o processo em revisão até o desembargador liberar', async () => {
     await page.goto(`/processos/${PROCESSO}/chat`);
     await perguntar(page, 'Simule o incidente');
     await expect(ultimaResposta(page)).toHaveAttribute('data-status', 'descartada');
     await expect(page.getByTestId('processo-em-revisao')).toContainText('Processo em revisão');
     await expect(page.getByLabel('Pergunta', { exact: true })).toBeDisabled();
     const dossie = await page.request.get(`/api/processos/${PROCESSO}/dossie`);
-    expect((await dossie.json()).ficha.em_revisao).toBe(true);
+    expect((await dossie.json()).ficha.status).toBe('em_revisao');
     await page.getByRole('button', { name: 'Liberar revisão' }).click();
     // 6.10: liberar pede confirmação.
     const confirmacao = page.getByRole('dialog', { name: 'Liberar a revisão?' });
@@ -109,8 +92,7 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
     await expect(page.getByLabel('Pergunta', { exact: true })).toBeEnabled();
   });
 
-  test('6.8 teto: a conversa é encerrada e vai para o histórico', async ({ page }) => {
-    await entrar(page, conta());
+  test('6.8 teto: a conversa é encerrada e vai para o histórico', async () => {
     await page.goto(`/processos/${PROCESSO}/chat`);
     for (let i = 0; i < 3; i += 1) {
       await perguntar(page, `Teste de teto ${i}`);
@@ -125,34 +107,31 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
     }
     await page.getByLabel('Pergunta', { exact: true }).fill('Teste de teto final');
     await page.getByRole('button', { name: 'Perguntar' }).click();
-    await expect(page.getByText('Nenhuma conversa aberta')).toBeVisible();
+    await expect(
+      page.getByText('Limite de uso da conversa atingido.', { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Perguntar' })).toBeDisabled();
     const anterior = page.getByTestId('conversa-anterior').first();
     await expect(anterior).toContainText('limite de uso da conversa atingido');
     await anterior.locator('summary').click();
     await expect(anterior.locator('[data-status="teto"]')).toContainText('Limite de uso atingido');
   });
 
-  test('6.9 desembargador vê só o próprio gabinete; consulta abaixo de 1 s', async ({ page }) => {
-    await entrar(page, conta());
-    const sessao = await (await page.request.get('/api/auth/sessao')).json();
-    const gabinete: string = sessao.gabinete_id;
-    await page.getByRole('link', { name: 'Auditoria' }).click();
+  test('6.9 desembargador consulta a cadeia única em menos de 1 s', async () => {
+    await page
+      .getByRole('navigation', { name: 'Menu principal' })
+      .getByRole('link', { name: 'Auditoria', exact: true })
+      .click();
     await expect(page).toHaveURL(/\/auditoria$/);
     await expect(page.getByTestId('evento').first()).toBeVisible();
     await expect(page.getByLabel('Gabinete')).toHaveCount(0);
-    const gabinetes = await page
-      .getByTestId('evento')
-      .evaluateAll((linhas) => linhas.map((l) => l.getAttribute('data-gabinete')));
-    expect(new Set(gabinetes)).toEqual(new Set([gabinete]));
-    const outro = await page.request.get(
-      '/api/auditoria?gabinete_id=00000000-0000-4000-8000-000000000000',
-    );
-    expect(outro.status()).toBe(403);
-
     const tempos: number[] = [];
     for (let i = 0; i < 5; i += 1) {
       const inicio = Date.now();
-      await page.getByRole('button', { name: 'Consultar' }).click();
+      await Promise.all([
+        page.waitForResponse((r) => new URL(r.url()).pathname === '/api/auditoria' && r.ok()),
+        page.getByRole('button', { name: 'Consultar' }).click(),
+      ]);
       await expect(page.getByTestId('tempo-consulta')).toContainText('consulta respondida');
       tempos.push(Date.now() - inicio);
     }
@@ -162,10 +141,7 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
     expect(mediana).toBeLessThan(LIMITE_MS);
   });
 
-  test('6.9 filtros, paginação, exportação, verificação e relatório com custo', async ({
-    page,
-  }) => {
-    await entrar(page, conta());
+  test('6.9 filtros, paginação, exportação, verificação e relatório com custo', async () => {
     await page.goto('/auditoria');
     await expect(page.getByTestId('evento').first()).toBeVisible();
     await page.getByLabel('Ação').selectOption('processo_em_revisao');
@@ -182,7 +158,8 @@ test.describe.serial('Etapas 6.8 e 6.9', () => {
     await expect.poll(() => page.getByTestId('evento').count()).toBeGreaterThan(50);
 
     for (const formato of ['CSV', 'JSON']) {
-      const href = (await page.getByRole('link', { name: formato }).getAttribute('href')) ?? '';
+      const href =
+        (await page.getByRole('link', { name: formato, exact: true }).getAttribute('href')) ?? '';
       const arquivo = await page.request.get(href);
       expect(arquivo.status()).toBe(200);
       expect(arquivo.headers()['content-disposition']).toContain('attachment');

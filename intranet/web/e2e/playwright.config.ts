@@ -1,10 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Um único worker e ordem fixa: os fluxos dependem uns dos outros (o admin cria o gabinete e o
-// desembargador; o desembargador cria o assessor), como no uso real.
-// 6.10: dois projetos. "fluxos" (6.1 a 6.9) faz o primeiro acesso de cada conta e a guarda pela
-// fixture global (testes/credenciais.ts); "finais" (segurança, acessibilidade, auditoria como
-// admin) depende dele e reutiliza as contas.
+// Os fluxos cadastram MFA, trocam senhas e guardam as contas usadas nos testes finais.
 const comum = { ...devices['Desktop Chrome'] };
 
 export default defineConfig({
@@ -23,10 +19,16 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'fluxos', testMatch: /(chat-auditoria|fluxos|processos)\.spec\.ts$/, use: comum },
+    { name: 'acesso', testMatch: /fluxos\.spec\.ts$/, use: comum },
+    {
+      name: 'fluxos',
+      testMatch: /(chat-auditoria|processos)\.spec\.ts$/,
+      dependencies: ['acesso'],
+      use: comum,
+    },
     {
       name: 'finais',
-      testMatch: /(acessibilidade|auditoria-admin|seguranca)\.spec\.ts$/,
+      testMatch: /\/(acessibilidade|auditoria|seguranca)\.spec\.ts$/,
       dependencies: ['fluxos'],
       use: comum,
     },

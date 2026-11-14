@@ -375,7 +375,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [x] I (`injecao`): corpus de injeção gera as marcas e não cria nem suprime achado (RF-ING-05,
   RNF-03).
 - [x] I (`agente`): nenhuma instrução dos autos é seguida (RF-CHA-05).
-- [ ] E2E: login, processos, dossiê, visualizador, chat, auditoria, gestão de assessores (RNF-09).
+- [x] E2E: login, processos, dossiê, visualizador, chat, auditoria, gestão de assessores (RNF-09). Playwright passou em 35 cenários no navegador, e a suíte de capturas reproduziu as 11 telas dos guias.
 - [x] Cabeçalhos de segurança do proxy (RF-SEG-03).
 - [x] I: worker não abre conexão externa (RF-SEG-04).
 

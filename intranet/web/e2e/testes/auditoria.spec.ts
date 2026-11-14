@@ -1,36 +1,28 @@
-// Etapa 6.10: auditoria como administrador (revisão 6.4-6.9, item 6), custo dos resumos no
-// relatório por usuário (item 7) e o aviso de "sessão encerrada ou expirada" depois de recarga
-// completa. O admin é o criado em fluxos.spec.ts, compartilhado pela fixture global.
 import { expect, test } from '@playwright/test';
 import { contextoComo, lerConta } from './credenciais';
 
-test.describe.serial('6.10 auditoria como admin e sessão', () => {
-  test('admin vê eventos de todos os gabinetes e filtra por um deles', async ({ browser }) => {
-    const { contexto, page } = await contextoComo(browser, 'admin');
+test.describe.serial('6.10 auditoria do desembargador e sessão', () => {
+  test('o filtro de processo também delimita a exportação de uso em CSV', async ({ browser }) => {
+    const { contexto, page } = await contextoComo(browser, 'desembargador');
+    const processo = process.env['LUPA_E2E_CHAT_PROCESSO'] ?? '';
+    expect(processo).toMatch(/^[0-9a-f]{64}$/);
     try {
       await page.goto('/auditoria');
-      await expect(page.getByTestId('evento').first()).toBeVisible();
-      const gabinete = page.getByLabel('Gabinete');
-      await expect(gabinete).toBeVisible();
-      await expect(gabinete).toHaveValue('');
-      // Sem filtro: eventos de mais de um gabinete (e da cadeia global).
-      await page.getByRole('button', { name: 'Carregar mais' }).click();
-      const todos = await page
-        .getByTestId('evento')
-        .evaluateAll((linhas) => linhas.map((l) => l.getAttribute('data-gabinete') ?? ''));
-      expect(new Set(todos).size).toBeGreaterThan(1);
-      // Com filtro: só o escolhido.
-      const escolhido = todos.find((g) => g !== '') ?? '';
-      await gabinete.selectOption(escolhido);
+      await page.getByLabel('Processo (id)').fill(processo);
       await page.getByRole('button', { name: 'Consultar' }).click();
       await expect(page.getByTestId('evento').first()).toBeVisible();
-      const filtrados = await page
-        .getByTestId('evento')
-        .evaluateAll((linhas) => linhas.map((l) => l.getAttribute('data-gabinete')));
-      expect(new Set(filtrados)).toEqual(new Set([escolhido]));
-      // A API confirma: admin pode consultar qualquer gabinete.
-      const api = await page.request.get(`/api/auditoria?gabinete_id=${escolhido}`);
-      expect(api.status()).toBe(200);
+      const exportacao = page.getByRole('link', {
+        name: 'Exportar uso por processo e usuário em CSV',
+      });
+      await expect(exportacao).toHaveAttribute('href', new RegExp(processo));
+      const resposta = await page.request.get((await exportacao.getAttribute('href')) ?? '');
+      expect(resposta.status()).toBe(200);
+      expect(resposta.headers()['content-type']).toContain('text/csv');
+      const [cabecalho, ...linhas] = (await resposta.text()).trim().split(/\r?\n/);
+      expect(cabecalho).toContain('processo');
+      expect(cabecalho).toContain('custo');
+      expect(linhas.length).toBeGreaterThan(0);
+      for (const linha of linhas) expect(linha).toContain(processo);
     } finally {
       await contexto.close();
     }
@@ -39,9 +31,9 @@ test.describe.serial('6.10 auditoria como admin e sessão', () => {
   test('relatório por usuário traz o custo estimado (chat e resumos do dossiê)', async ({
     browser,
   }) => {
-    const { contexto, page } = await contextoComo(browser, 'admin');
+    const { contexto, page } = await contextoComo(browser, 'desembargador');
     try {
-      const desembargador = lerConta('desembargador-chat').usuario;
+      const desembargador = lerConta('desembargador').usuario;
       const usuarios = (await (await page.request.get('/api/usuarios')).json()) as {
         id: string;
         nome_usuario: string;
@@ -61,7 +53,7 @@ test.describe.serial('6.10 auditoria como admin e sessão', () => {
   });
 
   test('recarga completa sem sessão avisa "sessão encerrada ou expirada"', async ({ browser }) => {
-    const { contexto, page } = await contextoComo(browser, 'admin');
+    const { contexto, page } = await contextoComo(browser, 'desembargador');
     try {
       await page.goto('/usuarios');
       await expect(page.getByRole('heading', { name: 'Usuários' })).toBeVisible();
@@ -90,7 +82,7 @@ test.describe.serial('6.10 auditoria como admin e sessão', () => {
   test('sair de propósito não mostra aviso de expiração, nem após recarregar', async ({
     browser,
   }) => {
-    const { contexto, page } = await contextoComo(browser, 'admin');
+    const { contexto, page } = await contextoComo(browser, 'desembargador');
     try {
       await page.goto('/');
       await page.getByRole('button', { name: 'Sair' }).click();

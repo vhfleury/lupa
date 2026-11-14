@@ -8,6 +8,7 @@ import { contextoComo, type Papel } from './credenciais';
 
 const PROC = process.env['LUPA_E2E_PROC_ID'] ?? '';
 const CHAT = process.env['LUPA_E2E_CHAT_PROCESSO'] ?? '';
+const CHAT_ATIVO = process.env['LUPA_E2E_HOSTIL_PROCESSO'] ?? '';
 const TEMAS = ['claro', 'escuro'] as const;
 const GRAVES = new Set(['serious', 'critical']);
 
@@ -18,7 +19,7 @@ interface Tela {
 }
 
 const TELAS: Tela[] = [
-  { papel: null, caminho: () => '/login', titulo: /^Lupa$/ },
+  { papel: null, caminho: () => '/login', titulo: /^Bem-vindo ao Lupa$/ },
   { papel: 'assessor-processos', caminho: () => '/', titulo: /./ },
   { papel: 'assessor-processos', caminho: () => '/processos', titulo: /^Processos$/ },
   { papel: 'assessor-processos', caminho: () => `/processos/${PROC}`, titulo: /./ },
@@ -34,15 +35,12 @@ const TELAS: Tela[] = [
     titulo: /Validações/,
   },
   {
-    papel: 'desembargador-chat',
+    papel: 'desembargador',
     caminho: () => `/processos/${CHAT}/chat`,
     titulo: /Chat sobre os autos/,
   },
-  { papel: 'desembargador-chat', caminho: () => '/auditoria', titulo: /Auditoria/ },
-  { papel: 'desembargador-chat', caminho: () => '/usuarios', titulo: /Usuários/ },
-  { papel: 'admin', caminho: () => '/gabinetes', titulo: /Gabinetes/ },
-  { papel: 'admin', caminho: () => '/usuarios', titulo: /Usuários/ },
-  { papel: 'admin', caminho: () => '/auditoria', titulo: /Auditoria/ },
+  { papel: 'desembargador', caminho: () => '/usuarios', titulo: /Usuários/ },
+  { papel: 'desembargador', caminho: () => '/auditoria', titulo: /Auditoria/ },
 ];
 
 async function abrir(browser: Browser, papel: Papel | null, tema: (typeof TEMAS)[number]) {
@@ -120,7 +118,7 @@ test.describe('6.10 acessibilidade', () => {
   test('telas internas pelo teclado: menu, sair, tema e conteúdo com foco visível', async ({
     browser,
   }) => {
-    const { contexto, page } = await contextoComo(browser, 'desembargador-chat');
+    const { contexto, page } = await contextoComo(browser, 'desembargador');
     try {
       await page.goto('/');
       await expect(page.getByTestId('usuario-nome')).toBeVisible();
@@ -144,23 +142,24 @@ test.describe('6.10 acessibilidade', () => {
       await page.getByRole('link', { name: 'Pular para o conteúdo' }).focus();
       await page.keyboard.press('Enter');
       await expect(page.locator('main#conteudo')).toBeFocused();
-      // Navega até Processos só com Tab e Enter.
+      // A navegação precede o conteúdo na ordem de foco. Volta ao menu e abre Processos.
       const menu = page.getByRole('navigation', { name: 'Menu principal' });
       const processos = menu.getByRole('link', { name: 'Processos' });
-      for (
-        let i = 0;
-        i < 15 && !(await processos.evaluate((el) => el === document.activeElement));
-        i += 1
-      ) {
-        await page.keyboard.press('Tab');
+      for (const nome of ['Auditoria', 'Usuários', 'Processos']) {
+        await page.keyboard.press('Shift+Tab');
+        await expect(menu.getByRole('link', { name: nome })).toBeFocused();
       }
       await expect(processos).toBeFocused();
       await page.keyboard.press('Enter');
       await expect(page).toHaveURL(/\/processos$/);
-      // Chat: campo de pergunta rotulado e alcançável; o visualizador navega por setas.
-      await page.goto(`/processos/${CHAT}/chat`);
-      await expect(page.getByLabel('Pergunta', { exact: true })).toBeVisible();
-      await page.getByLabel('Pergunta', { exact: true }).focus();
+      // O outro processo ainda aceita perguntas; no primeiro a conversa já atingiu o teto.
+      await page.goto(`/processos/${CHAT_ATIVO}/chat`);
+      const pergunta = page.getByLabel('Pergunta', { exact: true });
+      await expect(pergunta).toBeEnabled();
+      await page.getByRole('link', { name: 'Pular para o conteúdo' }).focus();
+      await page.keyboard.press('Enter');
+      await page.keyboard.press('Tab');
+      await expect(pergunta).toBeFocused();
       expect(await descreverFoco(page)).toBe('textarea:Pergunta');
     } finally {
       await contexto.close();
@@ -188,19 +187,19 @@ test.describe('6.10 acessibilidade', () => {
   test('tema manual: claro, escuro e sistema, persistido só no localStorage', async ({
     browser,
   }) => {
-    const contexto = await browser.newContext({ colorScheme: 'dark' });
+    const contexto = await browser.newContext({ colorScheme: 'light' });
     const page = await contexto.newPage();
     try {
       await page.goto('/login');
       const fundo = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
       const seletor = page.getByLabel('Tema');
-      await expect(seletor).toHaveValue('sistema');
-      expect(await page.locator('html').getAttribute('data-tema')).toBeNull();
-      const escuroDoSistema = await fundo();
+      await expect(seletor).toHaveValue('escuro');
+      await expect(page.locator('html')).toHaveAttribute('data-tema', 'escuro');
+      const escuro = await fundo();
       await seletor.selectOption('claro');
       await expect(page.locator('html')).toHaveAttribute('data-tema', 'claro');
       const claro = await fundo();
-      expect(claro).not.toBe(escuroDoSistema);
+      expect(claro).not.toBe(escuro);
       expect(await page.evaluate(() => localStorage.getItem('lupa.tema'))).toBe('claro');
       // Recarga completa: o tema vem do localStorage antes do primeiro desenho (inicio.js).
       await page.reload();
@@ -208,9 +207,14 @@ test.describe('6.10 acessibilidade', () => {
       await expect(page.getByLabel('Tema')).toHaveValue('claro');
       expect(await fundo()).toBe(claro);
       await page.getByLabel('Tema').selectOption('escuro');
-      expect(await fundo()).toBe(escuroDoSistema);
+      expect(await fundo()).toBe(escuro);
       await page.getByLabel('Tema').selectOption('sistema');
-      expect(await page.evaluate(() => localStorage.getItem('lupa.tema'))).toBeNull();
+      await expect(page.locator('html')).not.toHaveAttribute('data-tema');
+      expect(await fundo()).toBe(claro);
+      expect(await page.evaluate(() => localStorage.getItem('lupa.tema'))).toBe('sistema');
+      await page.reload();
+      await expect(seletor).toHaveValue('sistema');
+      expect(await fundo()).toBe(claro);
       // Nada de tema em cookie (nem vai ao servidor).
       expect((await contexto.cookies()).map((c) => c.name)).not.toContain('lupa.tema');
     } finally {
@@ -237,8 +241,10 @@ async function descreverFoco(page: Page): Promise<string> {
     const rotulo =
       el.getAttribute('aria-label') ??
       (id ? document.querySelector(`label[for="${id}"]`)?.textContent : null) ??
-      el.textContent ??
-      '';
+      Array.from(el.childNodes)
+        .filter((node) => !(node instanceof Element && node.getAttribute('aria-hidden') === 'true'))
+        .map((node) => node.textContent)
+        .join('');
     return `${el.tagName.toLowerCase()}:${rotulo.trim().replace(/\s+/g, ' ')}`;
   });
   if (descricao !== 'body:')

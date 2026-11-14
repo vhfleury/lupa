@@ -118,15 +118,16 @@ test.describe.serial('Etapas 6.4 a 6.7', () => {
     test.setTimeout(240_000);
     await page.goto('/processos');
     const sequencial = 1_000_000 + Math.floor(Math.random() * 8_000_000);
+    await page.getByRole('button', { name: /Novo processo/ }).click();
     await page.getByLabel('Número CNJ').fill(numeroCnj(sequencial, false));
-    await page.getByLabel('Classe').fill('Apelação Criminal');
+    await page.getByLabel('Classe').selectOption('apelacao_civel');
     await page.getByRole('button', { name: 'Criar processo' }).click();
     await expect(page.getByText('Dígito verificador não confere.')).toBeVisible();
     await page.getByLabel('Número CNJ').fill(numeroCnj(sequencial, true));
     await page.getByRole('button', { name: 'Criar processo' }).click();
     await expect(page.getByText(/Processo .* criado\./)).toBeVisible();
     await page.getByRole('link', { name: numeroCnj(sequencial, true) }).click();
-    await expect(page).toHaveURL(/\/processos\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/\/processos\/[0-9a-f]{64}$/);
     processoNovo = page.url().split('/').at(-1) ?? '';
 
     await page.getByLabel(/Arquivo PDF ou ZIP/).setInputFiles({
@@ -205,7 +206,15 @@ test.describe.serial('Etapas 6.4 a 6.7', () => {
   test('6.5 dossiê: ficha, índice e clique no evento abre o visualizador na página certa', async () => {
     await page.goto(`/processos/${PROCESSO}/dossie`);
     await expect(page.getByTestId('ficha')).toContainText(/\d{7}-\d{2}\.\d{4}/);
-    await expect(page.getByTestId('reus')).toContainText('REU-');
+    const partes = page.getByTestId('partes');
+    await expect(partes).toContainText(/Polo (ativo|passivo)/i);
+    await expect(partes.getByRole('link').first()).toHaveAttribute(
+      'href',
+      /evidencia=[0-9a-f]{64}$/,
+    );
+    await partes.getByRole('link').first().click();
+    await expect(page.getByTestId('destaque-evidencia').first()).toBeVisible();
+    await page.goto(`/processos/${PROCESSO}/dossie`);
     await expect(page.getByTestId('indice-pecas').locator('tbody tr').first()).toBeVisible();
     const eventos = page.getByTestId('evento');
     expect(await eventos.count()).toBeGreaterThan(0);
@@ -271,7 +280,7 @@ test.describe.serial('Etapas 6.4 a 6.7', () => {
     await expect(page.getByTestId('zoom')).toHaveText('125%');
   });
 
-  test('6.7 corrigir fato gera fato novo ligado; achado antigo fica no histórico; anotar', async () => {
+  test('6.7 correção preserva a identidade do fato e mantém o valor anterior no histórico', async () => {
     await page.goto(`/processos/${PROCESSO}/validacoes`);
     const fatoDeData = page
       .getByTestId('achado')
@@ -292,11 +301,14 @@ test.describe.serial('Etapas 6.4 a 6.7', () => {
     await expect(
       page.getByTestId('status-fato').filter({ hasText: 'Corrigido' }).first(),
     ).toBeVisible();
-    await expect(page.getByTestId('historico-fatos')).toContainText(String(ano));
+    const versaoAnterior = page
+      .getByTestId('historico-fatos')
+      .locator(`[data-fato="${fatoId}"]`)
+      .first();
+    await expect(versaoAnterior).toContainText(atual.slice(0, 4));
+    const vigente = page.getByTestId('achado').locator(`[data-fato="${fatoId}"]`).first();
+    await expect(vigente).toContainText(String(ano));
     await expect(page.getByTestId('historico-achados').locator('tbody tr').first()).toBeVisible();
-    expect(
-      await page.locator(`[data-fato="${fatoId}"] button`, { hasText: 'Corrigir' }).count(),
-    ).toBe(0);
 
     const achado = page.getByTestId('achado').first();
     await achado.getByRole('button', { name: 'Anotar' }).last().click();

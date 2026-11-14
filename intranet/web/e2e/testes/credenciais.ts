@@ -9,7 +9,7 @@ import { Autenticador } from './totp';
 
 export const DIRETORIO_ESTADO = process.env['LUPA_E2E_ESTADO'] ?? '/tmp/lupa-e2e-estado';
 
-export type Papel = 'admin' | 'desembargador-chat' | 'assessor-processos';
+export type Papel = 'desembargador' | 'assessor-processos';
 
 export interface Conta {
   usuario: string;

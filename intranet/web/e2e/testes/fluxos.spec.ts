@@ -1,24 +1,19 @@
 // Fluxos ponta a ponta das subetapas 6.1 a 6.3 contra a API real (pelo proxy, mesmo origin).
-// O administrador vem de intranet/api/scripts/e2e_preparar.py (senha temporária gerada na hora); todos os
-// demais usuários são criados pela própria interface. O MFA é resolvido calculando o TOTP a
-// partir da URI otpauth:// exibida na tela.
+// O desembargador vem de e2e_preparar.py e cria o assessor pela interface.
 import { randomBytes } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { enviarSenha, entrar, primeiroAcesso, senhaNova } from './acesso';
 import { guardarConta, type Conta } from './credenciais';
 import { Autenticador, segredoDaUri } from './totp';
 
-const ADMIN_USUARIO = process.env['LUPA_E2E_ADMIN_USUARIO'] ?? '';
-const ADMIN_SENHA = process.env['LUPA_E2E_ADMIN_SENHA'] ?? '';
+const DESEMBARGADOR = process.env['LUPA_E2E_DES_USUARIO'] ?? '';
+const SENHA_TEMPORARIA = process.env['LUPA_E2E_DES_SENHA'] ?? '';
 const SUFIXO = randomBytes(3).toString('hex');
-const GABINETE = `Gabinete E2E ${SUFIXO}`;
-const DESEMBARGADOR = `des.e2e.${SUFIXO}`;
 const ASSESSOR = `ass.e2e.${SUFIXO}`;
 const MENSAGEM_CREDENCIAIS = 'Usuário ou senha inválidos.';
 const MENSAGEM_BLOQUEIO = /Muitas tentativas/;
 
 const contas: Record<string, Conta> = {};
-let senhaTemporariaDesembargador = '';
 let senhaTemporariaAssessor = '';
 
 function conta(nome: string): Conta {
@@ -54,13 +49,16 @@ function linha(page: Page, usuario: string) {
 
 test.describe.serial('Etapa 6.1 a 6.3', () => {
   test.beforeAll(() => {
-    expect(ADMIN_USUARIO, 'rode via intranet/web/scripts/e2e.sh (prepara o admin)').not.toBe('');
-    expect(ADMIN_SENHA).not.toBe('');
+    expect(
+      DESEMBARGADOR,
+      'rode via intranet/web/scripts/e2e.sh (prepara o desembargador)',
+    ).not.toBe('');
+    expect(SENHA_TEMPORARIA).not.toBe('');
   });
 
-  // 6.10: o admin (dono do primeiro acesso aqui) fica disponível para os testes finais.
+  // 6.10: o desembargador (dono do primeiro acesso aqui) fica disponível para os testes finais.
   test.afterAll(() => {
-    if (contas[ADMIN_USUARIO]) guardarConta('admin', conta(ADMIN_USUARIO));
+    if (contas[DESEMBARGADOR]) guardarConta('desembargador', conta(DESEMBARGADOR));
   });
 
   test('6.1 rota protegida redireciona para o login e a API responde no mesmo origin', async ({
@@ -74,10 +72,10 @@ test.describe.serial('Etapa 6.1 a 6.3', () => {
     expect((await page.request.get('/api/auth/sessao')).status()).toBe(401);
   });
 
-  test('6.2 admin: primeiro acesso, código errado recusado, troca obrigatória antes de tudo', async ({
+  test('6.2 desembargador: primeiro acesso, código errado recusado, troca obrigatória antes de tudo', async ({
     page,
   }) => {
-    await enviarSenha(page, ADMIN_USUARIO, ADMIN_SENHA);
+    await enviarSenha(page, DESEMBARGADOR, SENHA_TEMPORARIA);
     await expect(page.getByRole('heading', { name: 'Cadastre o autenticador' })).toBeVisible();
     const segredo = segredoDaUri(((await page.getByTestId('uri-mfa').textContent()) ?? '').trim());
     const autenticador = new Autenticador(segredo);
@@ -94,59 +92,23 @@ test.describe.serial('Etapa 6.1 a 6.3', () => {
     expect((await page.request.get('/api/usuarios')).status()).toBe(403);
 
     const senha = senhaNova();
-    await page.getByLabel('Senha atual').fill(ADMIN_SENHA);
+    await page.getByLabel('Senha atual').fill(SENHA_TEMPORARIA);
     await page.getByLabel('Nova senha', { exact: true }).fill(senha);
     await page.getByLabel('Confirme a nova senha').fill(senha);
     await page.getByRole('button', { name: 'Salvar nova senha' }).click();
-    await expect(page.getByTestId('usuario-papel')).toHaveText('Administrador');
+    await expect(page.getByTestId('usuario-papel')).toHaveText('Desembargador');
     await expect(page.getByTestId('estado-sessao')).toContainText('Sessão ativa');
     const menu = page.getByRole('navigation', { name: 'Menu principal' });
     await expect(menu.getByRole('link', { name: 'Usuários' })).toBeVisible();
-    await expect(menu.getByRole('link', { name: 'Gabinetes' })).toBeVisible();
-    contas[ADMIN_USUARIO] = { usuario: ADMIN_USUARIO, senha, autenticador };
-    guardarConta('admin', conta(ADMIN_USUARIO));
+    await expect(menu.getByRole('link', { name: 'Auditoria' })).toBeVisible();
+    contas[DESEMBARGADOR] = { usuario: DESEMBARGADOR, senha, autenticador };
+    guardarConta('desembargador', conta(DESEMBARGADOR));
   });
 
-  test('6.3 admin cria gabinete e desembargador; senha temporária aparece uma única vez', async ({
+  test('6.3 desembargador cria, desativa, reativa e redefine o acesso do assessor', async ({
     page,
   }) => {
-    await entrar(page, conta(ADMIN_USUARIO));
-    await page
-      .getByRole('navigation', { name: 'Menu principal' })
-      .getByRole('link', { name: 'Gabinetes' })
-      .click();
-    await page.getByLabel('Nome do gabinete').fill(GABINETE);
-    await page.getByRole('button', { name: 'Criar gabinete' }).click();
-    await expect(page.getByRole('status')).toContainText(`Gabinete ${GABINETE} criado`);
-    await expect(page.getByRole('list', { name: 'Gabinetes cadastrados' })).toContainText(GABINETE);
-
-    await page.getByLabel('Nome de usuário').fill(DESEMBARGADOR);
-    await page.getByLabel('Gabinete', { exact: true }).selectOption({ label: GABINETE });
-    await page.getByRole('button', { name: 'Criar desembargador' }).click();
-    senhaTemporariaDesembargador = await lerSenhaTemporaria(page);
-    await page.reload();
-    await expect(page.getByText(senhaTemporariaDesembargador)).toHaveCount(0);
-
-    await page
-      .getByRole('navigation', { name: 'Menu principal' })
-      .getByRole('link', { name: 'Usuários' })
-      .click();
-    const linhaDes = linha(page, DESEMBARGADOR);
-    await expect(linhaDes).toContainText('Desembargador');
-    await expect(linhaDes).toContainText(GABINETE);
-    await expect(
-      linhaDes.getByRole('button', { name: `Desativar ${DESEMBARGADOR}` }),
-    ).toBeVisible();
-    await expect(
-      linhaDes.getByRole('button', { name: `Resetar senha de ${DESEMBARGADOR}` }),
-    ).toBeVisible();
-    await expect(linha(page, ADMIN_USUARIO).getByRole('button')).toHaveCount(0);
-    await sair(page);
-    expect((await page.request.get('/api/auth/sessao')).status()).toBe(401);
-  });
-
-  test('6.2/6.3 desembargador: primeiro acesso e gestão completa de assessor', async ({ page }) => {
-    contas[DESEMBARGADOR] = await primeiroAcesso(page, DESEMBARGADOR, senhaTemporariaDesembargador);
+    await entrar(page, conta(DESEMBARGADOR));
     await expect(page.getByTestId('usuario-papel')).toHaveText('Desembargador');
     const menu = page.getByRole('navigation', { name: 'Menu principal' });
     await expect(menu.getByRole('link', { name: 'Gabinetes' })).toHaveCount(0);
@@ -183,17 +145,8 @@ test.describe.serial('Etapa 6.1 a 6.3', () => {
     await expect(linha(page, DESEMBARGADOR).getByRole('button')).toHaveCount(0);
   });
 
-  test('6.3 matriz reconfirmada no servidor: desembargador recebe 403 nas ações do admin', async ({
-    page,
-  }) => {
+  test('6.3 gestão pela API permite ao desembargador criar apenas assessores', async ({ page }) => {
     await entrar(page, conta(DESEMBARGADOR));
-    await page.goto('/gabinetes');
-    await expect(page.getByRole('alert')).toContainText('Só o administrador');
-    await expect(page.getByRole('button', { name: 'Criar gabinete' })).toHaveCount(0);
-    expect(
-      (await page.request.post('/api/gabinetes', { data: { nome: 'Gabinete pirata' } })).status(),
-    ).toBe(403);
-    expect((await page.request.get('/api/gabinetes')).status()).toBe(403);
     const desembargadorNovo = await page.request.post('/api/usuarios', {
       data: { nome_usuario: `des.pirata.${SUFIXO}`, papel: 'desembargador' },
     });

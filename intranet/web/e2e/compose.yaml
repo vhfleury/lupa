@@ -1,0 +1,18 @@
+# Os serviços do navegador usam somente o ambiente e os volumes desta execução.
+services:
+  api:
+    env_file: !override
+      - ${LUPA_E2E_ENV:?}
+    ports: !reset []
+    volumes: !reset []
+  worker:
+    env_file: !override
+      - ${LUPA_E2E_ENV:?}
+    volumes: !reset []
+  minio:
+    ports: !reset []
+  proxy:
+    ports: !reset []
+networks:
+  borda:
+    ipam: !reset {}
