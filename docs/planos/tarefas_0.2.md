@@ -39,7 +39,9 @@ a saída resumida (vermelho inicial e verde final).
     teste e código depois da migração `v0011_responsaveis`, que criou `processo_responsavel`:
     `pipeline/tests/dominio/test_banco.py::test_rls_ativa_em_todas_as_tabelas_com_gabinete` e
     `intranet/api/tests/auditoria/test_limpar_dev.py::test_remove_dados_em_cascata_do_processo`.
-    Correção depende de decisão do usuário.
+    Em 14/11/2026 o usuário decidiu preservar esse resultado histórico. A verificação dos
+    responsáveis segue na versão 0.2 pelo vínculo `link_processo_responsavel`, pela view
+    `v_responsavel` e pelas rotas de atribuição e remoção (T3.6 e regressão).
   - Comandos (no host, stack de pé): `docker compose exec worker python -m pytest -c
     pipeline/pyproject.toml pipeline/tests` e `docker compose exec api python -m pytest -c
     intranet/api/pyproject.toml intranet/api/tests`.
@@ -324,7 +326,10 @@ a saída resumida (vermelho inicial e verde final).
     cadeia, 35 testes passaram. O relatório consulta chamadas e tokens pela view.
     `test_carga.py` passou com um milhão de eventos e mediana inferior a 200 ms.
 - [ ] **T3.12** Conversa, mensagens, chamada ao modelo e processo em revisão. A16. D26. RF-CHA-06, 07, 08.
-- [ ] **T3.13** Descarte. A13. RF-PRO-05.
+- [x] **T3.13** Descarte. A13. RF-PRO-05.
+  - `python -m pytest intranet/api/tests/seguranca/test_descarte.py --no-cov`
+    contra PostgreSQL e MinIO. Vermelho: a rota devolvia 404. Verde: os três testes passaram,
+    incluindo 403 para assessor, eliminação da DEK e repetição após falha no storage.
 - [ ] **T3.14** Rotas da API com ids em texto; remoção de `/gabinetes*`. D12, D27.
 - [ ] **T3.15** Scripts sem gabinete e administrador (`e2e_*`, `limpar_dev`, `calibrar`, `ponta_a_ponta`, `criar_usuario_banco`).
 - [ ] **T3.16** Suíte completa verde nos dois pacotes. D23.

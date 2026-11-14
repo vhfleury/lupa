@@ -329,7 +329,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [ ] I: cada ação da lista gera evento, com localização (RF-AUD-01).
 - [ ] I: varredura de eventos e logs não acha texto sintético (RF-AUD-02).
 - [x] I: relatório de uso com contagens e custo (RF-AUD-05).
-- [ ] I: descarte apaga satélites e chave, mantém hubs, links e auditoria; conteúdo responde
+- [x] I: descarte apaga satélites e chave, mantém hubs, links e auditoria; conteúdo responde
   indisponível (A13; RF-PRO-05).
 - [x] I: varredura do banco e do storage não acha texto em claro; valor em claro é recusado
   (RF-SEG-01). T3.5 (`test_cifra_satelites.py`, no nível dos satélites e do

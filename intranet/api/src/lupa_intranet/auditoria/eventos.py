@@ -50,7 +50,7 @@ class AcaoAuditoria(StrEnum):
     REVISAO_LIBERADA = "revisao_liberada"
     IDENTIDADE_LIDA = "identidade_lida"
     PROCESSO_DESCARTADO = "processo_descartado"
-    CHAVE_ROTACIONADA = "chave_rotacionada"
+    DESCARTE_OBJETOS_PENDENTE = "descarte_objetos_pendente"
 
 
 class ResultadoEvento(StrEnum):
