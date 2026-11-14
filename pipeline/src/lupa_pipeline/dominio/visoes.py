@@ -240,6 +240,7 @@ class VisaoFato(BaseVisao):
     tipo: Mapped[str]
     sujeito: Mapped[str]
     hk_evidencia_origem: Mapped[bytes]
+    evidencias_vigentes: Mapped[list[bytes]] = mapped_column(ARRAY(BYTEA))
     hk_processo: Mapped[bytes]
     processo_id: Mapped[str]
     valor: Mapped[Any] = mapped_column(JsonCifrado("sat_fato_valor.valor"))
@@ -390,6 +391,7 @@ class VisaoFatoHistorico(BaseVisao):
     hk_fato: Mapped[bytes] = _hk()
     load_dts: Mapped[datetime] = mapped_column(Instante, primary_key=True)
     fato_id: Mapped[str]
+    evidencias_vigentes: Mapped[list[bytes]] = mapped_column(ARRAY(BYTEA))
     hk_usuario: Mapped[bytes | None]
     usuario_id: Mapped[str | None]
     valor: Mapped[Any] = mapped_column(JsonCifrado("sat_fato_valor.valor"))
@@ -397,6 +399,25 @@ class VisaoFatoHistorico(BaseVisao):
     versao_extrator: Mapped[str]
     confianca: Mapped[float]
     status: Mapped[str]
+
+
+class VisaoAchadoHistorico(BaseVisao):
+    """Todas as versões do resultado de cada validação por recorrente."""
+
+    __tablename__ = "v_achado_historico"
+
+    hk_achado: Mapped[bytes] = _hk()
+    criado_em: Mapped[datetime] = mapped_column(Instante, primary_key=True)
+    id: Mapped[str]
+    hk_processo: Mapped[bytes]
+    processo_id: Mapped[str]
+    validacao: Mapped[str]
+    sujeito: Mapped[str]
+    versao_catalogo: Mapped[str]
+    resultado: Mapped[str]
+    fatos_usados: Mapped[list[bytes]] = mapped_column(ARRAY(BYTEA))
+    valores: Mapped[Any] = mapped_column(JsonCifrado("sat_achado_resultado.valores"))
+    explicacao: Mapped[str] = mapped_column(TextoCifrado("sat_achado_resultado.explicacao"))
 
 
 class VisaoMensagem(BaseVisao):

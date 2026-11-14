@@ -763,8 +763,12 @@ SELECT encode(h.hk_fato, 'hex') AS id, h.hk_fato, h.numero_cnj, h.tipo, h.sujeit
        h.hk_evidencia_origem, l.hk_processo, encode(l.hk_processo, 'hex') AS processo_id,
        v.valor, v.extraido_por, v.versao_extrator, v.confianca, v.status, v.hk_usuario,
        v.load_dts AS atualizado_em,
-       EXISTS (
-           SELECT 1 FROM link_fato_evidencia e
+       cardinality(ev.hks) > 0 AS vigente, ev.hks AS evidencias_vigentes
+FROM hub_fato h
+JOIN link_processo_fato l ON l.hk_fato = h.hk_fato
+CROSS JOIN LATERAL (
+       SELECT ARRAY (
+           SELECT e.hk_evidencia FROM link_fato_evidencia e
            LEFT JOIN LATERAL (
                SELECT vigente
                FROM sat_fato_evidencia_vigencia s
@@ -772,9 +776,9 @@ SELECT encode(h.hk_fato, 'hex') AS id, h.hk_fato, h.numero_cnj, h.tipo, h.sujeit
                ORDER BY s.load_dts DESC LIMIT 1
            ) g ON true
            WHERE e.hk_fato = h.hk_fato AND g.vigente
-       ) AS vigente
-FROM hub_fato h
-JOIN link_processo_fato l ON l.hk_fato = h.hk_fato
+           ORDER BY e.hk_evidencia
+       ) AS hks
+) ev
 LEFT JOIN LATERAL (
     SELECT valor, extraido_por, versao_extrator, confianca, status, hk_usuario, load_dts
     FROM sat_fato_valor s
@@ -883,8 +887,24 @@ JOIN hub_peca h ON h.hk_peca = s.hk_peca
     "v_fato_historico": """
 SELECT encode(s.hk_fato, 'hex') AS fato_id, s.hk_fato, s.load_dts, s.hk_usuario,
        encode(s.hk_usuario, 'hex') AS usuario_id, s.valor, s.extraido_por, s.versao_extrator,
-       s.confianca, s.status
+       s.confianca, s.status, ARRAY(
+           SELECT e.hk_evidencia FROM link_fato_evidencia e
+           JOIN LATERAL (
+               SELECT v.vigente FROM sat_fato_evidencia_vigencia v
+               WHERE v.hk_fato_evidencia = e.hk_fato_evidencia AND v.load_dts <= s.load_dts
+               ORDER BY v.load_dts DESC LIMIT 1
+           ) g ON g.vigente
+           WHERE e.hk_fato = s.hk_fato ORDER BY e.hk_evidencia
+       ) AS evidencias_vigentes
 FROM sat_fato_valor s
+""",
+    "v_achado_historico": """
+SELECT h.hk_achado, encode(h.hk_achado, 'hex') AS id, l.hk_processo,
+       encode(l.hk_processo, 'hex') AS processo_id, h.validacao, h.sujeito, s.load_dts AS criado_em,
+       s.versao_catalogo, s.resultado, s.fatos_usados, s.valores, s.explicacao
+FROM sat_achado_resultado s
+JOIN hub_achado h USING (hk_achado)
+JOIN link_processo_achado l USING (hk_achado)
 """,
     "v_mensagem": """
 SELECT DISTINCT ON (s.hk_conversa, s.sequencia)

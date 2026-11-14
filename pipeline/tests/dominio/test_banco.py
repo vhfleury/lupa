@@ -1,91 +1,113 @@
-"""Repositórios de fatos e achados contra PostgreSQL real.
-
-Fase 3 (D23): reescritos sobre o Data Vault em T3.10. A migração, o trigger de fato sem evidência
-e o nome só em coluna autorizada estão em `test_migracao_0001.py`; a imutabilidade, em
-`test_gravacao.py`; a RLS saiu com os gabinetes (T3.2).
-"""
-
-from uuid import UUID, uuid4
+"""Repositórios, correção humana e vigência no Data Vault real."""
 
 import pytest
-from alembic.autogenerate import compare_metadata
-from alembic.migration import MigrationContext
-from sqlalchemy import Engine, delete, insert, inspect, select, text, update
-from sqlalchemy.exc import DBAPIError
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from apoio_comum import FabricaFato, FabricaProcesso, criar_pagina, migrar
-from lupa_pipeline.dominio.enums import ResultadoAchado, TipoFato
-from lupa_pipeline.dominio.esquemas import Achado
+from apoio_comum import criar_pagina, criar_processo
+from lupa_pipeline.dominio.correcoes import corrigir_fato
+from lupa_pipeline.dominio.enums import ResultadoAchado, StatusFato, TipoFato
+from lupa_pipeline.dominio.esquemas import Achado, Evidencia, Fato
 from lupa_pipeline.dominio.repositorios import (
-    ProcessoNaoEncontradoError,
     listar_achados,
     listar_fatos_por_processo,
     salvar_achado,
     salvar_fato,
 )
-from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao, definir_gabinete
-from lupa_pipeline.dominio.tabelas import (
-    TABELAS_COM_GABINETE,
-    AchadoTabela,
-    Base,
-    FatoEvidenciaTabela,
-    FatoTabela,
-    ProcessoTabela,
-)
+from lupa_pipeline.dominio.tabelas import sat_achado_resultado, sat_fato_valor
+from lupa_pipeline.dominio.visoes import VisaoProcesso
 
 pytestmark = pytest.mark.integracao
 
 
-def _forcar_constraints(sessao: Session) -> None:
-    sessao.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+def evidencia(pagina: bytes, trecho: str, inicio: int) -> Evidencia:
+    """RF-FAT-01. Monta o trecho da página sintética nos offsets indicados."""
+    return Evidencia(
+        id="0" * 64, pagina_id=pagina.hex(), trecho=trecho, inicio=inicio, fim=inicio + len(trecho)
+    )
 
 
-def _achado(processo_id: UUID, fatos: tuple[UUID, ...] = ()) -> Achado:
-    return Achado(
-        processo_id=processo_id,
+def test_correcao_troca_evidencias_preserva_id_e_reprocessamento(sessao: Session) -> None:
+    """RF-FAT-03. A prova humana permanece sob o mesmo identificador no replay."""
+    processo = criar_processo(sessao)
+    autor = sessao.get_one(VisaoProcesso, processo).hk_criador
+    assert autor
+    pagina = criar_pagina(sessao, processo, "intimado em 03/03, retificado para 05/03")
+    origem = evidencia(pagina, "03/03", 12)
+    novo = evidencia(pagina, "05/03", 35)
+    candidato = Fato(
+        id="0" * 64,
+        processo_id=processo.hex(),
+        tipo=TipoFato.DATA_INTIMACAO,
+        valor="2025-03-03",
+        evidencias=(origem,),
+        extraido_por="certidao",
+        versao_extrator="1",
+        confianca=1,
+    )
+    hk = salvar_fato(sessao, candidato)
+    (fato,) = listar_fatos_por_processo(sessao, processo)
+    assert fato.id == hk.hex()
+    corrigir_fato(sessao, fato, StatusFato.CORRIGIDO, autor, "2025-03-05", novo)
+    assert salvar_fato(sessao, candidato) == hk
+    (vigente,) = listar_fatos_por_processo(sessao, processo)
+    assert (vigente.id, vigente.valor, vigente.status) == (
+        fato.id,
+        "2025-03-05",
+        StatusFato.CORRIGIDO,
+    )
+    assert [e.trecho for e in vigente.evidencias] == ["05/03"]
+    assert (
+        sessao.scalar(
+            select(func.count()).select_from(sat_fato_valor).where(sat_fato_valor.c.hk_fato == hk)
+        )
+        == 2
+    )
+
+
+def test_recusa_evidencia_de_outro_processo_ou_trecho_incorreto(sessao: Session) -> None:
+    """RF-FAT-01. Uma evidência precisa pertencer ao processo e ao trecho."""
+    externo = criar_processo(sessao)
+    pagina_externa = criar_pagina(sessao, externo, "origem")
+    processo = criar_processo(sessao)
+    pagina = criar_pagina(sessao, processo, "outra")
+    for pagina_id in (pagina_externa, pagina):
+        candidato = Fato(
+            id="0" * 64,
+            processo_id=processo.hex(),
+            tipo=TipoFato.TIPO_RECURSO,
+            valor="apelacao_civel",
+            evidencias=(evidencia(pagina_id, "origem", 0),),
+            extraido_por="teste",
+            versao_extrator="1",
+            confianca=1,
+        )
+        with pytest.raises(ValueError):
+            salvar_fato(sessao, candidato)
+    assert listar_fatos_por_processo(sessao, processo) == []
+
+
+def test_achado_so_grava_quando_muda(sessao: Session) -> None:
+    """RES-13. O satélite de resultado só ganha versão quando os atributos mudam."""
+    processo = criar_processo(sessao)
+    achado = Achado(
+        id="0" * 64,
+        processo_id=processo.hex(),
         validacao="tempestividade_recurso",
-        versao_catalogo="2025.1",
-        resultado=ResultadoAchado.CONFORME,
-        fatos_usados=fatos,
-        valores={"prazo_dias": 5, "base_legal": "art. 593 CPP"},
-        explicacao="Recurso tempestivo.",
+        versao_catalogo="1",
+        resultado=ResultadoAchado.VERIFICAR,
+        explicacao="Falta data.",
     )
-
-
-def test_fato_salvo_volta_com_evidencias(
-    sessao: Session, processo_id: UUID, pagina_id: UUID, fabrica_fato: FabricaFato
-) -> None:
-    """`salvar_fato` e `listar_fatos_por_processo` preservam o contrato do `Fato`."""
-    primeiro = fabrica_fato(processo_id=processo_id, pagina_id=pagina_id)
-    segundo = fabrica_fato(
-        processo_id=processo_id, pagina_id=pagina_id, tipo=TipoFato.PENA_MAXIMA_ABSTRATA, valor=48
+    assert salvar_achado(sessao, achado)
+    assert not salvar_achado(sessao, achado)
+    (atual,) = listar_achados(sessao, processo)
+    assert atual.id != achado.id and atual.explicacao == achado.explicacao
+    assert salvar_achado(sessao, achado.model_copy(update={"explicacao": "Falta certidão."}))
+    assert (
+        sessao.scalar(
+            select(func.count())
+            .select_from(sat_achado_resultado)
+            .where(sat_achado_resultado.c.hk_achado == bytes.fromhex(atual.id))
+        )
+        == 2
     )
-    salvar_fato(sessao, primeiro)
-    salvar_fato(sessao, segundo)
-    _forcar_constraints(sessao)
-    fatos = {fato.id: fato for fato in listar_fatos_por_processo(sessao, processo_id)}
-    assert set(fatos) == {primeiro.id, segundo.id}
-    assert fatos[primeiro.id].evidencias == primeiro.evidencias
-    assert fatos[segundo.id].valor == 48
-    assert fatos[segundo.id].tipo is TipoFato.PENA_MAXIMA_ABSTRATA
-
-
-def test_salvar_fato_de_processo_inexistente_falha(
-    sessao: Session, fabrica_fato: FabricaFato
-) -> None:
-    """Processo desconhecido (ou invisível pela RLS) gera erro claro."""
-    with pytest.raises(ProcessoNaoEncontradoError):
-        salvar_fato(sessao, fabrica_fato())
-    with pytest.raises(ProcessoNaoEncontradoError):
-        salvar_achado(sessao, _achado(uuid4()))
-
-
-def test_achado_salvo_e_listado(sessao: Session, processo_id: UUID) -> None:
-    """`salvar_achado` e `listar_achados` fazem ida e volta completa."""
-    fatos_usados = (uuid4(), uuid4())
-    achado = _achado(processo_id, fatos_usados)
-    salvar_achado(sessao, achado)
-    assert listar_achados(sessao, processo_id) == [achado]
-
-

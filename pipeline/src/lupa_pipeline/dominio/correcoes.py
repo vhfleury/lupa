@@ -1,64 +1,23 @@
-"""Correção e confirmação humana de fatos (Etapa 6.7).
+"""Conferência humana do valor e das evidências de um fato (A11)."""
 
-O fato original nunca é alterado: a correção grava um fato NOVO com `status=corrigido` (ou
-`confirmado`), `substitui_fato_id` apontando para o original e as mesmas evidências. Um fato
-substituído deixa de ser vigente: o catálogo só enxerga os fatos vigentes.
-"""
-
-import json
-from collections.abc import Iterable, Sequence
 from datetime import date
 from typing import Any
-from uuid import UUID
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from lupa_pipeline.dominio.enums import StatusFato
-from lupa_pipeline.dominio.esquemas import Fato
-from lupa_pipeline.dominio.repositorios import listar_fatos_por_processo, salvar_fato
-from lupa_pipeline.dominio.tabelas import FatoTabela
-
-EXTRAIDO_POR_PESSOA = "assessor"
-VERSAO_CORRECAO = "manual"
+from lupa_pipeline.dominio.esquemas import Evidencia, Fato
+from lupa_pipeline.dominio.repositorios import (
+    evidencia_da_pagina,
+    gravar_valor,
+    listar_fatos_por_processo,
+    processo_para_gravar,
+    vincular_evidencia,
+)
 
 
 class CorrecaoInvalidaError(ValueError):
-    """Pedido de correção incoerente com o fato original."""
-
-
-class FatoJaSubstituidoError(ValueError):
-    """O fato já foi corrigido ou confirmado; corrija o vigente."""
-
-
-def fatos_vigentes(fatos: Iterable[Fato]) -> list[Fato]:
-    """Remove os fatos que outro fato substituiu.
-
-    Args:
-        fatos: Fatos do processo.
-
-    Returns:
-        Só os fatos que ninguém substitui, na ordem recebida.
-    """
-    lista = list(fatos)
-    substituidos = {f.substitui_fato_id for f in lista if f.substitui_fato_id is not None}
-    return [f for f in lista if f.id not in substituidos]
-
-
-def _desembrulhar(valor: Any) -> tuple[Any, str | None]:
-    if isinstance(valor, dict) and "reu_id" in valor and "valor" in valor:
-        return valor["valor"], str(valor["reu_id"])
-    return valor, None
-
-
-def _e_data(valor: Any) -> bool:
-    if not isinstance(valor, str):
-        return False
-    try:
-        date.fromisoformat(valor)
-    except ValueError:
-        return False
-    return True
+    """Valor, evidência ou estado incompatível com a correção."""
 
 
 def _tipo_json(valor: Any) -> str:
@@ -66,98 +25,70 @@ def _tipo_json(valor: Any) -> str:
         return "booleano"
     if isinstance(valor, int | float):
         return "numero"
-    if _e_data(valor):
+    if isinstance(valor, str):
+        try:
+            date.fromisoformat(valor)
+        except ValueError:
+            return "texto"
         return "data"
     return type(valor).__name__
 
 
 def valor_corrigido(original: Any, novo: Any) -> Any:
-    """Confere o valor novo contra o original e reaplica o réu, quando o fato é por réu.
-
-    Args:
-        original: Valor gravado no fato original.
-        novo: Valor informado pela pessoa (sem o envelope do réu).
-
-    Returns:
-        Valor a gravar.
-
-    Raises:
-        CorrecaoInvalidaError: Tipo diferente do original (data por texto, número por data...).
-    """
-    base, reu_id = _desembrulhar(original)
-    if _tipo_json(base) != _tipo_json(novo):
-        esperado = _tipo_json(base)
-        raise CorrecaoInvalidaError(f"valor deve ser do mesmo tipo do original ({esperado})")
-    if json.dumps(novo, sort_keys=True) == json.dumps(base, sort_keys=True):
+    """Exige um novo valor do mesmo tipo do anterior."""
+    if _tipo_json(original) != _tipo_json(novo):
+        raise CorrecaoInvalidaError(
+            f"valor deve ser do mesmo tipo do original ({_tipo_json(original)})"
+        )
+    if original == novo:
         raise CorrecaoInvalidaError("valor igual ao original: use confirmar")
-    return {"valor": novo, "reu_id": reu_id} if reu_id is not None else novo
-
-
-def obter_fato(session: Session, processo_id: UUID, fato_id: UUID) -> Fato | None:
-    """Fato do processo, com evidências.
-
-    Args:
-        session: Sessão com transação aberta.
-        processo_id: Processo.
-        fato_id: Fato.
-
-    Returns:
-        O fato, ou None se não existe no processo.
-    """
-    for fato in listar_fatos_por_processo(session, processo_id):
-        if fato.id == fato_id:
-            return fato
-    return None
-
-
-def corrigir_fato(session: Session, original: Fato, status: StatusFato, valor: Any = None) -> Fato:
-    """Grava o fato novo que substitui o original.
-
-    Args:
-        session: Sessão com transação aberta (RLS do gabinete).
-        original: Fato vigente a corrigir ou confirmar.
-        status: `corrigido` (valor novo obrigatório) ou `confirmado` (mantém o valor).
-        valor: Valor novo, sem o envelope do réu.
-
-    Returns:
-        Fato novo gravado.
-
-    Raises:
-        FatoJaSubstituidoError: O original já tem substituto.
-        CorrecaoInvalidaError: Status não aceito ou valor incoerente.
-    """
-    ja = session.scalar(select(FatoTabela.id).where(FatoTabela.substitui_fato_id == original.id))
-    if ja is not None:
-        raise FatoJaSubstituidoError("fato já corrigido ou confirmado")
-    if status is StatusFato.CORRIGIDO:
-        gravar = valor_corrigido(original.valor, valor)
-    elif status is StatusFato.CONFIRMADO:
-        gravar = original.valor
-    else:
-        raise CorrecaoInvalidaError("status deve ser corrigido ou confirmado")
-    novo = Fato(
-        processo_id=original.processo_id,
-        tipo=original.tipo,
-        valor=gravar,
-        evidencias=original.evidencias,
-        extraido_por=EXTRAIDO_POR_PESSOA,
-        versao_extrator=VERSAO_CORRECAO,
-        confianca=1.0,
-        status=status,
-        substitui_fato_id=original.id,
-    )
-    salvar_fato(session, novo)
-    session.flush()
     return novo
 
 
-def cadeia_de_substituicao(fatos: Sequence[Fato]) -> dict[UUID, UUID]:
-    """Mapa fato substituído → fato que o substitui.
+def obter_fato(session: Session, processo_id: bytes, fato_id: str) -> Fato | None:
+    """Retorna o fato com as evidências vigentes, se pertencer ao processo."""
+    return next(
+        (f for f in listar_fatos_por_processo(session, processo_id) if f.id == fato_id), None
+    )
 
-    Args:
-        fatos: Fatos do processo.
 
-    Returns:
-        Mapa de ids.
-    """
-    return {f.substitui_fato_id: f.id for f in fatos if f.substitui_fato_id is not None}
+def corrigir_fato(
+    session: Session,
+    original: Fato,
+    status: StatusFato,
+    autor: bytes,
+    valor: Any = None,
+    evidencia: Evidencia | None = None,
+) -> Fato:
+    """Aplica a decisão humana sob a trava do processo, preservando a chave de origem."""
+    processo_id = bytes.fromhex(original.processo_id)
+    processo_para_gravar(session, processo_id)
+    corrente = obter_fato(session, processo_id, original.id)
+    if corrente is None:
+        raise CorrecaoInvalidaError("fato indisponível")
+    hk = bytes.fromhex(corrente.id)
+    if status == StatusFato.CORRIGIDO and evidencia is not None:
+        valor = valor_corrigido(corrente.valor, valor)
+        nova = evidencia_da_pagina(session, processo_id, evidencia)
+        for anterior in corrente.evidencias:
+            if anterior.id != nova.hex():
+                vincular_evidencia(session, hk, bytes.fromhex(anterior.id), False)
+        vincular_evidencia(session, hk, nova, True)
+    elif status == StatusFato.CONFIRMADO and valor is None and evidencia is None:
+        valor = corrente.valor
+    else:
+        raise CorrecaoInvalidaError("correção exige valor e evidência; confirmação mantém ambos")
+    novo = corrente.model_copy(
+        update={
+            "status": status,
+            "valor": valor,
+            "extraido_por": "revisao_humana",
+            "versao_extrator": "manual",
+            "confianca": 1.0,
+        }
+    )
+    gravar_valor(session, hk, novo, autor)
+    salvo = obter_fato(session, processo_id, original.id)
+    if salvo is None:
+        raise CorrecaoInvalidaError("fato indisponível após a correção")
+    return salvo
