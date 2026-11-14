@@ -348,7 +348,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
   5 dias, fato ausente, conflito (A7; RF-VAL-02, RF-FAT-02).
 - [x] U: preparo: comprovante, dispensa, gratuidade deferida, pedido sem decisão, ausência (A8;
   RF-VAL-03).
-- [ ] U: representação: procuração, substabelecimento em cadeia, dispensa, sem procuração,
+- [x] U: representação: procuração, substabelecimento em cadeia, dispensa, sem procuração,
   assinatura não identificada (A9; RF-VAL-04).
 - [ ] U: cabimento: inciso identificado e não identificado; nunca `atenção` (A10; RF-VAL-05).
 - [x] U: catálogo aplica a tabela 3.1; ação originária não gera achado (RF-VAL-01).

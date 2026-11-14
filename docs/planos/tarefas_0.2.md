@@ -360,7 +360,9 @@ a saída resumida (vermelho inicial e verde final).
 - [x] **T4.8** Preparo. A8. RF-VAL-03.
   - A regra vazia falhou ao avaliar comprovante, dispensa e gratuidade. No worker,
     `python -m pytest pipeline/tests/validacoes/test_preparo.py --no-cov -q` passou nos dez casos.
-- [ ] **T4.9** Representação. A9. RF-VAL-04.
+- [x] **T4.9** Representação. A9. RF-VAL-04.
+  - A regra vazia falhou ao reconhecer o mandato. No worker,
+    `python -m pytest pipeline/tests/validacoes/test_representacao.py --no-cov -q` passou nos dez casos, incluindo cadeias e ciclos.
 - [ ] **T4.10** Cabimento do agravo. A10. RF-VAL-05.
 - [ ] **T4.11** Linha de comando das validações e `fatos_exemplo.json`. RF-VAL-06.
 - [x] **T4.12** Agente cível: prompt, recusa, ferramenta de cálculo, contexto sem pseudônimos, dossiê com partes. RF-CHA-01 a 05, RF-DOS-01 a 04.
