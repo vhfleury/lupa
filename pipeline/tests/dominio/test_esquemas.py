@@ -1,7 +1,5 @@
 """Testes dos esquemas pydantic e do número CNJ (sem banco)."""
 
-from uuid import uuid4
-
 import pytest
 from pydantic import ValidationError
 
@@ -19,6 +17,7 @@ from lupa_pipeline.dominio.enums import (
 from lupa_pipeline.dominio.esquemas import (
     Achado,
     Anotacao,
+    Arquivo,
     Evidencia,
     Fato,
     Pagina,
@@ -76,7 +75,7 @@ def test_fato_com_evidencia_e_aceito_e_imutavel(fabrica_fato: FabricaFato) -> No
     fato = fabrica_fato()
     assert len(fato.evidencias) == 1
     with pytest.raises(ValidationError):
-        fato.confianca = 0.1
+        fato.confianca = 0.1  # type: ignore[misc]  # Exercita a proteção em tempo de execução.
 
 
 def test_evidencia_calcula_hash_do_trecho_quando_omitido() -> None:
@@ -112,7 +111,8 @@ def test_peca_com_pagina_final_antes_da_inicial_e_rejeitada() -> None:
     """`pagina_final >= pagina_inicial`."""
     with pytest.raises(ValidationError, match="pagina_final"):
         Peca(
-            arquivo_id=uuid4(),
+            id=calcular_hash("peca"),
+            arquivo_id=calcular_hash("arquivo"),
             tipo=TipoPeca.SENTENCA,
             pagina_inicial=10,
             pagina_final=9,
@@ -125,7 +125,8 @@ def test_peca_com_pagina_final_antes_da_inicial_e_rejeitada() -> None:
 def test_peca_de_uma_pagina_e_aceita() -> None:
     """Página inicial igual à final é válida."""
     peca = Peca(
-        arquivo_id=uuid4(),
+        id=calcular_hash("peca"),
+        arquivo_id=calcular_hash("arquivo"),
         tipo=TipoPeca.CERTIDAO,
         pagina_inicial=3,
         pagina_final=3,
@@ -138,10 +139,23 @@ def test_peca_de_uma_pagina_e_aceita() -> None:
 
 def test_pagina_calcula_e_confere_hash_do_texto() -> None:
     """`hash_texto` é calculado e, se informado, conferido."""
-    pagina = Pagina(arquivo_id=uuid4(), numero=1, tipo=TipoPagina.NATIVA, texto="x")
+    pagina = Pagina(
+        id=calcular_hash("pagina"),
+        arquivo_id=calcular_hash("arquivo"),
+        numero=1,
+        tipo=TipoPagina.NATIVA,
+        texto="x",
+    )
     assert pagina.hash_texto == calcular_hash("x")
     with pytest.raises(ValidationError, match="hash_texto"):
-        Pagina(arquivo_id=uuid4(), numero=1, tipo=TipoPagina.OCR, texto="x", hash_texto="y")
+        Pagina(
+            id=calcular_hash("pagina"),
+            arquivo_id=calcular_hash("arquivo"),
+            numero=1,
+            tipo=TipoPagina.OCR,
+            texto="x",
+            hash_texto="y",
+        )
 
 
 def test_achado_com_resultado_fora_do_enum_e_rejeitado() -> None:
@@ -168,11 +182,12 @@ def test_achado_com_resultado_fora_do_enum_e_rejeitado() -> None:
 
 def test_anotacao_exige_exatamente_um_alvo() -> None:
     """Anotação aponta para um achado ou um fato, nunca ambos nem nenhum."""
+    dados = {"id": calcular_hash("nota"), "usuario_id": calcular_hash("usuario"), "texto": "nota"}
     with pytest.raises(ValidationError, match="exatamente um"):
-        Anotacao(usuario_id=uuid4(), texto="nota")
+        Anotacao(**dados)
     with pytest.raises(ValidationError, match="exatamente um"):
-        Anotacao(achado_id=uuid4(), fato_id=uuid4(), usuario_id=uuid4(), texto="nota")
-    assert Anotacao(fato_id=uuid4(), usuario_id=uuid4(), texto="nota").achado_id is None
+        Anotacao(**dados, achado_id=calcular_hash("achado"), fato_id=calcular_hash("fato"))
+    assert Anotacao(**dados, fato_id=calcular_hash("fato")).achado_id is None
 
 
 @pytest.mark.parametrize("papel", list(PapelUsuario))
@@ -191,3 +206,20 @@ def test_sujeito_e_ids_dos_fatos_exigem_hash_publico(fabrica_fato: FabricaFato) 
     for alteracao in ({"id": "x"}, {"sujeito": "apelante"}):
         with pytest.raises(ValidationError):
             Fato(**(dados | alteracao))
+
+
+def test_arquivo_exige_hks_nos_identificadores() -> None:
+    """RF-ING-01, D12: aceita a identidade do hub e rejeita UUID na referência ao processo."""
+    dados = {
+        "id": calcular_hash("arquivo"),
+        "processo_id": calcular_hash("processo"),
+        "enviado_por": calcular_hash("usuario"),
+        "sha256": calcular_hash("pdf"),
+        "tamanho_bytes": 8,
+        "nome_original": "autos.pdf",
+        "chave_storage": "autos/teste",
+        "mime": "application/pdf",
+    }
+    assert Arquivo.model_validate(dados).processo_id == dados["processo_id"]
+    with pytest.raises(ValidationError, match="processo_id"):
+        Arquivo.model_validate(dados | {"processo_id": "00000000-0000-4000-8000-000000000000"})

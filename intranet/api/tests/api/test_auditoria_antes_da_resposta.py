@@ -1,45 +1,27 @@
 """Correção 1 da Revisão da Etapa 3: conteúdo só sai depois de o evento estar gravado."""
 
-from uuid import uuid4
-
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
-from sqlalchemy.orm import Session
 
-from apoio_comum import criar_gabinete_teste, eventos_do_banco, gerar_numero_cnj
+from apoio_comum import criar_processo_teste, eventos_do_banco
 from lupa_intranet.api import middleware
-from lupa_pipeline.dominio.enums import Materia, PapelUsuario, StatusProcesso
-from lupa_pipeline.dominio.tabelas import ProcessoTabela
+from lupa_pipeline.dominio.enums import ClasseProcessual, PapelUsuario
 from tests.conftest import criar_usuario_teste, logar
 
 pytestmark = pytest.mark.integracao
 
-CLASSE_MARCADORA = "Classe marcadora que nao pode vazar"
+CLASSE_MARCADORA = ClasseProcessual.AGRAVO_INTERNO.value
 
 
 def test_falha_ao_gravar_auditoria_vira_500_e_o_conteudo_nao_sai(
     app_teste: FastAPI, engine_teste: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Se `processo_aberto` não grava, a resposta é 500 sem os dados do processo."""
-    assessor = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
-    processo_id = uuid4()
-    with Session(engine_teste) as session, session.begin():
-        session.add(
-            ProcessoTabela(
-                id=processo_id,
-                gabinete_id=assessor.gabinete_id,
-                numero_cnj=gerar_numero_cnj(int(processo_id.int % 9_000_000) + 1),
-                classe=CLASSE_MARCADORA,
-                materia=Materia.CRIMINAL.value,
-                sigiloso=False,
-                status=StatusProcesso.CRIADO.value,
-                criado_por=assessor.id,
-            )
-        )
+    assessor = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
+    hk = criar_processo_teste(engine_teste, assessor, classe=ClasseProcessual.AGRAVO_INTERNO)
+    processo_id = hk.hex()
     cliente = TestClient(app_teste, base_url="https://testserver")
     logar(cliente, engine_teste, assessor)
 

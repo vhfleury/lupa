@@ -335,7 +335,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
   (RF-SEG-01). T3.5 (`test_cifra_satelites.py`, no nível dos satélites e do
   storage; a varredura pela API, em `intranet/api/tests/seguranca/test_cifra_banco.py`, volta em
   T3.14).
-- [ ] I: cofre selado dá 503 na saúde (RF-SEG-02).
+- [x] I: cofre selado dá 503 na saúde (RF-SEG-02).
   - Não feito em T3.5: a saúde não mudou e o teste da rota depende de `create_app` (T3.14).
 - [x] I: teto de conversa e processo em revisão bloqueiam a chamada; liberação restaura (A16;
   RF-CHA-06, 08).

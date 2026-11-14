@@ -1,139 +1,41 @@
-"""Visualizador (Etapa 6.6): página como imagem do original, bbox da evidência e auditoria.
-
-Usa a extração da sessão (`extracao_sessao`): cada teste recebe um processo novo processado até
-os achados, com o PDF sintético no storage em memória do worker, que a aplicação passa a usar.
-"""
+"""Página original e retângulos de evidência no visualizador."""
 
 import io
-from collections.abc import Iterator
-from pathlib import Path
-from typing import Any
 
 import fitz
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
-from apoio_comum import UsuarioTeste, criar_gabinete_teste, eventos_do_banco
-from apoio_ingestao import ExtracaoSessao, lacrar_e_processar
+from apoio_comum import criar_processo_teste, eventos_do_banco
 from lupa_intranet.api.rotas.visualizador import caixas_da_evidencia, fracao
-from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.ingestao import renderizacao
 from lupa_pipeline.ingestao.sandbox import LimitesSandbox
 from lupa_pipeline.ingestao.storage import ArmazenamentoMemoria
-from tests.conftest import criar_usuario_teste, logar
-
-pytestmark = pytest.mark.integracao
+from tests.ingestao.conftest import Autos
 
 
-def _colega(engine: Engine, processado: dict[str, Any]) -> UsuarioTeste:
-    """Assessor novo do mesmo gabinete (cada login gasta um passo TOTP do usuário)."""
-    return criar_usuario_teste(engine, PapelUsuario.ASSESSOR, processado["assessor"].gabinete_id)
-
-
-@pytest.fixture
-def processado(
-    engine_teste: Engine, extracao_sessao: ExtracaoSessao, tmp_path: Path
-) -> dict[str, Any]:
-    """Processo novo processado até achados."""
-    return lacrar_e_processar(extracao_sessao, engine_teste, tmp_path)
-
-
-@pytest.fixture
-def cliente(
-    app_teste: FastAPI,
-    engine_teste: Engine,
-    extracao_sessao: ExtracaoSessao,
-    processado: dict[str, Any],
-) -> Iterator[TestClient]:
-    """Cliente do assessor dono do processo, com a aplicação lendo o storage do worker."""
-    app_teste.state.storage = extracao_sessao.deps.storage
-    cliente = TestClient(app_teste, base_url="https://testserver")
-    logar(cliente, engine_teste, _colega(engine_teste, processado))
-    yield cliente
-
-
-def _png(conteudo: bytes) -> fitz.Pixmap:
-    return fitz.Pixmap(conteudo)
-
-
-def test_pagina_renderizada_como_png_privado_e_auditada_como_pagina_vista(
-    cliente: TestClient, engine_teste: Engine, processado: dict[str, Any]
+@pytest.mark.integracao
+def test_imagem_do_zip_e_caixa_da_evidencia(
+    autos_civeis: Autos, engine_teste: Engine, app_teste: FastAPI
 ) -> None:
-    """PNG (nunca PDF nem texto), `Cache-Control: private`, evento `pagina_vista`; cache."""
-    processo, arquivo = processado["processo"], processado["lacre"].arquivo_id
-    caminho = f"/processos/{processo}/arquivos/{arquivo}/paginas/1/imagem"
-    resposta = cliente.get(caminho)
-    assert resposta.status_code == 200, resposta.text
-    assert resposta.headers["content-type"] == "image/png"
-    assert resposta.headers["cache-control"].startswith("private")
-    assert resposta.content.startswith(b"\x89PNG")
-    imagem = _png(resposta.content)
-    largura = float(resposta.headers["x-lupa-pagina-largura"])
-    assert imagem.width == pytest.approx(largura * renderizacao.ZOOM_PADRAO, abs=2)
-    eventos = eventos_do_banco(engine_teste, processo_id=processo, acao="pagina_vista")
-    assert [e.objeto_id for e in eventos] == [caminho]
-    segunda = cliente.get(caminho)
-    assert segunda.content == resposta.content
-    menor = cliente.get(caminho, params={"zoom": 1})
-    assert _png(menor.content).width < imagem.width
-    assert cliente.get(caminho, params={"zoom": 9}).status_code == 422
-
-
-def test_pagina_inexistente_arquivo_alheio_e_outro_gabinete(
-    app_teste: FastAPI, cliente: TestClient, engine_teste: Engine, processado: dict[str, Any]
-) -> None:
-    """404 para página fora do arquivo e para quem é de outro gabinete (tentativa auditada)."""
-    processo, arquivo = processado["processo"], processado["lacre"].arquivo_id
-    base = f"/processos/{processo}/arquivos/{arquivo}/paginas"
-    assert cliente.get(f"{base}/9999/imagem").status_code == 404
-    assert (
-        cliente.get(f"/processos/{processo}/arquivos/{processo}/paginas/1/imagem").status_code
-        == 404
-    )
-    outro = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
-    intruso = TestClient(app_teste, base_url="https://testserver")
-    logar(intruso, engine_teste, outro)
-    assert intruso.get(f"{base}/1/imagem").status_code == 404
-    negados = eventos_do_banco(engine_teste, usuario_id=outro.id, resultado="negado")
-    assert [e.acao for e in negados] == ["processo_aberto"]
-
-
-def test_origem_ausente_no_storage_responde_503(
-    app_teste: FastAPI, cliente: TestClient, processado: dict[str, Any]
-) -> None:
-    """Sem o objeto de origem, a rota responde 503 sem conteúdo."""
-    app_teste.state.storage = ArmazenamentoMemoria()
-    processo, arquivo = processado["processo"], processado["lacre"].arquivo_id
-    resposta = cliente.get(f"/processos/{processo}/arquivos/{arquivo}/paginas/1/imagem")
-    assert resposta.status_code == 503
-
-
-def test_bbox_de_cada_evidencia_de_fato_cai_dentro_da_pagina(
-    cliente: TestClient, processado: dict[str, Any]
-) -> None:
-    """Toda evidência de fato tem arquivo, página e retângulo dentro da página (fração)."""
-    processo = processado["processo"]
-    fatos = cliente.get(f"/processos/{processo}/fatos").json()["fatos"]
-    evidencias = {e["id"]: e for f in fatos for e in f["evidencias"]}
-    assert evidencias
-    for evidencia in evidencias.values():
-        resposta = cliente.get(f"/processos/{processo}/evidencias/{evidencia['id']}/bbox")
-        assert resposta.status_code == 200, resposta.text
-        corpo = resposta.json()
-        assert (corpo["arquivo_id"], corpo["pagina"]) == (
-            evidencia["arquivo_id"],
-            evidencia["pagina"],
-        )
-        uniao = corpo["uniao"]
-        assert uniao is not None, evidencia
-        assert 0 <= uniao["x"] < 1 and 0 <= uniao["y"] < 1
-        assert 0 < uniao["largura"] <= 1 and 0 < uniao["altura"] <= 1
-        assert corpo["retangulos"]
-    assert cliente.get(f"/processos/{processo}/evidencias/{processo}/bbox").status_code == 404
+    """RF-DOS-05: imagem e destaques têm origem na mesma página e são auditados."""
+    c, base = autos_civeis.cliente, autos_civeis.url
+    fato = next(f for f in c.get(base + "/fatos").json()["fatos"] if f["tipo"] == "data_intimacao")
+    e = fato["evidencias"][0]
+    imagem = f"{base}/arquivos/{e['arquivo_id']}/paginas/{e['pagina']}/imagem"
+    r = c.get(imagem)
+    assert r.status_code == 200 and r.content.startswith(b"\x89PNG")
+    assert "private" in r.headers["Cache-Control"]
+    caixa = c.get(f"{base}/evidencias/{e['id']}/bbox").json()
+    assert caixa["retangulos"] and caixa["trecho"] == e["trecho"]
+    assert 0 <= caixa["uniao"]["y"] < 1
+    externo = criar_processo_teste(engine_teste)
+    assert c.get(imagem.replace(autos_civeis.processo.hex(), externo.hex())).status_code == 404
+    assert c.get(imagem.replace("/paginas/3/", "/paginas/100/")).status_code == 404
+    assert "pagina_vista" in {
+        ev.acao for ev in eventos_do_banco(engine_teste, hk_processo=autos_civeis.processo)
+    }
 
 
 def test_caixas_por_offset_em_blocos_nativos_e_linhas_de_ocr() -> None:

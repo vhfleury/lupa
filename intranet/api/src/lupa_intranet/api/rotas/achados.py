@@ -1,24 +1,12 @@
-"""Rotas de achados, fatos e anotações do processo (Etapas 4F.7 e 6.7).
+"""Fatos, versões, achados e anotações do processo (A11, RF-DOS-06)."""
 
-`GET /processos/{id}/achados` devolve o último achado de cada validação (com valores,
-explicação e fatos usados) e o status do processo; `GET .../achados/historico` devolve todos os
-achados já gravados (imutáveis), marcando os vigentes. `GET .../fatos` lista os fatos com as
-evidências (arquivo, página, trecho) e a cadeia de correção. Leituras de conteúdo: auditadas
-como `processo_aberto` (com `admin_acesso_conteudo` para o administrador).
-
-`POST .../fatos/{fato_id}/corrigir` grava um fato NOVO (`corrigido` ou `confirmado`) ligado ao
-original por `substitui_fato_id`, registra `fato_corrigido`, reexecuta o catálogo sobre os fatos
-vigentes e grava só os achados que mudaram (os antigos ficam como histórico), registrando
-`validacao_executada`. `POST .../anotacoes` grava uma nota sobre achado ou fato (`anotacao`).
-Processo de outro gabinete responde 404 (`exige_processo`).
-"""
-
-from typing import Annotated, Any
-from uuid import UUID, uuid4
+from collections import defaultdict
+from typing import Annotated, Any, Self
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from sqlalchemy import or_, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from lupa_intranet.acesso.autorizacao import (
     AtorAutenticado,
@@ -26,263 +14,283 @@ from lupa_intranet.acesso.autorizacao import (
     SessaoBanco,
     exige_processo,
 )
-from lupa_intranet.acesso.erros import (
-    ConflitoError,
-    DadosInvalidosError,
-    NaoEncontradoError,
-    PermissaoNegadaError,
-)
-from lupa_intranet.acesso.papeis import Permissao, pode
-from lupa_intranet.acesso.servico import Ator, Contexto, auditar
+from lupa_intranet.acesso.erros import DadosInvalidosError, NaoEncontradoError
+from lupa_intranet.acesso.servico import auditar
 from lupa_intranet.api.middleware import auditar_rota
 from lupa_intranet.auditoria.eventos import AcaoAuditoria
 from lupa_pipeline.dominio import correcoes
+from lupa_pipeline.dominio.chaves import chave_hash
 from lupa_pipeline.dominio.enums import StatusFato
-from lupa_pipeline.dominio.repositorios import listar_achados, listar_fatos_por_processo
-from lupa_pipeline.dominio.tabelas import (
-    AchadoTabela,
-    AnotacaoTabela,
-    FatoTabela,
-    PaginaTabela,
-    ProcessoTabela,
-    UsuarioTabela,
+from lupa_pipeline.dominio.esquemas import Evidencia, Fato, IdPublico
+from lupa_pipeline.dominio.gravacao import gravar_satelite
+from lupa_pipeline.dominio.repositorios import (
+    evidencias_por_id,
+    listar_achados,
+    listar_fatos_por_processo,
+    processo_para_gravar,
 )
-from lupa_pipeline.ingestao import repositorio_eventos
+from lupa_pipeline.dominio.tabelas import sat_achado_anotacao, sat_fato_anotacao
+from lupa_pipeline.dominio.visoes import (
+    VisaoAchado,
+    VisaoAchadoHistorico,
+    VisaoAnotacao,
+    VisaoFato,
+    VisaoFatoHistorico,
+    VisaoPagina,
+    VisaoProcesso,
+)
 from lupa_pipeline.ingestao.eventos.etapa import achados_do_processo
+from lupa_pipeline.ingestao.repositorio_eventos import gravar_achados
 
 router = APIRouter()
-
-Processo = Annotated[ProcessoTabela, Depends(exige_processo)]
+Processo = Annotated[VisaoProcesso, Depends(exige_processo)]
 
 
 class CorpoCorrecao(BaseModel):
-    """Correção (`corrigido`, com valor novo) ou confirmação (`confirmado`) de um fato."""
+    """Valor e localização da prova escolhida na correção humana."""
 
     model_config = ConfigDict(extra="forbid")
-
     status: StatusFato
     valor: Any = None
+    pagina_id: IdPublico | None = None
+    inicio: int | None = Field(None, ge=0)
+    fim: int | None = Field(None, gt=0)
+    trecho: str | None = Field(None, min_length=1)
 
     @model_validator(mode="after")
-    def _coerente(self) -> "CorpoCorrecao":
-        if self.status is StatusFato.AUTOMATICO:
-            raise ValueError("status deve ser corrigido ou confirmado")
-        if self.status is StatusFato.CORRIGIDO and self.valor is None:
-            raise ValueError("informe o valor corrigido")
-        return self
+    def _coerente(self) -> Self:
+        campos = (self.valor, self.pagina_id, self.inicio, self.fim, self.trecho)
+        if self.status == StatusFato.CORRIGIDO and all(c is not None for c in campos):
+            if self.inicio is not None and self.fim is not None and self.fim > self.inicio:
+                return self
+        if self.status == StatusFato.CONFIRMADO and all(c is None for c in campos):
+            return self
+        raise ValueError(
+            "informe valor, página, início, fim e trecho ao corrigir, ou apenas confirme"
+        )
 
 
 class CorpoAnotacao(BaseModel):
-    """Nota sobre um achado ou um fato (exatamente um dos dois)."""
+    """Nota sobre exatamente um alvo do processo."""
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-
-    achado_id: UUID | None = None
-    fato_id: UUID | None = None
+    achado_id: IdPublico | None = None
+    fato_id: IdPublico | None = None
     texto: str = Field(min_length=1, max_length=2000)
 
     @model_validator(mode="after")
-    def _um_alvo(self) -> "CorpoAnotacao":
+    def _um_alvo(self) -> Self:
         if (self.achado_id is None) == (self.fato_id is None):
             raise ValueError("informe achado_id ou fato_id")
         return self
 
 
-def _exigir_anotar(ator: Ator, processo: ProcessoTabela) -> None:
-    if not pode(ator.papel, Permissao.ANOTAR, ator.gabinete_id, processo.gabinete_id):
-        raise PermissaoNegadaError("ação não permitida para o seu papel")
-
-
 @router.get("/processos/{processo_id}/achados")
 @auditar_rota(AcaoAuditoria.PROCESSO_ABERTO, conteudo=True)
 def obter_achados(processo: Processo, sessao: SessaoBanco) -> dict[str, Any]:
-    """Achados vigentes do processo.
-
-    Args:
-        processo: Processo autorizado.
-        sessao: Sessão da requisição.
-
-    Returns:
-        `{processo_id, status, achados: [...]}`.
-    """
-    achados = repositorio_eventos.achados_vigentes(sessao, processo.id)
+    """Resultados correntes por validação e recorrente."""
     return {
-        "processo_id": str(processo.id),
+        "processo_id": processo.id,
         "status": processo.status,
-        "achados": [a.model_dump(mode="json") for a in achados],
+        "achados": [
+            a.model_dump(mode="json") for a in listar_achados(sessao, processo.hk_processo)
+        ],
     }
 
 
 @router.get("/processos/{processo_id}/achados/historico")
 @auditar_rota(AcaoAuditoria.PROCESSO_ABERTO, conteudo=True)
-def obter_historico_achados(processo: Processo, sessao: SessaoBanco) -> dict[str, Any]:
-    """Todos os achados gravados do processo, em ordem de criação, com o vigente marcado.
-
-    Args:
-        processo: Processo autorizado.
-        sessao: Sessão da requisição.
-
-    Returns:
-        `{processo_id, achados: [{..., vigente}]}`.
-    """
-    vigentes = {a.id for a in repositorio_eventos.achados_vigentes(sessao, processo.id)}
+def historico_achados(processo: Processo, sessao: SessaoBanco) -> dict[str, Any]:
+    """Resultados em ordem de gravação, com a versão corrente de cada achado marcada."""
+    vigentes = {a.id: a.criado_em for a in listar_achados(sessao, processo.hk_processo)}
+    linhas = sessao.scalars(
+        select(VisaoAchadoHistorico)
+        .where(VisaoAchadoHistorico.hk_processo == processo.hk_processo)
+        .order_by(VisaoAchadoHistorico.criado_em, VisaoAchadoHistorico.id)
+    )
     return {
-        "processo_id": str(processo.id),
+        "processo_id": processo.id,
         "achados": [
-            a.model_dump(mode="json") | {"vigente": a.id in vigentes}
-            for a in listar_achados(sessao, processo.id)
+            {
+                "id": a.id,
+                "processo_id": a.processo_id,
+                "sujeito": a.sujeito,
+                "validacao": a.validacao,
+                "resultado": a.resultado,
+                "versao_catalogo": a.versao_catalogo,
+                "valores": a.valores,
+                "fatos_usados": [hk.hex() for hk in a.fatos_usados],
+                "explicacao": a.explicacao,
+                "criado_em": a.criado_em,
+                "vigente": vigentes.get(a.id) == a.criado_em,
+            }
+            for a in linhas
         ],
     }
 
 
-def _paginas(sessao: SessaoBanco, ids: set[UUID]) -> dict[UUID, tuple[UUID, int]]:
-    if not ids:
-        return {}
-    linhas = sessao.execute(
-        select(PaginaTabela.id, PaginaTabela.arquivo_id, PaginaTabela.numero).where(
-            PaginaTabela.id.in_(ids)
+def _anotacao(a: VisaoAnotacao) -> dict[str, Any]:
+    return {
+        "id": chave_hash([a.alvo_tipo, a.alvo_id, a.criada_em.isoformat()]).hex(),
+        "fato_id": a.alvo_id if a.alvo_tipo == "fato" else None,
+        "achado_id": a.alvo_id if a.alvo_tipo == "achado" else None,
+        "usuario_id": a.usuario_id,
+        "autor": a.nome_usuario,
+        "texto": a.texto,
+        "criado_em": a.criada_em,
+    }
+
+
+def _com_paginas(
+    session: Session, processo: VisaoProcesso, fatos: list[tuple[Fato, bool]]
+) -> list[dict[str, Any]]:
+    numeros = {e.pagina_id for fato, _ in fatos for e in fato.evidencias}
+    paginas = {
+        p.id: (p.arquivo_id, p.numero)
+        for p in session.execute(
+            select(VisaoPagina.id, VisaoPagina.arquivo_id, VisaoPagina.numero).where(
+                VisaoPagina.hk_processo == processo.hk_processo, VisaoPagina.id.in_(numeros)
+            )
         )
-    )
-    return {pagina_id: (arquivo_id, numero) for pagina_id, arquivo_id, numero in linhas}
+    }
+    notas: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for a in session.scalars(
+        select(VisaoAnotacao)
+        .where(VisaoAnotacao.hk_processo == processo.hk_processo, VisaoAnotacao.alvo_tipo == "fato")
+        .order_by(VisaoAnotacao.criada_em)
+    ):
+        notas[a.alvo_id].append(_anotacao(a))
+    return [
+        f.model_dump(mode="json", exclude={"evidencias"})
+        | {
+            "vigente": vigente,
+            "anotacoes": notas[f.id],
+            "evidencias": [
+                e.model_dump(mode="json")
+                | {"arquivo_id": paginas[e.pagina_id][0], "pagina": paginas[e.pagina_id][1]}
+                for e in f.evidencias
+            ],
+        }
+        for f, vigente in fatos
+    ]
 
 
 @router.get("/processos/{processo_id}/fatos")
 @auditar_rota(AcaoAuditoria.PROCESSO_ABERTO, conteudo=True)
-def listar_fatos(processo: Processo, sessao: SessaoBanco) -> dict[str, Any]:
-    """Fatos do processo com evidências localizadas e a cadeia de correção.
+def fatos_correntes(processo: Processo, sessao: SessaoBanco) -> dict[str, Any]:
+    """Fatos com evidências verificáveis e notas humanas."""
+    fatos = listar_fatos_por_processo(sessao, processo.hk_processo)
+    return {
+        "processo_id": processo.id,
+        "fatos": _com_paginas(sessao, processo, [(f, True) for f in fatos]),
+    }
 
-    Args:
-        processo: Processo autorizado.
-        sessao: Sessão da requisição.
 
-    Returns:
-        `{processo_id, fatos: [{id, tipo, valor, status, vigente, substitui_fato_id,
-        substituido_por, evidencias: [{id, arquivo_id, pagina, trecho, ...}]}]}`.
-    """
-    fatos = listar_fatos_por_processo(sessao, processo.id)
-    substituto = correcoes.cadeia_de_substituicao(fatos)
-    paginas = _paginas(sessao, {e.pagina_id for f in fatos for e in f.evidencias})
-    serializados = []
-    for fato in fatos:
-        evidencias = []
-        for evidencia in fato.evidencias:
-            arquivo_id, numero = paginas.get(evidencia.pagina_id, (None, None))
-            evidencias.append(
-                {
-                    "id": str(evidencia.id),
-                    "pagina_id": str(evidencia.pagina_id),
-                    "arquivo_id": str(arquivo_id) if arquivo_id else None,
-                    "pagina": numero,
-                    "trecho": evidencia.trecho,
-                    "inicio": evidencia.inicio,
-                    "fim": evidencia.fim,
-                }
-            )
-        serializados.append(
-            fato.model_dump(mode="json", exclude={"evidencias"})
-            | {
-                "vigente": fato.id not in substituto,
-                "substituido_por": str(substituto[fato.id]) if fato.id in substituto else None,
-                "evidencias": evidencias,
+@router.get("/processos/{processo_id}/fatos/historico")
+@auditar_rota(AcaoAuditoria.PROCESSO_ABERTO, conteudo=True)
+def historico_fatos(processo: Processo, sessao: SessaoBanco) -> dict[str, Any]:
+    """Versões dos valores com as evidências que os sustentavam no instante da gravação."""
+    linhas = sessao.execute(
+        select(VisaoFato, VisaoFatoHistorico)
+        .join(VisaoFatoHistorico, VisaoFato.hk_fato == VisaoFatoHistorico.hk_fato)
+        .where(VisaoFato.hk_processo == processo.hk_processo)
+        .order_by(VisaoFatoHistorico.load_dts, VisaoFato.id)
+    ).all()
+    evidencias = evidencias_por_id(
+        sessao, {hk for f, v in linhas for hk in (v.evidencias_vigentes or [f.hk_evidencia_origem])}
+    )
+    fatos = []
+    for f, v in linhas:
+        fato = Fato.model_validate(
+            {
+                "id": f.id,
+                "processo_id": f.processo_id,
+                "tipo": f.tipo,
+                "sujeito": f.sujeito,
+                "valor": v.valor,
+                "extraido_por": v.extraido_por,
+                "versao_extrator": v.versao_extrator,
+                "confianca": v.confianca,
+                "status": v.status,
+                "criado_em": v.load_dts,
+                "evidencias": [
+                    evidencias[hk] for hk in (v.evidencias_vigentes or [f.hk_evidencia_origem])
+                ],
             }
         )
-    return {"processo_id": str(processo.id), "fatos": serializados}
-
-
-def _registrar(
-    sessao: SessaoBanco,
-    ctx: Contexto,
-    ator: Ator,
-    processo: ProcessoTabela,
-    acao: AcaoAuditoria,
-    objeto: tuple[str, UUID],
-) -> None:
-    auditar(
-        sessao,
-        ctx,
-        acao,
-        usuario_id=ator.usuario_id,
-        gabinete_id=processo.gabinete_id,
-        processo_id=processo.id,
-        objeto_tipo=objeto[0],
-        objeto_id=str(objeto[1]),
-    )
+        fatos.append((fato, f.vigente and v.load_dts == f.atualizado_em))
+    return {"processo_id": processo.id, "fatos": _com_paginas(sessao, processo, fatos)}
 
 
 @router.post("/processos/{processo_id}/fatos/{fato_id}/corrigir", status_code=201)
 def corrigir_fato(
     processo: Processo,
-    fato_id: UUID,
+    fato_id: str,
     corpo: CorpoCorrecao,
     ator: AtorAutenticado,
     sessao: SessaoBanco,
     ctx: ContextoReq,
 ) -> dict[str, Any]:
-    """Corrige ou confirma um fato e reexecuta o catálogo.
-
-    Args:
-        processo: Processo autorizado.
-        fato_id: Fato vigente.
-        corpo: Status e valor.
-        ator: Quem corrige.
-        sessao: Sessão da requisição.
-        ctx: Contexto para a auditoria (a data de referência das validações é a de hoje).
-
-    Returns:
-        `{fato, achados_gravados, achados}` com o fato novo e os achados vigentes.
-
-    Raises:
-        PermissaoNegadaError: Papel sem permissão de anotar no gabinete.
-        NaoEncontradoError: Fato inexistente ou de outro processo.
-        ConflitoError: Fato já substituído.
-        DadosInvalidosError: Valor incoerente com o original.
-    """
-    _exigir_anotar(ator, processo)
-    original = correcoes.obter_fato(sessao, processo.id, fato_id)
+    """Confere o trecho e reexecuta as regras sobre a versão revista."""
+    original = correcoes.obter_fato(sessao, processo.hk_processo, fato_id)
     if original is None:
         raise NaoEncontradoError("fato não encontrado")
+    evidencia = None
+    if corpo.pagina_id and corpo.inicio is not None and corpo.fim and corpo.trecho:
+        evidencia = Evidencia(
+            id=chave_hash([corpo.pagina_id, corpo.inicio, corpo.fim]).hex(),
+            pagina_id=corpo.pagina_id,
+            inicio=corpo.inicio,
+            fim=corpo.fim,
+            trecho=corpo.trecho,
+        )
     try:
-        novo = correcoes.corrigir_fato(sessao, original, corpo.status, corpo.valor)
-    except correcoes.FatoJaSubstituidoError as erro:
-        raise ConflitoError(str(erro)) from None
-    except correcoes.CorrecaoInvalidaError as erro:
+        novo = correcoes.corrigir_fato(
+            sessao, original, corpo.status, ator.hk_usuario, corpo.valor, evidencia
+        )
+    except ValueError as erro:
         raise DadosInvalidosError(str(erro)) from None
-    _registrar(sessao, ctx, ator, processo, AcaoAuditoria.FATO_CORRIGIDO, ("fato", novo.id))
-    achados = achados_do_processo(sessao, processo.id, processo.materia, ctx.agora.date())
-    gravados = repositorio_eventos.gravar_achados(sessao, processo.id, achados)
-    objeto = ("processo", processo.id)
-    _registrar(sessao, ctx, ator, processo, AcaoAuditoria.VALIDACAO_EXECUTADA, objeto)
+    auditar(
+        sessao,
+        ctx,
+        AcaoAuditoria.FATO_CORRIGIDO,
+        hk_usuario=ator.hk_usuario,
+        hk_processo=processo.hk_processo,
+        objeto_tipo="fato",
+        objeto_id=novo.id,
+    )
+    achados = achados_do_processo(
+        sessao, processo.hk_processo, processo.classe or "", ctx.agora.date()
+    )
+    novos = gravar_achados(sessao, processo.hk_processo, achados)
+    auditar(
+        sessao,
+        ctx,
+        AcaoAuditoria.VALIDACAO_EXECUTADA,
+        hk_usuario=ator.hk_usuario,
+        hk_processo=processo.hk_processo,
+        objeto_tipo="processo",
+        objeto_id=processo.id,
+    )
     return {
-        "fato": novo.model_dump(mode="json", exclude={"evidencias"}),
-        "achados_gravados": gravados,
+        "fato": novo.model_dump(mode="json"),
+        "achados_gravados": novos,
         "achados": [
-            a.model_dump(mode="json")
-            for a in repositorio_eventos.achados_vigentes(sessao, processo.id)
+            a.model_dump(mode="json") for a in listar_achados(sessao, processo.hk_processo)
         ],
     }
 
 
-def _alvo_no_processo(sessao: SessaoBanco, processo: ProcessoTabela, corpo: CorpoAnotacao) -> None:
-    if corpo.achado_id is not None:
-        achado = sessao.get(AchadoTabela, corpo.achado_id)
-        encontrado = achado is not None and achado.processo_id == processo.id
-    else:
-        fato = sessao.get(FatoTabela, corpo.fato_id)
-        encontrado = fato is not None and fato.processo_id == processo.id
-    if not encontrado:
-        raise NaoEncontradoError("achado ou fato não encontrado")
-
-
-def _serializar_anotacao(anotacao: AnotacaoTabela, autor: str | None) -> dict[str, Any]:
-    return {
-        "id": str(anotacao.id),
-        "achado_id": str(anotacao.achado_id) if anotacao.achado_id else None,
-        "fato_id": str(anotacao.fato_id) if anotacao.fato_id else None,
-        "usuario_id": str(anotacao.usuario_id),
-        "autor": autor,
-        "texto": anotacao.texto,
-        "criado_em": anotacao.criado_em.isoformat(),
-    }
+@router.get("/processos/{processo_id}/anotacoes")
+@auditar_rota(AcaoAuditoria.PROCESSO_ABERTO, conteudo=True)
+def listar_anotacoes(processo: Processo, sessao: SessaoBanco) -> dict[str, Any]:
+    """Lista as notas do processo em ordem de criação."""
+    linhas = sessao.scalars(
+        select(VisaoAnotacao)
+        .where(VisaoAnotacao.hk_processo == processo.hk_processo)
+        .order_by(VisaoAnotacao.criada_em)
+    )
+    return {"processo_id": processo.id, "anotacoes": [_anotacao(a) for a in linhas]}
 
 
 @router.post("/processos/{processo_id}/anotacoes", status_code=201)
@@ -293,65 +301,47 @@ def anotar(
     sessao: SessaoBanco,
     ctx: ContextoReq,
 ) -> dict[str, Any]:
-    """Grava uma anotação sobre achado ou fato do processo.
-
-    Args:
-        processo: Processo autorizado.
-        corpo: Alvo e texto.
-        ator: Autor.
-        sessao: Sessão da requisição.
-        ctx: Contexto para a auditoria.
-
-    Returns:
-        Anotação criada.
-    """
-    _exigir_anotar(ator, processo)
-    _alvo_no_processo(sessao, processo, corpo)
-    anotacao = AnotacaoTabela(
-        id=uuid4(),
-        gabinete_id=processo.gabinete_id,
-        achado_id=corpo.achado_id,
-        fato_id=corpo.fato_id,
-        usuario_id=ator.usuario_id,
-        texto=corpo.texto,
+    """Grava uma nota cifrada sobre um fato ou achado do processo."""
+    processo_para_gravar(sessao, processo.hk_processo)
+    if corpo.fato_id:
+        hk = sessao.scalar(
+            select(VisaoFato.hk_fato).where(
+                VisaoFato.hk_processo == processo.hk_processo, VisaoFato.id == corpo.fato_id
+            )
+        )
+        tabela = sat_fato_anotacao
+        tipo = "fato"
+    else:
+        hk = sessao.scalar(
+            select(VisaoAchado.hk_achado).where(
+                VisaoAchado.hk_processo == processo.hk_processo, VisaoAchado.id == corpo.achado_id
+            )
+        )
+        tabela = sat_achado_anotacao
+        tipo = "achado"
+    if hk is None:
+        raise NaoEncontradoError("achado ou fato não encontrado")
+    gravar_satelite(
+        sessao,
+        tabela,
+        hk,
+        {"texto": corpo.texto, "hk_usuario": ator.hk_usuario},
+        "intranet.anotacao",
     )
-    sessao.add(anotacao)
-    sessao.flush()
-    sessao.refresh(anotacao)
+    nota = sessao.scalars(
+        select(VisaoAnotacao)
+        .where(VisaoAnotacao.alvo_tipo == tipo, VisaoAnotacao.hk_alvo == hk)
+        .order_by(VisaoAnotacao.criada_em.desc())
+        .limit(1)
+    ).one()
+    resposta = _anotacao(nota)
     auditar(
         sessao,
         ctx,
         AcaoAuditoria.ANOTACAO,
-        usuario_id=ator.usuario_id,
-        gabinete_id=processo.gabinete_id,
-        processo_id=processo.id,
+        hk_usuario=ator.hk_usuario,
+        hk_processo=processo.hk_processo,
         objeto_tipo="anotacao",
-        objeto_id=str(anotacao.id),
+        objeto_id=resposta["id"],
     )
-    return _serializar_anotacao(anotacao, ator.nome_usuario)
-
-
-@router.get("/processos/{processo_id}/anotacoes")
-@auditar_rota(AcaoAuditoria.PROCESSO_ABERTO, conteudo=True)
-def listar_anotacoes(processo: Processo, sessao: SessaoBanco) -> dict[str, Any]:
-    """Anotações sobre achados e fatos do processo, em ordem de criação.
-
-    Args:
-        processo: Processo autorizado.
-        sessao: Sessão da requisição.
-
-    Returns:
-        `{processo_id, anotacoes: [...]}`.
-    """
-    achados = select(AchadoTabela.id).where(AchadoTabela.processo_id == processo.id)
-    fatos = select(FatoTabela.id).where(FatoTabela.processo_id == processo.id)
-    linhas = sessao.execute(
-        select(AnotacaoTabela, UsuarioTabela.nome_usuario)
-        .outerjoin(UsuarioTabela, UsuarioTabela.id == AnotacaoTabela.usuario_id)
-        .where(or_(AnotacaoTabela.achado_id.in_(achados), AnotacaoTabela.fato_id.in_(fatos)))
-        .order_by(AnotacaoTabela.criado_em, AnotacaoTabela.id)
-    ).all()
-    return {
-        "processo_id": str(processo.id),
-        "anotacoes": [_serializar_anotacao(a, nome) for a, nome in linhas],
-    }
+    return resposta

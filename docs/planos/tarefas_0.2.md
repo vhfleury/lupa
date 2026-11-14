@@ -338,7 +338,8 @@ a saída resumida (vermelho inicial e verde final).
   - `python -m pytest intranet/api/tests/seguranca/test_descarte.py --no-cov`
     contra PostgreSQL e MinIO. Vermelho: a rota devolvia 404. Verde: os três testes passaram,
     incluindo 403 para assessor, eliminação da DEK e repetição após falha no storage.
-- [ ] **T3.14** Rotas da API com ids em texto; remoção de `/gabinetes*`. D12, D27.
+- [x] **T3.14** Rotas da API com ids em texto; remoção de `/gabinetes*`. D12, D27.
+  - A coleta anterior ainda importava as tabelas da 0.1. Com create_app real, 12 testes de saúde, os 8 de fatos, peças, diagnóstico e visualizador e os 4 de auditoria e sessão passaram. Os esquemas também passaram nos 89 casos de hash público e estado de ingestão.
 - [ ] **T3.15** Scripts sem gabinete e administrador (`e2e_*`, `limpar_dev`, `calibrar`, `ponta_a_ponta`, `criar_usuario_banco`).
 - [ ] **T3.16** Suíte completa verde nos dois pacotes. D23.
 

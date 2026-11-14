@@ -1,7 +1,6 @@
 """Testes da máquina de estados do job e dos esquemas da ingestão (sem banco)."""
 
 from itertools import product
-from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -12,6 +11,7 @@ from lupa_pipeline.dominio.esquemas import (
     EntradaManifesto,
     JobIngestao,
     LoteIngestao,
+    calcular_hash,
 )
 from lupa_pipeline.ingestao.estados import (
     ESTADOS_FINAIS,
@@ -70,7 +70,7 @@ def test_exigir_transicao_valida_nao_lanca() -> None:
 
 def test_job_em_quarentena_exige_motivo_e_so_ele() -> None:
     """`motivo_quarentena` existe se e somente se o estado é `quarentena`."""
-    base = {"processo_id": uuid4(), "arquivo_id": uuid4()}
+    base = {"processo_id": calcular_hash("processo"), "arquivo_id": calcular_hash("arquivo")}
     with pytest.raises(ValidationError):
         JobIngestao(**base, estado=E.QUARENTENA)
     with pytest.raises(ValidationError):
@@ -89,15 +89,22 @@ def test_entrada_de_manifesto_exige_hash_valido() -> None:
 
 
 def test_lote_e_diagnostico_validam_campos() -> None:
-    """Lote começa em 1 e exige token; diagnóstico usa o cenário enumerado."""
+    """RF-ING-04: lote é identificado pelo arquivo e pelo número a partir de 1."""
     with pytest.raises(ValidationError):
-        LoteIngestao(job_id=uuid4(), numero=0, estado=EstadoLote.CONCLUIDO, fencing_token=1)
-    lote = LoteIngestao(job_id=uuid4(), numero=1, estado=EstadoLote.CONCLUIDO, fencing_token=1)
+        LoteIngestao(arquivo_id=calcular_hash("arquivo"), numero=0, estado=EstadoLote.CONCLUIDO)
+    lote = LoteIngestao(arquivo_id=calcular_hash("arquivo"), numero=1, estado=EstadoLote.CONCLUIDO)
     assert lote.resultado == {}
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        LoteIngestao.model_validate(lote.model_dump() | {"fencing_token": 1})
     with pytest.raises(ValidationError):
-        DiagnosticoArquivo(arquivo_id=uuid4(), cenario="outro", total_paginas=1, tem_indice=False)
+        DiagnosticoArquivo(
+            arquivo_id=calcular_hash("arquivo"), cenario="outro", total_paginas=1, tem_indice=False
+        )
     diagnostico = DiagnosticoArquivo(
-        arquivo_id=uuid4(), cenario=CenarioArquivo.PDF_LISO, total_paginas=3, tem_indice=False
+        arquivo_id=calcular_hash("arquivo"),
+        cenario=CenarioArquivo.PDF_LISO,
+        total_paginas=3,
+        tem_indice=False,
     )
     assert diagnostico.sinais == {}
 

@@ -6,7 +6,6 @@
 import hashlib
 from datetime import UTC, date, datetime
 from typing import Annotated, Any, Self
-from uuid import UUID, uuid4
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
@@ -72,22 +71,22 @@ class Processo(EsquemaBase):
 class Arquivo(EsquemaBase):
     """Arquivo enviado (PDF dos autos); imutável."""
 
-    id: UUID = Field(default_factory=uuid4)
-    processo_id: UUID
+    id: IdPublico
+    processo_id: IdPublico
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     tamanho_bytes: int = Field(gt=0)
     nome_original: str = Field(min_length=1)
     mime: str = Field(min_length=1)
     chave_storage: str = Field(min_length=1)
-    enviado_por: UUID
+    enviado_por: IdPublico
     enviado_em: datetime = Field(default_factory=_agora)
 
 
 class Peca(EsquemaBase):
     """Peça processual identificada dentro de um arquivo."""
 
-    id: UUID = Field(default_factory=uuid4)
-    arquivo_id: UUID
+    id: IdPublico
+    arquivo_id: IdPublico
     tipo: TipoPeca
     pagina_inicial: int = Field(ge=1)
     pagina_final: int = Field(ge=1)
@@ -96,8 +95,7 @@ class Peca(EsquemaBase):
     origem: OrigemPeca
     data: date | None = None
     tipo_data: str | None = None
-    data_evidencia_id: UUID | None = None
-    substitui_peca_id: UUID | None = None
+    data_evidencia_id: IdPublico | None = None
     vigente: bool = True
     flags: dict[str, Any] = Field(default_factory=dict)
     classificacao: dict[str, Any] = Field(default_factory=dict)
@@ -112,8 +110,8 @@ class Peca(EsquemaBase):
 class Pagina(EsquemaBase):
     """Página de um arquivo com seu texto e marcadores de ingestão."""
 
-    id: UUID = Field(default_factory=uuid4)
-    arquivo_id: UUID
+    id: IdPublico
+    arquivo_id: IdPublico
     numero: int = Field(ge=1)
     tipo: TipoPagina
     texto: str
@@ -174,7 +172,6 @@ class Fato(EsquemaBase):
     versao_extrator: str = Field(min_length=1)
     confianca: Confianca
     status: StatusFato = StatusFato.AUTOMATICO
-    substitui_fato_id: IdPublico | None = None
     criado_em: datetime = Field(default_factory=_agora)
 
 
@@ -196,10 +193,10 @@ class Achado(EsquemaBase):
 class Anotacao(EsquemaBase):
     """Nota de usuário sobre um achado ou um fato; não altera nenhum dos dois."""
 
-    id: UUID = Field(default_factory=uuid4)
-    achado_id: UUID | None = None
-    fato_id: UUID | None = None
-    usuario_id: UUID
+    id: IdPublico
+    achado_id: IdPublico | None = None
+    fato_id: IdPublico | None = None
+    usuario_id: IdPublico
     texto: str = Field(min_length=1)
     criado_em: datetime = Field(default_factory=_agora)
 
@@ -227,10 +224,10 @@ class Usuario(EsquemaBase):
 class EventoAuditoria(EsquemaBase):
     """Evento da cadeia única com os identificadores públicos dos hubs (RF-AUD-04)."""
 
-    id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    id: IdPublico
     ocorrido_em: datetime
-    usuario_id: str | None
-    processo_id: str | None
+    usuario_id: IdPublico | None
+    processo_id: IdPublico | None
     acao: str = Field(min_length=1)
     objeto_tipo: str | None = None
     objeto_id: str | None = None
@@ -261,16 +258,14 @@ class EntradaManifesto(EsquemaBase):
 
 
 class JobIngestao(EsquemaBase):
-    """Job de ingestão de um arquivo; transições de estado em `lupa_pipeline.ingestao.estados`."""
+    """Estado da ingestão de um arquivo em seu processo (A3 e A4)."""
 
-    id: UUID = Field(default_factory=uuid4)
-    processo_id: UUID
-    arquivo_id: UUID
+    processo_id: IdPublico
+    arquivo_id: IdPublico
     estado: EstadoJob = EstadoJob.RECEBIDO
     motivo_quarentena: MotivoQuarentena | None = None
     motivo_falha: MotivoFalha | None = None
     tentativas: int = Field(default=0, ge=0)
-    fencing_token: int = Field(default=0, ge=0)
     total_paginas: int | None = Field(default=None, ge=0)
     manifesto: tuple[EntradaManifesto, ...] | None = None
     criado_em: datetime = Field(default_factory=_agora)
@@ -283,25 +278,21 @@ class JobIngestao(EsquemaBase):
 
 
 class LoteIngestao(EsquemaBase):
-    """Resultado de um lote de trabalho do job, gravado uma única vez por `(job_id, numero)`."""
+    """Lote de extração identificado pelo arquivo e pelo número (A5)."""
 
-    id: UUID = Field(default_factory=uuid4)
-    job_id: UUID
+    arquivo_id: IdPublico
     numero: int = Field(ge=1)
     estado: EstadoLote
-    fencing_token: int = Field(ge=1)
     resultado: dict[str, Any] = Field(default_factory=dict)
 
 
 class DiagnosticoArquivo(EsquemaBase):
     """Diagnóstico do arquivo: cenário de empacotamento e sinais medidos."""
 
-    id: UUID = Field(default_factory=uuid4)
-    arquivo_id: UUID
+    arquivo_id: IdPublico
     cenario: CenarioArquivo
     total_paginas: int = Field(ge=0)
     tem_indice: bool
     sinais: dict[str, Any] = Field(default_factory=dict)
     fronteiras_origem: list[dict[str, Any]] = Field(default_factory=list)
     metadados_descartados: list[dict[str, Any]] = Field(default_factory=list)
-    criado_em: datetime = Field(default_factory=_agora)

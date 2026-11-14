@@ -1,9 +1,4 @@
-"""Fixtures da intranet (aplicação, login e MFA); as comuns vêm de `pipeline/tests/apoio/`.
-
-Fase 3 (D23): até as rotas de ingestão, auditoria e agente importarem sobre o Data Vault (T3.11
-a T3.14), `app_teste` monta só as rotas de acesso e de processos, com a auditoria automática e
-sem `create_app`, e `apoio_ingestao` fica fora de `pytest_plugins` (volta em T3.7 a T3.9).
-"""
+"""Fixtures de acesso à aplicação real com serviços e dados sintéticos."""
 
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -18,21 +13,16 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from apoio_comum import UsuarioTeste, semear_usuario
-from lupa_intranet.acesso import rotas as rotas_acesso
 from lupa_intranet.acesso import senhas
 from lupa_intranet.acesso.autorizacao import relogio
-from lupa_intranet.acesso.erros import RecusaAcessoError, tratar_erro_acesso
-from lupa_intranet.api.middleware import auditoria_middleware
-from lupa_intranet.api.rotas import chat as rotas_chat
-from lupa_intranet.api.rotas import descarte as rotas_descarte
-from lupa_intranet.api.rotas import dossie as rotas_dossie
-from lupa_intranet.api.rotas import processos as rotas_processos
-from lupa_intranet.api.rotas import revisao as rotas_revisao
-from lupa_intranet.auditoria import rotas as rotas_auditoria
+from lupa_intranet.api.app import create_app
+from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.dominio.visoes import VisaoUsuario
+from lupa_pipeline.ingestao.storage import ArmazenamentoMemoria, StorageCifrado
+from lupa_pipeline.seguranca.contexto import definir_cofre, obter_cofre
 
-pytest_plugins = ["apoio_comum"]
+pytest_plugins = ["apoio_comum", "apoio_ingestao"]
 
 SENHA_TESTE = "cavalo-bateria-grampo-correto"  # noqa: S105
 
@@ -64,20 +54,19 @@ def resolvedor_falso() -> ResolvedorFalso:
 
 
 @pytest.fixture
-def app_teste(fabrica_sessao: sessionmaker[Session], resolvedor_falso: ResolvedorFalso) -> FastAPI:
-    """Aplicação com as rotas de acesso e de processos, ligada ao banco de teste."""
-    app = FastAPI()
+def app_teste(
+    fabrica_sessao: sessionmaker[Session],
+    resolvedor_falso: ResolvedorFalso,
+    settings_ficticias: Settings,
+) -> FastAPI:
+    """Sobe a fábrica pública e aponta suas dependências para o banco efêmero."""
+    cofre = obter_cofre()
+    app = create_app(settings_ficticias.model_copy(update={"cofre_backend": "memoria"}))
+    definir_cofre(cofre)
+    app.state.cofre = cofre
     app.state.fabrica_sessao = fabrica_sessao
     app.state.resolvedor = resolvedor_falso
-    app.add_exception_handler(RecusaAcessoError, tratar_erro_acesso)
-    app.middleware("http")(auditoria_middleware)
-    app.include_router(rotas_acesso.router)
-    app.include_router(rotas_processos.router)
-    app.include_router(rotas_auditoria.router)
-    app.include_router(rotas_descarte.router)
-    app.include_router(rotas_chat.router)
-    app.include_router(rotas_revisao.router)
-    app.include_router(rotas_dossie.router)
+    app.state.storage = StorageCifrado(ArmazenamentoMemoria())
     return app
 
 

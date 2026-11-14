@@ -1,21 +1,6 @@
-"""Rotas do visualizador de páginas (Etapa 6.6).
-
-`GET /processos/{id}/arquivos/{arquivo_id}/paginas/{numero}/imagem` devolve a página como PNG
-renderizado pelo servidor a partir do original no storage (`lupa_pipeline.ingestao.renderizacao`),
-com `Cache-Control: private`; é auditada como `pagina_vista` (com `admin_acesso_conteudo` para o
-administrador). Só existem as páginas gravadas pela ingestão (arquivo em quarentena não tem
-página). Num ZIP, a página aponta para a entrada de origem (`origem_arquivo`/`pagina_origem`),
-guardada no storage pelo hash do manifesto.
-
-`GET /processos/{id}/evidencias/{evidencia_id}/bbox` calcula onde está o trecho da evidência:
-os offsets `[inicio, fim)` no texto da página são cruzados com as linhas gravadas em
-`pagina.coordenadas` (blocos nativos ou linhas de OCR/fusão, cada uma com `inicio`, `fim` e
-`bbox` em pontos PDF com origem no canto superior esquerdo da `CropBox`), as caixas das linhas
-atingidas são unidas e convertidas em fração da página. Fecha o item pendente da Revisão 4F.
-"""
+"""Renderização de páginas e localização de evidências do processo (RF-DOS-05)."""
 
 from typing import Annotated, Any
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import JSONResponse
@@ -25,20 +10,14 @@ from lupa_intranet.acesso.autorizacao import SessaoBanco, exige_processo
 from lupa_intranet.acesso.erros import NaoEncontradoError
 from lupa_intranet.api.middleware import auditar_rota
 from lupa_intranet.auditoria.eventos import AcaoAuditoria
-from lupa_pipeline.dominio.tabelas import (
-    ArquivoTabela,
-    EvidenciaTabela,
-    JobIngestaoTabela,
-    PaginaTabela,
-    ProcessoTabela,
-)
+from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoEvidencia, VisaoPagina, VisaoProcesso
 from lupa_pipeline.ingestao import renderizacao
 from lupa_pipeline.ingestao.recepcao import TipoArquivo
 from lupa_pipeline.ingestao.storage import chave_objeto
 
 router = APIRouter()
 
-Processo = Annotated[ProcessoTabela, Depends(exige_processo)]
+Processo = Annotated[VisaoProcesso, Depends(exige_processo)]
 MENSAGEM_INDISPONIVEL = "página indisponível para visualização"
 
 
@@ -102,29 +81,32 @@ def _uniao(caixas: list[tuple[float, float, float, float]]) -> tuple[float, floa
     )
 
 
-def _origem(sessao: SessaoBanco, arquivo: ArquivoTabela, pagina: PaginaTabela) -> tuple[str, int]:
+def _origem(arquivo: VisaoArquivo, pagina: VisaoPagina) -> tuple[str, int]:
     """Chave do PDF de origem no storage e o número da página dentro dele."""
+    if not arquivo.chave_storage:
+        raise NaoEncontradoError(MENSAGEM_INDISPONIVEL)
     if arquivo.mime != TipoArquivo.ZIP.value or not pagina.origem_arquivo:
         return arquivo.chave_storage, pagina.pagina_origem or pagina.numero
-    manifesto = sessao.scalar(
-        select(JobIngestaoTabela.manifesto).where(JobIngestaoTabela.arquivo_id == arquivo.id)
-    )
-    for entrada in manifesto or []:
+    for entrada in arquivo.manifesto or []:
         if entrada.get("nome") == pagina.origem_arquivo:
-            chave = chave_objeto(arquivo.gabinete_id, arquivo.processo_id, entrada["sha256"])
+            chave = chave_objeto(arquivo.hk_processo, entrada["sha256"])
             return chave, pagina.pagina_origem or 1
     raise NaoEncontradoError(MENSAGEM_INDISPONIVEL)
 
 
 def _pagina(
-    sessao: SessaoBanco, processo: ProcessoTabela, arquivo_id: UUID, numero: int
-) -> tuple[ArquivoTabela, PaginaTabela]:
-    arquivo = sessao.get(ArquivoTabela, arquivo_id)
+    sessao: SessaoBanco, processo: VisaoProcesso, arquivo_id: str, numero: int
+) -> tuple[VisaoArquivo, VisaoPagina]:
+    arquivo = sessao.scalar(
+        select(VisaoArquivo).where(
+            VisaoArquivo.id == arquivo_id, VisaoArquivo.hk_processo == processo.hk_processo
+        )
+    )
     if arquivo is None or arquivo.processo_id != processo.id:
         raise NaoEncontradoError("arquivo não encontrado")
     pagina = sessao.scalar(
-        select(PaginaTabela).where(
-            PaginaTabela.arquivo_id == arquivo_id, PaginaTabela.numero == numero
+        select(VisaoPagina).where(
+            VisaoPagina.arquivo_id == arquivo_id, VisaoPagina.numero == numero
         )
     )
     if pagina is None:
@@ -137,7 +119,7 @@ def _pagina(
 def imagem_pagina(
     request: Request,
     processo: Processo,
-    arquivo_id: UUID,
+    arquivo_id: str,
     numero: int,
     sessao: SessaoBanco,
     zoom: Annotated[
@@ -158,7 +140,7 @@ def imagem_pagina(
         `image/png` com `Cache-Control: private`, ou 503 se a página não pôde ser desenhada.
     """
     arquivo, pagina = _pagina(sessao, processo, arquivo_id, numero)
-    chave, numero_origem = _origem(sessao, arquivo, pagina)
+    chave, numero_origem = _origem(arquivo, pagina)
     try:
         imagem = renderizacao.renderizar(request.app.state.storage, chave, numero_origem, zoom)
     except renderizacao.RenderizacaoError:
@@ -178,7 +160,7 @@ def imagem_pagina(
 @router.get("/processos/{processo_id}/evidencias/{evidencia_id}/bbox")
 @auditar_rota(AcaoAuditoria.PROCESSO_ABERTO, conteudo=True)
 def bbox_evidencia(
-    request: Request, processo: Processo, evidencia_id: UUID, sessao: SessaoBanco
+    request: Request, processo: Processo, evidencia_id: str, sessao: SessaoBanco
 ) -> dict[str, Any]:
     """Onde está o trecho da evidência: arquivo, página e retângulos em fração da página.
 
@@ -196,10 +178,12 @@ def bbox_evidencia(
         NaoEncontradoError: Evidência inexistente ou de outro processo.
     """
     linha = sessao.execute(
-        select(EvidenciaTabela, PaginaTabela, ArquivoTabela)
-        .join(PaginaTabela, PaginaTabela.id == EvidenciaTabela.pagina_id)
-        .join(ArquivoTabela, ArquivoTabela.id == PaginaTabela.arquivo_id)
-        .where(EvidenciaTabela.id == evidencia_id)
+        select(VisaoEvidencia, VisaoPagina, VisaoArquivo)
+        .join(VisaoPagina, VisaoPagina.id == VisaoEvidencia.pagina_id)
+        .join(VisaoArquivo, VisaoArquivo.id == VisaoPagina.arquivo_id)
+        .where(
+            VisaoEvidencia.id == evidencia_id, VisaoEvidencia.hk_processo == processo.hk_processo
+        )
     ).one_or_none()
     if linha is None or linha[2].processo_id != processo.id:
         raise NaoEncontradoError("evidência não encontrada")
@@ -216,7 +200,7 @@ def bbox_evidencia(
     }
     if not caixas:
         return corpo
-    chave, numero_origem = _origem(sessao, arquivo, pagina)
+    chave, numero_origem = _origem(arquivo, pagina)
     try:
         medida = renderizacao.renderizar(request.app.state.storage, chave, numero_origem)
     except renderizacao.RenderizacaoError:

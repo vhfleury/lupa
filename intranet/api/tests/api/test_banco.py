@@ -9,22 +9,20 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from lupa_intranet.acesso.erros import NaoEncontradoError
 from lupa_intranet.api.banco import sessao_aplicacao
-from lupa_pipeline.dominio.tabelas import GabineteTabela
+from lupa_pipeline.dominio.gravacao import gravar_hub
+from lupa_pipeline.dominio.tabelas import hub_usuario
+from lupa_pipeline.dominio.visoes import VisaoUsuario
 
 pytestmark = pytest.mark.integracao
 
 
-def _existe(engine: Engine, gabinete_id: object) -> bool:
+def _existe(engine: Engine, hk: bytes) -> bool:
     with Session(engine) as session:
-        return session.get(GabineteTabela, gabinete_id) is not None
+        return session.get(VisaoUsuario, hk) is not None
 
 
-def _inserir(session: Session) -> object:
-    gabinete_id = uuid4()
-    session.execute(
-        text("INSERT INTO gabinete (id, nome) VALUES (:g, 'teste')"), {"g": gabinete_id}
-    )
-    return gabinete_id
+def _inserir(session: Session) -> bytes:
+    return gravar_hub(session, hub_usuario, {"nome_usuario": f"teste.{uuid4().hex}"}, "teste")
 
 
 @pytest.mark.parametrize(
@@ -39,7 +37,7 @@ def test_recusa_prevista_confirma_e_erro_inesperado_desfaz(
     fabrica_sessao: sessionmaker[Session], engine_teste: Engine, erro: Exception, confirma: bool
 ) -> None:
     """`RecusaAcessoError`/`HTTPException` confirmam; outra exceção desfaz."""
-    gravado: list[object] = []
+    gravado: list[bytes] = []
     with pytest.raises(type(erro)), sessao_aplicacao(fabrica_sessao) as session:
         assert session.execute(text("SELECT current_user")).scalar() == "lupa_app"
         gravado.append(_inserir(session))
