@@ -2,7 +2,7 @@
 
 | Status | Data | Responsável |
 | --- | --- | --- |
-| Aceito | `{{data exata da decisão}}` (até 2026-10-22, data do primeiro commit) | Executor da Etapa 4A; endossada na revisão 4A |
+| Substituído pelo [ADR 0014](0014-fila-no-banco.md) | Até 2026-10-22 | Executor da Etapa 4A, endossada na revisão 4A |
 
 ## Contexto
 

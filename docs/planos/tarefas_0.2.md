@@ -436,5 +436,7 @@ a saída resumida (vermelho inicial e verde final).
     explicita o envio de dados identificáveis, inclusive sigilosos, os acessos do gabinete e a
     perda de conteúdo sem backup. Foram consultadas as fontes oficiais do CNJ, da LGPD e da ANPD.
     A revisão jurídica e o aceite são de responsabilidade humana.
-- [ ] **T7.4** ADRs 0013 a 0016 e `docs/decisoes/registro.md`.
+- [x] **T7.4** ADRs 0013 a 0016 e `docs/decisoes/registro.md`.
+  - O índice de ADRs liga as decisões substituídas às vigentes. O histórico registra a view
+    adicional de versões do achado e a preservação de T1.7 com verificação de responsáveis na 0.2.
 - [ ] **T7.5** `README.md`, `CONTRIBUTING.md`, `CLAUDE.md`, `docs/README.md`, `CHANGELOG.md` e versão `0.2.0`.
