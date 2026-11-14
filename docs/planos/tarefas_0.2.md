@@ -112,7 +112,15 @@ a saída resumida (vermelho inicial e verde final).
 
 ## Fase 3 — Data Vault e gabinete único
 
-- [ ] **T3.1** `dominio/chaves.py`. A1. D4, D5. RES-02.
+- [x] **T3.1** `dominio/chaves.py`. A1. D4, D5. RES-02.
+  - `chave_hash`, `chave_link`, `hash_diff` (SHA-256 do JSON canônico; HMAC-SHA-256 com a DEK
+    quando o satélite é cifrado), `hmac_processo`, `normalizar_cnj`, `normalizar_hash` e
+    `json_canonico`. Teste: `pipeline/tests/dominio/test_chaves.py` (21 testes, unitários).
+  - Comando: `docker compose run --rm --no-deps worker python -m pytest -c pipeline/pyproject.toml
+    pipeline/tests/dominio/test_chaves.py --no-cov -q` (código montado em `/app/pipeline`).
+  - Vermelho (assinaturas vazias): `17 failed, 4 passed` (os 4 comparam dois valores do esboço
+    entre si). Verde: `21 passed`. `ruff check`, `ruff format --check` e `mypy` nos dois arquivos:
+    ok.
 - [ ] **T3.2** `dominio/tabelas.py` no Data Vault, `migrations/esquema_v0001.py`, `versions/v0001_data_vault.py` e `test_migracao_0001`; remoção das revisões `v0001` a `v0012`. D3, D6, D7, D8, D9, D18. RES-02, RES-03, RES-13.
 - [ ] **T3.3** `dominio/gravacao.py` e `dominio/visoes.py`; teste de imutabilidade sob `lupa_app`. A2. D6, D13. RES-13.
 - [ ] **T3.4** Enum `PapelUsuario` com dois papéis; `acesso/` sobre hubs e satélites; `criar_desembargador.py`. A14. D11. RF-ACE-01 a 05.
