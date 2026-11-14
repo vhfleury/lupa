@@ -939,10 +939,14 @@ SELECT encode(e.hk_evento, 'hex') AS id, e.hk_evento, e.sequencia, e.ocorrido_em
        encode(e.hk_usuario, 'hex') AS usuario_id, u.nome_usuario, e.hk_processo,
        encode(e.hk_processo, 'hex') AS processo_id, p.numero_cnj, e.acao, e.objeto_tipo,
        e.objeto_id, e.ip, e.localizacao, e.resultado, e.versao_modelo, e.versao_prompt,
-       e.hash_anterior, e.hash_evento, e.load_dts
+       e.hash_anterior, e.hash_evento, e.load_dts,
+       c.modelo AS modelo_chamada, c.tokens_entrada, c.tokens_saida
 FROM link_evento_auditoria e
 LEFT JOIN hub_usuario u ON u.hk_usuario = e.hk_usuario
 LEFT JOIN hub_processo p ON p.hk_processo = e.hk_processo
+LEFT JOIN link_chamada_modelo c ON c.hk_processo = e.hk_processo
+    AND c.hk_chamada = CASE WHEN e.acao = 'chamada_modelo' AND e.objeto_tipo = 'chamada_modelo'
+        AND e.objeto_id ~ '^[0-9a-f]{64}$' THEN decode(e.objeto_id, 'hex') END
 """,
 }
 
@@ -957,6 +961,10 @@ def _criar_visoes() -> None:
 def _criar_funcoes_e_triggers() -> None:
     op.execute(SQL_FUNCOES)
     op.execute(SQL_DESCARTE)
+    op.execute(
+        "CREATE TRIGGER link_evento_auditoria_bloquear_truncate BEFORE TRUNCATE "
+        "ON link_evento_auditoria FOR EACH STATEMENT EXECUTE FUNCTION lupa_bloquear_alteracao()"
+    )
     for tabela in TABELAS:
         op.execute(
             f"CREATE TRIGGER {tabela}_imutavel BEFORE UPDATE OR DELETE ON {tabela} "

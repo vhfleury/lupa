@@ -256,13 +256,12 @@ class Usuario(EsquemaBase):
 
 
 class EventoAuditoria(EsquemaBase):
-    """Evento da trilha de auditoria encadeada por hash (ver `lupa_intranet.auditoria`)."""
+    """Evento da cadeia única com os identificadores públicos dos hubs (RF-AUD-04)."""
 
-    id: UUID = Field(default_factory=uuid4)
-    ocorrido_em: datetime = Field(default_factory=_agora)
-    usuario_id: UUID | None
-    gabinete_id: UUID | None
-    processo_id: UUID | None = None
+    id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    ocorrido_em: datetime
+    usuario_id: str | None
+    processo_id: str | None
     acao: str = Field(min_length=1)
     objeto_tipo: str | None = None
     objeto_id: str | None = None

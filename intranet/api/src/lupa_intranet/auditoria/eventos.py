@@ -43,7 +43,7 @@ class AcaoAuditoria(StrEnum):
     PECA_RECLASSIFICADA = "peca_reclassificada"
     VALIDACAO_EXECUTADA = "validacao_executada"
     CHAMADA_MODELO = "chamada_modelo"
-    ADMIN_ACESSO_CONTEUDO = "admin_acesso_conteudo"
+    CITACAO_DESCARTADA = "citacao_descartada"
     AUDITORIA_CONSULTADA = "auditoria_consultada"
     AUDITORIA_EXPORTADA = "auditoria_exportada"
     PROCESSO_EM_REVISAO = "processo_em_revisao"

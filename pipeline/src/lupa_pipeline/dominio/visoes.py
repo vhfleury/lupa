@@ -481,5 +481,8 @@ class VisaoAuditoria(BaseVisao):
     versao_modelo: Mapped[str | None]
     versao_prompt: Mapped[str | None]
     hash_anterior: Mapped[str | None]
+    modelo_chamada: Mapped[str | None]
+    tokens_entrada: Mapped[int | None]
+    tokens_saida: Mapped[int | None]
     hash_evento: Mapped[str]
     load_dts: Mapped[datetime]

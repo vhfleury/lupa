@@ -24,6 +24,7 @@ from lupa_intranet.acesso.autorizacao import relogio
 from lupa_intranet.acesso.erros import RecusaAcessoError, tratar_erro_acesso
 from lupa_intranet.api.middleware import auditoria_middleware
 from lupa_intranet.api.rotas import processos as rotas_processos
+from lupa_intranet.auditoria import rotas as rotas_auditoria
 from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.dominio.visoes import VisaoUsuario
 
@@ -68,6 +69,7 @@ def app_teste(fabrica_sessao: sessionmaker[Session], resolvedor_falso: Resolvedo
     app.middleware("http")(auditoria_middleware)
     app.include_router(rotas_acesso.router)
     app.include_router(rotas_processos.router)
+    app.include_router(rotas_auditoria.router)
     return app
 
 

@@ -1,30 +1,23 @@
-"""Consulta da auditoria: filtros, paginação por cursor, exportação e relatório de uso.
-
-A visibilidade por gabinete é garantida pela RLS; os filtros aqui só restringem.
-A ordem é do mais recente para o mais antigo (`ocorrido_em DESC, id DESC`), e o cursor carrega
-o par do último evento da página.
-"""
+"""Consulta da cadeia única e relatório de uso a partir da view de auditoria."""
 
 import base64
 import csv
 import io
 import json
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
+from itertools import groupby
 from typing import Any
-from uuid import UUID
 
-from sqlalchemy import Select, String, and_, cast, exists, func, literal, or_, select, tuple_
+from sqlalchemy import Select, func, select, tuple_
 from sqlalchemy.orm import Session
 
 from lupa_intranet.agente.precos import TabelaPrecos, custo, tabela_padrao
 from lupa_intranet.auditoria.eventos import AcaoAuditoria
 from lupa_pipeline.dominio.esquemas import EventoAuditoria
-from lupa_pipeline.dominio.tabelas import ChamadaModeloTabela as Chamada
-from lupa_pipeline.dominio.tabelas import ConversaTabela
-from lupa_pipeline.dominio.tabelas import EventoAuditoriaTabela as Evento
+from lupa_pipeline.dominio.visoes import VisaoAuditoria as Evento
 
 LIMITE_PADRAO = 50
 LIMITE_MAXIMO = 500
@@ -32,26 +25,15 @@ LIMITE_EXPORTACAO = 100_000
 
 
 class CursorInvalidoError(ValueError):
-    """O cursor recebido não pôde ser decodificado."""
+    """O cursor recebido não identifica uma posição na cadeia."""
 
 
 @dataclass(frozen=True)
 class FiltroAuditoria:
-    """Filtros da consulta; campos None não filtram.
+    """Filtros por ids públicos e por intervalo semiaberto de ocorrência."""
 
-    Attributes:
-        gabinete_id: Gabinete.
-        usuario_id: Usuário que agiu.
-        processo_id: Processo envolvido.
-        acao: Ação.
-        inicio: Instante inicial (inclusive).
-        fim: Instante final (exclusivo).
-        ip: IP de origem.
-    """
-
-    gabinete_id: UUID | None = None
-    usuario_id: UUID | None = None
-    processo_id: UUID | None = None
+    usuario_id: str | None = None
+    processo_id: str | None = None
     acao: AcaoAuditoria | None = None
     inicio: datetime | None = None
     fim: datetime | None = None
@@ -60,60 +42,41 @@ class FiltroAuditoria:
 
 @dataclass(frozen=True)
 class PaginaEventos:
-    """Uma página de eventos.
-
-    Attributes:
-        eventos: Eventos da página, do mais recente ao mais antigo.
-        proximo_cursor: Cursor da página seguinte, ou None se acabou.
-    """
+    """Eventos em ordem cronológica inversa e cursor para continuar a consulta."""
 
     eventos: list[EventoAuditoria]
     proximo_cursor: str | None
 
 
 def codificar_cursor(evento: EventoAuditoria) -> str:
-    """Codifica o cursor a partir do último evento da página.
-
-    Args:
-        evento: Último evento devolvido.
-
-    Returns:
-        Cursor opaco em base64 url-safe.
-    """
+    """Codifica o instante e o id do último evento da página."""
     bruto = f"{evento.ocorrido_em.isoformat()}|{evento.id}"
     return base64.urlsafe_b64encode(bruto.encode()).decode()
 
 
-def decodificar_cursor(cursor: str) -> tuple[datetime, UUID]:
-    """Decodifica o cursor.
-
-    Args:
-        cursor: Cursor recebido.
-
-    Returns:
-        Par (ocorrido_em, id).
-
-    Raises:
-        CursorInvalidoError: Se o cursor estiver malformado.
-    """
+def decodificar_cursor(cursor: str) -> tuple[datetime, bytes]:
+    """Recupera o instante com fuso e o hash binário do evento."""
     try:
-        instante, ident = base64.urlsafe_b64decode(cursor.encode()).decode().split("|")
-        return datetime.fromisoformat(instante), UUID(ident)
+        bruto = base64.b64decode(cursor.encode(), altchars=b"-_", validate=True)
+        instante, ident = bruto.decode().split("|")
+        data = datetime.fromisoformat(instante)
+        hk = bytes.fromhex(ident)
+        if data.utcoffset() is None or len(hk) != 32 or len(ident) != 64:
+            raise ValueError
     except ValueError as erro:
         raise CursorInvalidoError("cursor inválido") from erro
+    return data, hk
 
 
 def _aplicar_filtros(consulta: Select[Any], filtro: FiltroAuditoria) -> Select[Any]:
-    igualdades = {
-        Evento.gabinete_id: filtro.gabinete_id,
-        Evento.usuario_id: filtro.usuario_id,
-        Evento.processo_id: filtro.processo_id,
-        Evento.acao: filtro.acao.value if filtro.acao else None,
-        Evento.ip: filtro.ip,
-    }
-    for coluna, valor in igualdades.items():
-        if valor is not None:
-            consulta = consulta.where(coluna == valor)
+    if filtro.usuario_id is not None:
+        consulta = consulta.where(Evento.hk_usuario == bytes.fromhex(filtro.usuario_id))
+    if filtro.processo_id is not None:
+        consulta = consulta.where(Evento.hk_processo == bytes.fromhex(filtro.processo_id))
+    if filtro.acao is not None:
+        consulta = consulta.where(Evento.acao == filtro.acao.value)
+    if filtro.ip is not None:
+        consulta = consulta.where(Evento.ip == filtro.ip)
     if filtro.inicio is not None:
         consulta = consulta.where(Evento.ocorrido_em >= filtro.inicio)
     if filtro.fim is not None:
@@ -122,9 +85,7 @@ def _aplicar_filtros(consulta: Select[Any], filtro: FiltroAuditoria) -> Select[A
 
 
 def _para_esquema(linha: Evento) -> EventoAuditoria:
-    return EventoAuditoria(
-        **{coluna: getattr(linha, coluna) for coluna in EventoAuditoria.model_fields}
-    )
+    return EventoAuditoria.model_validate(linha, from_attributes=True)
 
 
 def consultar(
@@ -133,43 +94,26 @@ def consultar(
     cursor: str | None = None,
     limite: int = LIMITE_PADRAO,
 ) -> PaginaEventos:
-    """Consulta uma página de eventos.
-
-    Args:
-        session: Sessão com contexto de RLS.
-        filtro: Filtros.
-        cursor: Cursor devolvido pela página anterior.
-        limite: Tamanho da página (até `LIMITE_MAXIMO`).
-
-    Returns:
-        A página e o cursor da próxima.
-    """
+    """Lê uma página de eventos filtrados, do mais recente ao mais antigo."""
     limite = max(1, min(limite, LIMITE_MAXIMO))
     consulta = _aplicar_filtros(select(Evento), filtro)
     if cursor is not None:
-        instante, ident = decodificar_cursor(cursor)
         consulta = consulta.where(
-            tuple_(Evento.ocorrido_em, Evento.id) < tuple_(literal(instante), literal(ident))
+            tuple_(Evento.ocorrido_em, Evento.hk_evento) < decodificar_cursor(cursor)
         )
-    consulta = consulta.order_by(Evento.ocorrido_em.desc(), Evento.id.desc()).limit(limite + 1)
+    consulta = consulta.order_by(Evento.ocorrido_em.desc(), Evento.hk_evento.desc()).limit(
+        limite + 1
+    )
     eventos = [_para_esquema(linha) for linha in session.scalars(consulta)]
     proximo = codificar_cursor(eventos[limite - 1]) if len(eventos) > limite else None
     return PaginaEventos(eventos[:limite], proximo)
 
 
 def iterar_para_exportacao(session: Session, filtro: FiltroAuditoria) -> Iterator[EventoAuditoria]:
-    """Percorre os eventos filtrados, até `LIMITE_EXPORTACAO`, do mais antigo ao mais recente.
-
-    Args:
-        session: Sessão com contexto de RLS.
-        filtro: Filtros.
-
-    Yields:
-        Eventos em ordem cronológica.
-    """
+    """Percorre os eventos filtrados em ordem cronológica até o limite de exportação."""
     consulta = (
         _aplicar_filtros(select(Evento), filtro)
-        .order_by(Evento.ocorrido_em, Evento.id)
+        .order_by(Evento.ocorrido_em, Evento.hk_evento)
         .limit(LIMITE_EXPORTACAO)
         .execution_options(yield_per=1000)
     )
@@ -178,14 +122,7 @@ def iterar_para_exportacao(session: Session, filtro: FiltroAuditoria) -> Iterato
 
 
 def exportar_csv(eventos: Iterator[EventoAuditoria]) -> str:
-    """Serializa eventos em CSV com cabeçalho.
-
-    Args:
-        eventos: Eventos a exportar.
-
-    Returns:
-        Texto CSV.
-    """
+    """Serializa eventos em CSV com cabeçalho."""
     saida = io.StringIO()
     escritor = csv.DictWriter(saida, fieldnames=list(EventoAuditoria.model_fields))
     escritor.writeheader()
@@ -195,27 +132,12 @@ def exportar_csv(eventos: Iterator[EventoAuditoria]) -> str:
 
 
 def exportar_json(eventos: Iterator[EventoAuditoria]) -> str:
-    """Serializa eventos em JSON (lista de objetos).
-
-    Args:
-        eventos: Eventos a exportar.
-
-    Returns:
-        Texto JSON.
-    """
+    """Serializa os eventos como uma lista JSON."""
     return json.dumps([evento.model_dump(mode="json") for evento in eventos], ensure_ascii=False)
 
 
 def relatorio_uso(session: Session, filtro: FiltroAuditoria) -> dict[str, Any]:
-    """Resume o uso por processo ou por usuário, para o magistrado informar o tribunal.
-
-    Args:
-        session: Sessão com contexto de RLS.
-        filtro: Filtro com `processo_id` ou `usuario_id`.
-
-    Returns:
-        Contagem por ação, primeiro e último acesso e versões de modelo/prompt usadas.
-    """
+    """Resume contagens, acessos, versões e custos no escopo selecionado."""
     por_acao = session.execute(
         _aplicar_filtros(
             select(
@@ -230,7 +152,7 @@ def relatorio_uso(session: Session, filtro: FiltroAuditoria) -> dict[str, Any]:
     versoes = session.execute(
         _aplicar_filtros(
             select(Evento.versao_modelo, Evento.versao_prompt, func.count()),
-            FiltroAuditoria(**{**filtro.__dict__, "acao": AcaoAuditoria.CHAMADA_MODELO}),
+            replace(filtro, acao=AcaoAuditoria.CHAMADA_MODELO),
         )
         .group_by(Evento.versao_modelo, Evento.versao_prompt)
         .order_by(Evento.versao_modelo, Evento.versao_prompt)
@@ -247,57 +169,27 @@ def relatorio_uso(session: Session, filtro: FiltroAuditoria) -> dict[str, Any]:
     }
 
 
-def _tokens_por_modelo(session: Session, filtro: FiltroAuditoria) -> list[tuple[str, int, int]]:
-    consulta = select(
-        Chamada.modelo,
-        func.coalesce(func.sum(Chamada.tokens_entrada), 0),
-        func.coalesce(func.sum(Chamada.tokens_saida), 0),
-    )
-    if filtro.usuario_id is not None:
-        # Chat: chamadas das conversas do usuário. Resumos do dossiê (sem conversa, 6.10): o
-        # evento `chamada_modelo` que aponta para a chamada diz quem pediu o resumo.
-        do_resumo = exists().where(
-            Evento.acao == AcaoAuditoria.CHAMADA_MODELO.value,
-            Evento.objeto_id == cast(Chamada.id, String),
-            Evento.usuario_id == filtro.usuario_id,
-        )
-        consulta = consulta.outerjoin(
-            ConversaTabela, ConversaTabela.id == Chamada.conversa_id
-        ).where(
-            or_(
-                ConversaTabela.usuario_id == filtro.usuario_id,
-                and_(Chamada.conversa_id.is_(None), do_resumo),
-            )
-        )
-    if filtro.processo_id is not None:
-        consulta = consulta.where(Chamada.processo_id == filtro.processo_id)
-    if filtro.gabinete_id is not None:
-        consulta = consulta.where(Chamada.gabinete_id == filtro.gabinete_id)
-    linhas = session.execute(consulta.group_by(Chamada.modelo).order_by(Chamada.modelo)).all()
-    return [(str(m), int(e), int(s)) for m, e, s in linhas]
-
-
 def custo_estimado(
     session: Session, filtro: FiltroAuditoria, tabela: TabelaPrecos | None = None
 ) -> dict[str, Any]:
-    """Custo estimado em dinheiro das chamadas ao modelo (tokens de `chamada_modelo`).
-
-    Por usuário, conta as chamadas das conversas dele e, desde a 6.10, os resumos do dossiê
-    que ele pediu (sem conversa; o autor vem do evento `chamada_modelo` da chamada).
-
-    Args:
-        session: Sessão com contexto de RLS.
-        filtro: Filtro com `processo_id` ou `usuario_id` (e o gabinete).
-        tabela: Tabela de preços (padrão: `agente/dados/precos.yaml`).
-
-    Returns:
-        Total, moeda, versão e fonte da tabela, ressalva e detalhamento por modelo; modelo fora
-        da tabela aparece com custo None e não entra no total.
-    """
+    """Custeia os tokens das chamadas de chat e de dossiê atribuídas a cada evento."""
     tabela = tabela or tabela_padrao()
+    tokens = (
+        _aplicar_filtros(
+            select(
+                Evento.modelo_chamada,
+                func.sum(Evento.tokens_entrada),
+                func.sum(Evento.tokens_saida),
+            ),
+            filtro,
+        )
+        .where(Evento.modelo_chamada.is_not(None))
+        .group_by(Evento.modelo_chamada)
+        .order_by(Evento.modelo_chamada)
+    )
     por_modelo = []
     total = Decimal("0.0000")
-    for modelo, entrada, saida in _tokens_por_modelo(session, filtro):
+    for modelo, entrada, saida in session.execute(tokens):
         preco = tabela.preco_de(modelo)
         valor = custo(preco, entrada, saida) if preco else None
         total += valor or 0
@@ -317,3 +209,65 @@ def custo_estimado(
         "observacao": tabela.observacao,
         "por_modelo": por_modelo,
     }
+
+
+def exportar_uso(session: Session, filtro: FiltroAuditoria) -> str:
+    """Exporta contagens e custos por par processo/usuário no período (RF-AUD-05)."""
+    tabela = tabela_padrao()
+    grupos = [Evento.processo_id, Evento.usuario_id, Evento.acao, Evento.modelo_chamada]
+    consulta = (
+        _aplicar_filtros(
+            select(
+                *grupos,
+                func.count(),
+                func.sum(Evento.tokens_entrada),
+                func.sum(Evento.tokens_saida),
+            ),
+            filtro,
+        )
+        .group_by(*grupos)
+        .order_by(*grupos)
+    )
+    saida = io.StringIO()
+    escritor = csv.writer(saida)
+    escritor.writerow(
+        (
+            "processo_id",
+            "usuario_id",
+            "eventos",
+            "contagem_por_acao",
+            "chamadas_modelo",
+            "chamadas_sem_preco",
+            "custo_estimado",
+            "moeda",
+            "versao_tabela",
+        )
+    )
+    for (processo, usuario), linhas in groupby(
+        session.execute(consulta), key=lambda r: (r[0], r[1])
+    ):
+        por_acao: dict[str, int] = {}
+        total = Decimal("0.0000")
+        sem_preco = 0
+        for _, _, acao, modelo, quantidade, tokens_entrada, tokens_saida in linhas:
+            por_acao[acao] = por_acao.get(acao, 0) + quantidade
+            if acao == AcaoAuditoria.CHAMADA_MODELO:
+                preco = tabela.preco_de(modelo) if modelo else None
+                if preco:
+                    total += custo(preco, tokens_entrada, tokens_saida)
+                else:
+                    sem_preco += quantidade
+        escritor.writerow(
+            (
+                processo,
+                usuario,
+                sum(por_acao.values()),
+                json.dumps(por_acao, sort_keys=True),
+                por_acao.get(AcaoAuditoria.CHAMADA_MODELO, 0),
+                sem_preco,
+                total,
+                tabela.moeda,
+                tabela.versao,
+            )
+        )
+    return saida.getvalue()

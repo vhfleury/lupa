@@ -1,143 +1,72 @@
-"""Teste de carga: 1 milhão de eventos sintéticos e consulta filtrada em menos de 200 ms."""
+"""Consulta filtrada no conjunto sintético de um milhão de eventos."""
 
-import random
 import statistics
 import time
-from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
-from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Engine, func, select, text
 from sqlalchemy.orm import Session
 
-from apoio_comum import migrar
-from lupa_intranet.acesso.servico import definir_contexto
 from lupa_intranet.auditoria import consulta
-from lupa_pipeline.dominio.enums import PapelUsuario
+from lupa_pipeline.dominio.chaves import chave_hash
 from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao
-from lupa_pipeline.logging import get_logger
+from lupa_pipeline.dominio.visoes import VisaoAuditoria
 
 pytestmark = [pytest.mark.integracao, pytest.mark.carga]
 
 TOTAL_EVENTOS = 1_000_000
-TOTAL_GABINETES = 40
-USUARIOS_POR_GABINETE = 25
+TOTAL_USUARIOS = 1000
 LIMITE_MS = 200
 INICIO = datetime(2025, 1, 1, tzinfo=UTC)
-ACOES = ("pagina_vista", "processo_aberto", "busca", "pergunta_chat", "login_ok", "mfa_ok")
-COLUNAS = (
-    "id, ocorrido_em, usuario_id, gabinete_id, processo_id, acao, ip, localizacao, resultado, "
-    "hash_anterior, hash_evento, sequencia"
-)
-
-
-@pytest.fixture(scope="module")
-def banco_carga(engine_teste: Engine) -> Iterator[Engine]:
-    """Banco próprio para a carga, para não pesar nos demais testes."""
-    nome = f"{engine_teste.url.database}_carga"
-    with engine_teste.connect().execution_options(isolation_level="AUTOCOMMIT") as conexao:
-        conexao.execute(text(f'DROP DATABASE IF EXISTS "{nome}" WITH (FORCE)'))
-        conexao.execute(text(f'CREATE DATABASE "{nome}"'))
-    engine = create_engine(engine_teste.url.set(database=nome))
-    migrar(engine, "head")
-    yield engine
-    engine.dispose()
-    with engine_teste.connect().execution_options(isolation_level="AUTOCOMMIT") as conexao:
-        conexao.execute(text(f'DROP DATABASE "{nome}" WITH (FORCE)'))
-
-
-def _semear_donos(engine: Engine) -> list[tuple[UUID, UUID]]:
-    pares = [
-        (uuid4(), gabinete)
-        for gabinete in (uuid4() for _ in range(TOTAL_GABINETES))
-        for _ in range(USUARIOS_POR_GABINETE)
-    ]
-    with engine.begin() as conexao:
-        for gabinete in {g for _, g in pares}:
-            conexao.execute(
-                text("INSERT INTO gabinete (id, nome) VALUES (:g, 'carga')"), {"g": gabinete}
-            )
-        conexao.execute(
-            text(
-                "INSERT INTO usuario (id, gabinete_id, nome_usuario, papel, senha_hash, "
-                "mfa_confirmado, ativo, troca_senha_obrigatoria) "
-                "VALUES (:u, :g, :n, 'assessor', 'x', true, true, false)"
-            ),
-            [{"u": u, "g": g, "n": f"carga_{u.hex[:12]}"} for u, g in pares],
-        )
-    return pares
-
-
-def _linhas(pares: list[tuple[UUID, UUID]]) -> Iterator[tuple[object, ...]]:
-    sorteio = random.Random(20261020)  # noqa: S311
-    sequencias: dict[UUID, int] = {}
-    passo = timedelta(days=365) / TOTAL_EVENTOS
-    for indice in range(TOTAL_EVENTOS):
-        usuario, gabinete = pares[sorteio.randrange(len(pares))]
-        sequencias[gabinete] = sequencias.get(gabinete, 0) + 1
-        yield (
-            uuid4(),
-            INICIO + passo * indice,
-            usuario,
-            gabinete,
-            uuid4(),
-            ACOES[indice % len(ACOES)],
-            f"10.0.{indice % 256}.{indice % 200}",
-            "rede interna",
-            "ok",
-            None,
-            f"{indice:064x}",
-            sequencias[gabinete],
-        )
-
-
-def _copiar(engine: Engine, pares: list[tuple[UUID, UUID]]) -> float:
-    inicio = time.perf_counter()
-    with engine.begin() as conexao:
-        cursor = conexao.connection.driver_connection.cursor()  # type: ignore[union-attr]
-        with cursor.copy(f"COPY evento_auditoria ({COLUNAS}) FROM STDIN") as copia:
-            for linha in _linhas(pares):
-                copia.write_row(linha)
-    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conexao:
-        conexao.execute(text("ANALYZE evento_auditoria"))
-    return time.perf_counter() - inicio
-
-
-def _medir_consulta(engine: Engine, usuario: UUID, gabinete: UUID) -> list[float]:
-    filtro = consulta.FiltroAuditoria(
-        usuario_id=usuario, inicio=INICIO + timedelta(days=90), fim=INICIO + timedelta(days=180)
-    )
-    tempos = []
-    with Session(engine) as session, session.begin():
-        assumir_papel_aplicacao(session)
-        definir_contexto(session, PapelUsuario.DESEMBARGADOR.value, gabinete)
-        for _ in range(10):
-            inicio = time.perf_counter()
-            pagina = consulta.consultar(session, filtro, limite=50)
-            tempos.append((time.perf_counter() - inicio) * 1000)
-        assert pagina.eventos and all(e.usuario_id == usuario for e in pagina.eventos)
-    return tempos
 
 
 def test_um_milhao_de_eventos_consulta_por_usuario_e_intervalo_abaixo_de_200ms(
-    banco_carga: Engine,
+    engine_teste: Engine,
 ) -> None:
-    """Consulta por usuário e intervalo, sob RLS de desembargador, com mediana < 200 ms."""
-    pares = _semear_donos(banco_carga)
-    segundos_carga = _copiar(banco_carga, pares)
-    with banco_carga.connect() as conexao:
-        assert conexao.execute(text("SELECT count(*) FROM evento_auditoria")).scalar() == (
-            TOTAL_EVENTOS
+    """RF-AUD-04: mediana inferior a 200 ms para filtrar por usuário e intervalo."""
+    with Session(engine_teste) as sessao, sessao.begin():
+        sessao.execute(
+            text("""
+            INSERT INTO hub_usuario(hk_usuario, nome_usuario, record_source)
+            SELECT sha256(convert_to('CARGA' || i, 'UTF8')), 'carga' || i, 'teste.carga'
+            FROM generate_series(0, :usuarios - 1) AS i
+        """),
+            {"usuarios": TOTAL_USUARIOS},
         )
-    usuario, gabinete = pares[7]
-    tempos = _medir_consulta(banco_carga, usuario, gabinete)
-    mediana = statistics.median(tempos)
-    get_logger(__name__).info(
-        "teste_carga",
-        eventos=TOTAL_EVENTOS,
-        segundos_carga=round(segundos_carga, 1),
-        mediana_ms=round(mediana, 1),
-        maximo_ms=round(max(tempos), 1),
-    )
-    assert mediana < LIMITE_MS
+        sequencia = sessao.scalar(select(func.max(VisaoAuditoria.sequencia))) or 0
+        sessao.execute(
+            text("""
+            INSERT INTO link_evento_auditoria(hk_evento, sequencia, ocorrido_em, hk_usuario,
+                                                record_source, acao, resultado, hash_evento)
+            SELECT sha256(convert_to((:anterior + i)::text, 'UTF8')), :anterior + i,
+                   CAST(:inicio AS timestamptz) + i * interval '31.5 seconds',
+                   sha256(convert_to('CARGA' || (i % :usuarios), 'UTF8')),
+                   'teste.carga', 'busca', 'ok', repeat('0', 64)
+            FROM generate_series(1, :total) AS i
+        """),
+            {
+                "total": TOTAL_EVENTOS,
+                "usuarios": TOTAL_USUARIOS,
+                "inicio": INICIO,
+                "anterior": sequencia,
+            },
+        )
+        sessao.execute(text("ANALYZE link_evento_auditoria"))
+        assert (
+            sessao.scalar(select(func.count()).select_from(VisaoAuditoria))
+            == sequencia + TOTAL_EVENTOS
+        )
+        assumir_papel_aplicacao(sessao)
+        usuario = chave_hash(["CARGA7"]).hex()
+        filtro = consulta.FiltroAuditoria(
+            usuario_id=usuario, inicio=INICIO + timedelta(days=90), fim=INICIO + timedelta(days=180)
+        )
+        tempos = []
+        for _ in range(10):
+            inicio = time.perf_counter()
+            pagina = consulta.consultar(sessao, filtro, limite=50)
+            tempos.append((time.perf_counter() - inicio) * 1000)
+        assert pagina.eventos and all(e.usuario_id == usuario for e in pagina.eventos)
+        assert statistics.median(tempos) < LIMITE_MS
+        sessao.rollback()

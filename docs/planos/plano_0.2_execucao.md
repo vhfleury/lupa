@@ -313,7 +313,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [x] I: `gravar_satelite` não insere com `hash_diff` igual e insere com diferente (A2). T3.3.
 - [x] I: fato sem evidência é recusado no commit (RF-FAT-01). T3.2.
 - [x] I: login, falha, bloqueio, desafio e sessão (A14; RF-ACE-01, 02). T3.4.
-- [ ] I: assessor recebe 403 em auditoria e usuários; desembargador não (RF-ACE-03).
+- [x] I: assessor recebe 403 em auditoria e usuários; desembargador não (RF-ACE-03).
   - Usuários feito em T3.4 (`test_usuarios.py`); auditoria fica com T3.11, que monta a rota.
 - [x] I: criação, desativação, reativação e redefinição de assessor (RF-ACE-04). T3.4.
 - [x] I: `criar_desembargador.py` cria um e não repete (RF-ACE-05). T3.4.
@@ -328,7 +328,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [x] I: cadeia de auditoria única; alteração direta no banco é apontada (A15; RF-AUD-03). T3.4 (`test_registrador.py`; o registrador foi reescrito em T3.4 porque o login grava eventos).
 - [ ] I: cada ação da lista gera evento, com localização (RF-AUD-01).
 - [ ] I: varredura de eventos e logs não acha texto sintético (RF-AUD-02).
-- [ ] I: relatório de uso com contagens e custo (RF-AUD-05).
+- [x] I: relatório de uso com contagens e custo (RF-AUD-05).
 - [ ] I: descarte apaga satélites e chave, mantém hubs, links e auditoria; conteúdo responde
   indisponível (A13; RF-PRO-05).
 - [x] I: varredura do banco e do storage não acha texto em claro; valor em claro é recusado

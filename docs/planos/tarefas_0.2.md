@@ -318,7 +318,11 @@ a saída resumida (vermelho inicial e verde final).
     Vermelho em quatro testes de configuração, dois da fila e um de ordenação. Verde em 46 casos.
 - [ ] **T3.9** Páginas, diagnóstico, lotes e peças em satélites (conteúdo jurídico ainda da 0.1). A5 passos 1 a 7. RF-ING-03.
 - [ ] **T3.10** Evidências, fatos, achados e anotações em hubs, links e satélites; remoção de `reu`, `reu_identidade` e da pseudonimização. A5 passos 8 a 11, A11, A12. RF-FAT-01, RF-FAT-03, RF-PEC-02, RF-DOS-06.
-- [ ] **T3.11** Auditoria como link não historizado, cadeia única, consulta, relatório de uso com custo. A15. D8, D26. RF-AUD-01 a 05.
+- [x] **T3.11** Auditoria como link não historizado, cadeia única, consulta, relatório de uso com custo. A15. D8, D26. RF-AUD-01 a 05.
+  - `python -m pytest intranet/api/tests/auditoria/test_{cadeia,consulta,custo}.py --no-cov`:
+    o assessor recebia 404 e a tabela aceitava TRUNCATE. Após montar as rotas e proteger a
+    cadeia, 35 testes passaram. O relatório consulta chamadas e tokens pela view.
+    `test_carga.py` passou com um milhão de eventos e mediana inferior a 200 ms.
 - [ ] **T3.12** Conversa, mensagens, chamada ao modelo e processo em revisão. A16. D26. RF-CHA-06, 07, 08.
 - [ ] **T3.13** Descarte. A13. RF-PRO-05.
 - [ ] **T3.14** Rotas da API com ids em texto; remoção de `/gabinetes*`. D12, D27.

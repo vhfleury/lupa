@@ -72,7 +72,9 @@ def test_toda_tabela_tem_o_trigger_de_imutabilidade(engine_teste: Engine) -> Non
                 )
             ).scalars()
         )
-    assert gatilhos == {f"{nome}_imutavel" for nome in metadata.tables}
+    assert gatilhos == {f"{nome}_imutavel" for nome in metadata.tables} | {
+        "link_evento_auditoria_bloquear_truncate"
+    }
 
 
 def test_papel_da_aplicacao_so_le_e_insere(engine_teste: Engine) -> None:
