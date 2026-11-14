@@ -368,7 +368,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 
 - [x] Unitários do front: permissões com dois papéis, rótulos cíveis, ids em texto, envio com
   classe.
-- [ ] `svelte-check`, ESLint e Prettier sem aviso.
+- [x] `svelte-check`, ESLint e Prettier sem aviso.
 
 ### Fase 6
 

@@ -360,7 +360,8 @@ a saída resumida (vermelho inicial e verde final).
   - `npx vitest run src/lib/processos/cadastro.test.ts` confirmou pelo formulário o envio do número CNJ com a classe selecionada. O dossiê abre a página de cada fonte e as versões do fato conservam o mesmo identificador.
 - [x] **T5.4** Telas de usuários e auditoria. RF-ACE-04, RF-AUD-04, RF-AUD-05.
   - `npx vitest run src/lib/auditoria/auditoria.test.ts src/lib/componentes/componentes.test.ts` passou nos 17 casos. Antes da mudança, os filtros rejeitavam ids hexadecimais e a mensagem de quebra não exibia a sequência.
-- [ ] **T5.5** `docker build --target verificacao intranet/web` verde.
+- [x] **T5.5** `docker build --target verificacao intranet/web` verde.
+  - `docker build --target verificacao intranet/web` terminou com código 0. Vitest passou nos 66 testes, Svelte Check não encontrou erros ou avisos e ESLint e Prettier passaram.
 
 ## Fase 6 — Regressão
 
