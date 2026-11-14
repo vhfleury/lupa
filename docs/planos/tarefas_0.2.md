@@ -431,6 +431,10 @@ a saída resumida (vermelho inicial e verde final).
   - Os guias descrevem os dois papéis, trazem a conta de prazo de 03/08 a 24/08/2026, a fonte
     das citações, os limites do chat e o uso da auditoria. Links internos e destinos das capturas
     foram conferidos contra os arquivos da suíte de telas.
-- [ ] **T7.3** `docs/conformidade/CONFORMIDADE.md` e `docs/operacao/operacao.md`. RF-DOC-02.
+- [x] **T7.3** `docs/conformidade/CONFORMIDADE.md` e `docs/operacao/operacao.md`. RF-DOC-02.
+  - O manual foi conferido contra os comandos de bootstrap, saúde, descarte e relatório. A minuta
+    explicita o envio de dados identificáveis, inclusive sigilosos, os acessos do gabinete e a
+    perda de conteúdo sem backup. Foram consultadas as fontes oficiais do CNJ, da LGPD e da ANPD.
+    A revisão jurídica e o aceite são de responsabilidade humana.
 - [ ] **T7.4** ADRs 0013 a 0016 e `docs/decisoes/registro.md`.
 - [ ] **T7.5** `README.md`, `CONTRIBUTING.md`, `CLAUDE.md`, `docs/README.md`, `CHANGELOG.md` e versão `0.2.0`.
