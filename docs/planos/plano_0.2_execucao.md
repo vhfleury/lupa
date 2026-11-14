@@ -56,6 +56,8 @@ saída.
 
 1. Entrada: conexão. Ação: `pg_try_advisory_lock(<constante>)`. Saída: obtido ou não.
 2. Parada: lock não obtido. Ação: registrar `worker_duplicado` e encerrar com código 1.
+   Com o lock obtido, comparar as versões dos arquivos prontos às regras instaladas. Se houver
+   diferença, abrir uma nova execução em `em_extracao` com a primeira etapa afetada (RF-ING-08).
 3. Entrada: `v_fila_ingestao`. Ação: ler o primeiro arquivo. Saída: arquivo ou nada.
 4. Desvio: fila vazia. Ação: esperar `LUPA_FILA_INTERVALO_S` e voltar ao passo 3.
 5. Entrada: arquivo. Ação: ler `tentativas` do estado corrente. Saída: número.
@@ -68,6 +70,10 @@ saída.
 9. Parada: sinal `SIGTERM`. Ação: terminar o lote em curso, liberar o lock e encerrar com 0.
 
 ### A5. Ingestão de um arquivo
+
+Em um reprocessamento, uma alteração no extrator retoma do passo 3. Alterações nas regras de
+peças, fatos ou catálogo retomam dos passos 7, 8 ou 9, respectivamente. O relatório final
+registra as quatro versões. As correções e anotações humanas mantêm sua autoria e evidência.
 
 1. Entrada: arquivo em `recebido`. Ação: validar tipo, assinatura, senha, truncamento e ZIP no
    sandbox. Saída: `validado` com manifesto, ou `quarentena` com motivo (fim).

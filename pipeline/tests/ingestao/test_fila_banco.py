@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from apoio_arquivos import TEXTO_SENTINELA, pdf_minimo
 from apoio_comum import banco_vazio, migrar
-from apoio_ingestao import lacrar_bytes, semear_processo
+from apoio_ingestao import PararAoEsvaziar, lacrar_bytes, semear_processo
 from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.enums import EstadoJob, MotivoFalha
 from lupa_pipeline.dominio.visoes import VisaoArquivo
@@ -36,21 +36,6 @@ def _receber(engine: Engine, storage: ObjectStorage, tmp_path: Path) -> tuple[by
     caminho.write_bytes(pdf_minimo())
     recebido = lacrar_bytes(engine, storage, processo, caminho)
     return recebido.hk_arquivo, processo.hk_processo
-
-
-class PararAoEsvaziar(Event):
-    """Encerra o worker na primeira espera, sem usar o relógio real."""
-
-    def __init__(self) -> None:
-        """Guarda os intervalos solicitados pelo worker."""
-        super().__init__()
-        self.esperas: list[float | None] = []
-
-    def wait(self, timeout: float | None = None) -> bool:
-        """Registra o intervalo e simula a chegada de SIGTERM."""
-        self.esperas.append(timeout)
-        self.set()
-        return True
 
 
 def test_processa_em_ordem_e_segundo_worker_encerra_entre_commits(

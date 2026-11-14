@@ -12,6 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from threading import Event
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -82,6 +83,21 @@ class Relogio:
             segundos: Quanto avançar.
         """
         self.agora += timedelta(seconds=segundos)
+
+
+class PararAoEsvaziar(Event):
+    """Encerra o worker na primeira espera, sem usar o relógio real."""
+
+    def __init__(self) -> None:
+        """Guarda os intervalos solicitados pelo worker."""
+        super().__init__()
+        self.esperas: list[float | None] = []
+
+    def wait(self, timeout: float | None = None) -> bool:
+        """Registra o intervalo e simula a chegada de SIGTERM."""
+        self.esperas.append(timeout)
+        self.set()
+        return True
 
 
 def semear_processo(

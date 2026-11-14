@@ -399,6 +399,7 @@ a saída resumida (vermelho inicial e verde final).
     de agente, rotas de revisão e limites passou em 63 testes. Ruff e mypy passaram nos
     módulos e testes alterados.
 - [x] **T4.13** Ponta a ponta de cada classe contra o gabarito; reprocessamento preserva correção. RF-ING-04, RF-ING-08, RNF-01, RNF-02.
+  - RF-ING-08 passou por dez reinícios do worker com PostgreSQL e PDF sintético. Antes, a fila continuava vazia após mudar o catálogo. Agora o teste observa o sandbox, a classificação, os extratores e as validações e confirma que só as etapas dependentes se repetem. A evidência da correção, a anotação e a autoria sobreviveram às quatro mudanças. `pytest pipeline/tests/ingestao/test_reprocessamento.py pipeline/tests/ingestao/test_fila_banco.py --no-cov`: 3 passaram.
   - O teste passou da coleta interrompida por Redis a seis fluxos aprovados pela API, MinIO e worker PostgreSQL. Cada classe foi comparada com o gabarito folha a folha, inclusive peças, partes, valores, sujeitos e resultados. A apelação também passou em PDF liso. A correção foi relida após reprocessar e validada no catálogo.
 
 ## Fase 5 — Interface

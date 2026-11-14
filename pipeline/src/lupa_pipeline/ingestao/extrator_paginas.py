@@ -31,7 +31,7 @@ from lupa_pipeline.ingestao.saneamento_pagina import categorias_de, sanear
 from lupa_pipeline.ingestao.sinais import medir_sinais
 from lupa_pipeline.ingestao.texto_nativo import TextoPagina, extrair_texto_nativo
 
-VERSAO_EXTRATOR = "4f.0"
+VERSAO_EXTRATOR = "0.2.0"
 SISTEMA_COORDENADAS = "pdf_pontos_origem_superior_esquerda"
 ROTA_ABSTENCAO = "abstencao"
 

@@ -15,6 +15,7 @@ from lupa_pipeline.dominio.gravacao import travar_processo
 from lupa_pipeline.dominio.sessao import PAPEL_APLICACAO
 from lupa_pipeline.dominio.visoes import VisaoFilaIngestao
 from lupa_pipeline.ingestao.repositorio import atualizar_status_processo, mudar_estado
+from lupa_pipeline.ingestao.reprocessamento import reagendar_desatualizados
 from lupa_pipeline.ingestao.storage import ObjectStorage, criar_storage
 from lupa_pipeline.logging import configurar_logging, get_logger
 from lupa_pipeline.seguranca.contexto import ativar_processo, contexto_cifra
@@ -99,6 +100,7 @@ def executar_worker(
                 raise ConexaoDoWorkerPerdidaError("conexão da fila encerrada")
 
         fabrica = sessionmaker(conexao, expire_on_commit=False)
+        reagendar_desatualizados(fabrica)
         log.info("worker_iniciado")
         while not parar.is_set():
             if not _processar_proximo(fabrica, settings, storage, parar, processar):

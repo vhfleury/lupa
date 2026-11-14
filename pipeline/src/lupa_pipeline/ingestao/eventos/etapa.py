@@ -137,6 +137,16 @@ def achados_do_processo(
     return resultado
 
 
+def atualizar_achados(session: Session, processo_id: bytes, referencia: date) -> dict[str, Any]:
+    """Aplica o catálogo aos fatos vigentes e resume os achados persistidos."""
+    processo = processo_para_gravar(session, processo_id)
+    achados = achados_do_processo(session, processo_id, processo.classe or "", referencia)
+    return {
+        "achados_gravados": gravar_achados(session, processo_id, achados),
+        "achados": dict(Counter(a.resultado.value for a in achados)),
+    }
+
+
 def processar_eventos(session: Session, processo_id: bytes, referencia: date) -> dict[str, Any]:
     """Recalcula o processo inteiro a partir das páginas e peças, respeitando revisões humanas."""
     processo = processo_para_gravar(session, processo_id)
@@ -160,12 +170,10 @@ def processar_eventos(session: Session, processo_id: bytes, referencia: date) ->
         ):
             for evid in anterior.evidencias:
                 vincular_evidencia(session, hk, bytes.fromhex(evid.id), False)
-    achados = achados_do_processo(session, processo_id, processo.classe or "", referencia)
     return {
         "versao_extrator": VERSAO,
         "partes": len(sujeitos),
         "fatos": len(gravados),
         "sem_trecho": rejeitados,
-        "achados_gravados": gravar_achados(session, processo_id, achados),
-        "achados": dict(Counter(a.resultado.value for a in achados)),
+        **atualizar_achados(session, processo_id, referencia),
     }

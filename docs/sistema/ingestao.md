@@ -14,4 +14,6 @@ Cada página tem texto normalizado, origem da extração, blocos, coordenadas e 
 
 O índice reúne as páginas de cada peça. A classificação combina títulos, fórmulas e assinaturas das peças cíveis. Uma reclassificação manual fica no histórico e orienta o reprocessamento. Os extratores usam qualificações da petição, da decisão e do recurso para reconhecer as partes. Cada fato contém o tipo, o valor, o sujeito, a confiança e a origem. Antes de armazenar o fato, o extrator confere a igualdade entre o trecho e o intervalo do texto normalizado.
 
+Ao iniciar, o worker compara as versões das páginas, das regras de peças, dos extratores de fatos e do catálogo com o relatório de cada arquivo pronto. Uma alteração de catálogo recalcula os achados a partir dos fatos vigentes. Alterações nas peças ou nos fatos também refazem as etapas que dependem deles. A troca de extrator processa as páginas na nova versão. As anotações e as correções humanas conservam a autoria e a evidência.
+
 O relatório do arquivo expõe o diagnóstico e as páginas pendentes. O processo pode ficar parcial se faltarem páginas. Com os fatos vigentes, o worker avalia as validações cabíveis e disponibiliza o dossiê. [Regras cíveis](validacoes.md).

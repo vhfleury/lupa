@@ -26,10 +26,10 @@ from lupa_pipeline.dominio.gravacao import gravar_satelite, travar_processo
 from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao
 from lupa_pipeline.dominio.tabelas import sat_arquivo_diagnostico, sat_arquivo_lote
 from lupa_pipeline.dominio.visoes import VisaoArquivo
-from lupa_pipeline.ingestao import paginas
+from lupa_pipeline.ingestao import paginas, reprocessamento
 from lupa_pipeline.ingestao.cache import copiar_do_cache
 from lupa_pipeline.ingestao.diagnostico import diagnosticar_pdf, diagnosticar_zip
-from lupa_pipeline.ingestao.eventos.etapa import processar_eventos
+from lupa_pipeline.ingestao.eventos.etapa import atualizar_achados, processar_eventos
 from lupa_pipeline.ingestao.extracao import (
     FontePaginas,
     ResultadoTarefa,
@@ -39,8 +39,7 @@ from lupa_pipeline.ingestao.extracao import (
     pendentes,
     planejar,
 )
-from lupa_pipeline.ingestao.extrator_paginas import VERSAO_EXTRATOR
-from lupa_pipeline.ingestao.indice import montar_indice, versoes
+from lupa_pipeline.ingestao.indice import montar_indice
 from lupa_pipeline.ingestao.inventario import EntradaExtraida, LimitesZip, ZipRecusadoError
 from lupa_pipeline.ingestao.qualidade import relatorio_qualidade
 from lupa_pipeline.ingestao.quarentena import motivo_do_parser
@@ -73,6 +72,7 @@ class Trabalho:
 
     fabrica: sessionmaker[Session]
     arquivo: VisaoArquivo
+    versoes: dict[str, Any]
 
     @contextmanager
     def transacao(self) -> Iterator[Session]:
@@ -213,7 +213,10 @@ def _preparar(
             ORIGEM,
         )
         mudar_estado(
-            session, arquivo.hk_arquivo, EstadoJob.EM_EXTRACAO, versao_extrator=VERSAO_EXTRATOR
+            session,
+            arquivo.hk_arquivo,
+            EstadoJob.EM_EXTRACAO,
+            versao_extrator=trabalho.versoes["paginas"],
         )
         atualizar_status_processo(session, arquivo.hk_processo)
     return fontes, diagnostico
@@ -239,7 +242,7 @@ def _processar_lotes(
 ) -> Counter[str]:
     hk = trabalho.arquivo.hk_arquivo
     with trabalho.transacao() as session:
-        prontas = paginas.prontas(session, hk, VERSAO_EXTRATOR)
+        prontas = paginas.prontas(session, hk, trabalho.versoes["paginas"])
     falhas: Counter[str] = Counter()
     for numero, lote in enumerate(planejar(fontes, settings.extracao_paginas_por_lote), 1):
         if parar.is_set():
@@ -251,7 +254,7 @@ def _processar_lotes(
                     copiar_do_cache(
                         session,
                         trabalho.arquivo,
-                        VERSAO_EXTRATOR,
+                        trabalho.versoes["paginas"],
                         sum(f.paginas for f in fontes),
                         faltam,
                     )
@@ -290,7 +293,7 @@ def _processar_lotes(
         with trabalho.transacao() as session:
             for pagina in extraidas:
                 paginas.gravar_pagina(
-                    session, trabalho.arquivo, linha_pagina(pagina, VERSAO_EXTRATOR)
+                    session, trabalho.arquivo, linha_pagina(pagina, trabalho.versoes["paginas"])
                 )
                 faltam.discard(int(pagina["numero"]))
             if faltam:
@@ -309,9 +312,9 @@ def _processar_lotes(
     return falhas
 
 
-def _processar(
+def _extrair_paginas(
     trabalho: Trabalho, settings: Settings, storage: ObjectStorage, parar: Event
-) -> None:
+) -> dict[str, Any] | None:
     limites = LimitesSandbox(
         settings.sandbox_memoria_mb, settings.sandbox_cpu_segundos, settings.sandbox_tempo_segundos
     )
@@ -322,32 +325,78 @@ def _processar(
         fontes, diagnostico = _preparar(trabalho, storage, Path(diretorio), settings, limites)
         falhas = _processar_lotes(trabalho, fontes, settings, limites, parar)
     if parar.is_set():
-        return
+        return None
+    versao = trabalho.versoes["paginas"]
     with trabalho.transacao() as session:
-        arquivo = trabalho.arquivo
-        linhas = paginas.paginas_para_indice(session, arquivo.hk_arquivo, VERSAO_EXTRATOR)
+        linhas = paginas.paginas_para_indice(session, trabalho.arquivo.hk_arquivo, versao)
         relatorio = relatorio_qualidade(
             linhas,
             total_paginas=diagnostico.total_paginas,
             tempo_parede_segundos=monotonic() - inicio,
             falhas=falhas,
-            versao_extrator=VERSAO_EXTRATOR,
+            versao_extrator=versao,
             metadados=diagnostico.metadados_descartados,
         )
-        resultado = montar_indice(linhas, diagnostico.model_dump(mode="json"))
-        gravar_indice(session, arquivo, linhas, resultado)
+        _indexar(session, trabalho, linhas, diagnostico.model_dump(mode="json"), relatorio)
+        return relatorio
+
+
+def _indexar(
+    session: Session,
+    trabalho: Trabalho,
+    linhas: list[dict[str, Any]],
+    diagnostico: dict[str, Any],
+    relatorio: dict[str, Any],
+) -> None:
+    resultado = montar_indice(linhas, diagnostico)
+    gravar_indice(session, trabalho.arquivo, linhas, resultado)
+    relatorio["indice"] = {
+        "fonte": resultado.fonte,
+        "pecas": len(resultado.pecas),
+        "versoes": trabalho.versoes["pecas"],
+    }
+    relatorio["divergencias_fronteira"] = resultado.divergencias
+
+
+def _processar(
+    trabalho: Trabalho, settings: Settings, storage: ObjectStorage, parar: Event
+) -> None:
+    arquivo = trabalho.arquivo
+    relatorio = dict(arquivo.relatorio or {})
+    agendada = relatorio.pop("reprocessar_desde", None)
+    etapa = (
+        (reprocessamento.primeira_etapa(arquivo, trabalho.versoes) or agendada)
+        if agendada
+        else "paginas"
+    )
+    if etapa == "paginas":
+        qualidade = _extrair_paginas(trabalho, settings, storage, parar)
+        if qualidade is None:
+            return
+        relatorio = qualidade
+    elif etapa == "pecas":
+        with trabalho.transacao() as session:
+            linhas = paginas.paginas_para_indice(
+                session, arquivo.hk_arquivo, trabalho.versoes["paginas"]
+            )
+            diagnostico = {"sinais": arquivo.sinais, "fronteiras_origem": arquivo.fronteiras_origem}
+            _indexar(session, trabalho, linhas, diagnostico, relatorio)
+
     with trabalho.transacao() as session:
-        relatorio["eventos"] = processar_eventos(
-            session, arquivo.hk_processo, datetime.now(UTC).date()
-        )
-        relatorio["indice"] = {
-            "fonte": resultado.fonte,
-            "pecas": len(resultado.pecas),
-            "versoes": versoes(),
-        }
-        relatorio["divergencias_fronteira"] = resultado.divergencias
+        referencia = datetime.now(UTC).date()
+        if etapa == "catalogo":
+            relatorio["eventos"] |= atualizar_achados(session, arquivo.hk_processo, referencia)
+        else:
+            relatorio["eventos"] = processar_eventos(session, arquivo.hk_processo, referencia)
+        relatorio["versoes_processamento"] = trabalho.versoes
         estado = EstadoJob.PARCIAL if relatorio["paginas_faltando"] else EstadoJob.CONCLUIDO
-        mudar_estado(session, arquivo.hk_arquivo, estado, relatorio=relatorio)
+        mudar_estado(
+            session,
+            arquivo.hk_arquivo,
+            estado,
+            relatorio=relatorio,
+            versao_extrator=trabalho.versoes["paginas"],
+        )
         atualizar_status_processo(session, arquivo.hk_processo)
     log.info("arquivo_finalizado", arquivo_id=arquivo.id, estado=estado.value)
 
@@ -364,7 +413,7 @@ def processar_arquivo(
         assumir_papel_aplicacao(session)
         arquivo = session.get_one(VisaoArquivo, hk_arquivo)
         session.expunge(arquivo)
-    trabalho = Trabalho(fabrica, arquivo)
+    trabalho = Trabalho(fabrica, arquivo, reprocessamento.versoes_atuais())
     try:
         try:
             _processar(trabalho, settings, storage, parar)
