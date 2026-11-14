@@ -372,9 +372,9 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 
 ### Fase 6
 
-- [ ] I (`injecao`): corpus de injeção gera as marcas e não cria nem suprime achado (RF-ING-05,
+- [x] I (`injecao`): corpus de injeção gera as marcas e não cria nem suprime achado (RF-ING-05,
   RNF-03).
-- [ ] I (`agente`): nenhuma instrução dos autos é seguida (RF-CHA-05).
+- [x] I (`agente`): nenhuma instrução dos autos é seguida (RF-CHA-05).
 - [ ] E2E: login, processos, dossiê, visualizador, chat, auditoria, gestão de assessores (RNF-09).
 - [ ] Cabeçalhos de segurança do proxy (RF-SEG-03).
 - [ ] I: worker não abre conexão externa (RF-SEG-04).

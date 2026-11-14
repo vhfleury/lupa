@@ -8,13 +8,12 @@ não está no normalizado, os homóglifos viram ASCII no normalizado. Mede recal
 textuais detectadas) e falso positivo (páginas de `semente_01` com flag de saneamento) por
 versão dos YAML; com `LUPA_METRICAS_INJECAO` definido, grava as métricas nesse caminho.
 
-Pula sem o corpus, ou falha quando `LUPA_EXIGIR_INTEGRACAO=1` (como no `verificar.sh`).
+Gera os autos em pasta temporária quando a referência cível não está instalada.
 """
 
 import json
 import os
-from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -31,14 +30,13 @@ from lupa_pipeline.ingestao.parser_pdf import inspecionar
 from lupa_pipeline.ingestao.sandbox import LimitesSandbox
 from lupa_pipeline.ingestao.saneamento import normalizar
 from lupa_pipeline.ingestao.saneamento_pagina import versoes
-from lupa_pipeline.sinteticos.gabarito import Gabarito, VetorInjecao
+from lupa_pipeline.sinteticos.gabarito import VERSAO_ESQUEMA, Cenario, Gabarito, VetorInjecao
+from lupa_pipeline.sinteticos.referencia import REFERENCIAS, configuracoes_injecao, gerar_processo
+from lupa_pipeline.sinteticos.roteiro import Configuracao
 
 pytestmark = [pytest.mark.integracao, pytest.mark.injecao]
 
 RAIZ = Path(os.environ.get("LUPA_SINTETICOS_DIR", ".sinteticos")).resolve()
-CORPUS = RAIZ / "injecao"
-SEMENTE = RAIZ / "referencia" / "semente_01" / "pdf_liso" / "autos.pdf"
-EXIGIR = "LUPA_EXIGIR_INTEGRACAO"
 META_RECALL = 0.9
 META_FALSO_POSITIVO = 0.05
 LIMITES = LimitesSandbox(tempo_segundos=600.0, cpu_segundos=600)
@@ -59,14 +57,27 @@ FLAG_ESPERADA: dict[VetorInjecao, tuple[FlagPagina, ...]] = {
 CIRILICOS = frozenset("аеорсх")
 
 
-def _exigir(motivo: str) -> None:
-    if os.environ.get(EXIGIR) == "1":
-        pytest.fail(f"{motivo} (exigido por {EXIGIR})")
-    pytest.skip(motivo)
+@pytest.fixture(scope="module")
+def corpus(tmp_path_factory: pytest.TempPathFactory) -> tuple[list[Path], Path]:
+    """Usa o corpus de referência instalado ou gera as mesmas variantes cíveis para a suíte."""
+    local = tmp_path_factory.mktemp("corpus-civel")
 
+    def materializar(raiz: Path, nome: str, config: Configuracao) -> Path:
+        pasta = RAIZ / raiz / nome / Cenario.PDF_LISO.value
+        arquivo = pasta / "gabarito.json"
+        if (pasta / "autos.pdf").is_file() and arquivo.is_file():
+            if json.loads(arquivo.read_text("utf-8")).get("versao_esquema") == VERSAO_ESQUEMA:
+                return pasta
+        gerar_processo(nome, config, local / raiz, (Cenario.PDF_LISO,))
+        return local / raiz / nome / Cenario.PDF_LISO.value
 
-def _variantes() -> list[Path]:
-    return sorted(p for p in CORPUS.glob("injecao_*") if p.is_dir()) if CORPUS.is_dir() else []
+    variantes = [
+        materializar(Path("injecao"), nome, config).parent
+        for nome, config in configuracoes_injecao().items()
+    ]
+    controle = replace(REFERENCIAS["semente_01"], paginas_alvo=30)
+    controle_pdf = materializar(Path("referencia"), "semente_01", controle) / "autos.pdf"
+    return variantes, controle_pdf
 
 
 def _extrair(pdf: Path, numeros: set[int]) -> dict[int, dict[str, Any]]:
@@ -164,12 +175,12 @@ def _medir(medicao: Medicao, variante: Path) -> None:
         )  # fmt: skip
 
 
-def _falso_positivo() -> tuple[int, int, list[int]]:
+def _falso_positivo(semente: Path) -> tuple[int, int, list[int]]:
     import fitz
 
-    with fitz.open(SEMENTE) as documento:
+    with fitz.open(semente) as documento:
         total = documento.page_count
-    fonte = FontePaginas(SEMENTE, SEMENTE.name, total, 0)
+    fonte = FontePaginas(semente, semente.name, total, 0)
     sinalizadas = []
     for resultado in executar_em_paralelo(
         planejar([fonte], 8), LIMITES, Paralelismo(8, 4, 4), "regressao"
@@ -184,15 +195,13 @@ def _falso_positivo() -> tuple[int, int, list[int]]:
 
 
 @pytest.fixture(scope="module")
-def medicao() -> Iterator[Medicao]:
+def medicao(corpus: tuple[list[Path], Path]) -> Medicao:
     """Roda as dez variantes uma vez para todos os testes do módulo."""
-    variantes = _variantes()
-    if len(variantes) < 10:
-        _exigir(f"corpus de injeção ausente ou incompleto em {CORPUS}")
+    variantes, _ = corpus
     resultado = Medicao()
     for variante in variantes:
         _medir(resultado, variante)
-    yield resultado
+    return resultado
 
 
 def test_dez_variantes_com_flag_esperada_e_objetivo_contido(medicao: Medicao) -> None:
@@ -201,11 +210,12 @@ def test_dez_variantes_com_flag_esperada_e_objetivo_contido(medicao: Medicao) ->
     assert {c["vetor"] for c in medicao.casos} == {v.value for v in VetorInjecao}
 
 
-def test_recall_e_falso_positivo_dentro_das_metas(medicao: Medicao) -> None:
+def test_recall_e_falso_positivo_dentro_das_metas(
+    medicao: Medicao, corpus: tuple[list[Path], Path]
+) -> None:
     """Recall ≥ 90% nas injeções textuais; falso positivo ≤ 5% das páginas de `semente_01`."""
-    if not SEMENTE.is_file():
-        _exigir(f"processo de referência ausente: {SEMENTE}")
-    total, sinalizadas, numeros = _falso_positivo()
+    _, semente = corpus
+    total, sinalizadas, numeros = _falso_positivo(semente)
     recall = medicao.detectadas / medicao.textuais
     falso_positivo = sinalizadas / total
     metricas = {
