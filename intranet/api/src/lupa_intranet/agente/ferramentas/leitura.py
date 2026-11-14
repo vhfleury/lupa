@@ -3,7 +3,7 @@
 `listar_pecas`, `ler_pagina_estruturada`, `buscar_texto`, `listar_fatos` e `listar_achados`.
 Todas leem só o processo da `SessaoAgente` (fechamento criado por requisição); argumentos a mais
 vindos do modelo, como um `processo_id` forjado, são ignorados. Todo texto dos autos sai
-pseudonimizado e entre os delimitadores da chamada. `ler_pagina_estruturada` usa o texto
+entre os delimitadores da chamada. `ler_pagina_estruturada` usa o texto
 normalizado e nunca devolve `trechos_ocultos`.
 """
 
@@ -23,7 +23,7 @@ from lupa_intranet.agente.ferramentas.sessao import (
 )
 from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.dominio.repositorios import listar_fatos_por_processo
-from lupa_pipeline.dominio.tabelas import ArquivoTabela, PaginaTabela
+from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoPagina
 from lupa_pipeline.ingestao import repositorio_eventos, repositorio_pecas
 from lupa_pipeline.ingestao.deteccao import dobrar
 from lupa_pipeline.ingestao.saneamento import normalizar
@@ -53,7 +53,7 @@ def erro(mensagem: str) -> str:
     return json.dumps({"erro": mensagem}, ensure_ascii=False)
 
 
-def texto_analise(pagina: PaginaTabela) -> str:
+def texto_analise(pagina: VisaoPagina) -> str:
     """Texto normalizado da página (recalculado do original se não gravado).
 
     Args:
@@ -65,11 +65,11 @@ def texto_analise(pagina: PaginaTabela) -> str:
     return (
         pagina.texto_normalizado
         if pagina.texto_normalizado is not None
-        else normalizar(pagina.texto).texto
+        else normalizar(pagina.texto or "").texto
     )
 
 
-def cabecalho_pagina(sessao: SessaoAgente, pagina: PaginaTabela) -> dict[str, Any]:
+def cabecalho_pagina(sessao: SessaoAgente, pagina: VisaoPagina) -> dict[str, Any]:
     """Cabeçalho de origem da página.
 
     Args:
@@ -114,7 +114,7 @@ def listar_pecas(sessao: SessaoAgente, _argumentos: dict[str, Any]) -> str:
         }
         for p in repositorio_pecas.indice_processo(sessao.session, sessao.processo_id)
     ]
-    corpo = sessao.pseudonimizador.aplicar_json(pecas)
+    corpo = json.dumps(pecas, ensure_ascii=False, default=str)
     return sessao.delimitador.envelopar({"tipo": "indice_de_pecas"}, corpo)
 
 
@@ -132,7 +132,7 @@ def ler_pagina_estruturada(sessao: SessaoAgente, argumentos: dict[str, Any]) -> 
         pagina = resolver_pagina(sessao, argumentos)
     except PaginaForaDoProcessoError as motivo:
         return erro(str(motivo))
-    itens = segmentos(sessao.pseudonimizador.aplicar(texto_analise(pagina)))
+    itens = segmentos(texto_analise(pagina))
     return sessao.delimitador.envelopar(cabecalho_pagina(sessao, pagina), formatar_segmentos(itens))
 
 
@@ -150,7 +150,7 @@ def limite_paginas_busca() -> int:
 
 def _paginas_com_termo(
     sessao: SessaoAgente, termo: str, limite_paginas: int | None = None
-) -> list[PaginaTabela]:
+) -> list[VisaoPagina]:
     """Busca em memória (Etapa 7.5): o texto está cifrado no banco, então ILIKE não serve.
 
     Percorre as páginas do processo na ordem dos autos, decifrando sob demanda em blocos, até
@@ -159,14 +159,14 @@ def _paginas_com_termo(
     limite = limite_paginas or limite_paginas_busca()
     alvo = termo.lower()
     consulta = (
-        select(PaginaTabela)
-        .join(ArquivoTabela, ArquivoTabela.id == PaginaTabela.arquivo_id)
-        .where(ArquivoTabela.processo_id == sessao.processo_id)
-        .order_by(ArquivoTabela.enviado_em, ArquivoTabela.id, PaginaTabela.numero)
+        select(VisaoPagina)
+        .join(VisaoArquivo, VisaoArquivo.id == VisaoPagina.arquivo_id)
+        .where(VisaoArquivo.hk_processo == sessao.processo_id)
+        .order_by(VisaoArquivo.criado_em, VisaoArquivo.id, VisaoPagina.numero)
         .limit(limite)
         .execution_options(yield_per=PAGINAS_POR_BLOCO_BUSCA)
     )
-    achadas: list[PaginaTabela] = []
+    achadas: list[VisaoPagina] = []
     for pagina in sessao.session.scalars(consulta):
         if pagina.texto_normalizado is not None and alvo in pagina.texto_normalizado.lower():
             achadas.append(pagina)
@@ -191,7 +191,7 @@ def buscar_texto(sessao: SessaoAgente, argumentos: dict[str, Any]) -> str:
     dobrado = dobrar(termo)
     blocos = []
     for pagina in _paginas_com_termo(sessao, termo):
-        itens = segmentos(sessao.pseudonimizador.aplicar(texto_analise(pagina)))
+        itens = segmentos(texto_analise(pagina))
         achados = [(s, h) for s, h in itens if dobrado in dobrar(s)] or itens[:1]
         blocos.append(
             sessao.delimitador.envelopar(
@@ -229,7 +229,7 @@ def listar_fatos(sessao: SessaoAgente, argumentos: dict[str, Any]) -> str:
         for f in listar_fatos_por_processo(sessao.session, sessao.processo_id)
         if not tipo or f.tipo.value == tipo
     ][:MAX_FATOS]
-    corpo = sessao.pseudonimizador.aplicar_json(fatos)
+    corpo = json.dumps(fatos, ensure_ascii=False, default=str)
     return sessao.delimitador.envelopar({"tipo": "fatos_extraidos"}, corpo)
 
 
@@ -253,5 +253,5 @@ def listar_achados(sessao: SessaoAgente, _argumentos: dict[str, Any]) -> str:
         }
         for a in repositorio_eventos.achados_vigentes(sessao.session, sessao.processo_id)
     ]
-    corpo = sessao.pseudonimizador.aplicar_json(achados)
+    corpo = json.dumps(achados, ensure_ascii=False, default=str)
     return sessao.delimitador.envelopar({"tipo": "achados_das_validacoes"}, corpo)

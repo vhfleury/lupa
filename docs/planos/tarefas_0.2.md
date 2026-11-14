@@ -353,7 +353,13 @@ a saída resumida (vermelho inicial e verde final).
 - [ ] **T4.9** Representação. A9. RF-VAL-04.
 - [ ] **T4.10** Cabimento do agravo. A10. RF-VAL-05.
 - [ ] **T4.11** Linha de comando das validações e `fatos_exemplo.json`. RF-VAL-06.
-- [ ] **T4.12** Agente cível: prompt, recusa, ferramenta de cálculo, contexto sem pseudônimos, dossiê com partes. RF-CHA-01 a 05, RF-DOS-01 a 04.
+- [x] **T4.12** Agente cível: prompt, recusa, ferramenta de cálculo, contexto sem pseudônimos, dossiê com partes. RF-CHA-01 a 05, RF-DOS-01 a 04.
+  - A política anterior deixou passar dois pedidos de valoração cível no corpus de 30
+    perguntas vedadas. O corpus cível passou nos critérios de 100% de recusa e até 10% de
+    falsos positivos nas 30 permitidas. O prompt versão 2 usa nomes e polos do processo.
+  - O dossiê liga cada parte e cada fato usado pelo achado à evidência de página. A bateria
+    de agente, rotas de revisão e limites passou em 63 testes. Ruff e mypy passaram nos
+    módulos e testes alterados.
 - [ ] **T4.13** Ponta a ponta de cada classe contra o gabarito; reprocessamento preserva correção. RF-ING-04, RF-ING-08, RNF-01, RNF-02.
 
 ## Fase 5 — Interface

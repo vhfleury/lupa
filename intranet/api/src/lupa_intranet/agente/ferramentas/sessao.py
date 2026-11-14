@@ -1,23 +1,16 @@
-"""Estado de uma chamada ao agente, compartilhado pelas ferramentas por fechamento.
-
-O par (gabinete, processo) vem do processo autorizado por `exige_processo` e fica aqui; as
-ferramentas nunca o recebem do modelo. Também ficam aqui o delimitador da chamada, o
-pseudonimizador do processo, o contador de páginas originais e as saídas de ferramenta (para o
-hash de entrada registrado em `chamada_modelo`).
-"""
+"""Contexto das ferramentas limitado ao processo da conversa pelo servidor."""
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from lupa_intranet.agente.contexto import Delimitador, Pseudonimizador
+from lupa_intranet.agente.contexto import Delimitador
 from lupa_intranet.auditoria.eventos import AcaoAuditoria
-from lupa_pipeline.dominio.tabelas import ArquivoTabela, PaginaTabela, PecaTabela
+from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoPagina, VisaoPeca
 
 Registrador = Callable[[AcaoAuditoria, str, str], None]
 """Grava um evento de auditoria: `(acao, objeto_tipo, objeto_id)`."""
@@ -28,12 +21,10 @@ class SessaoAgente:
     """Contexto de uma chamada; criado por requisição.
 
     Attributes:
-        session: Sessão do banco da requisição (RLS do gabinete).
-        gabinete_id: Gabinete do processo.
+        session: Sessão do banco da requisição.
         processo_id: Processo da conversa.
-        materia: Matéria do processo (catálogo de validações).
+        classe: Classe do processo (catálogo de validações).
         numero_cnj: Número do processo.
-        pseudonimizador: Pseudonimizador dos réus do processo.
         delimitador: Delimitador aleatório da chamada.
         registrar: Grava evento de auditoria.
         referencia: Data de referência das validações.
@@ -43,11 +34,9 @@ class SessaoAgente:
     """
 
     session: Session
-    gabinete_id: UUID
-    processo_id: UUID
-    materia: str
+    processo_id: bytes
+    classe: str
     numero_cnj: str
-    pseudonimizador: Pseudonimizador
     delimitador: Delimitador
     registrar: Registrador
     referencia: date
@@ -60,14 +49,17 @@ class PaginaForaDoProcessoError(LookupError):
     """Página inexistente ou de outro processo."""
 
 
-def _uuid(valor: Any) -> UUID | None:
-    try:
-        return UUID(str(valor))
-    except ValueError:
-        return None
+def _id(valor: Any) -> str:
+    if (
+        not isinstance(valor, str)
+        or len(valor) != 64
+        or any(c not in "0123456789abcdefABCDEF" for c in valor)
+    ):
+        raise PaginaForaDoProcessoError("identificador inválido")
+    return valor.lower()
 
 
-def arquivos_do_processo(sessao: SessaoAgente) -> list[UUID]:
+def arquivos_do_processo(sessao: SessaoAgente) -> list[str]:
     """Arquivos do processo em ordem de envio.
 
     Args:
@@ -77,18 +69,16 @@ def arquivos_do_processo(sessao: SessaoAgente) -> list[UUID]:
         Ids.
     """
     consulta = (
-        select(ArquivoTabela.id)
-        .where(ArquivoTabela.processo_id == sessao.processo_id)
-        .order_by(ArquivoTabela.enviado_em, ArquivoTabela.id)
+        select(VisaoArquivo.id)
+        .where(VisaoArquivo.hk_processo == sessao.processo_id)
+        .order_by(VisaoArquivo.criado_em, VisaoArquivo.id)
     )
     return list(sessao.session.scalars(consulta))
 
 
-def _por_id(sessao: SessaoAgente, pagina_id: UUID) -> PaginaTabela:
-    consulta = (
-        select(PaginaTabela)
-        .join(ArquivoTabela, ArquivoTabela.id == PaginaTabela.arquivo_id)
-        .where(PaginaTabela.id == pagina_id, ArquivoTabela.processo_id == sessao.processo_id)
+def _por_id(sessao: SessaoAgente, pagina_id: str) -> VisaoPagina:
+    consulta = select(VisaoPagina).where(
+        VisaoPagina.id == pagina_id, VisaoPagina.hk_processo == sessao.processo_id
     )
     pagina = sessao.session.scalar(consulta)
     if pagina is None:
@@ -96,7 +86,7 @@ def _por_id(sessao: SessaoAgente, pagina_id: UUID) -> PaginaTabela:
     return pagina
 
 
-def _por_numero(sessao: SessaoAgente, numero: int, arquivo: UUID | None) -> PaginaTabela:
+def _por_numero(sessao: SessaoAgente, numero: int, arquivo: str | None) -> VisaoPagina:
     arquivos = arquivos_do_processo(sessao)
     if arquivo is None:
         if len(arquivos) != 1:
@@ -104,8 +94,8 @@ def _por_numero(sessao: SessaoAgente, numero: int, arquivo: UUID | None) -> Pagi
         arquivo = arquivos[0]
     if arquivo not in arquivos:
         raise PaginaForaDoProcessoError("arquivo não pertence a este processo")
-    consulta = select(PaginaTabela).where(
-        PaginaTabela.arquivo_id == arquivo, PaginaTabela.numero == numero
+    consulta = select(VisaoPagina).where(
+        VisaoPagina.arquivo_id == arquivo, VisaoPagina.numero == numero
     )
     pagina = sessao.session.scalar(consulta)
     if pagina is None:
@@ -113,7 +103,7 @@ def _por_numero(sessao: SessaoAgente, numero: int, arquivo: UUID | None) -> Pagi
     return pagina
 
 
-def resolver_pagina(sessao: SessaoAgente, argumentos: dict[str, Any]) -> PaginaTabela:
+def resolver_pagina(sessao: SessaoAgente, argumentos: dict[str, Any]) -> VisaoPagina:
     """Página pedida pelo modelo, sempre dentro do processo da sessão.
 
     Args:
@@ -127,18 +117,15 @@ def resolver_pagina(sessao: SessaoAgente, argumentos: dict[str, Any]) -> PaginaT
         PaginaForaDoProcessoError: Página de outro processo, inexistente ou pedido ambíguo.
     """
     if argumentos.get("pagina_id"):
-        pagina_id = _uuid(argumentos["pagina_id"])
-        if pagina_id is None:
-            raise PaginaForaDoProcessoError("pagina_id inválido")
-        return _por_id(sessao, pagina_id)
+        return _por_id(sessao, _id(argumentos["pagina_id"]))
     numero = argumentos.get("numero")
     if not isinstance(numero, int) or isinstance(numero, bool):
         raise PaginaForaDoProcessoError("informe pagina_id ou numero")
-    arquivo = _uuid(argumentos["arquivo_id"]) if argumentos.get("arquivo_id") else None
+    arquivo = _id(argumentos["arquivo_id"]) if argumentos.get("arquivo_id") else None
     return _por_numero(sessao, numero, arquivo)
 
 
-def peca_da_pagina(sessao: SessaoAgente, pagina: PaginaTabela) -> tuple[str, str]:
+def peca_da_pagina(sessao: SessaoAgente, pagina: VisaoPagina) -> tuple[str, str]:
     """Tipo e origem da peça vigente que contém a página.
 
     Args:
@@ -149,14 +136,14 @@ def peca_da_pagina(sessao: SessaoAgente, pagina: PaginaTabela) -> tuple[str, str
         `(tipo, origem)`; `("desconhecido", "desconhecida")` sem peça.
     """
     consulta = (
-        select(PecaTabela.tipo, PecaTabela.origem)
+        select(VisaoPeca.tipo, VisaoPeca.origem)
         .where(
-            PecaTabela.arquivo_id == pagina.arquivo_id,
-            PecaTabela.vigente.is_(True),
-            PecaTabela.pagina_inicial <= pagina.numero,
-            PecaTabela.pagina_final >= pagina.numero,
+            VisaoPeca.arquivo_id == pagina.arquivo_id,
+            VisaoPeca.vigente.is_(True),
+            VisaoPeca.pagina_inicial <= pagina.numero,
+            VisaoPeca.pagina_final >= pagina.numero,
         )
-        .order_by(PecaTabela.confianca.desc(), PecaTabela.id)
+        .order_by(VisaoPeca.confianca.desc(), VisaoPeca.id)
         .limit(1)
     )
     linha = sessao.session.execute(consulta).first()

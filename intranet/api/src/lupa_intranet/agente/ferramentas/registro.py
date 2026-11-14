@@ -30,7 +30,7 @@ def _ligar(sessao: SessaoAgente, funcao: Funcao) -> Callable[[dict[str, Any]], A
 
 
 def _definicoes(sessao: SessaoAgente) -> list[tuple[str, str, dict[str, Any], Funcao]]:
-    validacoes = nomes_validacoes(sessao.materia)
+    validacoes = nomes_validacoes(sessao.classe)
     return [
         ("listar_pecas", "Índice de peças do processo (tipo, origem, páginas, data, flags).",
          SEM_ARGUMENTOS, listar_pecas),
@@ -45,7 +45,7 @@ def _definicoes(sessao: SessaoAgente) -> list[tuple[str, str, dict[str, Any], Fu
         ("listar_achados", "Achados vigentes das validações, com valores e explicação.",
          SEM_ARGUMENTOS, listar_achados),
         ("executar_validacao",
-         "Executa a validação determinística (prazo, prescrição, preventiva) e devolve o achado.",
+         "Executa a validação determinística de prazo do recurso e devolve o achado.",
          {"type": "object", "properties": {"nome": {"type": "string", "enum": validacoes}},
           "required": ["nome"]}, executar_validacao),
         ("ler_pagina_original",

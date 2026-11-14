@@ -9,15 +9,14 @@ from sqlalchemy import Engine
 
 from apoio_comum import eventos_do_banco
 from lupa_intranet.agente.cliente import ClienteFalso, PedidoAgente, Roteiro, resposta_json
-from lupa_intranet.agente.contexto import Pseudonimizador, segmentos
+from lupa_intranet.agente.contexto import segmentos
 from lupa_pipeline.ingestao.saneamento import normalizar
-from tests.agente.conftest import CPF_REU, NOME_REU, TEXTOS, ProcessoAgente
+from tests.agente.conftest import NOME_PARTE, TEXTOS, ProcessoAgente
 from tests.conftest import logar
 
 pytestmark = pytest.mark.integracao
 
-CAMPOS_TEXTO_LIVRE = {"trecho", "explicacao", "classe"}
-PSEUDO = Pseudonimizador([(NOME_REU, CPF_REU, "REU-01")])
+CAMPOS_TEXTO_LIVRE = {"trecho", "explicacao", "classe", "nome"}
 
 
 def textos_livres_sem_rotulo(valor: Any, chave: str = "", rotulado: bool = False) -> list[str]:
@@ -50,7 +49,7 @@ def _cliente_http(app: FastAPI, engine: Engine, processo: ProcessoAgente) -> Tes
 
 
 def _hash(numero: int, trecho: str) -> str:
-    base = PSEUDO.aplicar(normalizar(TEXTOS[numero]).texto)
+    base = normalizar(TEXTOS[numero]).texto
     return next(h for s, h in segmentos(base) if trecho in s)
 
 
@@ -72,34 +71,44 @@ def test_dossie_deterministico_tem_esquema_fixo_e_e_auditado(
         "alertas",
         "achados",
     }
-    assert dossie["ficha"]["reus"] == ["REU-01"]
-    assert [p["tipo"] for p in dossie["pecas"]] == ["denuncia", "recurso", "certidao"]
+    (parte,) = dossie["ficha"]["partes"]
+    assert (parte["nome"], parte["polo"], parte["qualidade"], parte["pagina_id"]) == (
+        NOME_PARTE,
+        "ativo",
+        "particular",
+        processo_agente.paginas[1],
+    )
+    assert dossie["ficha"]["responsaveis"] == [
+        {"id": processo_agente.assessor.id, "nome_usuario": processo_agente.assessor.nome}
+    ]
+    assert dossie["ficha"]["ingestao"]["situacao"] == "processando"
+    assert [p["tipo"] for p in dossie["pecas"]] == ["sentenca", "apelacao", "certidao"]
     assert all(p["resumo_peca"] is None for p in dossie["pecas"])
     datas = [(e["data"], e["tipo"], e["pagina"]) for e in dossie["linha_do_tempo"]]
     assert datas == [
-        ("2024-01-05", "data_fato", 1),
-        ("2025-03-10", "data_intimacao_defesa", 3),
-        ("2025-03-14", "data_interposicao_recurso", 2),
+        ("2024-01-05", "data_decisao_recorrida", 1),
+        ("2025-03-10", "data_intimacao", 3),
+        ("2025-03-14", "data_interposicao", 2),
     ]
     assert [(a["pagina"], a["flags"]) for a in dossie["alertas"]] == [(2, ["padrao_instrucao"])]
-    assert {a["validacao"] for a in dossie["achados"]} == {
-        "tempestividade_recurso", "prescricao_abstrata", "revisao_preventiva",
-    }  # fmt: skip
-    assert "Sauro" not in resposta.text and "123.456.789" not in resposta.text
+    (achado,) = dossie["achados"]
+    assert achado["validacao"] == "tempestividade_recurso"
+    assert len(achado["fatos_usados"]) == len(achado["fontes"]) == 5
+    assert all(f["pagina_id"] in processo_agente.paginas.values() for f in achado["fontes"])
     assert textos_livres_sem_rotulo(dossie) == []
     assert falso.pedidos == []
     eventos = eventos_do_banco(
         engine_teste, acao="processo_aberto", processo_id=processo_agente.processo_id
     )
     assert any(e.objeto_id == f"/processos/{processo_agente.processo_id}/dossie" for e in eventos)
-    assert cliente.get(f"/processos/{processo_agente.outro_processo_id}/dossie").status_code == 404
+    assert cliente.get("/processos/" + "f" * 64 + "/dossie").status_code == 404
 
 
 def _roteiro_resumo(pedido: PedidoAgente) -> Roteiro:
-    if "DENÚNCIA" in pedido.mensagem:
-        trecho = "oferece denúncia contra REU-01"
+    if "SENTENÇA" in pedido.mensagem:
+        trecho = "Parte autora: Marina Lima"
         citacao = {"pagina_id": "{p1}", "trecho": trecho, "hash_trecho": _hash(1, trecho)}
-        return Roteiro(resposta=resposta_json("O MP denunciou o REU-01 [1].", [citacao]))
+        return Roteiro(resposta=resposta_json("A sentença identifica Marina Lima [1].", [citacao]))
     if "RAZÕES" in pedido.mensagem:
         trecho = "interpõe apelação em 14/03/2025"
         citacao = {"pagina_id": "{p2}", "trecho": trecho, "hash_trecho": _hash(2, trecho)}
@@ -127,27 +136,14 @@ def test_resumo_so_entra_com_citacao_conferida_ate_duas_frases_e_rotulo_gerado(
     dossie = cliente.get(f"/processos/{processo_agente.processo_id}/dossie?resumos=true").json()
     resumos = [p["resumo_peca"] for p in dossie["pecas"]]
     assert resumos[0]["rotulo"] == "gerado"
-    assert resumos[0]["texto"] == "O MP denunciou o REU-01 [1]."
+    assert resumos[0]["texto"] == "A sentença identifica Marina Lima [1]."
     assert len(resumos[0]["citacoes"]) == 1
     assert resumos[1:] == [None, None]
     assert len(falso.pedidos) == 3 and all(p.ferramentas == () for p in falso.pedidos)
     assert textos_livres_sem_rotulo(dossie) == []
     tudo = "\n".join(falso.recebidos)
-    assert "Sauro" not in tudo and "123.456.789" not in tudo
+    assert NOME_PARTE in tudo
     chamadas = eventos_do_banco(
         engine_teste, acao="chamada_modelo", processo_id=processo_agente.processo_id
     )
     assert len(chamadas) == 3
-
-
-def test_identidade_lida_no_dossie_registra_quem_pediu(
-    app_teste: FastAPI, engine_teste: Engine, processo_agente: ProcessoAgente
-) -> None:
-    """O evento `identidade_lida` do dossiê leva o `usuario_id` do assessor (revisão 7.1-7.9)."""
-    app_teste.state.cliente_agente = ClienteFalso([Roteiro(resposta="nunca")])
-    cliente = _cliente_http(app_teste, engine_teste, processo_agente)
-    assert cliente.get(f"/processos/{processo_agente.processo_id}/dossie").status_code == 200
-    eventos = eventos_do_banco(
-        engine_teste, acao="identidade_lida", processo_id=processo_agente.processo_id
-    )
-    assert eventos and all(e.usuario_id == processo_agente.assessor.id for e in eventos)

@@ -59,5 +59,5 @@ def ler_pagina_original(sessao: SessaoAgente, argumentos: dict[str, Any]) -> str
         "texto": "original",
         "trechos_suspeitos": suspeitos,
     }
-    itens = segmentos(sessao.pseudonimizador.aplicar(pagina.texto))
+    itens = segmentos(pagina.texto or "")
     return sessao.delimitador.envelopar(cabecalho, formatar_segmentos(itens))

@@ -360,9 +360,9 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
   RF-ING-08).
 - [ ] I: reclassificação mantém histórico (A12; RF-PEC-02).
 - [ ] I: estouro de memória no sandbox termina em `falho` (RF-ING-04).
-- [ ] U: recusa do chat para cada pergunta da suíte (RF-CHA-02).
-- [ ] I: citação inexistente descartada; nenhuma válida vira "sem evidência" (RF-CHA-03).
-- [ ] I: conversa do processo A não lê o processo B (RF-CHA-01).
+- [x] U: recusa do chat para cada pergunta da suíte (RF-CHA-02).
+- [x] I: citação inexistente descartada; nenhuma válida vira "sem evidência" (RF-CHA-03).
+- [x] I: conversa do processo A não lê o processo B (RF-CHA-01).
 
 ### Fase 5
 

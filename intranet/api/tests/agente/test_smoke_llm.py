@@ -25,7 +25,7 @@ from lupa_intranet.agente.contexto import prompt_sistema
 
 pytestmark = pytest.mark.llm
 
-INDICE = json.dumps([{"ordem": 1, "tipo": "denuncia"}, {"ordem": 2, "tipo": "sentenca"}])
+INDICE = json.dumps([{"ordem": 1, "tipo": "peticao_inicial"}, {"ordem": 2, "tipo": "sentenca"}])
 
 
 def _tem_credencial() -> bool:

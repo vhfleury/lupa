@@ -1,7 +1,7 @@
 """Conferência de citações (5.6): só código decide o que chega à tela."""
 
 import json
-from uuid import UUID, uuid4
+from secrets import token_hex
 
 from lupa_intranet.agente.citacoes import (
     Desfecho,
@@ -11,19 +11,19 @@ from lupa_intranet.agente.citacoes import (
     interpretar,
     outro_processo,
 )
-from lupa_intranet.agente.contexto import Pseudonimizador, segmentos
+from lupa_intranet.agente.contexto import segmentos
 from lupa_pipeline.dominio.esquemas import calcular_hash
 from lupa_pipeline.ingestao.saneamento import normalizar
 
-TEXTO = "SENTENÇA\nJULGO PROCEDENTE a denúncia contra Fulano Tal.\nIntime-se em 10/03/2025."
-PAGINA = uuid4()
+TEXTO = "SENTENÇA\nJULGO PROCEDENTE o pedido de Marina Lima.\nIntime-se em 10/03/2025."
+PAGINA = token_hex(32)
 NUMERO = "0000001-23.2025.8.09.0001"
-PSEUDO = Pseudonimizador([("Fulano Tal", None, "REU-01")])
+
 PAGINAS = {PAGINA: PaginaConferencia(TEXTO, normalizar(TEXTO).texto)}
 IDS = {str(PAGINA)}
 
 
-def _bruto(texto: str, *citacoes: tuple[UUID, str, str]) -> str:
+def _bruto(texto: str, *citacoes: tuple[str, str, str]) -> str:
     return json.dumps(
         {"texto": texto, "citacoes": [
             {"pagina_id": str(p), "trecho": t, "hash_trecho": h} for p, t, h in citacoes
@@ -32,16 +32,16 @@ def _bruto(texto: str, *citacoes: tuple[UUID, str, str]) -> str:
 
 
 def _segmento(trecho: str) -> str:
-    return next(h for s, h in segmentos(PSEUDO.aplicar(TEXTO)) if trecho in s)
+    return next(h for s, h in segmentos(TEXTO) if trecho in s)
 
 
 def _conferir(bruto: str):  # type: ignore[no-untyped-def]
-    return conferir(bruto, PAGINAS, NUMERO, IDS, PSEUDO.aplicar)
+    return conferir(bruto, PAGINAS, NUMERO, IDS)
 
 
-def test_citacao_pelo_hash_do_segmento_pseudonimizado_confere() -> None:
-    """Citacao pelo hash do segmento pseudonimizado confere."""
-    trecho = "JULGO PROCEDENTE a denúncia contra REU-01"
+def test_citacao_pelo_hash_do_segmento_dos_autos_confere() -> None:
+    """Citacao pelo hash do segmento dos autos confere."""
+    trecho = "JULGO PROCEDENTE o pedido de Marina Lima"
     resultado = _conferir(
         _bruto("A sentença julgou procedente [1].", (PAGINA, trecho, _segmento(trecho)))
     )
@@ -65,7 +65,7 @@ def test_citacao_inventada_e_removida_e_contada() -> None:
             (PAGINA, trecho_real, _segmento(trecho_real)),
             (PAGINA, "JULGO IMPROCEDENTE", _segmento(trecho_real)),
             (PAGINA, trecho_real, "0" * 64),
-            (uuid4(), trecho_real, _segmento(trecho_real)),
+            (token_hex(32), trecho_real, _segmento(trecho_real)),
         )
     )
     assert resultado.desfecho is Desfecho.RESPONDIDA
@@ -80,7 +80,7 @@ def test_resposta_sem_citacao_valida_fica_sem_evidencia() -> None:
         _bruto("Não encontrei.", (PAGINA, "inventado", calcular_hash("inventado")))
     )
     assert resultado.desfecho is Desfecho.SEM_EVIDENCIA
-    assert resultado.texto == "Não encontrei." and resultado.descartadas == 1
+    assert resultado.texto == "Sem evidência nos autos." and resultado.descartadas == 1
     assert _conferir(_bruto("Nada.")).desfecho is Desfecho.SEM_EVIDENCIA
 
 
@@ -108,7 +108,7 @@ def test_identificador_de_outro_processo_bloqueia() -> None:
     estranho = "0000999-11.2024.8.09.0001"
     assert outro_processo(f"ver processo {estranho}", NUMERO, frozenset(IDS))
     assert not outro_processo(f"processo {NUMERO}", NUMERO, frozenset(IDS))
-    assert outro_processo(f"página {uuid4()}", NUMERO, frozenset(IDS))
+    assert outro_processo(f"página {token_hex(32)}", NUMERO, frozenset(IDS))
     assert not outro_processo(f"página {PAGINA}", NUMERO, frozenset(IDS))
     bloqueada = _conferir(_bruto(f"Veja também {estranho}."))
     assert bloqueada.desfecho is Desfecho.BLOQUEADA and bloqueada.motivos == ["outro_processo"]
@@ -120,7 +120,5 @@ def test_pagina_sem_normalizado_gravado_usa_o_recalculado() -> None:
     """Pagina sem normalizado gravado usa o recalculado."""
     paginas = {PAGINA: PaginaConferencia(TEXTO, None)}
     trecho = "Intime-se em 10/03/2025."
-    resultado = conferir(
-        _bruto("x", (PAGINA, trecho, _segmento(trecho))), paginas, NUMERO, IDS, PSEUDO.aplicar
-    )
+    resultado = conferir(_bruto("x", (PAGINA, trecho, _segmento(trecho))), paginas, NUMERO, IDS)
     assert resultado.desfecho is Desfecho.RESPONDIDA

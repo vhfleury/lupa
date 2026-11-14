@@ -2,19 +2,16 @@
 
 1. Esquema estrito (`RespostaModelo`, `extra="forbid"`); texto fora do JSON é rejeitado.
 2. Instrução refletida (`padroes_instrucao.yaml` da ingestão, mais URLs) ou identificador de
-   outro processo (número CNJ diferente, UUID que não é do processo): resposta descartada.
-3. Cada citação: página do processo; trecho literal dentro do segmento cujo hash é
-   `hash_trecho` (segmentos recalculados do texto gravado, normalizado e original, depois da
-   pseudonimização), ou `hash_trecho == sha256(trecho)` com o trecho literal no texto da
-   página. Citação que falha é removida e contada; sem nenhuma válida, `sem_evidencia`.
+   outro processo (número CNJ diferente ou hk de outro processo): resposta descartada.
+3. Uma citação válida contém trecho literal do original ou do texto normalizado, com o hash
+   do segmento ou do próprio trecho. Sem citação válida, o texto do modelo fica oculto.
 """
 
 import json
 import re
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -23,10 +20,8 @@ from lupa_pipeline.dominio.esquemas import calcular_hash
 from lupa_pipeline.ingestao.deteccao import encontrar_padroes
 from lupa_pipeline.ingestao.saneamento import normalizar
 
-PADRAO_CNJ = re.compile(r"\d{7}-?\d{2}\.?\d{4}\.?\d\.?\d{2}\.?\d{4}")
-PADRAO_UUID = re.compile(
-    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
-)
+PADRAO_CNJ = re.compile(r"(?<![\da-fA-F])\d{7}-?\d{2}\.?\d{4}\.?\d\.?\d{2}\.?\d{4}(?![\da-fA-F])")
+PADRAO_ID = re.compile(r"(?<![0-9a-zA-Z])[0-9a-fA-F]{64}(?![0-9a-zA-Z])")
 PADRAO_URL = re.compile(r"https?://|www\.", re.IGNORECASE)
 CERCA = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
 
@@ -36,7 +31,7 @@ class Citacao(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    pagina_id: UUID
+    pagina_id: str = Field(pattern=r"^[0-9a-f]{64}$")
     trecho: str = Field(min_length=1, max_length=600)
     hash_trecho: str = Field(pattern=r"^[0-9a-f]{64}$")
 
@@ -122,12 +117,12 @@ def instrucao_refletida(texto: str) -> bool:
 
 
 def outro_processo(texto: str, numero_cnj: str, ids_processo: frozenset[str]) -> bool:
-    """Se o texto cita número CNJ ou UUID que não é deste processo.
+    """Se o texto cita número CNJ ou identificador que não é deste processo.
 
     Args:
         texto: Texto.
         numero_cnj: Número do processo da conversa.
-        ids_processo: UUIDs (minúsculos) que pertencem ao processo.
+        ids_processo: IDs hexadecimais que pertencem ao processo.
 
     Returns:
         Verdadeiro se há identificador estranho.
@@ -135,34 +130,31 @@ def outro_processo(texto: str, numero_cnj: str, ids_processo: frozenset[str]) ->
     proprio = re.sub(r"\D", "", numero_cnj)
     if any(re.sub(r"\D", "", m) != proprio for m in PADRAO_CNJ.findall(texto)):
         return True
-    return any(m.lower() not in ids_processo for m in PADRAO_UUID.findall(texto))
+    return any(m.lower() not in ids_processo for m in PADRAO_ID.findall(texto))
 
 
-def _bases(pagina: PaginaConferencia, pseudonimizar: Callable[[str], str]) -> list[str]:
+def _bases(pagina: PaginaConferencia) -> list[str]:
     normalizado = (
         pagina.texto_normalizado
         if pagina.texto_normalizado is not None
         else normalizar(pagina.texto).texto
     )
-    return [pseudonimizar(normalizado), pseudonimizar(pagina.texto)]
+    return [normalizado, pagina.texto]
 
 
-def citacao_confere(
-    citacao: Citacao, pagina: PaginaConferencia | None, pseudonimizar: Callable[[str], str]
-) -> bool:
+def citacao_confere(citacao: Citacao, pagina: PaginaConferencia | None) -> bool:
     """Confere uma citação contra o texto gravado da página.
 
     Args:
         citacao: Citação.
         pagina: Página do processo, ou None se não pertence a ele.
-        pseudonimizar: Pseudonimização aplicada ao que foi enviado ao modelo.
 
     Returns:
         Verdadeiro se o trecho existe e o hash bate.
     """
     if pagina is None:
         return False
-    bases = _bases(pagina, pseudonimizar)
+    bases = _bases(pagina)
     for base in bases:
         for segmento, hash_segmento in segmentos(base):
             if hash_segmento == citacao.hash_trecho and citacao.trecho in segmento:
@@ -177,7 +169,7 @@ def _bloqueio(
     resposta: RespostaModelo, numero_cnj: str, ids_processo: frozenset[str]
 ) -> str | None:
     textos = [resposta.texto, *(c.trecho for c in resposta.citacoes)]
-    if instrucao_refletida(resposta.texto):
+    if any(instrucao_refletida(t) for t in textos):
         return "instrucao_refletida"
     if any(outro_processo(t, numero_cnj, ids_processo) for t in textos):
         return "outro_processo"
@@ -186,10 +178,9 @@ def _bloqueio(
 
 def conferir(
     bruto: str,
-    paginas: Mapping[UUID, PaginaConferencia],
+    paginas: Mapping[str, PaginaConferencia],
     numero_cnj: str,
     ids_processo: Iterable[str],
-    pseudonimizar: Callable[[str], str],
 ) -> Conferencia:
     """Confere a saída do modelo.
 
@@ -197,8 +188,7 @@ def conferir(
         bruto: Texto devolvido pelo modelo.
         paginas: Páginas do processo citadas (as de fora não aparecem aqui).
         numero_cnj: Número do processo.
-        ids_processo: UUIDs que pertencem ao processo.
-        pseudonimizar: Pseudonimização usada no envio.
+        ids_processo: Identificadores que pertencem ao processo.
 
     Returns:
         Conferência com o desfecho e as citações válidas.
@@ -211,10 +201,9 @@ def conferir(
     motivo = _bloqueio(resposta, numero_cnj, ids)
     if motivo:
         return Conferencia(Desfecho.BLOQUEADA, motivos=[motivo])
-    validas = [
-        c for c in resposta.citacoes if citacao_confere(c, paginas.get(c.pagina_id), pseudonimizar)
-    ]
+    validas = [c for c in resposta.citacoes if citacao_confere(c, paginas.get(c.pagina_id))]
     descartadas = len(resposta.citacoes) - len(validas)
     motivos = ["citacao_invalida"] * descartadas
     desfecho = Desfecho.RESPONDIDA if validas else Desfecho.SEM_EVIDENCIA
-    return Conferencia(desfecho, resposta.texto, validas, descartadas, motivos)
+    texto = resposta.texto if validas else "Sem evidência nos autos."
+    return Conferencia(desfecho, texto, validas, descartadas, motivos)

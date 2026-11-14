@@ -3,7 +3,7 @@
 `GET /processos/{id}/dossie` devolve o dossiê em esquema fixo, montado dos dados estruturados
 sem modelo. Com `?resumos=true`, o modelo preenche `resumo_peca` (rotulado `gerado`, com
 citação conferida) nas primeiras peças. Leitura de conteúdo: `processo_aberto`, com
-`admin_acesso_conteudo` para o administrador. Processo de outro gabinete responde 404.
+autoria registrada na cadeia única do gabinete.
 """
 
 from typing import Any
@@ -40,7 +40,7 @@ def obter_dossie(
     Returns:
         Dossiê serializado.
     """
-    dossie = montar_dossie(sessao, processo, chat.usuario_id)
+    dossie = montar_dossie(sessao, processo)
     if resumos:
         dossie = preencher_resumos(chat, dossie, settings.agente_max_resumos_dossie)
     return dossie.model_dump(mode="json")
