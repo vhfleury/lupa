@@ -298,8 +298,11 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 ### Fase 2
 
 - [ ] U: `config` não aceita mais as chaves de Redis, métricas e backup.
-- [ ] I: `GET /metricas/servico` responde 404.
+  - Métricas e backup feitos em T2.1 (`test_configuracao_ignora_chaves_de_metricas_e_backup`);
+    as chaves de Redis saem em T3.8, junto com o Redis.
+- [x] I: `GET /metricas/servico` responde 404 (`test_rotas_de_metricas_nao_existem`, T2.1).
 - [ ] `docker compose config` lista só os serviços de D22.
+  - Depois da fase 2 lista os de D22 mais `redis`, que sai em T3.8.
 
 ### Fase 3
 

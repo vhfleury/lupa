@@ -91,7 +91,24 @@ a saída resumida (vermelho inicial e verde final).
     `docker compose up -d --build --wait api`, `docker compose exec api python -m pytest -c
     intranet/api/pyproject.toml intranet/api/tests` → 282 passed, 1 failed (o da linha de base),
     3 deselected, sem os 2 skipped de backup; cobertura 98,71%.
-- [ ] **T2.3** Remover o perfil de produção: `docker-compose.prod.yml`, `instalar_piloto.sh`, `conferir_piloto.py`, `preparar_repositorio.md`, `vault/producao/` e os modos `acme` e `fornecido` do proxy. D25. RES-11.
+- [x] **T2.3** Remover o perfil de produção: `docker-compose.prod.yml`, `instalar_piloto.sh`, `conferir_piloto.py`, `preparar_repositorio.md`, `vault/producao/` e os modos `acme` e `fornecido` do proxy. D25. RES-11.
+  - Saíram `docker-compose.prod.yml`, `scripts/{instalar_piloto.sh,conferir_piloto.py,preparar_repositorio.md}`
+    (sem teste próprio), `vault/producao/`, `intranet/proxy/modos/{acme,fornecido}.caddy`,
+    `sem-certificado.pem`, o ramo de produção de `scripts/vault_inicializar.sh` (e `LUPA_COMPOSE`) e
+    a seção do piloto de `.env.example`. O `Caddyfile` importa só `modos/interno.caddy` (sem
+    `LUPA_TLS_MODO`) e `validar_caddyfile.sh` valida esse modo único. Sem teste novo
+    (infraestrutura).
+  - Comandos: `bash intranet/api/scripts/validar_caddyfile.sh` → `caddy validate: ok`;
+    `docker compose up -d --build --wait`, proxy recriado, `bash scripts/vault_inicializar.sh` →
+    Transit e AppRole prontos; `GET /saude` → tudo `ok`; `verificar_cabecalhos.py --url
+    https://proxy:8443 --exigir` → `ok em 4 rotas`; `docker compose --profile '*' config
+    --services` → `api db e2e front minio minio-init proxy redis vault worker` (os de D22 mais
+    `redis`, que sai em T3.8); volumes `db-dados`, `minio-dados`, `vault-dados`.
+  - Fechamento da fase 2, depois do rebuild: pipeline 604 passed, 1 failed
+    (`test_rls_ativa_em_todas_as_tabelas_com_gabinete`, linha de base), cobertura 93,98%;
+    intranet 282 passed, 1 failed (`test_remove_dados_em_cascata_do_processo`, linha de base),
+    3 deselected, cobertura 98,71%; `ruff check`, `ruff format --check` e `mypy` nos dois
+    pacotes: ok. Front não alterado.
 
 ## Fase 3 — Data Vault e gabinete único
 

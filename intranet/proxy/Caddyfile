@@ -1,17 +1,13 @@
-# Proxy reverso do Lupa (Etapa 6; modos de certificado na Etapa 8.1). Um unico origin HTTPS:
+# Proxy reverso do Lupa (Etapa 6). Um unico origin HTTPS:
 #   /api/*  -> api:8000 (prefixo /api removido; a API nao sabe do prefixo)
 #   /*      -> front:8080 (SPA estatica)
 # Assim nao ha CORS e o cookie de sessao (Secure, SameSite=Strict, Path=/) funciona.
 # O Caddy substitui o X-Forwarded-For recebido pelo IP real do cliente (nao confia em cabecalho
 # vindo de fora); a API confia nesse cabecalho so quando vem da rede `borda`.
 #
-# Modo de certificado (LUPA_TLS_MODO, arquivo intranet/proxy/modos/<modo>.caddy):
-#   interno    (padrao, desenvolvimento) CA interna do Caddy, `tls internal`, localhost e proxy
-#   acme       dominio LUPA_DOMINIO com certificado automatico (HTTP-01: a porta 80 do host vai a
-#              8080 do conteiner), e-mail LUPA_ACME_EMAIL; dados do ACME em volume persistente
-#   fornecido  dominio LUPA_DOMINIO com certificado e chave montados em /certs (LUPA_TLS_CERT,
-#              LUPA_TLS_CHAVE no docker-compose.prod.yml)
-# Validacao dos tres modos: intranet/api/scripts/validar_caddyfile.sh (caddy validate em conteiner).
+# Certificado: so o modo interno (intranet/proxy/modos/interno.caddy), CA interna do Caddy com
+# `tls internal` para localhost e proxy.
+# Validacao: intranet/api/scripts/validar_caddyfile.sh (caddy validate em conteiner).
 {
 	admin off
 	persist_config off
@@ -20,7 +16,7 @@
 	https_port 8443
 }
 
-# Cabecalhos e rotas comuns a todos os modos.
+# Cabecalhos e rotas do site.
 (lupa_site) {
 	encode gzip
 	# Etapa 6.10: cabecalhos de seguranca (conferidos por intranet/api/scripts/verificar_cabecalhos.py e pelo
@@ -30,7 +26,7 @@
 	# `unsafe-inline` nao e necessario. Unica excecao: o anunciador de rota do proprio SvelteKit
 	# (div aria-live com atributo style fixo, gerado pelo framework) exige o hash desse estilo
 	# com 'unsafe-hashes' (vale so para esse texto exato). Imagens das paginas vem da propria API.
-	# HSTS: fica em cada modo (intranet/proxy/modos/*.caddy).
+	# HSTS: fica em intranet/proxy/modos/interno.caddy.
 	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy no-referrer
@@ -50,7 +46,7 @@
 	}
 }
 
-import modos/{$LUPA_TLS_MODO:interno}.caddy
+import modos/interno.caddy
 
 # Saude do proprio proxy, so para o healthcheck do conteiner (porta nao publicada).
 :8081 {
