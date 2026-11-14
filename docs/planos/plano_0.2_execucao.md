@@ -293,7 +293,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 
 - [x] U: nenhum módulo de `lupa_pipeline` importa `lupa_intranet` (D2).
 - [ ] Suíte completa da 0.1 verde nos dois pacotes, com 90% de cobertura em cada.
-- [ ] `docker build --target verificacao intranet/web` verde.
+- [x] `docker build --target verificacao intranet/web` verde.
 
 ### Fase 2
 

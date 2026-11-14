@@ -35,6 +35,21 @@ a saída resumida (vermelho inicial e verde final).
   - Comandos: `docker compose up -d --build --wait` → todos os serviços `healthy`;
     `docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q` → ok.
 - [ ] **T1.7** Suíte completa da 0.1 verde nos dois pacotes, com 90% de cobertura em cada, e `docker build --target verificacao intranet/web` verde.
+  - Não marcada: dois testes falham já na 0.1 (linha de base em T1.1), por divergência entre
+    teste e código depois da migração `v0011_responsaveis`, que criou `processo_responsavel`:
+    `pipeline/tests/dominio/test_banco.py::test_rls_ativa_em_todas_as_tabelas_com_gabinete` e
+    `intranet/api/tests/auditoria/test_limpar_dev.py::test_remove_dados_em_cascata_do_processo`.
+    Correção depende de decisão do usuário.
+  - Comandos (no host, stack de pé): `docker compose exec worker python -m pytest -c
+    pipeline/pyproject.toml pipeline/tests` e `docker compose exec api python -m pytest -c
+    intranet/api/pyproject.toml intranet/api/tests`.
+  - Pipeline (imagem do `worker`): 602 passed, 1 failed; cobertura `lupa_pipeline` 94,03%.
+  - Intranet (imagem da `api`): 284 passed, 1 failed, 2 skipped (backup, só com
+    `LUPA_VERIFICAR_BACKUP=1`), 3 deselected; cobertura `lupa_intranet` 98,74%.
+  - `ruff check`, `ruff format --check` e `mypy` nos dois pacotes: ok. Ponta a ponta (1
+    passed), corpus de injeção (2 passed, recall 1.0, falso positivo 0.0), suíte do agente
+    (9 passed), cabeçalhos do proxy (ok) e `docker build --target verificacao intranet/web`
+    (ok).
 
 ## Fase 2 — Remoções de infraestrutura
 
