@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { estiloDestaque, paginaDestino, proximoZoom } from '$lib/visualizador/geometria';
 import { digitoVerificador, mascararCnj, problemaCnj } from './cnj';
 import { formatarBytes, problemaArquivo } from './envio';
-import { datasDosValores, motivoQuarentena, textoDoValor, valorDoFato } from './rotulos';
+import { datasDosValores, motivoQuarentena, textoDoValor, legivel, CLASSES } from './rotulos';
 
 describe('número CNJ', () => {
   it('calcula o dígito pelo módulo 97 como o servidor', () => {
@@ -42,8 +42,10 @@ describe('rótulos', () => {
     expect(motivoQuarentena(null)).toBe('Arquivo recusado.');
   });
 
-  it('valor do fato sem o envelope do réu e datas dos valores', () => {
-    expect(valorDoFato({ valor: '2024-01-02', reu_id: 'r' })).toBe('2024-01-02');
+  it('RF-VAL-01: rótulos das cinco classes cíveis e valores de fatos', () => {
+    expect(Object.keys(CLASSES)).toHaveLength(5);
+    expect(legivel('apelacao_civel')).toBe('Apelação cível');
+    expect(legivel('peticao_inicial')).toBe('Petição inicial');
     expect(textoDoValor(8)).toBe('8');
     expect(datasDosValores({ a: '2024-01-02', b: { c: ['2023-05-06', 'x'] }, d: 3 })).toEqual([
       { chave: 'a', data: '2024-01-02' },

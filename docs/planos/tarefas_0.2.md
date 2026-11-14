@@ -354,7 +354,8 @@ a saída resumida (vermelho inicial e verde final).
 
 - [x] **T5.1** Permissões e menu com dois papéis; remoção da tela de gabinetes. RF-ACE-03.
   - `npx vitest run src/lib/permissoes.test.ts src/lib/visualizacao.test.ts` expôs o terceiro papel no menu. Após a alteração, 7 testes passaram.
-- [ ] **T5.2** Tipos, API e rótulos cíveis; ids em texto. D12.
+- [x] **T5.2** Tipos, API e rótulos cíveis; ids em texto. D12.
+  - `npx vitest run src/lib/processos/processos.test.ts` passou nos 8 casos, incluindo as cinco classes, tipos de peça e valores de fatos.
 - [ ] **T5.3** Telas de processos: cadastro com classe, lista, dossiê com partes, validações, visualizador. RF-DOS-01 a 05.
 - [ ] **T5.4** Telas de usuários e auditoria. RF-ACE-04, RF-AUD-04, RF-AUD-05.
 - [ ] **T5.5** `docker build --target verificacao intranet/web` verde.

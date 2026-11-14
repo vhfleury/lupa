@@ -1,4 +1,38 @@
-// Rótulos legíveis para estados, motivos e enumerações vindos da API.
+import type { ClasseProcessual } from './tipos';
+
+export const CLASSES: Record<ClasseProcessual, string> = {
+  apelacao_civel: 'Apelação cível',
+  agravo_instrumento: 'Agravo de instrumento',
+  embargos_declaracao: 'Embargos de declaração',
+  agravo_interno: 'Agravo interno',
+  acao_originaria: 'Ação originária',
+};
+
+const ROTULOS: Record<string, string> = {
+  ...CLASSES,
+  peticao_inicial: 'Petição inicial',
+  contestacao: 'Contestação',
+  replica: 'Réplica',
+  decisao_interlocutoria: 'Decisão interlocutória',
+  sentenca: 'Sentença',
+  apelacao: 'Apelação',
+  contrarrazoes: 'Contrarrazões',
+  acordao: 'Acórdão',
+  certidao: 'Certidão',
+  procuracao: 'Procuração',
+  comprovante_preparo: 'Comprovante de preparo',
+  laudo_pericial: 'Laudo pericial',
+  parecer_mp: 'Parecer do Ministério Público',
+  juizo: 'Juízo',
+  mp: 'Ministério Público',
+  ministerio_publico: 'Ministério Público',
+  fazenda_publica: 'Fazenda Pública',
+  defensoria_publica: 'Defensoria Pública',
+  tempestividade_recurso: 'Tempestividade do recurso',
+  preparo_recurso: 'Preparo do recurso',
+  representacao_recurso: 'Representação do recorrente',
+  cabimento_agravo: 'Cabimento do agravo',
+};
 
 export const ESTADO_JOB: Record<string, string> = {
   recebido: 'Na fila',
@@ -60,6 +94,7 @@ export const ESTADOS_FINAIS = new Set([
 
 /** Texto legível de um identificador em snake_case (`tempestividade_recurso`). */
 export function legivel(chave: string): string {
+  if (ROTULOS[chave]) return ROTULOS[chave];
   const texto = chave.replace(/_/g, ' ');
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
@@ -84,16 +119,7 @@ export function formatarData(iso: string | null): string {
     : data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-/** Valor de fato sem o envelope do réu. */
-export function valorDoFato(valor: unknown): unknown {
-  if (typeof valor === 'object' && valor !== null && 'reu_id' in valor && 'valor' in valor) {
-    return (valor as { valor: unknown }).valor;
-  }
-  return valor;
-}
-
-export function textoDoValor(valor: unknown): string {
-  const v = valorDoFato(valor);
+export function textoDoValor(v: unknown): string {
   if (typeof v === 'string') return /^\d{4}-\d{2}-\d{2}$/.test(v) ? formatarData(v) : v;
   if (typeof v === 'number' || typeof v === 'boolean') return String(v);
   return JSON.stringify(v);

@@ -1,7 +1,12 @@
 // Formatos das respostas das rotas de processo (intranet/api/src/lupa_intranet/api/rotas/processos.py, pecas.py,
 // achados.py, dossie.py e visualizador.py). Texto vindo da API é sempre exibido como texto.
 
-export type Materia = 'criminal' | 'civel';
+export type ClasseProcessual =
+  | 'apelacao_civel'
+  | 'agravo_instrumento'
+  | 'embargos_declaracao'
+  | 'agravo_interno'
+  | 'acao_originaria';
 
 export type SituacaoIngestao =
   | 'sem_arquivos'
@@ -13,11 +18,9 @@ export type SituacaoIngestao =
 
 export interface Processo {
   id: string;
-  gabinete_id: string;
   numero_cnj: string;
-  classe: string;
-  materia: Materia;
-  sigiloso: boolean;
+  classe: ClasseProcessual;
+  em_revisao: boolean;
   status: string;
   criado_em: string;
 }
@@ -37,12 +40,12 @@ export interface ArquivoProcesso {
   mime: string;
   tamanho_bytes: number;
   enviado_em: string;
-  job_id: string | null;
   estado: string | null;
   motivo_quarentena: string | null;
   motivo_falha: string | null;
   total_paginas: number | null;
-  finalizado_em: string | null;
+  estado_em: string | null;
+  relatorio: { faltantes?: number[] } | null;
 }
 
 export interface ArquivosDoProcesso {
@@ -54,7 +57,6 @@ export interface ArquivosDoProcesso {
 
 export interface RespostaEnvio {
   arquivo_id: string;
-  job_id: string;
   estado: string;
   sha256: string;
   tamanho_bytes: number;
@@ -93,10 +95,18 @@ export interface Dossie {
   ficha: {
     processo_id: string;
     numero_cnj: string;
-    classe: string;
-    materia: string;
+    classe: ClasseProcessual;
     status: string;
-    reus: string[];
+    partes: {
+      id: string;
+      nome: string;
+      polo: string;
+      qualidade: string;
+      evidencia_id: string;
+      pagina_id: string;
+    }[];
+    responsaveis: { id: string; nome_usuario: string }[];
+    ingestao: { situacao: SituacaoIngestao };
   };
   pecas: {
     ordem: number;
@@ -115,13 +125,21 @@ export interface Dossie {
     data: string;
     tipo: string;
     fato_id: string;
+    evidencia_id: string;
     status: string;
     pagina_id: string;
     pagina: number | null;
     trecho: string;
   }[];
   alertas: { pagina_id: string; arquivo_id: string; pagina: number; flags: string[] }[];
-  achados: { achado_id: string; validacao: string; resultado: string; explicacao: string }[];
+  achados: {
+    achado_id: string;
+    validacao: string;
+    resultado: string;
+    explicacao: string;
+    fatos_usados: string[];
+    fontes: { fato_id: string; evidencia_id: string; pagina_id: string }[];
+  }[];
 }
 
 export interface EvidenciaFato {
@@ -141,8 +159,6 @@ export interface Fato {
   status: 'automatico' | 'confirmado' | 'corrigido';
   confianca: number;
   extraido_por: string;
-  substitui_fato_id: string | null;
-  substituido_por: string | null;
   vigente: boolean;
   criado_em: string;
   evidencias: EvidenciaFato[];
