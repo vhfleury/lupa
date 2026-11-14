@@ -143,7 +143,15 @@ a saída resumida (vermelho inicial e verde final).
     pipeline/tests/dominio/test_migracao_0001.py --no-cov -q`.
   - Vermelho (upgrade só com os hubs): `8 failed, 3 passed` (os 3 olham só o modelo ou os hubs).
     Verde: `11 passed`. `ruff check`, `ruff format --check` e `mypy` nos arquivos da tarefa: ok.
-- [ ] **T3.3** `dominio/gravacao.py` e `dominio/visoes.py`; teste de imutabilidade sob `lupa_app`. A2. D6, D13. RES-13.
+- [x] **T3.3** `dominio/gravacao.py` e `dominio/visoes.py`; teste de imutabilidade sob `lupa_app`. A2. D6, D13. RES-13.
+  - `gravar_hub`, `gravar_link`, `gravar_satelite` e `chave_do_hub` (A2); `visoes.py` mapeia as
+    20 views em classes `Visao*` de metadados próprios, que recusam gravação pelo ORM. Testes:
+    `pipeline/tests/dominio/test_gravacao.py` (21) e `pipeline/tests/dominio/test_visoes.py` (5).
+  - Comando: `docker compose run --rm --no-deps worker python -m pytest -c pipeline/pyproject.toml
+    pipeline/tests/dominio/test_gravacao.py pipeline/tests/dominio/test_visoes.py --no-cov -q`.
+  - Vermelho (assinaturas vazias): `24 failed, 3 passed` (os 3 são os de `lupa_app` sem UPDATE e
+    DELETE, que dependem só das permissões criadas em T3.2). Verde: `27 passed`. `ruff check`,
+    `ruff format --check` e `mypy` nos quatro arquivos: ok.
 - [ ] **T3.4** Enum `PapelUsuario` com dois papéis; `acesso/` sobre hubs e satélites; `criar_desembargador.py`. A14. D11. RF-ACE-01 a 05.
 - [ ] **T3.5** Cofre com chave única, DEK em `sat_processo_chave`, caminho de objeto novo; cifra dos satélites. D14. RF-SEG-01, RF-SEG-02, RES-08.
 - [ ] **T3.6** Processos: cadastro com classe, lista, responsáveis, sem `materia`, `sigiloso` e 403. D12, D15 (`ClasseProcessual`, `StatusProcesso`). RF-PRO-01 a 04.
