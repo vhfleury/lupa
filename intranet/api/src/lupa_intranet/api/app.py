@@ -1,5 +1,7 @@
 """Fábrica da aplicação FastAPI."""
 
+import logging
+
 from fastapi import FastAPI
 
 from lupa_intranet.acesso import rotas as rotas_acesso
@@ -27,6 +29,16 @@ from lupa_pipeline.ingestao.storage import criar_storage
 from lupa_pipeline.logging import configurar_logging, get_logger
 
 
+def _preservar_sigilo_url(registro: logging.LogRecord) -> bool:
+    """Retém IP, método, versão HTTP e status do Uvicorn, que também recebe a URL bruta."""
+    campos = registro.args
+    if not isinstance(campos, tuple) or len(campos) != 5:
+        return False
+    ip, metodo, _url, versao, status = campos
+    registro.args = (ip, metodo, "[rota]", versao, status)
+    return True
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Cria a aplicação, validando a configuração antes de tudo.
 
@@ -41,6 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     """
     configuracao = settings or get_settings()
     configurar_logging(nivel=configuracao.log_level, estrito=configuracao.ambiente == "teste")
+    logging.getLogger("uvicorn.access").addFilter(_preservar_sigilo_url)
     app = FastAPI(title="Lupa", version="0.2.0")
     app.dependency_overrides[get_settings] = lambda: configuracao
     configurar_banco(app, configuracao)

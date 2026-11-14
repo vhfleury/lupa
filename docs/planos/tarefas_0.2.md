@@ -324,6 +324,7 @@ a saída resumida (vermelho inicial e verde final).
 - [x] **T3.10** Evidências, fatos, achados e anotações em hubs, links e satélites; remoção de `reu`, `reu_identidade` e da pseudonimização. A5 passos 8 a 11, A11, A12. RF-FAT-01, RF-FAT-03, RF-PEC-02, RF-DOS-06.
   - A suíte que usava as tabelas da 0.1 falhou na coleta. Três testes de domínio no PostgreSQL e os testes de rotas de fatos e peças passaram. Conferem escopo, vigência, id estável, reprocessamento e anotação em fato e achado. A view v_achado_historico preserva a consulta às versões anteriores aprovada pelo usuário.
 - [x] **T3.11** Auditoria como link não historizado, cadeia única, consulta, relatório de uso com custo. A15. D8, D26. RF-AUD-01 a 05.
+  - `test_eventos_reais.py` reproduziu três falhas: a busca de texto no chat não emitia evento, o objeto de uma tentativa negada guardava o valor livre da URL e o log de acesso do Uvicorn expunha caminho e parâmetros. Após a correção, a busca identifica o processo, a tentativa registra o hash do identificador inválido e o log mantém IP, método, versão e status. A varredura também procurou nomes de arquivo, trechos, consulta, anotação, resposta e credenciais sintéticas. A bateria de auditoria, rotas de processo e chat passou nos 70 testes.
   - `python -m pytest intranet/api/tests/auditoria/test_{cadeia,consulta,custo}.py --no-cov`:
     o assessor recebia 404 e a tabela aceitava TRUNCATE. Após montar as rotas e proteger a
     cadeia, 35 testes passaram. O relatório consulta chamadas e tokens pela view.

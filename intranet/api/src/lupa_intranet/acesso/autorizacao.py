@@ -27,6 +27,7 @@ from lupa_intranet.acesso.servico import Ator, Contexto, auditar, ler_usuario
 from lupa_intranet.api.banco import obter_sessao_banco
 from lupa_intranet.auditoria.eventos import AcaoAuditoria, ResultadoEvento
 from lupa_pipeline.dominio.enums import PapelUsuario, StatusProcesso
+from lupa_pipeline.dominio.esquemas import calcular_hash
 from lupa_pipeline.dominio.visoes import VisaoProcesso
 from lupa_pipeline.seguranca.contexto import ativar_processo
 
@@ -151,14 +152,16 @@ def carregar_processo(
     consulta = select(VisaoProcesso).where(VisaoProcesso.id == processo_id.lower())
     processo = session.scalars(consulta).one_or_none()
     if processo is None:
+        identificador = processo_id.lower()
+        publico = len(identificador) == 64 and all(c in "0123456789abcdef" for c in identificador)
         auditar(
             session,
             ctx,
             AcaoAuditoria.PROCESSO_ABERTO,
             ResultadoEvento.NEGADO,
             hk_usuario=ator.hk_usuario,
-            objeto_tipo="processo",
-            objeto_id=processo_id[:200],
+            objeto_tipo="processo" if publico else "identificador_sha256",
+            objeto_id=identificador if publico else calcular_hash(processo_id),
         )
         raise NaoEncontradoError("processo não encontrado")
     return processo

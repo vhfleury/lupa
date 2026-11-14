@@ -162,7 +162,11 @@ def test_tempestividade_respondida_so_com_a_ferramenta_de_calculo(
     assert corpo["status"] == "respondida"
     assert corpo["texto"].startswith("Resultado da validação: ")
     assert [c.nome for c in falso.chamadas] == ["mcp__lupa__executar_validacao"]
-    eventos = eventos_do_banco(engine_teste, acao=AcaoAuditoria.VALIDACAO_EXECUTADA.value)
+    eventos = eventos_do_banco(
+        engine_teste,
+        acao=AcaoAuditoria.VALIDACAO_EXECUTADA.value,
+        processo_id=processo_agente.processo_id,
+    )
     assert [e.objeto_tipo for e in eventos] == ["validacao_agente"]
 
 

@@ -21,6 +21,7 @@ from lupa_intranet.agente.ferramentas.sessao import (
     peca_da_pagina,
     resolver_pagina,
 )
+from lupa_intranet.auditoria.eventos import AcaoAuditoria
 from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.dominio.repositorios import listar_fatos_por_processo
 from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoPagina
@@ -188,6 +189,7 @@ def buscar_texto(sessao: SessaoAgente, argumentos: dict[str, Any]) -> str:
     termo = str(argumentos.get("termo") or "").strip()
     if not 3 <= len(termo) <= 100:
         return erro("termo deve ter de 3 a 100 caracteres")
+    sessao.registrar(AcaoAuditoria.BUSCA, "processo", sessao.processo_id.hex())
     dobrado = dobrar(termo)
     blocos = []
     for pagina in _paginas_com_termo(sessao, termo):

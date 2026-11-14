@@ -332,8 +332,8 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [x] I: interrupção depois de parte dos lotes retoma sem duplicar página (RF-ING-07).
 - [x] I: estado parcial lista as páginas faltantes (RF-ING-06).
 - [x] I: cadeia de auditoria única; alteração direta no banco é apontada (A15; RF-AUD-03). T3.4 (`test_registrador.py`; o registrador foi reescrito em T3.4 porque o login grava eventos).
-- [ ] I: cada ação da lista gera evento, com localização (RF-AUD-01).
-- [ ] I: varredura de eventos e logs não acha texto sintético (RF-AUD-02).
+- [x] I: cada ação da lista gera evento, com localização (RF-AUD-01). `test_eventos_reais.py` executa as ações pelas rotas, confere ator, objeto, resultado, IP e resolução da rede interna.
+- [x] I: varredura de eventos e logs não acha texto sintético (RF-AUD-02). O fluxo verifica a tabela física, os logs da aplicação e do worker e a ocultação do caminho e dos parâmetros no log HTTP.
 - [x] I: relatório de uso com contagens e custo (RF-AUD-05).
 - [x] I: descarte apaga satélites e chave, mantém hubs, links e auditoria; conteúdo responde
   indisponível (A13; RF-PRO-05).
