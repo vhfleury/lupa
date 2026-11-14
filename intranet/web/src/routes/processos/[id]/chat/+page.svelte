@@ -35,6 +35,9 @@
   let confirmandoLiberacao = $state(false);
 
   const atual = $derived(conversaAtual(conversas));
+  const encerramento = $derived(
+    conversas.at(-1)?.encerrada ? conversas.at(-1)?.motivo_encerramento : null,
+  );
   const anteriores = $derived([...conversas.filter((c) => c !== atual)].reverse());
   const podeLiberar = $derived(tem(sessao.atual, 'ver_auditoria'));
   const emRevisao = $derived(revisao?.em_revisao === true);
@@ -61,7 +64,7 @@
   async function enviar(evento: SubmitEvent): Promise<void> {
     evento.preventDefault();
     const texto = pergunta.trim();
-    if (!texto || enviando) return;
+    if (!texto || enviando || encerramento || emRevisao) return;
     erro = '';
     aviso = '';
     enviando = true;
@@ -93,10 +96,7 @@
 <svelte:head><title>Chat do processo · Lupa</title></svelte:head>
 
 <h1>Chat sobre os autos</h1>
-<p class="contexto">
-  As respostas vêm só dos autos deste processo, com citação da página. O assistente não valora
-  prova, não tipifica, não conclui sobre norma e não opina sobre o resultado.
-</p>
+<p class="contexto">Consulte os autos deste processo e confira cada resposta na página citada.</p>
 
 {#if erro}<Aviso tipo="erro">{erro}</Aviso>{/if}
 {#if aviso}<Aviso tipo="sucesso">{aviso}</Aviso>{/if}
@@ -131,6 +131,12 @@
           <MensagemChat {processoId} mensagem={m} />
         {/each}
       </div>
+    {:else if encerramento}
+      <p role="status">
+        {encerramento === 'teto_processo'
+          ? 'Limite de uso do processo atingido.'
+          : 'Limite de uso da conversa atingido.'}
+      </p>
     {:else}
       <p>Nenhuma conversa aberta. A próxima pergunta abre uma conversa nova.</p>
     {/if}
@@ -143,12 +149,15 @@
         bind:value={pergunta}
         maxlength={LIMITE_PERGUNTA}
         rows="3"
-        disabled={emRevisao || enviando}
+        disabled={Boolean(encerramento) || emRevisao || enviando}
         placeholder="Ex.: Em que página está a certidão de intimação da defesa?"
       ></textarea>
       <div class="acoes">
         <span class="restante">{LIMITE_PERGUNTA - pergunta.length} caracteres restantes</span>
-        <button type="submit" disabled={emRevisao || enviando || !pergunta.trim()}>
+        <button
+          type="submit"
+          disabled={Boolean(encerramento) || emRevisao || enviando || !pergunta.trim()}
+        >
           {enviando ? 'Consultando…' : 'Perguntar'}
         </button>
       </div>

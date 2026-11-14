@@ -27,6 +27,11 @@
   let aviso = $state('');
   let carregando = $state(true);
   let editando = $state<string | null>(null);
+  let fonteId = $state('');
+  let paginaNova = $state('');
+  let inicioNovo = $state<number | undefined>(undefined);
+  let fimNovo = $state<number | undefined>(undefined);
+  let trechoNovo = $state('');
   let valorNovo = $state('');
   let anotandoEm = $state<string | null>(null);
   let textoNota = $state('');
@@ -77,8 +82,13 @@
     );
   }
 
-  function iniciarCorrecao(fato: Fato): void {
-    editando = fato.id;
+  function iniciarCorrecao(achado: Achado, fato: Fato): void {
+    editando = `${achado.id}-${fato.id}`;
+    fonteId = fato.evidencias[0]?.id ?? '';
+    paginaNova = '';
+    inicioNovo = undefined;
+    fimNovo = undefined;
+    trechoNovo = '';
     const valor = fato.valor;
     valorNovo = typeof valor === 'string' ? valor : JSON.stringify(valor);
   }
@@ -97,7 +107,34 @@
     erro = '';
     aviso = '';
     const corpo: Record<string, unknown> = { status };
-    if (status === 'corrigido') corpo['valor'] = interpretar(fato, valorNovo);
+    if (status === 'corrigido') {
+      const fonte = fato.evidencias.find((e) => e.id === fonteId) ?? {
+        pagina_id: paginaNova.trim(),
+        inicio: inicioNovo,
+        fim: fimNovo,
+        trecho: trechoNovo,
+      };
+      if (
+        !/^[a-f0-9]{64}$/i.test(fonte.pagina_id) ||
+        fonte.inicio === undefined ||
+        fonte.fim === undefined ||
+        !Number.isInteger(fonte.inicio) ||
+        !Number.isInteger(fonte.fim) ||
+        fonte.inicio < 0 ||
+        fonte.fim <= fonte.inicio ||
+        !fonte.trecho.trim()
+      ) {
+        erro = 'Informe a página, o intervalo e o trecho da correção.';
+        return;
+      }
+      Object.assign(corpo, {
+        valor: interpretar(fato, valorNovo),
+        pagina_id: fonte.pagina_id,
+        inicio: fonte.inicio,
+        fim: fonte.fim,
+        trecho: fonte.trecho,
+      });
+    }
     try {
       const r = await chamar<{ achados_gravados: number }>(
         'POST',
@@ -235,7 +272,7 @@
                 </a>
               {/each}
               {#if fato.vigente && podeAnotar}
-                {#if editando === fato.id}
+                {#if editando === `${a.id}-${fato.id}`}
                   <form
                     class="correcao"
                     onsubmit={(e) => {
@@ -243,8 +280,51 @@
                       void registrar(fato, 'corrigido');
                     }}
                   >
-                    <label for="valor-{fato.id}">Valor corrigido</label>
-                    <input id="valor-{fato.id}" bind:value={valorNovo} />
+                    <label for="valor-{a.id}-{fato.id}">Valor corrigido</label>
+                    <input id="valor-{a.id}-{fato.id}" bind:value={valorNovo} />
+                    <label for="fonte-{a.id}-{fato.id}">Fonte da correção</label>
+                    <select id="fonte-{a.id}-{fato.id}" bind:value={fonteId}>
+                      {#each fato.evidencias as ev (ev.id)}
+                        <option value={ev.id}>Página {ev.pagina ?? '?'} · {ev.trecho}</option>
+                      {/each}
+                      <option value="">Informar outro trecho</option>
+                    </select>
+                    {#if !fonteId}
+                      <label for="pagina-{a.id}-{fato.id}">Identificador da página</label>
+                      <input
+                        id="pagina-{a.id}-{fato.id}"
+                        bind:value={paginaNova}
+                        required
+                        pattern={'[a-fA-F0-9]{64}'}
+                      />
+                      <label for="inicio-{a.id}-{fato.id}"
+                        >Início do trecho (posição a partir de zero)</label
+                      >
+                      <input
+                        id="inicio-{a.id}-{fato.id}"
+                        type="number"
+                        min="0"
+                        step="1"
+                        bind:value={inicioNovo}
+                        required
+                      />
+                      <label for="fim-{a.id}-{fato.id}">Fim do trecho (posição exclusiva)</label>
+                      <input
+                        id="fim-{a.id}-{fato.id}"
+                        type="number"
+                        min={(inicioNovo ?? 0) + 1}
+                        step="1"
+                        bind:value={fimNovo}
+                        required
+                      />
+                      <label for="trecho-{a.id}-{fato.id}">Trecho literal dos autos</label>
+                      <textarea
+                        id="trecho-{a.id}-{fato.id}"
+                        bind:value={trechoNovo}
+                        required
+                        rows="2"
+                      ></textarea>
+                    {/if}
                     <button type="submit">Salvar correção</button>
                     <button type="button" class="secundario" onclick={() => (editando = null)}
                       >Cancelar</button
@@ -256,7 +336,7 @@
                     class="secundario"
                     onclick={() => void registrar(fato, 'confirmado')}>Confirmar</button
                   >
-                  <button type="button" class="secundario" onclick={() => iniciarCorrecao(fato)}
+                  <button type="button" class="secundario" onclick={() => iniciarCorrecao(a, fato)}
                     >Corrigir</button
                   >
                 {/if}
