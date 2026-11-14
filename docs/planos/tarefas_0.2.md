@@ -355,7 +355,8 @@ a saída resumida (vermelho inicial e verde final).
     `python -m pytest pipeline/tests/sinteticos pipeline/tests/ingestao/test_extracao.py --no-cov -q`
     passou nos 104 casos dos sintéticos e nos oito da extração. Cada classe teve PDF e gabarito
     relido com qualificação, evidências literais, peças e resultados cabíveis.
-- [ ] **T4.3** Classificação e fronteiras de peças cíveis. RF-PEC-01.
+- [x] **T4.3** Classificação e fronteiras de peças cíveis. RF-PEC-01.
+  - O caso cível substituiu as antigas expectativas de denúncia e defesa. test_tipos_civeis.py cobriu os tipos de peça. test_indice.py e test_fronteiras.py conferiram a segmentação, o título, a origem e a data com gabarito sintético.
 - [ ] **T4.4** Partes. A6 passos 1 e 2. RF-FAT-04.
 - [ ] **T4.5** Extratores de fatos cíveis. A6 passos 3 a 8. D17. RF-FAT-01, RF-FAT-02.
 - [x] **T4.6** Catálogo por classe e dados do CPC (`prazos_recursos.yaml`, `preparo.yaml`, `cabimento_art1015.yaml`). D16. RF-VAL-01.

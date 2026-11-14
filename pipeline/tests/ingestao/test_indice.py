@@ -146,13 +146,11 @@ def test_tipo_ambiguo_vira_outros_com_confianca_baixa() -> None:
     vazio = classificar_tipo(["Texto qualquer sem marca."])
     assert (vazio.valor, vazio.motivo) == (TipoPeca.OUTROS.value, "sem_indicio")
     assert vazio.confianca < 0.5
-    empate = classificar_tipo(["DECISÃO", "Recebo a denúncia; custódia cautelar."])
+    empate = classificar_tipo(
+        ["Apresenta contestação e impugna especificamente.", "Em réplica, impugna a contestação."]
+    )
     assert (empate.valor, empate.motivo) == (TipoPeca.OUTROS.value, "ambiguo")
-    recebimento = classificar_tipo(["DECISÃO", "Vistos.", "Assim, recebo a denúncia em 1/1/2020."])
-    assert recebimento.valor == TipoPeca.RECEBIMENTO.value
-    prisao = classificar_tipo(["DECISÃO", "Vistos.", "Decreto a prisão preventiva de X."])
-    assert prisao.valor == TipoPeca.DECISAO_PRISAO.value
-    sem_titulo = classificar_tipo(["Vistos e examinados.", "É o relatório.", "JULGO PROCEDENTE"])
+    sem_titulo = classificar_tipo(["Julgo procedente a demanda e resolvo o mérito."])
     assert (sem_titulo.valor, sem_titulo.motivo) == (TipoPeca.SENTENCA.value, "formulas")
 
 
@@ -162,8 +160,8 @@ def test_origem_por_assinatura_cargo_aproximado_vocabulario_e_desconhecida() -> 
                                    "Promotor de Justiça, em 1/1/2020."])  # fmt: skip
     assert (assinada.valor, assinada.motivo) == (OrigemPeca.MP.value, "assinatura")
     advogado = classificar_origem(["Assinado eletronicamente por Z, OAB/GO 1234, em 2/2/2020."])
-    assert advogado.valor == OrigemPeca.DEFESA.value
-    ocr = classificar_origem(["Documento assinado eletronicamente por W, Perivo rirúinal, em 1."])
+    assert advogado.valor == OrigemPeca.PARTE.value
+    ocr = classificar_origem(["Documento assinado eletronicamente por W, Perivo judícial, em 1."])
     assert (ocr.valor, ocr.motivo) == (OrigemPeca.TERCEIRO.value, "assinatura_aproximada")
     vocabulario = classificar_origem(["O MINISTÉRIO PÚBLICO DO ESTADO vem apresentar."])
     assert (vocabulario.valor, vocabulario.motivo) == (OrigemPeca.MP.value, "vocabulario")

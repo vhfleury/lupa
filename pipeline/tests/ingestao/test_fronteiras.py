@@ -29,7 +29,7 @@ from lupa_pipeline.ingestao.sinais_fronteira import (
     titulos_padrao,
 )
 
-CABECALHO = "PODER JUDICIÁRIO - COMARCA DE VILA ESPERANÇA\nVara Criminal - Processo nº 1\n"
+CABECALHO = "PODER JUDICIÁRIO - COMARCA DE VILA ESPERANÇA\nVara Cível - Processo nº 1\n"
 ASSINATURA = "Documento assinado eletronicamente por Fulano, Juiz de Direito, em 10/01/2020."
 RODAPE = "Documento assinado digitalmente. Código de autenticação: ABCDEF0123456789ABCD"
 
@@ -40,8 +40,8 @@ def _pagina(corpo_texto: str, folha: int) -> str:
 
 def _documento() -> list[str]:
     return [
-        _pagina("DENÚNCIA\nO MINISTÉRIO PÚBLICO vem oferecer denúncia.\nParágrafo.", 1),
-        _pagina(f"Continuação da denúncia.\n{ASSINATURA}", 2),
+        _pagina("PETIÇÃO INICIAL\nA parte autora pede a citação.\nParágrafo.", 1),
+        _pagina(f"Continuação da petição.\n{ASSINATURA}", 2),
         _pagina("SENTENÇA\nVistos e examinados.\nÉ o relatório.", 3),
         _pagina("Fundamentação.\nRAZÕES DE APELAÇÃO\nTexto.", 4),
         _pagina(f"Dispositivo.\n{ASSINATURA}", 5),
@@ -59,7 +59,7 @@ def test_cabecalho_e_rodape_repetidos_saem_do_corpo() -> None:
     textos = _documento()
     repetidas = linhas_repetidas(textos)
     assert mascara("Fls. 12") in repetidas
-    assert corpo(textos[0], repetidas)[0] == "DENÚNCIA"
+    assert corpo(textos[0], repetidas)[0] == "PETIÇÃO INICIAL"
     assert all("Código" not in linha for linha in corpo(textos[1], repetidas))
 
 
@@ -85,11 +85,11 @@ def test_assinatura_tolera_ocr_e_recusa_rodape_de_autenticacao() -> None:
 def test_sinais_por_pagina() -> None:
     """Título, assinatura no fim, número da folha, protocolo e vazia."""
     sinais = _sinais(_documento())
-    assert (sinais[0]["titulo"], sinais[0]["titulo_linha"]) == ("DENUNCIA", 0)
+    assert (sinais[0]["titulo"], sinais[0]["titulo_linha"]) == ("PETICAO INICIAL", 0)
     assert sinais[0]["reinicio_numeracao"] is True
     assert sinais[1]["assinatura_fim"] is True and sinais[1]["titulo"] is None
     assert sinais[3]["titulo"] == "RAZOES DE APELACAO" and sinais[3]["titulo_secao"] is True
-    assert sinais[5] == {"vazia": True, "versao_titulos": "1", "tipo_pagina": None}
+    assert sinais[5] == {"vazia": True, "versao_titulos": "2", "tipo_pagina": None}
     assert sinais[2]["numero_folha"] == 3
     protocolo = medir_sinais_fronteira("Protocolo nº 123\nPETIÇÃO", {}, frozenset())
     assert protocolo["protocolo_topo"] is True
