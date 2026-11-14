@@ -24,15 +24,12 @@ from lupa_pipeline.validacoes.catalogo import Validacao, validacoes_de
 from lupa_pipeline.validacoes.dados import (
     ArquivoFeriados,
     ArquivoSuspensoes,
-    FaixaArt109,
-    ReducaoArt115,
-    TabelaPrescricao,
+    cabimento_padrao,
     calendario_padrao,
     caminho_padrao,
     carregar,
     prazos_recursos_padrao,
-    prescricao_padrao,
-    preventiva_padrao,
+    preparo_padrao,
 )
 from lupa_pipeline.validacoes.modelo import AchadoValidacao, ConflitoDeFatosError, ModeloProcesso
 from lupa_pipeline.validacoes.motor import executar_catalogo
@@ -50,34 +47,25 @@ def _modelo_exemplo() -> ModeloProcesso:
     return ModeloProcesso(Fato.model_validate(d) for d in dados)
 
 
-def _datas_rastreaveis(valor: object) -> list[dict[str, object]]:
-    if isinstance(valor, dict):
-        proprias = [valor] if "data" in valor and "fato_id" in valor else []
-        return proprias + [d for v in valor.values() for d in _datas_rastreaveis(v)]
-    if isinstance(valor, list):
-        return [d for v in valor for d in _datas_rastreaveis(v)]
-    return []
-
-
 def test_validacoes_sao_puras_mesma_entrada_mesmo_achado() -> None:
     """Validacoes sao puras mesma entrada mesmo achado."""
     modelo = _modelo_exemplo()
-    primeira = [a.model_dump() for a in executar_catalogo(modelo, "criminal", REFERENCIA)]
-    segunda = [a.model_dump() for a in executar_catalogo(modelo, "criminal", REFERENCIA)]
+    primeira = [a.model_dump() for a in executar_catalogo(modelo, "apelacao_civel", REFERENCIA)]
+    segunda = [a.model_dump() for a in executar_catalogo(modelo, "apelacao_civel", REFERENCIA)]
     assert primeira == segunda
 
 
 def test_achados_conclusivos_trazem_datas_com_fato_e_evidencia() -> None:
     """Achados conclusivos trazem datas com fato e evidencia."""
     modelo = _modelo_exemplo()
-    achados = executar_catalogo(modelo, "criminal", REFERENCIA)
+    achados = executar_catalogo(modelo, "apelacao_civel", REFERENCIA)
     assert all(a.resultado in ("conforme", "atencao") for a in achados)
-    ids_fatos = {str(f.id) for f in modelo.todos}
+    ids_fatos = {f.id for f in modelo.todos}
     for achado in achados:
-        datas = _datas_rastreaveis(achado.valores)
-        assert datas
-        assert all(d["fato_id"] in ids_fatos and d["evidencia_id"] for d in datas)
-        assert {d["fato_id"] for d in datas} <= {str(i) for i in achado.fatos_usados}
+        referencias = achado.valores["fatos"]
+        assert referencias
+        assert all(d["evidencia_ids"] and d["pagina_ids"] for d in referencias)
+        assert {d["fato_id"] for d in referencias} == set(achado.fatos_usados) <= ids_fatos
 
 
 def test_motor_sobrevive_a_excecao_e_devolve_as_demais(
@@ -89,15 +77,14 @@ def test_motor_sobrevive_a_excecao_e_devolve_as_demais(
         raise RuntimeError("falha sintética")
 
     configurar_logging(estrito=True)
-    quebrada = Validacao("quebrada", (), "nenhuma", explode)
-    originais = catalogo.CATALOGO["criminal"]
-    monkeypatch.setitem(catalogo.CATALOGO, "criminal", (quebrada, *originais))
-    achados = executar_catalogo(_modelo_exemplo(), "criminal", REFERENCIA)
+    quebrada = Validacao("quebrada", "sintética", explode)
+    originais = catalogo.CATALOGO["apelacao_civel"]
+    monkeypatch.setitem(catalogo.CATALOGO, "apelacao_civel", (quebrada, *originais))
+    achados = executar_catalogo(_modelo_exemplo(), "apelacao_civel", REFERENCIA)
     assert len(achados) == len(originais) + 1
     assert achados[0].resultado == "verificar"
     assert achados[0].explicacao == (
-        "A validação quebrada falhou ao executar (RuntimeError: falha sintética) e não produziu "
-        "conclusão. Confira manualmente."
+        "A regra quebrada não conseguiu concluir a conferência dos valores. Confira os autos."
     )
     assert all(a.resultado != "verificar" for a in achados[1:])
     assert json.loads(capsys.readouterr().out)["erro_tipo"] == "RuntimeError"
@@ -105,28 +92,39 @@ def test_motor_sobrevive_a_excecao_e_devolve_as_demais(
 
 def test_achado_grava_versao_do_catalogo() -> None:
     """AchadoValidacao grava versao do catalogo."""
-    achados = executar_catalogo(_modelo_exemplo(), "criminal", REFERENCIA)
+    achados = executar_catalogo(_modelo_exemplo(), "apelacao_civel", REFERENCIA)
     assert {a.versao_catalogo for a in achados} == {catalogo.VERSAO_CATALOGO}
 
 
-def test_catalogo_civel_existe_vazio_e_materia_desconhecida_falha() -> None:
-    """Catalogo civel existe vazio e materia desconhecida falha."""
-    assert validacoes_de("civel") == ()
-    with pytest.raises(ValueError, match="matéria"):
+def test_catalogo_de_acao_originaria_e_vazio_e_classe_desconhecida_falha() -> None:
+    """RF-VAL-01: ação originária fica sem achados e uma classe fora da tabela falha."""
+    assert validacoes_de("acao_originaria") == ()
+    with pytest.raises(ValueError, match="classe"):
         validacoes_de("trabalhista")
 
 
 def test_cli_imprime_achados_do_exemplo(capsys: pytest.CaptureFixture[str]) -> None:
     """Cli imprime achados do exemplo."""
-    codigo = main(["--fatos", str(EXEMPLO), "--materia", "criminal", "--referencia", "2026-10-20"])
+    codigo = main(
+        ["--fatos", str(EXEMPLO), "--classe", "apelacao_civel", "--referencia", "2026-10-20"]
+    )
     saida = json.loads(capsys.readouterr().out)
     assert codigo == 0
-    assert [a["validacao"] for a in saida] == [v.nome for v in validacoes_de("criminal")]
+    gabarito = EXEMPLO.with_name("achados_exemplo.json")
+    assert saida == json.loads(gabarito.read_text(encoding="utf-8"))
+    assert [(a["validacao"], a["resultado"]) for a in saida] == [
+        ("tempestividade_recurso", "atencao"),
+        ("preparo_recurso", "conforme"),
+        ("representacao_recurso", "conforme"),
+    ]
+    assert saida[0]["valores"]["vencimento"] == "2026-08-24"
+    assert saida[0]["valores"]["atraso_dias_uteis"] == 1
+    assert len(saida[2]["valores"]["paginas_mandato"]) == 1
 
 
 def test_fato_sem_evidencia_e_rejeitado() -> None:
     """Fato sem evidencia e rejeitado."""
-    base = criar_fato("data_fato", "2030-01-01").model_dump()
+    base = criar_fato("data_ajuizamento", "2030-01-01").model_dump()
     with pytest.raises(ValidationError):
         Fato.model_validate({**base, "evidencias": []})
 
@@ -134,30 +132,34 @@ def test_fato_sem_evidencia_e_rejeitado() -> None:
 def test_modelo_aceita_repeticao_com_mesmo_valor_e_acusa_conflito() -> None:
     """Modelo aceita repeticao com mesmo valor e acusa conflito."""
     modelo = modelo_de(
-        criar_fato("data_fato", "2030-01-01", fato_id="a"),
-        criar_fato("data_fato", "2030-01-01", fato_id="b"),
-        criar_fato("data_sentenca", "2030-01-01"),
-        criar_fato("data_sentenca", "2030-02-01"),
+        criar_fato("data_ajuizamento", "2030-01-01", fato_id="a"),
+        criar_fato("data_ajuizamento", "2030-01-01", fato_id="b"),
+        criar_fato("data_decisao_recorrida", "2030-01-01"),
+        criar_fato("data_decisao_recorrida", "2030-02-01"),
     )
-    fato = modelo.fato("data_fato")
+    fato = modelo.fato("data_ajuizamento")
     assert fato is not None and fato.id == min(id_sintetico("a"), id_sintetico("b"))
     assert modelo.fato("inexistente") is None
     with pytest.raises(ConflitoDeFatosError):
-        modelo.fato("data_sentenca")
+        modelo.fato("data_decisao_recorrida")
 
 
-def test_modelo_recorta_por_reu() -> None:
-    """Modelo recorta por reu."""
+def test_modelo_recorta_por_recorrente_e_classe() -> None:
+    """RF-VAL-01: uma parte não empresta fatos a outra; recurso de outra classe fica de fora."""
+    a, b = id_sintetico("a"), id_sintetico("b")
+    comum = criar_fato("data_ajuizamento", "2026-06-01", sujeito="")
     modelo = modelo_de(
-        criar_fato("data_fato", "2030-01-01"),
-        criar_fato("data_nascimento_reu", {"valor": "2000-01-01", "reu_id": "r1"}),
-        criar_fato("data_nascimento_reu", {"valor": "1950-01-01", "reu_id": "r2"}),
+        comum,
+        criar_fato("tipo_recurso", "apelacao_civel", sujeito=a),
+        criar_fato("tipo_recurso", "agravo_interno", sujeito=b),
+        criar_fato("data_interposicao", "2026-06-07", sujeito=a),
+        criar_fato("data_interposicao", "2026-06-18", sujeito=b),
     )
-    assert modelo.reus() == ["r1", "r2"]
-    recorte = modelo.por_reu("r1")
-    assert len(recorte.todos) == 2
-    fato = recorte.fato("data_nascimento_reu")
-    assert fato is not None and fato.valor["valor"] == "2000-01-01"
+    (recorte,) = modelo.recorrentes("apelacao_civel")
+    assert recorte.sujeito == a and comum in recorte.todos
+    assert {f.sujeito for f in recorte.todos} == {"", a}
+    assert modelo.recorrentes("embargos_declaracao") == []
+    assert {f.sujeito for f in modelo.recorrentes("agravo_interno")} == {b}
 
 
 def test_prazo_util_pula_fim_de_semana_feriado_e_suspensao() -> None:
@@ -195,7 +197,7 @@ def test_dados_empacotados_tem_versao_e_fonte_e_sao_validos() -> None:
         "feriados/tjgo.yaml",
         "suspensoes_prazo.yaml",
     }
-    for tabela in (prazos_recursos_padrao(), prescricao_padrao(), preventiva_padrao()):
+    for tabela in (prazos_recursos_padrao(), preparo_padrao(), cabimento_padrao()):
         assert tabela.versao and tabela.fonte
 
 
@@ -233,21 +235,6 @@ def test_suspensao_com_fim_antes_do_inicio_e_rejeitada() -> None:
                 ],
             }
         )
-
-
-def test_tabela_de_prescricao_ambigua_falha() -> None:
-    """Tabela de prescricao ambigua falha."""
-    tabela = TabelaPrescricao(
-        versao="1",
-        fonte="sintética",
-        base_legal="x",
-        faixas=[FaixaArt109(inciso="A", prazo_anos=1), FaixaArt109(inciso="B", prazo_anos=2)],
-        reducao=ReducaoArt115(
-            idade_no_fato_abaixo_de=21, idade_na_sentenca_a_partir_de=70, divisor=2, base_legal="y"
-        ),
-    )
-    with pytest.raises(ValueError, match="ambígua"):
-        tabela.faixa_para(10)
 
 
 def test_caminho_padrao_aponta_para_arquivo_existente() -> None:

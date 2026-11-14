@@ -366,7 +366,10 @@ a saída resumida (vermelho inicial e verde final).
 - [x] **T4.10** Cabimento do agravo. A10. RF-VAL-05.
   - A regra vazia falhou ao identificar o inciso da decisão agravada. No worker,
     `python -m pytest pipeline/tests/validacoes/test_cabimento.py --no-cov -q` passou nos cinco casos.
-- [ ] **T4.11** Linha de comando das validações e `fatos_exemplo.json`. RF-VAL-06.
+- [x] **T4.11** Linha de comando das validações e `fatos_exemplo.json`. RF-VAL-06.
+  - A CLI da 0.1 recusou `--classe apelacao_civel`. O worker executou
+    `python -m lupa_pipeline.validacoes --fatos pipeline/tests/validacoes/fatos_exemplo.json --classe apelacao_civel --referencia 2026-10-20`.
+    A saída reproduziu integralmente `achados_exemplo.json` e `python -m pytest pipeline/tests/validacoes --no-cov -q` passou nos 60 testes, incluindo a ida e volta pelo Data Vault.
 - [x] **T4.12** Agente cível: prompt, recusa, ferramenta de cálculo, contexto sem pseudônimos, dossiê com partes. RF-CHA-01 a 05, RF-DOS-01 a 04.
   - A política anterior deixou passar dois pedidos de valoração cível no corpus de 30
     perguntas vedadas. O corpus cível passou nos critérios de 100% de recusa e até 10% de
