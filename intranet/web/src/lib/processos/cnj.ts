@@ -1,5 +1,5 @@
 // Número único do CNJ (Resolução 65/2008): NNNNNNN-DD.AAAA.J.TR.OOOO, dígito pelo módulo 97.
-// Mesma regra de src/lupa/dominio/cnj.py; o servidor reconfere.
+// Mesma regra de pipeline/src/lupa_pipeline/dominio/cnj.py; o servidor reconfere.
 
 const PADRAO = /^(\d{7})-(\d{2})\.(\d{4})\.(\d)\.(\d{2})\.(\d{4})$/;
 

@@ -1,4 +1,4 @@
-# Preparo comum de front/scripts/e2e.sh e front/scripts/capturas.sh. Carregado com `source`,
+# Preparo comum de intranet/web/scripts/e2e.sh e intranet/web/scripts/capturas.sh. Carregado com `source`,
 # nao executado sozinho. `preparar_e2e`:
 # 1. vai para a raiz do repositorio e sobe a stack com o modelo falso;
 # 2. prepara o admin (senha temporaria gerada agora, so em memoria) e os dados sinteticos;
@@ -15,7 +15,7 @@ restaurar_api() {
 }
 
 preparar_e2e() {
-  cd "$(dirname "${BASH_SOURCE[0]}")/../.."
+  cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
   trap restaurar_api EXIT
   trap 'exit 130' INT TERM
 
@@ -26,19 +26,19 @@ preparar_e2e() {
   docker compose up -d --no-deps --force-recreate --wait proxy
 
   local credenciais processos chat
-  credenciais="$(docker compose exec -T api python scripts/e2e_preparar.py)"
+  credenciais="$(docker compose exec -T api python intranet/api/scripts/e2e_preparar.py)"
   LUPA_E2E_ADMIN_USUARIO="$(printf '%s\n' "$credenciais" | sed -n 1p)"
   LUPA_E2E_ADMIN_SENHA="$(printf '%s\n' "$credenciais" | sed -n 2p)"
   export LUPA_E2E_ADMIN_USUARIO LUPA_E2E_ADMIN_SENHA
   # Etapas 6.4 a 6.7: gabinete, assessor e processo sinteticos (autos enfileirados no worker real).
-  processos="$(docker compose exec -T api python scripts/e2e_processos.py)"
+  processos="$(docker compose exec -T api python intranet/api/scripts/e2e_processos.py)"
   LUPA_E2E_PROC_USUARIO="$(printf '%s\n' "$processos" | sed -n 1p)"
   LUPA_E2E_PROC_SENHA="$(printf '%s\n' "$processos" | sed -n 2p)"
   LUPA_E2E_PROC_ID="$(printf '%s\n' "$processos" | sed -n 3p)"
   export LUPA_E2E_PROC_USUARIO LUPA_E2E_PROC_SENHA LUPA_E2E_PROC_ID
   # Etapas 6.8 a 6.10: desembargador, processo do chat e processo com texto hostil (6.10); 1 milhao
   # de eventos de carga na auditoria (so na primeira vez).
-  chat="$(docker compose exec -T api python scripts/e2e_semear_chat.py --carga)"
+  chat="$(docker compose exec -T api python intranet/api/scripts/e2e_semear_chat.py --carga)"
   LUPA_E2E_CHAT_USUARIO="$(printf '%s\n' "$chat" | sed -n 1p)"
   LUPA_E2E_CHAT_SENHA="$(printf '%s\n' "$chat" | sed -n 2p)"
   LUPA_E2E_CHAT_PROCESSO="$(printf '%s\n' "$chat" | sed -n 3p)"

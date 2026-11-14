@@ -1,4 +1,4 @@
-// Tela de auditoria (Etapa 6.9): formatos de src/lupa/auditoria/rotas.py e a montagem da query.
+// Tela de auditoria (Etapa 6.9): formatos de intranet/api/src/lupa_intranet/auditoria/rotas.py e a montagem da query.
 import { BASE_API, chamar } from '$lib/api';
 
 export interface EventoAuditoria {
@@ -78,7 +78,7 @@ export const FILTROS_VAZIOS: Filtros = {
   ip: '',
 };
 
-/** Ações auditadas (src/lupa/auditoria/eventos.py), para o filtro. */
+/** Ações auditadas (intranet/api/src/lupa_intranet/auditoria/eventos.py), para o filtro. */
 export const ACOES = [
   'login_ok',
   'login_falha',

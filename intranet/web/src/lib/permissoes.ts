@@ -1,4 +1,4 @@
-// Reflexo da matriz de papéis (src/lupa/acesso/papeis.py) na interface: só esconde botões.
+// Reflexo da matriz de papéis (intranet/api/src/lupa_intranet/acesso/papeis.py) na interface: só esconde botões.
 // O servidor reconfere tudo; esconder aqui nunca substitui a checagem de lá.
 import type { Sessao, Usuario } from './tipos';
 

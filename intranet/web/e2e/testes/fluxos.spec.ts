@@ -1,5 +1,5 @@
 // Fluxos ponta a ponta das subetapas 6.1 a 6.3 contra a API real (pelo proxy, mesmo origin).
-// O administrador vem de scripts/e2e_preparar.py (senha temporária gerada na hora); todos os
+// O administrador vem de intranet/api/scripts/e2e_preparar.py (senha temporária gerada na hora); todos os
 // demais usuários são criados pela própria interface. O MFA é resolvido calculando o TOTP a
 // partir da URI otpauth:// exibida na tela.
 import { randomBytes } from 'node:crypto';
@@ -54,7 +54,7 @@ function linha(page: Page, usuario: string) {
 
 test.describe.serial('Etapa 6.1 a 6.3', () => {
   test.beforeAll(() => {
-    expect(ADMIN_USUARIO, 'rode via front/scripts/e2e.sh (prepara o admin)').not.toBe('');
+    expect(ADMIN_USUARIO, 'rode via intranet/web/scripts/e2e.sh (prepara o admin)').not.toBe('');
     expect(ADMIN_SENHA).not.toBe('');
   });
 

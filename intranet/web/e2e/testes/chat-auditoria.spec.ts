@@ -1,6 +1,6 @@
 // Fluxos ponta a ponta das subetapas 6.8 (chat) e 6.9 (auditoria) contra a API real.
-// O desembargador e o processo sintéticos vêm de scripts/e2e_semear_chat.py; a API roda com
-// LUPA_AGENTE_CLIENTE=falso (roteiro em src/lupa/agente/dados/roteiro_falso.json), então cada
+// O desembargador e o processo sintéticos vêm de intranet/api/scripts/e2e_semear_chat.py; a API roda com
+// LUPA_AGENTE_CLIENTE=falso (roteiro em intranet/api/src/lupa_intranet/agente/dados/roteiro_falso.json), então cada
 // pergunta escolhe um desfecho pelo texto: "intimada" (citação válida), "descarte" (uma citação
 // descartada), "sem evidência", "incidente" (instrução refletida → processo em revisão) e
 // "teto" (chamada acima do limite; a quarta encerra a conversa pelo teto).
@@ -34,7 +34,7 @@ function ultimaResposta(page: Page) {
 
 test.describe.serial('Etapas 6.8 e 6.9', () => {
   test.beforeAll(() => {
-    expect(USUARIO, 'rode via front/scripts/e2e.sh (semeia o chat)').not.toBe('');
+    expect(USUARIO, 'rode via intranet/web/scripts/e2e.sh (semeia o chat)').not.toBe('');
     expect(PROCESSO).not.toBe('');
   });
 

@@ -1,6 +1,6 @@
 // Etapa 7.9: capturas de tela dos guias (docs/imagens). Reaproveita a configuração da suíte E2E e
 // acrescenta o projeto "capturas", que depende de "fluxos" (primeiro acesso das contas sintéticas).
-// Rodar só por front/scripts/capturas.sh. Não altera a suíte normal (playwright.config.ts).
+// Rodar só por intranet/web/scripts/capturas.sh. Não altera a suíte normal (playwright.config.ts).
 import { defineConfig } from '@playwright/test';
 import base from './playwright.config';
 

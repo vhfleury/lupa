@@ -30,14 +30,14 @@ a imagem do front se os três passarem. Se o Prettier acusar formatação, rode 
 contêiner Node.
 
 ```bash
-bash front/scripts/e2e.sh
+bash intranet/web/scripts/e2e.sh
 ```
 
 Roda os testes ponta a ponta contra a stack real. **Reseta o administrador do banco de
 desenvolvimento.**
 
 ```bash
-bash front/scripts/capturas.sh
+bash intranet/web/scripts/capturas.sh
 ```
 
 Gera as capturas de tela dos guias em `docs/imagens/`.

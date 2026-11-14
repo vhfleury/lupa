@@ -55,8 +55,8 @@ services:
       LUPA_ACME_EMAIL: ${LUPA_ACME_EMAIL:-}
     volumes:
       - caddy-dados:/data
-      - ${LUPA_TLS_CERT:-./proxy/modos/sem-certificado.pem}:/certs/lupa.crt:ro
-      - ${LUPA_TLS_CHAVE:-./proxy/modos/sem-certificado.pem}:/certs/lupa.key:ro
+      - ${LUPA_TLS_CERT:-./intranet/proxy/modos/sem-certificado.pem}:/certs/lupa.crt:ro
+      - ${LUPA_TLS_CHAVE:-./intranet/proxy/modos/sem-certificado.pem}:/certs/lupa.key:ro
     deploy:
       resources:
         limits: {cpus: "1", memory: 256m}

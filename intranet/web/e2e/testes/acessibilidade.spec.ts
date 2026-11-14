@@ -59,7 +59,7 @@ async function esperarCarregada(page: Page, titulo: RegExp): Promise<void> {
 
 test.describe('6.10 acessibilidade', () => {
   test.beforeAll(() => {
-    expect(PROC, 'rode via front/scripts/e2e.sh').not.toBe('');
+    expect(PROC, 'rode via intranet/web/scripts/e2e.sh').not.toBe('');
     expect(CHAT).not.toBe('');
   });
 

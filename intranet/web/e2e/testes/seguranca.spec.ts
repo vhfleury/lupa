@@ -36,7 +36,7 @@ async function violacoes(page: Page): Promise<string[]> {
 
 test.describe('6.10 segurança do front', () => {
   test.beforeAll(() => {
-    expect(HOSTIL, 'rode via front/scripts/e2e.sh (semeia o processo hostil)').not.toBe('');
+    expect(HOSTIL, 'rode via intranet/web/scripts/e2e.sh (semeia o processo hostil)').not.toBe('');
   });
 
   test('cabeçalhos de segurança em todas as rotas, com CSP restritiva', async ({ request }) => {

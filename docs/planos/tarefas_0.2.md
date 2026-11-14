@@ -24,7 +24,9 @@ a saída resumida (vermelho inicial e verde final).
     pytest -c pipeline/pyproject.toml pipeline/tests/unit/test_dependencias.py --no-cov -q`.
   - Vermelho (com `import lupa_intranet.api.app` temporário num módulo da pipeline, só no
     contêiner): `1 failed, 1 passed`. Verde (sem ele): `2 passed`.
-- [ ] **T1.4** Mover `front/` para `intranet/web/` e `proxy/` para `intranet/proxy/`. D1. RES-04, RES-06.
+- [x] **T1.4** Mover `front/` para `intranet/web/` e `proxy/` para `intranet/proxy/`. D1. RES-04, RES-06.
+  - Comando: `docker build --target verificacao intranet/web` → ok (lint, typecheck e
+    unitários do front).
 - [x] **T1.5** Distribuir `scripts/` entre `pipeline/scripts/`, `intranet/api/scripts/` e a raiz. D1.
   - Junto com T1.1 e T1.2. `criar_usuario_banco.py` ficou em `intranet/api/scripts/` (importa
     `lupa_intranet.acesso.instalacao`); scripts de backup, piloto e Vault ficam na raiz até a

@@ -1,5 +1,5 @@
 // Fluxos ponta a ponta das subetapas 6.4 a 6.7 contra a stack real (proxy, API, worker, MinIO).
-// O assessor e o processo sintético vêm de scripts/e2e_processos.py (rodado por e2e.sh): o
+// O assessor e o processo sintético vêm de intranet/api/scripts/e2e_processos.py (rodado por e2e.sh): o
 // processo já está na fila do worker real quando o teste começa. O assessor faz o primeiro
 // acesso pela tela (autenticador e troca de senha), como no uso real.
 import { randomBytes } from 'node:crypto';
@@ -85,7 +85,7 @@ test.describe.serial('Etapas 6.4 a 6.7', () => {
   test.beforeAll(async ({ browser }) => {
     contexto = await browser.newContext();
     page = await contexto.newPage();
-    expect(USUARIO, 'rode via front/scripts/e2e.sh (prepara o processo)').not.toBe('');
+    expect(USUARIO, 'rode via intranet/web/scripts/e2e.sh (prepara o processo)').not.toBe('');
     expect(SENHA_TEMPORARIA).not.toBe('');
     expect(PROCESSO).not.toBe('');
   });

@@ -5,13 +5,13 @@
 # O Caddy substitui o X-Forwarded-For recebido pelo IP real do cliente (nao confia em cabecalho
 # vindo de fora); a API confia nesse cabecalho so quando vem da rede `borda`.
 #
-# Modo de certificado (LUPA_TLS_MODO, arquivo proxy/modos/<modo>.caddy):
+# Modo de certificado (LUPA_TLS_MODO, arquivo intranet/proxy/modos/<modo>.caddy):
 #   interno    (padrao, desenvolvimento) CA interna do Caddy, `tls internal`, localhost e proxy
 #   acme       dominio LUPA_DOMINIO com certificado automatico (HTTP-01: a porta 80 do host vai a
 #              8080 do conteiner), e-mail LUPA_ACME_EMAIL; dados do ACME em volume persistente
 #   fornecido  dominio LUPA_DOMINIO com certificado e chave montados em /certs (LUPA_TLS_CERT,
 #              LUPA_TLS_CHAVE no docker-compose.prod.yml)
-# Validacao dos tres modos: scripts/validar_caddyfile.sh (caddy validate em conteiner).
+# Validacao dos tres modos: intranet/api/scripts/validar_caddyfile.sh (caddy validate em conteiner).
 {
 	admin off
 	persist_config off
@@ -23,14 +23,14 @@
 # Cabecalhos e rotas comuns a todos os modos.
 (lupa_site) {
 	encode gzip
-	# Etapa 6.10: cabecalhos de seguranca (conferidos por scripts/verificar_cabecalhos.py e pelo
+	# Etapa 6.10: cabecalhos de seguranca (conferidos por intranet/api/scripts/verificar_cabecalhos.py e pelo
 	# E2E seguranca.spec.ts, que falham se faltar algum ou se a CSP afrouxar).
 	# CSP: nada inline. O script de partida do SvelteKit e externalizado no build
-	# (front/scripts/externalizar-inicio.mjs) e os estilos dinamicos usam `style:` (CSSOM), entao
+	# (intranet/web/scripts/externalizar-inicio.mjs) e os estilos dinamicos usam `style:` (CSSOM), entao
 	# `unsafe-inline` nao e necessario. Unica excecao: o anunciador de rota do proprio SvelteKit
 	# (div aria-live com atributo style fixo, gerado pelo framework) exige o hash desse estilo
 	# com 'unsafe-hashes' (vale so para esse texto exato). Imagens das paginas vem da propria API.
-	# HSTS: fica em cada modo (proxy/modos/*.caddy).
+	# HSTS: fica em cada modo (intranet/proxy/modos/*.caddy).
 	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy no-referrer

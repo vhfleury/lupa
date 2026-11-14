@@ -1,4 +1,4 @@
-// Formatos das respostas da API (src/lupa/acesso/rotas.py).
+// Formatos das respostas da API (intranet/api/src/lupa_intranet/acesso/rotas.py).
 export type Papel = 'assessor' | 'desembargador' | 'administrador';
 
 export type Permissao =

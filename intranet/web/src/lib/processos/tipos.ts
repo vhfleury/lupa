@@ -1,4 +1,4 @@
-// Formatos das respostas das rotas de processo (src/lupa/api/rotas/processos.py, pecas.py,
+// Formatos das respostas das rotas de processo (intranet/api/src/lupa_intranet/api/rotas/processos.py, pecas.py,
 // achados.py, dossie.py e visualizador.py). Texto vindo da API é sempre exibido como texto.
 
 export type Materia = 'criminal' | 'civel';

@@ -1,4 +1,4 @@
-// Chat por processo (Etapa 6.8): formatos de src/lupa/api/rotas/chat.py e api/rotas/revisao.py,
+// Chat por processo (Etapa 6.8): formatos de intranet/api/src/lupa_intranet/api/rotas/chat.py e api/rotas/revisao.py,
 // e as regras de exibição (rótulos, link da citação para o visualizador da 6.6).
 import { chamar } from '$lib/api';
 
