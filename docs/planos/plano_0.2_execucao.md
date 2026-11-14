@@ -346,7 +346,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [ ] U: cada extrator de A6 com trecho que confere e que não confere (RF-FAT-01).
 - [x] U: tempestividade: 15º e 16º dia útil, prazo em dobro, feriado local, recesso, embargos em
   5 dias, fato ausente, conflito (A7; RF-VAL-02, RF-FAT-02).
-- [ ] U: preparo: comprovante, dispensa, gratuidade deferida, pedido sem decisão, ausência (A8;
+- [x] U: preparo: comprovante, dispensa, gratuidade deferida, pedido sem decisão, ausência (A8;
   RF-VAL-03).
 - [ ] U: representação: procuração, substabelecimento em cadeia, dispensa, sem procuração,
   assinatura não identificada (A9; RF-VAL-04).
