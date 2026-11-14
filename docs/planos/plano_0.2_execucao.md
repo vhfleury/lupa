@@ -322,8 +322,8 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [x] I: `criar_desembargador.py` cria um e não repete (RF-ACE-05). T3.4.
 - [x] I: cadastro recusa CNJ inválido e duplicado; lista igual para dois usuários (RF-PRO-01, 02). T3.6.
 - [x] I: responsável não restringe acesso (RF-PRO-03). T3.6.
-- [ ] I: arquivo com marca de sigilo é aceito (RF-PRO-04).
-- [ ] I: upload lacra, detecta duplicado e deixa `recebido` (A3; RF-ING-01).
+- [x] I: arquivo com marca de sigilo é aceito (RF-PRO-04, T3.7).
+- [x] I: upload lacra, detecta duplicado e deixa `recebido` (A3; RF-ING-01, T3.7).
 - [ ] I: PDF com senha vai a quarentena (RF-ING-02).
 - [ ] I: worker processa a fila sem Redis; segundo worker encerra (A4; RES-07).
 - [ ] I: interrupção depois de parte dos lotes retoma sem duplicar página (RF-ING-07).

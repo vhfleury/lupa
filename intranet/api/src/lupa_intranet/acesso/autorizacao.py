@@ -141,32 +141,13 @@ def exige_papel(permissao: Permissao) -> Callable[[Ator], Ator]:
     return _dependencia
 
 
-def exige_processo(
+def carregar_processo(
     processo_id: str,
-    request: Request,
     ator: AtorAutenticado,
     session: SessaoBanco,
     ctx: ContextoReq,
 ) -> VisaoProcesso:
-    """Carrega o processo do caminho pelo hex do `hk_processo` (D12) e abre a DEK dele.
-
-    A tentativa negada é gravada na transação da requisição, que é confirmada mesmo com o 404
-    porque `NaoEncontradoError` é uma recusa prevista.
-
-    Args:
-        processo_id: Hex do `hk_processo` (parâmetro de caminho).
-        request: Requisição corrente.
-        ator: Ator autenticado.
-        session: Sessão do banco.
-        ctx: Contexto da requisição.
-
-    Returns:
-        O processo.
-
-    Raises:
-        NaoEncontradoError: Processo inexistente ou descartado.
-        ChaveIndisponivelError: Processo sem DEK.
-    """
+    """Lê o processo pelo identificador público, auditando a tentativa que não o encontra."""
     consulta = select(VisaoProcesso).where(VisaoProcesso.id == processo_id.lower())
     processo = session.scalars(consulta).one_or_none()
     if processo is None:
@@ -180,6 +161,13 @@ def exige_processo(
             objeto_id=processo_id[:200],
         )
         raise NaoEncontradoError("processo não encontrado")
+    return processo
+
+
+def exige_processo(
+    processo: Annotated[VisaoProcesso, Depends(carregar_processo)], request: Request
+) -> VisaoProcesso:
+    """Abre a DEK de um processo disponível para leitura (D14; RF-PRO-05)."""
     if processo.status == StatusProcesso.DESCARTADO.value:
         raise NaoEncontradoError("processo descartado")
     ativar_processo(processo.hk_processo, processo.chave_dados_cifrada)

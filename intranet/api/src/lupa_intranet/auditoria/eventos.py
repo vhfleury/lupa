@@ -33,7 +33,7 @@ class AcaoAuditoria(StrEnum):
     PROCESSO_CRIADO = "processo_criado"
     RESPONSAVEL_ADICIONADO = "responsavel_adicionado"
     RESPONSAVEL_REMOVIDO = "responsavel_removido"
-    ARQUIVO_ENVIADO = "arquivo_enviado"
+    UPLOAD = "upload"
     PROCESSO_ABERTO = "processo_aberto"
     PAGINA_VISTA = "pagina_vista"
     BUSCA = "busca"

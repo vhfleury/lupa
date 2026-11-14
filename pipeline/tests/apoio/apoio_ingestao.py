@@ -1,27 +1,33 @@
-"""Fixtures comuns da ingestão: processo semeado, dependências do worker e arquivo lacrado."""
+"""Fixtures comuns da ingestão: processo semeado, storage cifrado em memória e arquivo lacrado.
+
+Fase 3 (D23): as dependências do worker e a extração da sessão voltam com o worker novo
+(T3.8 e T3.9).
+"""
 
 import hashlib
 import io
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
-from sqlalchemy import Engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import Engine, select
+from sqlalchemy.orm import Session
 
-from apoio_comum import UsuarioTeste, criar_gabinete_teste, criar_processo_teste, gerar_numero_cnj
-from lupa_pipeline.dominio.enums import EstadoJob, Materia, PapelUsuario, StatusProcesso
-from lupa_pipeline.dominio.tabelas import GabineteTabela, ProcessoTabela, UsuarioTabela
-from lupa_pipeline.ingestao.extracao import LimitadorGabinete, Paralelismo
-from lupa_pipeline.ingestao.inventario import LimitesZip
-from lupa_pipeline.ingestao.recepcao import ArquivoRecebido, TipoArquivo, detectar_tipo, lacrar
-from lupa_pipeline.ingestao.sandbox import LimitesSandbox
-from lupa_pipeline.ingestao.storage import ArmazenamentoMemoria
-from lupa_pipeline.ingestao.worker import Dependencias, processar_job
+from apoio_comum import criar_processo
+from lupa_pipeline.dominio.enums import ClasseProcessual
+from lupa_pipeline.dominio.visoes import VisaoProcesso
+from lupa_pipeline.ingestao.recepcao import (
+    ArquivoRecebido,
+    ResultadoLacre,
+    TipoArquivo,
+    detectar_tipo,
+    lacrar,
+)
+from lupa_pipeline.ingestao.storage import ArmazenamentoMemoria, ObjectStorage, StorageCifrado
+from lupa_pipeline.seguranca.contexto import ativar_processo
 from lupa_pipeline.sinteticos.empacotamento import exportar
 from lupa_pipeline.sinteticos.gabarito import TODOS_VETORES, Cenario, Composicao, Gabarito
 from lupa_pipeline.sinteticos.gerador import gerar_conteudo
@@ -37,32 +43,30 @@ MISTURA_4C = {
 
 @dataclass(frozen=True)
 class ProcessoSemeado:
-    """Processo sintético com gabinete e usuário.
+    """Processo sintético gravado com commit.
 
     Attributes:
-        gabinete_id: Gabinete.
-        usuario_id: Usuário autor.
-        processo_id: Processo.
+        hk_processo: Processo.
+        hk_usuario: Criador (assessor sintético).
+        numero_cnj: Número só com dígitos, como no hub.
     """
 
-    gabinete_id: UUID
-    usuario_id: UUID
-    processo_id: UUID
+    hk_processo: bytes
+    hk_usuario: bytes
+    numero_cnj: str
 
 
 @dataclass(frozen=True)
-class JobSemeado:
-    """Job criado por `lacrar` para um arquivo sintético.
+class ArquivoSemeado:
+    """Arquivo lacrado por `lacrar` num processo sintético.
 
     Attributes:
         processo: Processo dono.
-        arquivo_id: Arquivo.
-        job_id: Job.
+        hk_arquivo: Arquivo.
     """
 
     processo: ProcessoSemeado
-    arquivo_id: UUID
-    job_id: UUID
+    hk_arquivo: bytes
 
 
 class Relogio:
@@ -85,43 +89,64 @@ class Relogio:
         self.agora += timedelta(seconds=segundos)
 
 
-def semear_processo(engine: Engine, *, sigiloso: bool = False) -> ProcessoSemeado:
-    """Cria gabinete, usuário e processo sintéticos com commit.
+def semear_processo(
+    engine: Engine, *, classe: ClasseProcessual = ClasseProcessual.APELACAO_CIVEL
+) -> ProcessoSemeado:
+    """Grava, com commit, um processo sintético com DEK e criador assessor.
 
     Args:
         engine: Engine do banco de teste.
-        sigiloso: Se o processo é sigiloso.
+        classe: Classe processual.
 
     Returns:
-        Ids criados.
+        Chaves do processo e do criador.
     """
-    gabinete_id, usuario_id, processo_id = uuid4(), uuid4(), uuid4()
     with Session(engine) as session, session.begin():
-        session.add(GabineteTabela(id=gabinete_id, nome=f"Gabinete {gabinete_id.hex[:6]}"))
-        session.flush()
-        session.add(
-            UsuarioTabela(
-                id=usuario_id,
-                gabinete_id=gabinete_id,
-                nome_usuario=f"semeado_{usuario_id.hex[:10]}",
-                papel=PapelUsuario.ASSESSOR.value,
-                senha_hash="hash-ficticio",
+        hk = criar_processo(session, classe=classe)
+        processo = session.scalars(
+            select(VisaoProcesso).where(VisaoProcesso.hk_processo == hk)
+        ).one()
+        assert processo.hk_criador is not None
+        return ProcessoSemeado(hk, processo.hk_criador, processo.numero_cnj)
+
+
+def lacrar_bytes(
+    engine: Engine,
+    storage: ObjectStorage,
+    processo: ProcessoSemeado,
+    caminho: Path,
+    nome: str = "autos.pdf",
+) -> ResultadoLacre:
+    """Lacra, com commit, o arquivo do disco no processo, com a DEK dele ativa.
+
+    Args:
+        engine: Engine do banco de teste.
+        storage: Storage (cifrado).
+        processo: Processo dono.
+        caminho: Arquivo com os bytes.
+        nome: Nome original.
+
+    Returns:
+        O resultado do lacre.
+    """
+    dados = caminho.read_bytes()
+    tipo = detectar_tipo(dados) or TipoArquivo.DESCONHECIDO
+    recebido = ArquivoRecebido(caminho, calcular_hash_bytes(dados), len(dados), tipo)
+    with Session(engine) as session, session.begin():
+        chave = session.scalar(
+            select(VisaoProcesso.chave_dados_cifrada).where(
+                VisaoProcesso.hk_processo == processo.hk_processo
             )
         )
-        session.flush()
-        session.add(
-            ProcessoTabela(
-                id=processo_id,
-                gabinete_id=gabinete_id,
-                numero_cnj=gerar_numero_cnj(int(processo_id.int % 9_000_000) + 1),
-                classe="Apelação Criminal",
-                materia=Materia.CRIMINAL.value,
-                sigiloso=sigiloso,
-                status=StatusProcesso.CRIADO.value,
-                criado_por=usuario_id,
-            )
+        ativar_processo(processo.hk_processo, chave)
+        return lacrar(
+            session,
+            storage,
+            recebido,
+            hk_processo=processo.hk_processo,
+            enviado_por=processo.hk_usuario,
+            nome_original=nome,
         )
-    return ProcessoSemeado(gabinete_id, usuario_id, processo_id)
 
 
 @pytest.fixture
@@ -131,74 +156,26 @@ def relogio() -> Relogio:
 
 
 @pytest.fixture
-def storage_memoria() -> ArmazenamentoMemoria:
-    """Storage em memória."""
-    return ArmazenamentoMemoria()
+def storage_memoria() -> StorageCifrado:
+    """Storage em memória embrulhado na cifra por processo, como o de produção."""
+    return StorageCifrado(ArmazenamentoMemoria())
+
+
+SemearArquivo = Callable[..., ArquivoSemeado]
 
 
 @pytest.fixture
-def deps(
-    fabrica_sessao: sessionmaker[Session],
-    storage_memoria: ArmazenamentoMemoria,
-    relogio: Relogio,
-) -> Dependencias:
-    """Dependências do worker da fundação (4A): param em `validado`, sem retentativa automática.
+def semear_arquivo(
+    engine_teste: Engine, storage_memoria: StorageCifrado, tmp_path: Path
+) -> SemearArquivo:
+    """Fábrica: processo novo e arquivo lacrado nele, em `recebido`."""
 
-    Os testes da Etapa 4C usam `deps_extracao`, que liga a extração e a política de retry.
-    """
-    return Dependencias(
-        fabrica=fabrica_sessao,
-        storage=storage_memoria,
-        limites_sandbox=LimitesSandbox(memoria_mb=512, cpu_segundos=20, tempo_segundos=30),
-        limites_zip=LimitesZip(),
-        duracao_lease=timedelta(seconds=60),
-        max_tentativas=3,
-        relogio=relogio,
-        dono="worker-teste-a",
-        extrair=False,
-        max_retentativas=0,
-    )
-
-
-def outro_worker(deps: Dependencias, dono: str) -> Dependencias:
-    """Copia as dependências com outro identificador de worker.
-
-    Args:
-        deps: Dependências de base.
-        dono: Novo identificador.
-
-    Returns:
-        Dependências do segundo worker.
-    """
-    return replace(deps, dono=dono)
-
-
-SemearJob = Callable[..., JobSemeado]
-
-
-@pytest.fixture
-def semear_job(
-    engine_teste: Engine, storage_memoria: ArmazenamentoMemoria, tmp_path: Path
-) -> SemearJob:
-    """Fábrica: grava os bytes no storage, registra `arquivo` e cria o job em `recebido`."""
-
-    def _semear(dados: bytes, nome: str = "autos.pdf") -> JobSemeado:
+    def _semear(dados: bytes, nome: str = "autos.pdf") -> ArquivoSemeado:
         processo = semear_processo(engine_teste)
         caminho = tmp_path / uuid4().hex
         caminho.write_bytes(dados)
-        tipo = detectar_tipo(dados) or TipoArquivo.PDF
-        recebido = ArquivoRecebido(caminho, calcular_hash_bytes(dados), len(dados), tipo)
-        with Session(engine_teste) as session, session.begin():
-            lacre = lacrar(
-                session,
-                storage_memoria,
-                recebido,
-                gabinete_id=processo.gabinete_id,
-                processo_id=processo.processo_id,
-                enviado_por=processo.usuario_id,
-                nome_original=nome,
-            )
-        return JobSemeado(processo, lacre.arquivo_id, lacre.job_id)
+        lacre = lacrar_bytes(engine_teste, storage_memoria, processo, caminho, nome)
+        return ArquivoSemeado(processo, lacre.hk_arquivo)
 
     return _semear
 
@@ -256,130 +233,3 @@ def autos_sinteticos(tmp_path_factory: pytest.TempPathFactory) -> AutosSintetico
             for a in gerados
         },
     )
-
-
-@pytest.fixture
-def deps_extracao(deps: Dependencias) -> Dependencias:
-    """Dependências da Etapa 4C: extração ligada, retry por motivo e paralelismo pequeno."""
-    return replace(
-        deps,
-        extrair=True,
-        max_retentativas=2,
-        paralelismo=Paralelismo(paginas_por_lote=4, lotes_por_job=4, lotes_por_gabinete=4),
-        limitador=LimitadorGabinete(),
-        limites_sandbox=LimitesSandbox(memoria_mb=1024, cpu_segundos=60, tempo_segundos=120),
-    )
-
-
-CriarAssessor = Callable[[Engine], UsuarioTeste]
-
-
-def assessor_sem_login(engine: Engine) -> UsuarioTeste:
-    """Cria gabinete e assessor sintéticos com commit, sem senha utilizável nem MFA.
-
-    Args:
-        engine: Engine do banco de teste.
-
-    Returns:
-        Dados do assessor criado.
-    """
-    gabinete_id, usuario_id = criar_gabinete_teste(engine), uuid4()
-    nome = f"asse_{usuario_id.hex[:10]}"
-    with Session(engine) as session, session.begin():
-        session.add(
-            UsuarioTabela(
-                id=usuario_id,
-                gabinete_id=gabinete_id,
-                nome_usuario=nome,
-                papel=PapelUsuario.ASSESSOR.value,
-                senha_hash="hash-ficticio",
-            )
-        )
-    return UsuarioTeste(usuario_id, nome, gabinete_id, PapelUsuario.ASSESSOR, None)
-
-
-@pytest.fixture(scope="session")
-def criar_assessor() -> CriarAssessor:
-    """Fábrica do assessor dono dos processos da extração da sessão.
-
-    A suíte da intranet sobrepõe esta fixture com um assessor que consegue fazer login.
-    """
-    return assessor_sem_login
-
-
-@dataclass(frozen=True)
-class ExtracaoSessao:
-    """Worker, assessor e bytes do PDF já extraído uma vez na sessão.
-
-    Attributes:
-        deps: Dependências do worker (storage e relógio compartilhados na sessão).
-        assessor: Assessor dono dos processos.
-        dados: Bytes do PDF sintético com índice.
-    """
-
-    deps: Dependencias
-    assessor: UsuarioTeste
-    dados: bytes
-
-
-def lacrar_e_processar(extracao: ExtracaoSessao, engine: Engine, tmp_path: Path) -> dict[str, Any]:
-    """Lacra o PDF num processo novo do assessor e processa o job até `concluido`.
-
-    Args:
-        extracao: Extração da sessão.
-        engine: Engine de testes.
-        tmp_path: Diretório temporário.
-
-    Returns:
-        `{assessor, processo, lacre}`.
-    """
-    assessor = extracao.assessor
-    assert assessor.gabinete_id is not None
-    processo = criar_processo_teste(engine, assessor)
-    caminho = tmp_path / f"{processo}.pdf"
-    caminho.write_bytes(extracao.dados)
-    recebido = ArquivoRecebido(
-        caminho, calcular_hash_bytes(extracao.dados), len(extracao.dados), TipoArquivo.PDF
-    )
-    with Session(engine) as session, session.begin():
-        lacre = lacrar(
-            session, extracao.deps.storage, recebido, gabinete_id=assessor.gabinete_id,
-            processo_id=processo, enviado_por=assessor.id, nome_original="autos.pdf",
-        )  # fmt: skip
-    estado = processar_job(extracao.deps, lacre.job_id, assessor.gabinete_id)
-    assert estado is EstadoJob.CONCLUIDO
-    return {"assessor": assessor, "processo": processo, "lacre": lacre}
-
-
-@pytest.fixture(scope="session")
-def extracao_sessao(
-    engine_teste: Engine,
-    autos_sinteticos: AutosSinteticos,
-    tmp_path_factory: pytest.TempPathFactory,
-    criar_assessor: CriarAssessor,
-) -> ExtracaoSessao:
-    """Extrai o PDF com índice uma única vez por sessão (OCR incluído).
-
-    Cada teste recebe um processo novo do mesmo gabinete com o mesmo arquivo (`lacrar_e_processar`);
-    a extração dele vem do cache por SHA-256 (4F.8), então o OCR roda uma vez, não uma por teste.
-    """
-    deps = Dependencias(
-        fabrica=sessionmaker(engine_teste, expire_on_commit=False),
-        storage=ArmazenamentoMemoria(),
-        limites_sandbox=LimitesSandbox(memoria_mb=1024, cpu_segundos=60, tempo_segundos=120),
-        limites_zip=LimitesZip(),
-        duracao_lease=timedelta(seconds=60),
-        max_tentativas=3,
-        relogio=Relogio(),
-        dono="worker-teste-sessao",
-        max_retentativas=2,
-        paralelismo=Paralelismo(paginas_por_lote=4, lotes_por_job=4, lotes_por_gabinete=4),
-        limitador=LimitadorGabinete(),
-    )
-    extracao = ExtracaoSessao(
-        deps,
-        criar_assessor(engine_teste),
-        autos_sinteticos.arquivos[Cenario.PDF_INDICE].read_bytes(),
-    )
-    lacrar_e_processar(extracao, engine_teste, tmp_path_factory.mktemp("pecas-modulo"))
-    return extracao

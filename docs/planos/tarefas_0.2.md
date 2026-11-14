@@ -295,7 +295,16 @@ a saída resumida (vermelho inicial e verde final).
     `hk_processo`): `8 failed, 13 passed`. Verde, cada arquivo sozinho: `5`, `14`, `2` e `4
     passed`; `intranet/api/tests/acesso` e `test_registrador.py` continuam `61 passed`. `ruff
     check`, `ruff format --check` e `mypy` nos arquivos da tarefa: ok.
-- [ ] **T3.7** Recepção e estado da ingestão em satélites de `hub_arquivo`. A3. D9. RF-ING-01, 02, 06.
+- [x] **T3.7** Recepção e estado da ingestão em satélites de `hub_arquivo`. A3. D9. RF-ING-01, 02, 06.
+  - Upload, estado e auditoria são confirmados juntos. A consulta de estado funciona sem abrir
+    a DEK. A trava por processo também cobre o descarte e envios simultâneos.
+  - Vermelho observado no upload (405), na triagem de tipo inválido e na leitura de estado sem
+    DEK. Em contêineres avulsos com o código montado e PostgreSQL/MinIO reais,
+    `python -m pytest -c pipeline/pyproject.toml pipeline/tests/ingestao/test_recepcao.py
+    pipeline/tests/ingestao/test_repositorio.py --no-cov -q` passou em 18 casos. Na API,
+    `python -m pytest -c intranet/api/pyproject.toml intranet/api/tests/ingestao/test_rotas.py
+    --no-cov -q` passou em 9 casos, inclusive rollback se a auditoria falhar. As regressões de
+    cadastro e listagem passaram em 19 casos. O teste da trava em duas conexões passou.
 - [ ] **T3.8** Worker sem Redis e RQ; remoção de `fila.py`, `redis` e `rq`. A4. D10. RF-ING-07, RES-07.
 - [ ] **T3.9** Páginas, diagnóstico, lotes e peças em satélites (conteúdo jurídico ainda da 0.1). A5 passos 1 a 7. RF-ING-03.
 - [ ] **T3.10** Evidências, fatos, achados e anotações em hubs, links e satélites; remoção de `reu`, `reu_identidade` e da pseudonimização. A5 passos 8 a 11, A11, A12. RF-FAT-01, RF-FAT-03, RF-PEC-02, RF-DOS-06.

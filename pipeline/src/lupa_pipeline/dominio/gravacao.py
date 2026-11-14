@@ -8,7 +8,7 @@ linha nova. Violação de FK ou de `CHECK` propaga; a transação de quem chama 
 
 from collections.abc import Callable, Mapping
 
-from sqlalchemy import Table, select
+from sqlalchemy import Table, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,7 @@ from lupa_pipeline.dominio.chaves import (
     normalizar_hash,
 )
 from lupa_pipeline.dominio.tabelas import atributos_do_satelite, satelite_cifrado
+from lupa_pipeline.dominio.visoes import VisaoProcesso
 from lupa_pipeline.seguranca.contexto import dek_para_gravar
 
 COLUNAS_OPCIONAIS = frozenset({"sujeito"})
@@ -33,6 +34,14 @@ NORMALIZADORES: Mapping[str, Callable[[str], str]] = {
 
 class GravacaoInvalidaError(ValueError):
     """Tabela do tipo errado ou colunas diferentes das que a tabela declara."""
+
+
+def travar_processo(session: Session, hk_processo: bytes) -> VisaoProcesso | None:
+    """Serializa as escritas do processo até o commit e relê seu estado após obter a trava."""
+    chave_a = int.from_bytes(hk_processo[:4], "big", signed=True)
+    chave_b = int.from_bytes(hk_processo[4:8], "big", signed=True)
+    session.execute(select(func.pg_advisory_xact_lock(chave_a, chave_b)))
+    return session.get(VisaoProcesso, hk_processo, populate_existing=True)
 
 
 def _exigir_tipo(tabela: Table, tipo: str) -> None:

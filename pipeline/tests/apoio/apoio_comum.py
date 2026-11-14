@@ -150,7 +150,7 @@ def _url_banco_principal() -> str | None:
 
 @contextmanager
 def banco_vazio(sufixo: str) -> Iterator[Engine]:
-    """Cria um database de teste vazio (`lupa_teste_<sufixo>_<pid>`) e o apaga ao sair.
+    """Cria um database de teste vazio com nome único e o apaga ao sair.
 
     Só toca databases com o prefixo `lupa_teste_`; o banco de desenvolvimento fica intacto.
     Pula o teste se o PostgreSQL não estiver acessível.
@@ -164,13 +164,12 @@ def banco_vazio(sufixo: str) -> Iterator[Engine]:
     url_principal = _url_banco_principal()
     if url_principal is None:
         pytest.skip("LUPA_DATABASE_URL não definida")
-    nome_banco = f"lupa_teste_{sufixo}_{os.getpid()}"
+    nome_banco = f"lupa_teste_{sufixo}_{uuid4().hex}"
     admin = create_engine(
         url_principal, isolation_level="AUTOCOMMIT", connect_args={"connect_timeout": 2}
     )
     try:
         with admin.connect() as conexao:
-            conexao.execute(text(f'DROP DATABASE IF EXISTS "{nome_banco}" WITH (FORCE)'))
             conexao.execute(text(f'CREATE DATABASE "{nome_banco}"'))
     except Exception:
         admin.dispose()

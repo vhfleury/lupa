@@ -1,10 +1,13 @@
 r"""Recepção e lacre: streaming com SHA-256, limite de tamanho, tipo pelo conteúdo e gravação.
 
 O corpo chega em blocos e vai direto para um arquivo temporário, com o hash calculado no
-caminho; nada é mantido inteiro em memória. O tipo é decidido pelos bytes mágicos (`%PDF-` ou
-`PK\\x03\\x04`), nunca pelo nome; extensão `.pdf`/`.zip` que contradiz o conteúdo é recusada.
-O objeto é gravado no storage pela chave do hash e o mesmo conteúdo no mesmo processo não gera
-segundo `arquivo` nem segundo job.
+caminho. Tipo desconhecido ou extensão `.pdf`/`.zip` incompatível com os bytes mágicos
+seguem como `application/octet-stream` para a quarentena (RF-ING-02).
+O lacre (A3, passos 4 a 7) cifra e grava o objeto em `processo/<hex do hk>/<sha256>` e, na
+transação de quem chama, grava `hub_arquivo`, `link_processo_arquivo`, `sat_arquivo_dados` e o
+estado `recebido` em `sat_arquivo_ingestao`. O mesmo conteúdo no mesmo processo não grava nada
+novo: devolve o arquivo existente como duplicado (RF-ING-01). Dois envios simultâneos do mesmo
+processo e seu descarte são serializados pela trava da transação sobre o processo.
 """
 
 import hashlib
@@ -14,24 +17,33 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from uuid import UUID, uuid4
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from lupa_pipeline.dominio.tabelas import ArquivoTabela, JobIngestaoTabela
+from lupa_pipeline.dominio.enums import EstadoJob, StatusProcesso
+from lupa_pipeline.dominio.gravacao import (
+    chave_do_hub,
+    gravar_hub,
+    gravar_link,
+    gravar_satelite,
+    travar_processo,
+)
+from lupa_pipeline.dominio.tabelas import hub_arquivo, link_processo_arquivo, sat_arquivo_dados
+from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoProcesso
 from lupa_pipeline.ingestao import repositorio
 from lupa_pipeline.ingestao.storage import ObjectStorage, chave_objeto
 
 TAMANHO_CABECALHO = 8
+ORIGEM = repositorio.ORIGEM
 
 
 class TipoArquivo(StrEnum):
-    """Tipos aceitos, com o MIME gravado em `arquivo.mime`."""
+    """MIME para a triagem do arquivo recebido."""
 
     PDF = "application/pdf"
     ZIP = "application/zip"
+    DESCONHECIDO = "application/octet-stream"
 
 
 MAGICOS = {b"%PDF-": TipoArquivo.PDF, b"PK\x03\x04": TipoArquivo.ZIP}
@@ -43,7 +55,6 @@ class MotivoRecusa(StrEnum):
 
     TAMANHO = "tamanho"
     VAZIO = "vazio"
-    TIPO = "tipo"
 
 
 class RecepcaoRecusadaError(ValueError):
@@ -57,6 +68,10 @@ class RecepcaoRecusadaError(ValueError):
         """
         super().__init__(motivo.value)
         self.motivo = motivo
+
+
+class ProcessoDescartadoError(ValueError):
+    """O processo foi descartado antes de o upload ser lacrado."""
 
 
 @dataclass(frozen=True)
@@ -81,14 +96,14 @@ class ResultadoLacre:
     """Resultado do lacre.
 
     Attributes:
-        arquivo_id: Arquivo (novo ou já existente).
-        job_id: Job do arquivo.
-        estado: Estado corrente do job.
+        hk_arquivo: Arquivo (novo ou já existente).
+        arquivo_id: Hex do `hk_arquivo` (D12).
+        estado: Estado corrente da ingestão do arquivo.
         duplicado: Verdadeiro se o conteúdo já existia no processo.
     """
 
-    arquivo_id: UUID
-    job_id: UUID
+    hk_arquivo: bytes
+    arquivo_id: str
     estado: str
     duplicado: bool
 
@@ -137,7 +152,7 @@ async def receber(
         O arquivo recebido.
 
     Raises:
-        RecepcaoRecusadaError: Vazio, acima do limite ou tipo inválido (o temporário é apagado).
+        RecepcaoRecusadaError: Vazio ou acima do limite (o temporário é apagado).
     """
     resumo = hashlib.sha256()
     tamanho = 0
@@ -167,26 +182,45 @@ def _conferir(
         raise RecepcaoRecusadaError(MotivoRecusa.VAZIO)
     tipo = detectar_tipo(cabecalho)
     if tipo is None or not extensao_confere(nome, tipo):
-        raise RecepcaoRecusadaError(MotivoRecusa.TIPO)
+        tipo = TipoArquivo.DESCONHECIDO
     return ArquivoRecebido(caminho, sha256, tamanho, tipo)
 
 
-def _existente(session: Session, processo_id: UUID, sha256: str) -> ResultadoLacre | None:
-    linha = session.execute(
-        select(ArquivoTabela.id, JobIngestaoTabela.id, JobIngestaoTabela.estado)
-        .join(JobIngestaoTabela, JobIngestaoTabela.arquivo_id == ArquivoTabela.id)
-        .where(ArquivoTabela.processo_id == processo_id, ArquivoTabela.sha256 == sha256)
-    ).first()
-    if linha is None:
+def _existente(session: Session, hk_arquivo: bytes) -> ResultadoLacre | None:
+    consulta = select(VisaoArquivo.estado).where(VisaoArquivo.hk_arquivo == hk_arquivo)
+    estado = session.scalar(consulta)
+    if estado is None:
         return None
-    return ResultadoLacre(linha[0], linha[1], linha[2], duplicado=True)
+    return ResultadoLacre(hk_arquivo, hk_arquivo.hex(), estado, duplicado=True)
 
 
 def _gravar_objeto(storage: ObjectStorage, chave: str, recebido: ArquivoRecebido) -> None:
-    if storage.existe(chave):
-        return
     with recebido.caminho.open("rb") as origem:
         storage.gravar(chave, origem)
+
+
+def _gravar_arquivo(
+    session: Session,
+    processo: VisaoProcesso,
+    recebido: ArquivoRecebido,
+    chave_storage: str,
+    enviado_por: bytes,
+    nome_original: str,
+) -> bytes:
+    chave = {"numero_cnj": processo.numero_cnj, "sha256": recebido.sha256}
+    hk_arquivo = gravar_hub(session, hub_arquivo, chave, ORIGEM)
+    ligacao = {"hk_processo": processo.hk_processo, "hk_arquivo": hk_arquivo}
+    gravar_link(session, link_processo_arquivo, ligacao, ORIGEM)
+    dados = {
+        "tamanho_bytes": recebido.tamanho_bytes,
+        "nome_original": nome_original,
+        "mime": recebido.tipo.value,
+        "chave_storage": chave_storage,
+        "hk_usuario": enviado_por,
+    }
+    gravar_satelite(session, sat_arquivo_dados, hk_arquivo, dados, ORIGEM)
+    repositorio.registrar_recebido(session, hk_arquivo)
+    return hk_arquivo
 
 
 def lacrar(
@@ -194,51 +228,41 @@ def lacrar(
     storage: ObjectStorage,
     recebido: ArquivoRecebido,
     *,
-    gabinete_id: UUID,
-    processo_id: UUID,
-    enviado_por: UUID,
+    hk_processo: bytes,
+    enviado_por: bytes,
     nome_original: str,
 ) -> ResultadoLacre:
-    """Grava o objeto no storage, registra `arquivo` e cria o job em `recebido`.
+    """Grava o objeto cifrado e registra o arquivo em `recebido` (A3, passos 4 a 7).
+
+    A DEK do processo precisa estar ativa no contexto de cifra (`ativar_processo`), porque o
+    objeto e `nome_original` são cifrados com ela. Um objeto gravado por uma transação que
+    depois desfez fica órfão e é sobrescrito no próximo envio do mesmo arquivo (A3, passo 8).
 
     Args:
-        session: Sessão da requisição (contexto de RLS já definido).
-        storage: Object storage.
+        session: Sessão da requisição, sob `lupa_app`.
+        storage: Object storage (cifrado).
         recebido: Arquivo conferido.
-        gabinete_id: Gabinete do processo.
-        processo_id: Processo.
-        enviado_por: Usuário que enviou.
+        hk_processo: Processo.
+        enviado_por: `hk_usuario` de quem enviou.
         nome_original: Nome informado pelo cliente.
 
     Returns:
-        Arquivo e job (novos, ou os existentes quando o conteúdo é repetido).
+        O arquivo novo, ou o existente como duplicado quando o conteúdo é repetido.
+
+    Raises:
+        ArquivoNaoEncontradoError: Processo inexistente (o arquivo não tem onde entrar).
     """
-    existente = _existente(session, processo_id, recebido.sha256)
+    processo = travar_processo(session, hk_processo)
+    if processo is None:
+        raise repositorio.ArquivoNaoEncontradoError(hk_processo.hex())
+    if processo.status == StatusProcesso.DESCARTADO.value:
+        raise ProcessoDescartadoError("processo descartado")
+    chave = {"numero_cnj": processo.numero_cnj, "sha256": recebido.sha256}
+    hk_arquivo = chave_do_hub(hub_arquivo, chave)
+    existente = _existente(session, hk_arquivo)
     if existente is not None:
         return existente
-    chave = chave_objeto(gabinete_id, processo_id, recebido.sha256)
-    _gravar_objeto(storage, chave, recebido)
-    arquivo_id = uuid4()
-    try:
-        with session.begin_nested():
-            session.add(
-                ArquivoTabela(
-                    id=arquivo_id,
-                    gabinete_id=gabinete_id,
-                    processo_id=processo_id,
-                    sha256=recebido.sha256,
-                    tamanho_bytes=recebido.tamanho_bytes,
-                    nome_original=nome_original,
-                    mime=recebido.tipo.value,
-                    chave_storage=chave,
-                    enviado_por=enviado_por,
-                )
-            )
-            session.flush()
-            job = repositorio.criar_job(session, gabinete_id, processo_id, arquivo_id)
-    except IntegrityError:
-        concorrente = _existente(session, processo_id, recebido.sha256)
-        if concorrente is None:
-            raise
-        return concorrente
-    return ResultadoLacre(arquivo_id, job.id, job.estado, duplicado=False)
+    chave_storage = chave_objeto(hk_processo, recebido.sha256)
+    _gravar_objeto(storage, chave_storage, recebido)
+    _gravar_arquivo(session, processo, recebido, chave_storage, enviado_por, nome_original)
+    return ResultadoLacre(hk_arquivo, hk_arquivo.hex(), EstadoJob.RECEBIDO.value, duplicado=False)
