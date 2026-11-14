@@ -12,7 +12,6 @@ from collections.abc import Iterable, Sequence
 from datetime import date
 from pathlib import PurePosixPath
 from typing import Any
-from uuid import UUID
 
 from lupa_pipeline.dominio.enums import CenarioArquivo
 from lupa_pipeline.dominio.esquemas import DiagnosticoArquivo
@@ -231,7 +230,7 @@ def _suspeito(descartados: Sequence[dict[str, Any]]) -> bool:
     return any(item.get("categorias") for item in descartados)
 
 
-def diagnosticar_pdf(arquivo_id: UUID, nome: str, inspecao: dict[str, Any]) -> DiagnosticoArquivo:
+def diagnosticar_pdf(arquivo_id: str, nome: str, inspecao: dict[str, Any]) -> DiagnosticoArquivo:
     """Diagnóstico de um PDF único a partir da inspeção do sandbox.
 
     Args:
@@ -266,7 +265,7 @@ def diagnosticar_pdf(arquivo_id: UUID, nome: str, inspecao: dict[str, Any]) -> D
 
 
 def diagnosticar_zip(
-    arquivo_id: UUID, entradas: Sequence[tuple[str, dict[str, Any]]]
+    arquivo_id: str, entradas: Sequence[tuple[str, dict[str, Any]]]
 ) -> DiagnosticoArquivo:
     """Diagnóstico de um ZIP a partir das entradas inspecionadas.
 

@@ -132,6 +132,7 @@ def _extrair(
 ) -> tuple[int, str]:
     resumo = hashlib.sha256()
     lidos = 0
+    destino.touch(mode=0o600, exist_ok=False)
     with arquivo.open(info) as origem, destino.open("wb") as saida:
         while bloco := origem.read(BLOCO):
             lidos += len(bloco)

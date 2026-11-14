@@ -11,6 +11,7 @@ import threading
 from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from itertools import groupby
 from pathlib import Path
 from typing import Any
 
@@ -133,7 +134,7 @@ def planejar(fontes: Sequence[FontePaginas], paginas_por_lote: int) -> list[Tare
 
 
 def pendentes(tarefas: Sequence[Tarefa], prontas: set[int]) -> list[Tarefa]:
-    """Lotes com alguma página ainda não gravada, reduzidos às páginas que faltam nas bordas.
+    """Intervalos consecutivos que ainda exigem extração.
 
     Args:
         tarefas: Lotes planejados.
@@ -144,10 +145,11 @@ def pendentes(tarefas: Sequence[Tarefa], prontas: set[int]) -> list[Tarefa]:
     """
     restantes = []
     for tarefa in tarefas:
-        faltam = [n for n in tarefa.numeros if n not in prontas]
-        if faltam:
-            base = tarefa.fonte.deslocamento
-            restantes.append(Tarefa(tarefa.fonte, faltam[0] - base, faltam[-1] - base))
+        base = tarefa.fonte.deslocamento
+        for pronta, grupo in groupby(tarefa.numeros, key=prontas.__contains__):
+            if not pronta:
+                numeros = list(grupo)
+                restantes.append(Tarefa(tarefa.fonte, numeros[0] - base, numeros[-1] - base))
     return restantes
 
 

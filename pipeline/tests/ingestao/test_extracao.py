@@ -56,6 +56,12 @@ def test_pendentes_pula_paginas_prontas_e_estreita_o_lote() -> None:
     ]
 
 
+def test_retomada_pula_tambem_as_paginas_no_meio_do_lote() -> None:
+    """RF-ING-07: uma página pronta entre duas faltantes não volta ao parser."""
+    tarefa = Tarefa(_fontes()[0], 1, 5)
+    assert [(t.inicio, t.fim) for t in pendentes([tarefa], {2, 4})] == [(1, 1), (3, 3), (5, 5)]
+
+
 def test_tarefa_converte_numeracao_e_falhas_do_filho() -> None:
     """Página do filho ganha número contínuo e origem; falha vira motivo."""
     tarefa = Tarefa(_fontes()[1], 1, 2)

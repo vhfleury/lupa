@@ -32,6 +32,6 @@ intranet/web/e2e/playwright-report/
 .vault-dev/
 # Segredos em arquivo da 0.1 (Prometheus e Grafana, removidos na 0.2), nunca no repositorio
 .segredos/
-dados/
+/dados/
 # Claude Code: permissoes locais de cada maquina
 .claude/settings.local.json

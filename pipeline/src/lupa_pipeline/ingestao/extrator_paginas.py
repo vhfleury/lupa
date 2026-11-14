@@ -60,7 +60,9 @@ def _linhas_ocr(ocr: ResultadoOcr) -> list[dict[str, Any]]:
                 "bbox": list(linha.bbox),
                 "inicio": cursor,
                 "fim": cursor + len(linha.texto),
-                "palavras": linha.palavras,
+                "palavras": [
+                    {"bbox": p["bbox"], "confianca": p["confianca"]} for p in linha.palavras
+                ],
             }
         )
         cursor += len(linha.texto) + 1

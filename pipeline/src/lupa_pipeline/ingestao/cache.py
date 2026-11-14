@@ -1,104 +1,69 @@
-"""Cache do resultado intermediário entre uploads do mesmo arquivo (Etapa 4F.8).
-
-As páginas extraídas dependem só dos bytes do arquivo e da versão do extrator de páginas. Se
-outro arquivo do MESMO gabinete, com o mesmo SHA-256, já tem todas as páginas gravadas na versão
-corrente, elas são copiadas para o arquivo novo em vez de extraídas de novo (OCR incluído). A
-busca filtra pelo gabinete explicitamente, além da RLS: cache nunca atravessa gabinetes. O
-índice (peças) é recalculado das páginas copiadas, porque é determinístico e custa segundos;
-correções manuais de peça não são herdadas por outro processo.
-"""
-
-from typing import Any
-from uuid import UUID
+"""Reaproveitamento das páginas de originais idênticos entre processos disponíveis (RF-ING-08)."""
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from lupa_pipeline.dominio.tabelas import ArquivoTabela, PaginaTabela
-from lupa_pipeline.ingestao import repositorio
-from lupa_pipeline.ingestao.repositorio import Lease
-
-PAGINAS_POR_INSERT = 500
-COLUNAS_COPIADAS = (
-    "numero",
-    "tipo",
-    "texto",
-    "flags",
-    "sinais",
-    "coordenadas",
-    "extracao",
-    "texto_nativo",
-    "texto_ocr",
-    "versao_extrator",
-    "origem_arquivo",
-    "pagina_origem",
-    "texto_normalizado",
-    "trechos_ocultos",
-    "trechos_suspeitos",
+from lupa_pipeline.dominio.tabelas import (
+    atributos_do_satelite,
+    sat_pagina_extracao,
+    sat_pagina_saneamento,
 )
+from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoPagina, VisaoProcesso
+from lupa_pipeline.ingestao.paginas import gravar_pagina
+from lupa_pipeline.seguranca.contexto import abrir_dek, obter_cofre, registrar_dek
 
 
-def fonte_em_cache(
-    session: Session,
-    gabinete_id: UUID,
-    arquivo_id: UUID,
-    sha256: str,
-    versao_extrator: str,
-    total_paginas: int,
-) -> UUID | None:
-    """Outro arquivo do gabinete com o mesmo conteúdo e todas as páginas na versão corrente.
-
-    Args:
-        session: Sessão com transação aberta (RLS do gabinete).
-        gabinete_id: Gabinete do job.
-        arquivo_id: Arquivo que vai ser extraído.
-        sha256: Hash do arquivo.
-        versao_extrator: Versão corrente do extrator de páginas.
-        total_paginas: Páginas esperadas.
-
-    Returns:
-        Id do arquivo de origem, ou None.
-    """
-    if total_paginas <= 0:
-        return None
+def copiar_do_cache(
+    session: Session, destino: VisaoArquivo, versao: str, total: int, pendentes: set[int]
+) -> set[int]:
+    """Copia apenas páginas pendentes, decifrando na origem e cifrando com a DEK de destino."""
+    if not pendentes:
+        return set()
     consulta = (
-        select(ArquivoTabela.id)
-        .join(PaginaTabela, PaginaTabela.arquivo_id == ArquivoTabela.id)
+        select(VisaoPagina.hk_arquivo)
+        .join(VisaoArquivo, VisaoArquivo.hk_arquivo == VisaoPagina.hk_arquivo)
+        .join(VisaoProcesso, VisaoProcesso.hk_processo == VisaoArquivo.hk_processo)
         .where(
-            ArquivoTabela.gabinete_id == gabinete_id,
-            ArquivoTabela.sha256 == sha256,
-            ArquivoTabela.id != arquivo_id,
-            PaginaTabela.versao_extrator == versao_extrator,
+            VisaoArquivo.sha256 == destino.sha256,
+            VisaoArquivo.hk_arquivo != destino.hk_arquivo,
+            VisaoArquivo.estado == "concluido",
+            VisaoProcesso.chave_dados_cifrada.is_not(None),
+            VisaoPagina.versao_extrator == versao,
         )
-        .group_by(ArquivoTabela.id)
-        .having(func.count(PaginaTabela.id) == total_paginas)
+        .group_by(VisaoPagina.hk_arquivo)
+        .having(func.count() == total)
+        .order_by(VisaoPagina.hk_arquivo)
         .limit(1)
     )
-    return session.scalar(consulta)
-
-
-def copiar_paginas(session: Session, lease: Lease, origem_id: UUID, destino_id: UUID) -> int:
-    """Copia as páginas de um arquivo para outro, sob o lease do job de destino.
-
-    Args:
-        session: Sessão com transação aberta.
-        lease: Lease do job de destino.
-        origem_id: Arquivo com as páginas.
-        destino_id: Arquivo que recebe a cópia.
-
-    Returns:
-        Páginas copiadas.
-    """
-    colunas = [getattr(PaginaTabela, c) for c in COLUNAS_COPIADAS]
-    linhas: list[dict[str, Any]] = [
-        dict(zip(COLUNAS_COPIADAS, linha, strict=True))
-        for linha in session.execute(
-            select(*colunas)
-            .where(PaginaTabela.arquivo_id == origem_id)
-            .order_by(PaginaTabela.numero)
-        )
-    ]
-    return sum(
-        repositorio.gravar_paginas(session, lease, destino_id, linhas[i : i + PAGINAS_POR_INSERT])
-        for i in range(0, len(linhas), PAGINAS_POR_INSERT)
+    fonte = session.scalar(consulta)
+    if fonte is None:
+        return set()
+    chave = session.execute(
+        select(VisaoProcesso.hk_processo, VisaoProcesso.chave_dados_cifrada)
+        .join(VisaoArquivo, VisaoArquivo.hk_processo == VisaoProcesso.hk_processo)
+        .where(VisaoArquivo.hk_arquivo == fonte)
+    ).one()
+    if chave.chave_dados_cifrada is None:
+        return set()
+    registrar_dek(
+        chave.hk_processo, abrir_dek(obter_cofre(), chave.chave_dados_cifrada), atual=False
     )
+    campos = [
+        *atributos_do_satelite(sat_pagina_extracao),
+        *atributos_do_satelite(sat_pagina_saneamento),
+    ]
+    linhas = session.scalars(
+        select(VisaoPagina)
+        .where(
+            VisaoPagina.hk_arquivo == fonte,
+            VisaoPagina.numero.in_(pendentes),
+            VisaoPagina.versao_extrator == versao,
+        )
+        .order_by(VisaoPagina.numero)
+    )
+    copiadas = set()
+    for pagina in linhas:
+        linha = {campo: getattr(pagina, campo) for campo in campos}
+        gravar_pagina(session, destino, linha | {"numero": pagina.numero})
+        copiadas.add(pagina.numero)
+    return copiadas

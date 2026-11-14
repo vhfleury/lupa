@@ -321,10 +321,10 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [x] I: responsável não restringe acesso (RF-PRO-03). T3.6.
 - [x] I: arquivo com marca de sigilo é aceito (RF-PRO-04, T3.7).
 - [x] I: upload lacra, detecta duplicado e deixa `recebido` (A3; RF-ING-01, T3.7).
-- [ ] I: PDF com senha vai a quarentena (RF-ING-02).
+- [x] I: PDF com senha vai a quarentena (RF-ING-02).
 - [x] I: worker processa a fila sem Redis; segundo worker encerra (A4; RES-07, T3.8).
-- [ ] I: interrupção depois de parte dos lotes retoma sem duplicar página (RF-ING-07).
-- [ ] I: estado parcial lista as páginas faltantes (RF-ING-06).
+- [x] I: interrupção depois de parte dos lotes retoma sem duplicar página (RF-ING-07).
+- [x] I: estado parcial lista as páginas faltantes (RF-ING-06).
 - [x] I: cadeia de auditoria única; alteração direta no banco é apontada (A15; RF-AUD-03). T3.4 (`test_registrador.py`; o registrador foi reescrito em T3.4 porque o login grava eventos).
 - [ ] I: cada ação da lista gera evento, com localização (RF-AUD-01).
 - [ ] I: varredura de eventos e logs não acha texto sintético (RF-AUD-02).
@@ -359,7 +359,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [ ] I: correção de fato preservada no reprocessamento e usada pela validação (A11; RF-FAT-03,
   RF-ING-08).
 - [ ] I: reclassificação mantém histórico (A12; RF-PEC-02).
-- [ ] I: estouro de memória no sandbox termina em `falho` (RF-ING-04).
+- [x] I: estouro de memória no sandbox termina em `falho` (RF-ING-04).
 - [x] U: recusa do chat para cada pergunta da suíte (RF-CHA-02).
 - [x] I: citação inexistente descartada; nenhuma válida vira "sem evidência" (RF-CHA-03).
 - [x] I: conversa do processo A não lê o processo B (RF-CHA-01).

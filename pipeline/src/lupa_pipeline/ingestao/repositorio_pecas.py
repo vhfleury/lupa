@@ -1,454 +1,282 @@
-"""Persistência das peças e do índice do processo (Etapas 4E.7, 4E.8 e 4E.10).
-
-Cada peça é uma linha de `peca` ligada ao arquivo. A reclassificação manual nunca altera a
-classificação gravada: grava linha nova (`metodo = manual`, `substitui_peca_id` apontando a
-anterior) e só marca a anterior como não vigente, de modo que o histórico fica inteiro e o
-índice lê sempre as linhas vigentes.
-"""
+"""Índice de peças e histórico das classificações no Data Vault (A5, A12)."""
 
 from dataclasses import dataclass
-from datetime import date
 from typing import Any
-from uuid import UUID, uuid4
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from lupa_pipeline.dominio.enums import MetodoClassificacao, OrigemPeca, TipoPeca
-from lupa_pipeline.dominio.tabelas import ArquivoTabela, EvidenciaTabela, PaginaTabela, PecaTabela
-from lupa_pipeline.ingestao.indice import PecaIndice, ResultadoIndice
-
-CONFIANCA_MANUAL = 1.0
+from lupa_pipeline.dominio.esquemas import calcular_hash
+from lupa_pipeline.dominio.gravacao import gravar_hub, gravar_link, gravar_satelite
+from lupa_pipeline.dominio.tabelas import (
+    atributos_do_satelite,
+    hub_evidencia,
+    hub_peca,
+    link_arquivo_peca,
+    link_pagina_evidencia,
+    sat_evidencia_trecho,
+    sat_pagina_fronteira,
+    sat_peca_classificacao,
+)
+from lupa_pipeline.dominio.visoes import (
+    VisaoArquivo,
+    VisaoEvidencia,
+    VisaoPeca,
+    VisaoPecaHistorico,
+    atual,
+)
+from lupa_pipeline.ingestao.indice import ResultadoIndice
+from lupa_pipeline.ingestao.repositorio import ORIGEM
 
 
 class ReclassificacaoInvalidaError(ValueError):
-    """Pedido de reclassificação incoerente (fronteira fora da peça, peças não vizinhas)."""
+    """Pedido fora do intervalo do arquivo ou peça que deixou de ser vigente."""
 
 
-def paginas_para_indice(session: Session, arquivo_id: UUID) -> list[dict[str, Any]]:
-    """Páginas do arquivo com o que o índice precisa, em ordem.
+def gravar_evidencia(
+    session: Session,
+    pagina: dict[str, Any],
+    inicio: int,
+    fim: int,
+    trecho: str,
+    bbox: dict[str, Any] | None = None,
+) -> bytes:
+    """Confere os offsets e grava o trecho com o vínculo à página."""
+    texto = pagina["texto"]
+    if not trecho or inicio < 0 or fim > len(texto) or texto[inicio:fim] != trecho:
+        raise ValueError("o trecho não confere com o texto da página")
+    chave = {campo: pagina[campo] for campo in ("numero_cnj", "sha256", "numero")}
+    hk = gravar_hub(session, hub_evidencia, chave | {"inicio": inicio, "fim": fim}, ORIGEM)
+    ligacao = {"hk_pagina": pagina["hk_pagina"], "hk_evidencia": hk}
+    gravar_link(session, link_pagina_evidencia, ligacao, ORIGEM)
+    dados = {"trecho": trecho, "hash_trecho": calcular_hash(trecho), "bbox": bbox}
+    gravar_satelite(session, sat_evidencia_trecho, hk, dados, ORIGEM)
+    return hk
 
-    Args:
-        session: Sessão com transação aberta (RLS do gabinete).
-        arquivo_id: Arquivo.
 
-    Returns:
-        `{id, numero, tipo, texto, coordenadas, flags, origem_arquivo, pagina_origem}`.
-    """
-    consulta = (
-        select(
-            PaginaTabela.id,
-            PaginaTabela.numero,
-            PaginaTabela.tipo,
-            PaginaTabela.texto,
-            PaginaTabela.coordenadas,
-            PaginaTabela.flags,
-            PaginaTabela.origem_arquivo,
-            PaginaTabela.pagina_origem,
-        )
-        .where(PaginaTabela.arquivo_id == arquivo_id)
-        .order_by(PaginaTabela.numero)
+def _hub(session: Session, arquivo: VisaoArquivo, inicio: int) -> bytes:
+    chave = {"numero_cnj": arquivo.numero_cnj, "sha256": arquivo.sha256, "pagina_inicial": inicio}
+    hk = gravar_hub(session, hub_peca, chave, ORIGEM)
+    gravar_link(
+        session, link_arquivo_peca, {"hk_arquivo": arquivo.hk_arquivo, "hk_peca": hk}, ORIGEM
     )
-    chaves = (
-        "id", "numero", "tipo", "texto", "coordenadas", "flags", "origem_arquivo", "pagina_origem",
-    )  # fmt: skip
-    return [dict(zip(chaves, linha, strict=True)) for linha in session.execute(consulta)]
+    return hk
 
 
-def tem_pecas(session: Session, arquivo_id: UUID) -> bool:
-    """Se o arquivo já tem peças gravadas (automáticas ou manuais).
-
-    Args:
-        session: Sessão com transação aberta.
-        arquivo_id: Arquivo.
-
-    Returns:
-        Verdadeiro se há ao menos uma linha em `peca`.
-    """
-    consulta = select(PecaTabela.id).where(PecaTabela.arquivo_id == arquivo_id).limit(1)
-    return session.scalar(consulta) is not None
-
-
-def _evidencia(
-    session: Session, gabinete_id: UUID, ids_pagina: dict[int, UUID], evidencia: dict[str, Any]
-) -> UUID:
-    linha = EvidenciaTabela(
-        id=uuid4(),
-        gabinete_id=gabinete_id,
-        pagina_id=ids_pagina[int(evidencia["pagina"])],
-        trecho=evidencia["trecho"],
-        hash_trecho=evidencia["hash_trecho"],
-        inicio=int(evidencia["inicio"]),
-        fim=int(evidencia["fim"]),
-    )
-    session.add(linha)
-    session.flush()
-    return linha.id
-
-
-def _linha_peca(
-    gabinete_id: UUID, arquivo_id: UUID, peca: PecaIndice, evidencia_id: UUID | None
-) -> PecaTabela:
-    return PecaTabela(
-        id=uuid4(),
-        gabinete_id=gabinete_id,
-        arquivo_id=arquivo_id,
-        tipo=peca.tipo.value,
-        pagina_inicial=peca.pagina_inicial,
-        pagina_final=peca.pagina_final,
-        confianca=peca.confianca,
-        metodo=peca.metodo.value,
-        origem=peca.origem.value,
-        data=peca.data,
-        tipo_data=peca.tipo_data,
-        data_evidencia_id=evidencia_id,
-        vigente=True,
-        flags=peca.flags,
-        classificacao=peca.classificacao | {"ordem": peca.ordem},
-    )
+def _atributos(peca: VisaoPeca) -> dict[str, Any]:
+    return {c: getattr(peca, c) for c in atributos_do_satelite(sat_peca_classificacao)}
 
 
 def gravar_indice(
     session: Session,
-    gabinete_id: UUID,
-    arquivo_id: UUID,
+    arquivo: VisaoArquivo,
     paginas: list[dict[str, Any]],
     resultado: ResultadoIndice,
 ) -> int:
-    """Grava os sinais de fronteira das páginas e as peças do índice.
-
-    Idempotente: se o arquivo já tem peças (de uma execução anterior ou corrigidas pelo
-    assessor), nada é regravado, para não sobrescrever correções manuais.
-
-    Args:
-        session: Sessão com transação aberta (RLS do gabinete).
-        gabinete_id: Gabinete.
-        arquivo_id: Arquivo.
-        paginas: Páginas de `paginas_para_indice` (mesma ordem de `resultado.sinais`).
-        resultado: Índice montado.
-
-    Returns:
-        Quantidade de peças gravadas (0 se já havia peças).
-    """
-    if tem_pecas(session, arquivo_id):
-        return 0
-    if paginas:
-        session.execute(
-            update(PaginaTabela),
-            [
-                {"id": p["id"], "sinais_fronteira": s}
-                for p, s in zip(paginas, resultado.sinais, strict=True)
-            ],
+    """Grava fronteiras e versões automáticas, preservando intervalos corrigidos pelo usuário."""
+    for pagina, sinais in zip(paginas, resultado.sinais, strict=True):
+        publicos = {chave: valor for chave, valor in sinais.items() if chave != "cabecalho"}
+        gravar_satelite(
+            session,
+            sat_pagina_fronteira,
+            pagina["hk_pagina"],
+            {"sinais_fronteira": publicos},
+            ORIGEM,
         )
-    ids_pagina = {int(p["numero"]): p["id"] for p in paginas}
+    por_numero = {p["numero"]: p for p in paginas}
+    existentes = list(
+        session.scalars(atual(select(VisaoPeca).where(VisaoPeca.hk_arquivo == arquivo.hk_arquivo)))
+    )
+    manuais = [p for p in existentes if p.metodo == MetodoClassificacao.MANUAL]
+    vigentes: set[bytes] = set()
+    inseridas = 0
     for peca in resultado.pecas:
-        evidencia_id = (
-            _evidencia(session, gabinete_id, ids_pagina, peca.evidencia_data)
-            if peca.evidencia_data
-            else None
-        )
-        session.add(_linha_peca(gabinete_id, arquivo_id, peca, evidencia_id))
-    session.flush()
-    return len(resultado.pecas)
-
-
-def _serializar(peca: PecaTabela, evidencias: dict[UUID, EvidenciaTabela]) -> dict[str, Any]:
-    evidencia = evidencias.get(peca.data_evidencia_id) if peca.data_evidencia_id else None
-    return {
-        "id": str(peca.id),
-        "arquivo_id": str(peca.arquivo_id),
-        "tipo": peca.tipo,
-        "origem": peca.origem,
-        "pagina_inicial": peca.pagina_inicial,
-        "pagina_final": peca.pagina_final,
-        "data": peca.data.isoformat() if peca.data else None,
-        "tipo_data": peca.tipo_data,
-        "evidencia_data": (
-            {
-                "id": str(evidencia.id),
-                "pagina_id": str(evidencia.pagina_id),
-                "trecho": evidencia.trecho,
-                "inicio": evidencia.inicio,
-                "fim": evidencia.fim,
-                "hash_trecho": evidencia.hash_trecho,
-            }
+        if any(
+            p.pagina_inicial == peca.pagina_inicial
+            or (
+                p.vigente
+                and p.pagina_inicial <= peca.pagina_final
+                and (p.pagina_final or p.pagina_inicial) >= peca.pagina_inicial
+            )
+            for p in manuais
+        ):
+            continue
+        evidencia = peca.evidencia_data
+        hk_evidencia = (
+            gravar_evidencia(
+                session,
+                por_numero[evidencia["pagina"]],
+                evidencia["inicio"],
+                evidencia["fim"],
+                evidencia["trecho"],
+            )
             if evidencia
             else None
-        ),
-        "confianca": peca.confianca,
-        "metodo": peca.metodo,
-        "vigente": peca.vigente,
-        "substitui_peca_id": str(peca.substitui_peca_id) if peca.substitui_peca_id else None,
-        "flags": peca.flags,
-        "resumo_flags": resumo_flags(peca.flags),
-    }
+        )
+        hk = _hub(session, arquivo, peca.pagina_inicial)
+        dados = {
+            "tipo": peca.tipo.value,
+            "origem": peca.origem.value,
+            "metodo": peca.metodo.value,
+            "pagina_final": peca.pagina_final,
+            "confianca": peca.confianca,
+            "data": peca.data,
+            "tipo_data": peca.tipo_data,
+            "hk_evidencia_data": hk_evidencia,
+            "flags": peca.flags,
+            "classificacao": peca.classificacao,
+            "vigente": True,
+            "hk_usuario": None,
+        }
+        inseridas += gravar_satelite(session, sat_peca_classificacao, hk, dados, ORIGEM)
+        vigentes.add(hk)
+    for antiga in existentes:
+        if (
+            antiga.metodo != MetodoClassificacao.MANUAL
+            and antiga.vigente
+            and antiga.hk_peca not in vigentes
+        ):
+            gravar_satelite(
+                session,
+                sat_peca_classificacao,
+                antiga.hk_peca,
+                _atributos(antiga) | {"vigente": False},
+                ORIGEM,
+            )
+    return inseridas
 
 
 def resumo_flags(flags: dict[str, Any]) -> dict[str, Any]:
-    """Resumo das flags da peça para o dossiê (4D.10): marcas da peça e páginas sinalizadas.
-
-    Args:
-        flags: `peca.flags` (`peca` e `paginas`).
-
-    Returns:
-        `{peca: [...], saneamento: {flag: páginas}, total_saneamento: n}`.
-    """
+    """Agrupa os sinais das peças e o número de páginas por marca de saneamento."""
     paginas = dict(flags.get("paginas") or {})
     return {
-        "peca": sorted(k for k, v in dict(flags.get("peca") or {}).items() if v),
+        "peca": sorted(k for k, v in (flags.get("peca") or {}).items() if v),
         "saneamento": paginas,
-        "total_saneamento": sum(int(v) for v in paginas.values()),
+        "total_saneamento": sum(paginas.values()),
     }
 
 
-def _evidencias(session: Session, pecas: list[PecaTabela]) -> dict[UUID, EvidenciaTabela]:
-    ids = [p.data_evidencia_id for p in pecas if p.data_evidencia_id]
-    if not ids:
-        return {}
-    return {
-        e.id: e for e in session.scalars(select(EvidenciaTabela).where(EvidenciaTabela.id.in_(ids)))
-    }
-
-
-def indice_processo(session: Session, processo_id: UUID) -> list[dict[str, Any]]:
-    """Índice do processo: peças vigentes de todos os arquivos, em ordem.
-
-    Ordem: arquivos pela data de envio, peças pela página inicial.
-
-    Args:
-        session: Sessão com transação aberta (RLS do gabinete).
-        processo_id: Processo.
-
-    Returns:
-        Peças serializadas, com `ordem` de 1 a N.
-    """
-    consulta = (
-        select(PecaTabela)
-        .join(ArquivoTabela, ArquivoTabela.id == PecaTabela.arquivo_id)
-        .where(ArquivoTabela.processo_id == processo_id, PecaTabela.vigente.is_(True))
-        .order_by(ArquivoTabela.enviado_em, ArquivoTabela.id, PecaTabela.pagina_inicial)
+def _serializar(
+    session: Session, peca: VisaoPeca | VisaoPecaHistorico, arquivo_id: str
+) -> dict[str, Any]:
+    evidencia = (
+        session.get(VisaoEvidencia, peca.hk_evidencia_data) if peca.hk_evidencia_data else None
     )
-    pecas = list(session.scalars(consulta))
-    evidencias = _evidencias(session, pecas)
+    campos = (
+        "tipo",
+        "origem",
+        "pagina_inicial",
+        "pagina_final",
+        "data",
+        "tipo_data",
+        "confianca",
+        "metodo",
+        "vigente",
+        "flags",
+        "classificacao",
+    )
+    return {campo: getattr(peca, campo) for campo in campos} | {
+        "id": peca.hk_peca.hex(),
+        "arquivo_id": arquivo_id,
+        "resumo_flags": resumo_flags(peca.flags or {}),
+        "autor_id": peca.hk_usuario.hex() if peca.hk_usuario else None,
+        "alterado_em": peca.classificada_em if isinstance(peca, VisaoPeca) else peca.load_dts,
+        "evidencia_data": None
+        if evidencia is None
+        else {
+            campo: getattr(evidencia, campo)
+            for campo in ("id", "pagina_id", "trecho", "inicio", "fim", "hash_trecho")
+        },
+    }
+
+
+def indice_processo(session: Session, processo_id: bytes) -> list[dict[str, Any]]:
+    """Lista as peças vigentes do processo em ordem de arquivo e página."""
+    consulta = (
+        select(VisaoPeca)
+        .join(VisaoArquivo, VisaoPeca.hk_arquivo == VisaoArquivo.hk_arquivo)
+        .where(VisaoPeca.hk_processo == processo_id, VisaoPeca.vigente.is_(True))
+        .order_by(VisaoArquivo.criado_em, VisaoArquivo.id, VisaoPeca.pagina_inicial)
+    )
     return [
-        {"ordem": ordem} | _serializar(peca, evidencias)
-        for ordem, peca in enumerate(pecas, start=1)
+        _serializar(session, p, p.arquivo_id) | {"ordem": n}
+        for n, p in enumerate(session.scalars(atual(consulta)), 1)
     ]
 
 
-def obter_peca(session: Session, processo_id: UUID, peca_id: UUID) -> PecaTabela | None:
-    """Peça do processo (vigente ou não).
-
-    Args:
-        session: Sessão com transação aberta (RLS do gabinete).
-        processo_id: Processo.
-        peca_id: Peça.
-
-    Returns:
-        A peça, ou None se não existe ou é de outro processo.
-    """
-    consulta = (
-        select(PecaTabela)
-        .join(ArquivoTabela, ArquivoTabela.id == PecaTabela.arquivo_id)
-        .where(PecaTabela.id == peca_id, ArquivoTabela.processo_id == processo_id)
+def obter_peca(session: Session, processo_id: bytes, peca_id: str) -> VisaoPeca | None:
+    """Busca uma peça pelo id público dentro do processo."""
+    return session.scalar(
+        atual(
+            select(VisaoPeca).where(VisaoPeca.hk_processo == processo_id, VisaoPeca.id == peca_id)
+        )
     )
-    return session.scalar(consulta)
 
 
-def historico_peca(session: Session, peca: PecaTabela) -> list[dict[str, Any]]:
-    """Versões anteriores da peça, da mais recente para a mais antiga.
-
-    Args:
-        session: Sessão com transação aberta.
-        peca: Peça de partida.
-
-    Returns:
-        Peças substituídas, seguindo `substitui_peca_id` (e as unidas, em `classificacao`).
-    """
-    anteriores: list[PecaTabela] = []
-    fila = [peca]
-    vistos = {peca.id}
-    while fila:
-        atual = fila.pop(0)
-        ids = [atual.substitui_peca_id] if atual.substitui_peca_id else []
-        ids += [UUID(i) for i in (atual.classificacao or {}).get("substitui", [])]
-        for anterior_id in ids:
-            if anterior_id in vistos:
-                continue
-            vistos.add(anterior_id)
-            anterior = session.get(PecaTabela, anterior_id)
-            if anterior is not None:
-                anteriores.append(anterior)
-                fila.append(anterior)
-    evidencias = _evidencias(session, anteriores)
-    return [_serializar(p, evidencias) for p in anteriores]
-
-
-def detalhar_peca(session: Session, peca: PecaTabela) -> dict[str, Any]:
-    """Peça serializada com a classificação e o histórico de versões.
-
-    Args:
-        session: Sessão com transação aberta.
-        peca: Peça.
-
-    Returns:
-        Peça, `classificacao` e `historico`.
-    """
-    base = _serializar(peca, _evidencias(session, [peca]))
-    return base | {"classificacao": peca.classificacao, "historico": historico_peca(session, peca)}
+def detalhar_peca(session: Session, peca: VisaoPeca) -> dict[str, Any]:
+    """Devolve a peça corrente e as classificações anteriores, com autor e instante."""
+    chaves = [peca.hk_peca] + [
+        bytes.fromhex(i) for i in (peca.classificacao or {}).get("anteriores", [])
+    ]
+    consulta = (
+        select(VisaoPecaHistorico)
+        .where(VisaoPecaHistorico.hk_peca.in_(chaves))
+        .order_by(VisaoPecaHistorico.load_dts.desc())
+    )
+    historico = [
+        _serializar(session, p, peca.arquivo_id)
+        for p in session.scalars(consulta)
+        if p.load_dts != peca.classificada_em or p.hk_peca != peca.hk_peca
+    ]
+    return _serializar(session, peca, peca.arquivo_id) | {"historico": historico}
 
 
 @dataclass(frozen=True)
 class PedidoReclassificacao:
-    """O que o assessor pediu.
-
-    Attributes:
-        tipo: Novo tipo (na divisão, vale para a parte nova).
-        origem: Nova origem (idem).
-        dividir_em: Página (numeração do arquivo) em que começa a parte nova.
-        unir_com: Peça vizinha a unir com esta.
-    """
+    """Classificação ou novo intervalo solicitado pelo usuário (A12)."""
 
     tipo: TipoPeca | None = None
     origem: OrigemPeca | None = None
-    dividir_em: int | None = None
-    unir_com: UUID | None = None
-
-
-def _copia(
-    base: PecaTabela,
-    inicial: int,
-    final: int,
-    substitui: list[PecaTabela],
-    usuario_id: UUID | None,
-    pagina_data: int | None,
-    tipo: TipoPeca | None = None,
-    origem: OrigemPeca | None = None,
-) -> PecaTabela:
-    data: date | None = base.data
-    evidencia_id = base.data_evidencia_id
-    if pagina_data is not None and not inicial <= pagina_data <= final:
-        data, evidencia_id = None, None
-    return PecaTabela(
-        id=uuid4(),
-        gabinete_id=base.gabinete_id,
-        arquivo_id=base.arquivo_id,
-        tipo=(tipo or TipoPeca(base.tipo)).value,
-        pagina_inicial=inicial,
-        pagina_final=final,
-        confianca=CONFIANCA_MANUAL,
-        metodo=MetodoClassificacao.MANUAL.value,
-        origem=(origem or OrigemPeca(base.origem)).value,
-        data=data,
-        tipo_data=base.tipo_data if data else None,
-        data_evidencia_id=evidencia_id,
-        substitui_peca_id=substitui[0].id,
-        vigente=True,
-        flags={"peca": {}, "paginas": dict(base.flags.get("paginas") or {})},
-        classificacao={
-            "substitui": [str(p.id) for p in substitui],
-            "corrigido_por": str(usuario_id) if usuario_id else None,
-        },
-    )
-
-
-def _pagina_da_evidencia(session: Session, peca: PecaTabela) -> int | None:
-    if peca.data_evidencia_id is None:
-        return None
-    consulta = (
-        select(PaginaTabela.numero)
-        .join(EvidenciaTabela, EvidenciaTabela.pagina_id == PaginaTabela.id)
-        .where(EvidenciaTabela.id == peca.data_evidencia_id)
-    )
-    return session.scalar(consulta)
+    pagina_inicial: int | None = None
+    pagina_final: int | None = None
 
 
 def reclassificar(
-    session: Session,
-    peca: PecaTabela,
-    pedido: PedidoReclassificacao,
-    usuario_id: UUID | None,
-) -> list[PecaTabela]:
-    """Aplica a correção do assessor gravando linhas novas e encerrando as anteriores.
-
-    Args:
-        session: Sessão com transação aberta (RLS do gabinete).
-        peca: Peça vigente a corrigir.
-        pedido: Tipo, origem, divisão ou união.
-        usuario_id: Quem corrigiu.
-
-    Returns:
-        As peças novas, em ordem de página.
-
-    Raises:
-        ReclassificacaoInvalidaError: Peça não vigente, divisão fora da peça, união com peça
-            que não é vizinha, ou pedido vazio.
-    """
-    if not peca.vigente:
-        raise ReclassificacaoInvalidaError("a peça já foi substituída")
-    pagina_data = _pagina_da_evidencia(session, peca)
-    if pedido.dividir_em is not None:
-        novas = _dividir(peca, pedido, usuario_id, pagina_data)
-        encerradas = [peca]
-    elif pedido.unir_com is not None:
-        outra = session.get(PecaTabela, pedido.unir_com)
-        novas, encerradas = _unir(session, peca, outra, pedido, usuario_id)
-    elif pedido.tipo is not None or pedido.origem is not None:
-        novas = [
-            _copia(peca, peca.pagina_inicial, peca.pagina_final, [peca], usuario_id,
-                   pagina_data, pedido.tipo, pedido.origem)
-        ]  # fmt: skip
-        encerradas = [peca]
-    else:
-        raise ReclassificacaoInvalidaError("informe tipo, origem, dividir_em ou unir_com")
-    for antiga in encerradas:
-        antiga.vigente = False
-    session.add_all(novas)
-    session.flush()
-    return novas
-
-
-def _dividir(
-    peca: PecaTabela,
-    pedido: PedidoReclassificacao,
-    usuario_id: UUID | None,
-    pagina_data: int | None,
-) -> list[PecaTabela]:
-    corte = int(pedido.dividir_em or 0)
-    if not peca.pagina_inicial < corte <= peca.pagina_final:
-        raise ReclassificacaoInvalidaError("a divisão precisa cair dentro da peça")
-    primeira = _copia(peca, peca.pagina_inicial, corte - 1, [peca], usuario_id, pagina_data)
-    segunda = _copia(
-        peca, corte, peca.pagina_final, [peca], usuario_id, pagina_data, pedido.tipo, pedido.origem
-    )
-    return [primeira, segunda]
-
-
-def _unir(
-    session: Session,
-    peca: PecaTabela,
-    outra: PecaTabela | None,
-    pedido: PedidoReclassificacao,
-    usuario_id: UUID | None,
-) -> tuple[list[PecaTabela], list[PecaTabela]]:
-    if outra is None or not outra.vigente or outra.arquivo_id != peca.arquivo_id:
-        raise ReclassificacaoInvalidaError("a peça a unir não existe ou não está vigente")
-    primeira, segunda = sorted((peca, outra), key=lambda p: p.pagina_inicial)
-    if segunda.pagina_inicial != primeira.pagina_final + 1:
-        raise ReclassificacaoInvalidaError("só peças vizinhas podem ser unidas")
-    nova = _copia(
-        primeira, primeira.pagina_inicial, segunda.pagina_final, [primeira, segunda], usuario_id,
-        _pagina_da_evidencia(session, primeira), pedido.tipo, pedido.origem,
-    )  # fmt: skip
-    nova.flags = {
-        "peca": {},
-        "paginas": _somar(primeira.flags.get("paginas"), segunda.flags.get("paginas")),
+    session: Session, peca: VisaoPeca, pedido: PedidoReclassificacao, usuario: bytes
+) -> VisaoPeca:
+    """Insere classificação manual e encerra a peça de origem quando a chave muda."""
+    arquivo = session.get_one(VisaoArquivo, peca.hk_arquivo)
+    inicio = peca.pagina_inicial if pedido.pagina_inicial is None else pedido.pagina_inicial
+    fim = peca.pagina_final if pedido.pagina_final is None else pedido.pagina_final
+    if not peca.vigente or not fim or not 1 <= inicio <= fim <= (arquivo.total_paginas or 0):
+        raise ReclassificacaoInvalidaError("peça sem vigência ou intervalo fora do arquivo")
+    hk = _hub(session, arquivo, inicio)
+    dados = _atributos(peca) | {
+        "metodo": MetodoClassificacao.MANUAL.value,
+        "hk_usuario": usuario,
+        "pagina_final": fim,
+        "confianca": 1.0,
     }
-    return [nova], [primeira, segunda]
-
-
-def _somar(a: dict[str, int] | None, b: dict[str, int] | None) -> dict[str, int]:
-    total = dict(a or {})
-    for chave, valor in (b or {}).items():
-        total[chave] = total.get(chave, 0) + int(valor)
-    return dict(sorted(total.items()))
+    if pedido.tipo is not None:
+        dados["tipo"] = pedido.tipo.value
+    if pedido.origem is not None:
+        dados["origem"] = pedido.origem.value
+    if peca.hk_evidencia_data:
+        evidencia = session.get_one(VisaoEvidencia, peca.hk_evidencia_data)
+        if not inicio <= evidencia.numero <= fim:
+            dados.update(data=None, tipo_data=None, hk_evidencia_data=None)
+    if hk != peca.hk_peca:
+        gravar_satelite(
+            session,
+            sat_peca_classificacao,
+            peca.hk_peca,
+            _atributos(peca) | {"vigente": False, "hk_usuario": usuario, "metodo": "manual"},
+            ORIGEM,
+        )
+        anteriores = (peca.classificacao or {}).get("anteriores", [])
+        dados["classificacao"] = (peca.classificacao or {}) | {
+            "anteriores": list(dict.fromkeys([peca.id, *anteriores]))
+        }
+    gravar_satelite(session, sat_peca_classificacao, hk, dados, ORIGEM)
+    return session.scalars(atual(select(VisaoPeca).where(VisaoPeca.hk_peca == hk))).one()

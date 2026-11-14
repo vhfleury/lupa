@@ -1,36 +1,41 @@
-"""Testes de observabilidade: logs do worker sem texto dos autos."""
+"""Logs do worker com PDF e ZIP processados em banco e sandbox reais."""
 
 import json
+from threading import Event
 
 import pytest
+from sqlalchemy.orm import Session, sessionmaker
 
-from apoio_arquivos import TEXTO_SENTINELA, pdf_com_senha, pdf_minimo, zip_por_peca
-from apoio_ingestao import SemearJob
-from lupa_pipeline.ingestao.worker import Dependencias, processar_job
+from apoio_arquivos import TEXTO_SENTINELA, pdf_com_senha, pdf_texto, zip_por_peca
+from apoio_ingestao import SemearArquivo
+from lupa_pipeline.config import Settings
+from lupa_pipeline.ingestao.processamento import processar_arquivo
+from lupa_pipeline.ingestao.storage import StorageCifrado
 from lupa_pipeline.logging import CAMPOS_PROIBIDOS, configurar_logging
 
-pytestmark = pytest.mark.integracao
 
-
+@pytest.mark.integracao
 def test_nenhum_log_do_worker_carrega_texto_dos_autos(
-    deps: Dependencias, semear_job: SemearJob, capsys: pytest.CaptureFixture[str]
+    fabrica_sessao: sessionmaker[Session],
+    settings_ficticias: Settings,
+    storage_memoria: StorageCifrado,
+    semear_arquivo: SemearArquivo,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Logs só com ids, estados e contagens: sem o texto sentinela, sem nome de arquivo."""
+    """RF-AUD-02. Somente identificadores, estados e contagens podem ir ao log."""
     configurar_logging(nivel="DEBUG", estrito=True)
-    nome_sensivel = f"{TEXTO_SENTINELA}-nome.zip"
-    trabalhos = [
-        semear_job(zip_por_peca(2), nome_sensivel),
-        semear_job(pdf_minimo(2), f"{TEXTO_SENTINELA}.pdf"),
-        semear_job(pdf_com_senha(), "senha.pdf"),
-    ]
     capsys.readouterr()
-    for job in trabalhos:
-        processar_job(deps, job.job_id, job.processo.gabinete_id)
+    for dados, ext in [
+        (zip_por_peca(2), "zip"),
+        (pdf_texto([TEXTO_SENTINELA + "-log"]), "pdf"),
+        (pdf_com_senha(), "pdf"),
+    ]:
+        arquivo = semear_arquivo(dados, f"{TEXTO_SENTINELA}.{ext}")
+        processar_arquivo(
+            fabrica_sessao, settings_ficticias, storage_memoria, arquivo.hk_arquivo, Event()
+        )
     saida = capsys.readouterr()
-    linhas = [json.loads(linha) for linha in saida.out.splitlines() if linha.strip()]
-    assert linhas, "o worker deveria ter emitido logs"
     assert TEXTO_SENTINELA not in saida.out + saida.err
-    for linha in linhas:
-        assert not CAMPOS_PROIBIDOS & {chave.lower() for chave in linha}
-    eventos = {linha["event"] for linha in linhas}
-    assert {"lote_gravado", "job_finalizado"} <= eventos
+    linhas = [json.loads(x) for x in saida.out.splitlines() if x.strip()]
+    assert {"lote_gravado", "arquivo_finalizado"} <= {x["event"] for x in linhas}
+    assert all(not CAMPOS_PROIBIDOS.intersection(k.lower() for k in x) for x in linhas)

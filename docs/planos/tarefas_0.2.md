@@ -318,7 +318,8 @@ a saída resumida (vermelho inicial e verde final).
     pipeline/tests/ingestao/test_fila_banco.py pipeline/tests/dominio/test_gravacao.py
     pipeline/tests/dominio/test_migracao_0001.py pipeline/tests/unit/test_config.py`.
     Vermelho em quatro testes de configuração, dois da fila e um de ordenação. Verde em 46 casos.
-- [ ] **T3.9** Páginas, diagnóstico, lotes e peças em satélites (conteúdo jurídico ainda da 0.1). A5 passos 1 a 7. RF-ING-03.
+- [x] **T3.9** Páginas, diagnóstico, lotes e peças em satélites (conteúdo jurídico ainda da 0.1). A5 passos 1 a 7. RF-ING-03.
+  - Os testes que importavam os jobs de Redis falhavam na coleta. Na imagem do worker, test_worker.py passou nas recusas de PDF e ZIP e no limite real de memória. test_processamento.py, test_worker_extracao.py e test_observabilidade.py passaram nos 10 casos de lotes, cache entre DEKs, retomada e logs.
 - [ ] **T3.10** Evidências, fatos, achados e anotações em hubs, links e satélites; remoção de `reu`, `reu_identidade` e da pseudonimização. A5 passos 8 a 11, A11, A12. RF-FAT-01, RF-FAT-03, RF-PEC-02, RF-DOS-06.
 - [x] **T3.11** Auditoria como link não historizado, cadeia única, consulta, relatório de uso com custo. A15. D8, D26. RF-AUD-01 a 05.
   - `python -m pytest intranet/api/tests/auditoria/test_{cadeia,consulta,custo}.py --no-cov`:

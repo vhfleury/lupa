@@ -1,46 +1,39 @@
-"""Origem por trecho (Etapa 4D.8).
-
-Cada trecho suspeito (e cada evidência futura) carrega a origem da peça a que a página
-pertence: juízo, MP, defesa ou terceiro. Na ingestão a origem ainda não é conhecida (a
-classificação de peças vem da 4E), então o trecho nasce `desconhecida`; quando há peça
-classificada que cobre a página, a origem é lida de `peca.origem`. Nunca há trecho sem rótulo.
-"""
+"""Origem dos trechos de uma página segundo a classificação vigente (RF-ING-05)."""
 
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from lupa_pipeline.dominio.enums import OrigemPeca
-from lupa_pipeline.dominio.tabelas import PaginaTabela, PecaTabela
+from lupa_pipeline.dominio.visoes import VisaoPagina, VisaoPeca
 
 
-def origem_da_pagina(session: Session, pagina_id: UUID) -> OrigemPeca:
+def origem_da_pagina(session: Session, pagina_id: bytes) -> OrigemPeca:
     """Origem da peça que contém a página.
 
     Só contam as peças vigentes (a reclassificação manual encerra a versão anterior); com mais
     de uma cobrindo a página, vale a de maior confiança; sem peça, `desconhecida`.
 
     Args:
-        session: Sessão com transação aberta (RLS do gabinete).
+        session: Sessão com transação aberta.
         pagina_id: Página.
 
     Returns:
         Origem da peça, ou `desconhecida`.
     """
-    pagina = session.get(PaginaTabela, pagina_id)
+    pagina = session.get(VisaoPagina, pagina_id)
     if pagina is None:
         return OrigemPeca.DESCONHECIDA
     consulta = (
-        select(PecaTabela.origem)
+        select(VisaoPeca.origem)
         .where(
-            PecaTabela.arquivo_id == pagina.arquivo_id,
-            PecaTabela.vigente.is_(True),
-            PecaTabela.pagina_inicial <= pagina.numero,
-            PecaTabela.pagina_final >= pagina.numero,
+            VisaoPeca.arquivo_id == pagina.arquivo_id,
+            VisaoPeca.vigente.is_(True),
+            VisaoPeca.pagina_inicial <= pagina.numero,
+            VisaoPeca.pagina_final >= pagina.numero,
         )
-        .order_by(PecaTabela.confianca.desc(), PecaTabela.id)
+        .order_by(VisaoPeca.confianca.desc(), VisaoPeca.id)
         .limit(1)
     )
     origem = session.scalar(consulta)
@@ -60,7 +53,7 @@ def rotular(trechos: list[dict[str, Any]], origem: OrigemPeca) -> list[dict[str,
     return [t | {"origem": (origem or OrigemPeca.DESCONHECIDA).value} for t in trechos]
 
 
-def trechos_rotulados(session: Session, pagina_id: UUID) -> list[dict[str, Any]]:
+def trechos_rotulados(session: Session, pagina_id: bytes) -> list[dict[str, Any]]:
     """Trechos suspeitos da página com a origem da peça.
 
     Args:
@@ -70,7 +63,7 @@ def trechos_rotulados(session: Session, pagina_id: UUID) -> list[dict[str, Any]]
     Returns:
         Trechos com `origem`; lista vazia se a página não existe.
     """
-    pagina = session.get(PaginaTabela, pagina_id)
+    pagina = session.get(VisaoPagina, pagina_id)
     if pagina is None:
         return []
     return rotular(list(pagina.trechos_suspeitos or []), origem_da_pagina(session, pagina_id))
