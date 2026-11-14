@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from alembic import command
@@ -118,21 +118,27 @@ def fabrica_fato() -> FabricaFato:
     """
 
     def _criar(
-        processo_id: UUID | None = None,
-        pagina_id: UUID | None = None,
-        tipo: TipoFato = TipoFato.DATA_INTIMACAO_DEFESA,
+        processo_id: bytes | str | None = None,
+        pagina_id: bytes | str | None = None,
+        tipo: TipoFato = TipoFato.DATA_INTIMACAO,
         valor: Any = "2025-03-10",
     ) -> Fato:
         trecho = "intimado o defensor em 10/03/2025"
         inicio = TEXTO_PAGINA.index(trecho)
         evidencia = Evidencia(
-            pagina_id=pagina_id or uuid4(),
+            id=calcular_hash(uuid4().hex),
+            pagina_id=pagina_id.hex()
+            if isinstance(pagina_id, bytes)
+            else pagina_id or calcular_hash(uuid4().hex),
             trecho=trecho,
             inicio=inicio,
             fim=inicio + len(trecho),
         )
         return Fato(
-            processo_id=processo_id or uuid4(),
+            id=calcular_hash(uuid4().hex),
+            processo_id=processo_id.hex()
+            if isinstance(processo_id, bytes)
+            else processo_id or calcular_hash(uuid4().hex),
             tipo=tipo,
             valor=valor,
             evidencias=(evidencia,),

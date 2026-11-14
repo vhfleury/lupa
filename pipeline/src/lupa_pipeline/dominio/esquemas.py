@@ -13,10 +13,10 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validat
 from lupa_pipeline.dominio.cnj import validar_numero_cnj
 from lupa_pipeline.dominio.enums import (
     CenarioArquivo,
+    ClasseProcessual,
     EstadoJob,
     EstadoLote,
     FlagPagina,
-    Materia,
     MetodoClassificacao,
     MotivoFalha,
     MotivoQuarentena,
@@ -31,6 +31,8 @@ from lupa_pipeline.dominio.enums import (
 )
 
 NumeroCnj = Annotated[str, AfterValidator(validar_numero_cnj)]
+IdPublico = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+Sujeito = Annotated[str, Field(pattern=r"^([0-9a-f]{64})?$")]
 Confianca = Annotated[float, Field(ge=0.0, le=1.0)]
 
 
@@ -56,27 +58,15 @@ class EsquemaBase(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
-class Gabinete(EsquemaBase):
-    """Gabinete (tenant)."""
-
-    id: UUID = Field(default_factory=uuid4)
-    nome: str = Field(min_length=1)
-    chave_criptografia_ref: str | None = None
-    criado_em: datetime = Field(default_factory=_agora)
-
-
 class Processo(EsquemaBase):
-    """Processo judicial cadastrado em um gabinete."""
+    """Processo cível de gabinete único com identificador público do hub."""
 
-    id: UUID = Field(default_factory=uuid4)
-    gabinete_id: UUID
+    id: IdPublico
     numero_cnj: NumeroCnj
-    classe: str = Field(min_length=1)
-    materia: Materia
-    sigiloso: bool
+    classe: ClasseProcessual
     status: StatusProcesso = StatusProcesso.CRIADO
     criado_em: datetime = Field(default_factory=_agora)
-    criado_por: UUID
+    criado_por: IdPublico
 
 
 class Arquivo(EsquemaBase):
@@ -151,8 +141,8 @@ class Pagina(EsquemaBase):
 class Evidencia(EsquemaBase):
     """Trecho de página que sustenta um fato; `hash_trecho` é calculado se omitido."""
 
-    id: UUID = Field(default_factory=uuid4)
-    pagina_id: UUID
+    id: IdPublico
+    pagina_id: IdPublico
     trecho: str = Field(min_length=1)
     hash_trecho: str = ""
     inicio: int = Field(ge=0)
@@ -174,44 +164,30 @@ class Evidencia(EsquemaBase):
 class Fato(EsquemaBase):
     """Fato extraído dos autos; não existe sem ao menos uma evidência."""
 
-    id: UUID = Field(default_factory=uuid4)
-    processo_id: UUID
+    id: IdPublico
+    processo_id: IdPublico
     tipo: TipoFato
+    sujeito: Sujeito = ""
     valor: Any
     evidencias: tuple[Evidencia, ...] = Field(min_length=1)
     extraido_por: str = Field(min_length=1)
     versao_extrator: str = Field(min_length=1)
     confianca: Confianca
     status: StatusFato = StatusFato.AUTOMATICO
-    substitui_fato_id: UUID | None = None
+    substitui_fato_id: IdPublico | None = None
     criado_em: datetime = Field(default_factory=_agora)
-
-
-class Reu(EsquemaBase):
-    """Réu identificado apenas por pseudônimo."""
-
-    id: UUID = Field(default_factory=uuid4)
-    processo_id: UUID
-    pseudonimo: str = Field(min_length=1)
-
-
-class ReuIdentidade(EsquemaBase):
-    """Identidade real do réu; acesso só pela camada de apresentação."""
-
-    reu_id: UUID
-    nome: str = Field(min_length=1)
-    documento: str | None = None
 
 
 class Achado(EsquemaBase):
     """Resultado de uma validação, gerado só pelo motor; imutável."""
 
-    id: UUID = Field(default_factory=uuid4)
-    processo_id: UUID
+    id: IdPublico
+    processo_id: IdPublico
     validacao: str = Field(min_length=1)
+    sujeito: Sujeito = ""
     versao_catalogo: str = Field(min_length=1)
     resultado: ResultadoAchado
-    fatos_usados: tuple[UUID, ...] = ()
+    fatos_usados: tuple[IdPublico, ...] = ()
     valores: dict[str, Any] = Field(default_factory=dict)
     explicacao: str
     criado_em: datetime = Field(default_factory=_agora)
@@ -235,10 +211,9 @@ class Anotacao(EsquemaBase):
 
 
 class Usuario(EsquemaBase):
-    """Usuário do sistema (detalhado na Etapa 3)."""
+    """Assessor ou desembargador do gabinete."""
 
-    id: UUID = Field(default_factory=uuid4)
-    gabinete_id: UUID | None
+    id: IdPublico
     nome_usuario: str = Field(min_length=1)
     papel: PapelUsuario
     senha_hash: str = Field(min_length=1, repr=False)
@@ -247,12 +222,6 @@ class Usuario(EsquemaBase):
     ativo: bool = True
     troca_senha_obrigatoria: bool = True
     criado_em: datetime = Field(default_factory=_agora)
-
-    @model_validator(mode="after")
-    def _gabinete_conforme_papel(self) -> Self:
-        if (self.papel is PapelUsuario.ADMINISTRADOR) != (self.gabinete_id is None):
-            raise ValueError("apenas o administrador não tem gabinete")
-        return self
 
 
 class EventoAuditoria(EsquemaBase):

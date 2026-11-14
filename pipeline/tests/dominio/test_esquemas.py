@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from apoio_comum import FabricaFato, gerar_numero_cnj
 from lupa_pipeline.dominio.cnj import NumeroCnjInvalidoError, validar_numero_cnj
 from lupa_pipeline.dominio.enums import (
-    Materia,
+    ClasseProcessual,
     MetodoClassificacao,
     OrigemPeca,
     PapelUsuario,
@@ -56,12 +56,10 @@ def test_processo_com_cnj_de_digito_errado_e_rejeitado_pelo_pydantic() -> None:
     adulterado = numero.replace(numero[8:10], f"{(int(numero[8:10]) + 1) % 100:02d}", 1)
     with pytest.raises(ValidationError):
         Processo(
-            gabinete_id=uuid4(),
             numero_cnj=adulterado,
-            classe="Apelação Criminal",
-            materia=Materia.CRIMINAL,
-            sigiloso=False,
-            criado_por=uuid4(),
+            id=calcular_hash("proc"),
+            classe=ClasseProcessual.APELACAO_CIVEL,
+            criado_por=calcular_hash("usuario"),
         )
 
 
@@ -78,25 +76,36 @@ def test_fato_com_evidencia_e_aceito_e_imutavel(fabrica_fato: FabricaFato) -> No
     fato = fabrica_fato()
     assert len(fato.evidencias) == 1
     with pytest.raises(ValidationError):
-        fato.confianca = 0.1  # type: ignore[misc]
+        fato.confianca = 0.1
 
 
 def test_evidencia_calcula_hash_do_trecho_quando_omitido() -> None:
     """`hash_trecho` vira sha256(trecho) se não informado."""
-    evidencia = Evidencia(pagina_id=uuid4(), trecho="abc", inicio=0, fim=3)
+    evidencia = Evidencia(
+        id=calcular_hash("ev"), pagina_id=calcular_hash("pag"), trecho="abc", inicio=0, fim=3
+    )
     assert evidencia.hash_trecho == calcular_hash("abc")
 
 
 def test_evidencia_com_hash_divergente_e_rejeitada() -> None:
     """Hash informado precisa corresponder ao trecho."""
     with pytest.raises(ValidationError, match="hash_trecho"):
-        Evidencia(pagina_id=uuid4(), trecho="abc", hash_trecho="0" * 64, inicio=0, fim=3)
+        Evidencia(
+            id=calcular_hash("ev"),
+            pagina_id=calcular_hash("pag"),
+            trecho="abc",
+            hash_trecho="0" * 64,
+            inicio=0,
+            fim=3,
+        )
 
 
 def test_evidencia_com_fim_nao_maior_que_inicio_e_rejeitada() -> None:
     """`fim` deve ser maior que `inicio`."""
     with pytest.raises(ValidationError, match="fim deve ser maior"):
-        Evidencia(pagina_id=uuid4(), trecho="abc", inicio=5, fim=5)
+        Evidencia(
+            id=calcular_hash("ev"), pagina_id=calcular_hash("pag"), trecho="abc", inicio=5, fim=5
+        )
 
 
 def test_peca_com_pagina_final_antes_da_inicial_e_rejeitada() -> None:
@@ -139,14 +148,16 @@ def test_achado_com_resultado_fora_do_enum_e_rejeitado() -> None:
     """`resultado` só aceita conforme, atencao ou verificar."""
     with pytest.raises(ValidationError, match="resultado"):
         Achado(
-            processo_id=uuid4(),
+            id=calcular_hash("ach"),
+            processo_id=calcular_hash("proc"),
             validacao="tempestividade",
             versao_catalogo="1",
             resultado="talvez",
             explicacao="-",
         )
     achado = Achado(
-        processo_id=uuid4(),
+        id=calcular_hash("ach"),
+        processo_id=calcular_hash("proc"),
         validacao="tempestividade",
         versao_catalogo="1",
         resultado=ResultadoAchado.VERIFICAR,
@@ -164,15 +175,19 @@ def test_anotacao_exige_exatamente_um_alvo() -> None:
     assert Anotacao(fato_id=uuid4(), usuario_id=uuid4(), texto="nota").achado_id is None
 
 
-def test_somente_administrador_fica_sem_gabinete() -> None:
-    """Assessor precisa de gabinete; administrador não pode ter."""
-    with pytest.raises(ValidationError, match="administrador"):
-        Usuario(gabinete_id=None, nome_usuario="a", papel=PapelUsuario.ASSESSOR, senha_hash="h")
-    with pytest.raises(ValidationError, match="administrador"):
-        Usuario(
-            gabinete_id=uuid4(), nome_usuario="b", papel=PapelUsuario.ADMINISTRADOR, senha_hash="h"
-        )
-    admin = Usuario(
-        gabinete_id=None, nome_usuario="c", papel=PapelUsuario.ADMINISTRADOR, senha_hash="h"
-    )
-    assert "senha_hash" not in repr(admin)
+@pytest.mark.parametrize("papel", list(PapelUsuario))
+def test_usuario_dos_dois_papeis_tem_id_publico_e_senha_oculta(papel: PapelUsuario) -> None:
+    """RF-ACE-03: os dois papéis do gabinete têm credencial protegida na representação."""
+    usuario = Usuario(id=calcular_hash("usuario"), nome_usuario="a", papel=papel, senha_hash="h")
+    assert usuario.papel == papel
+    assert "senha_hash" not in repr(usuario)
+
+
+def test_sujeito_e_ids_dos_fatos_exigem_hash_publico(fabrica_fato: FabricaFato) -> None:
+    """RF-FAT-01, D12: valor vazio indica fato comum e demais sujeitos exigem um hk."""
+    dados = fabrica_fato().model_dump()
+    assert Fato(**dados).sujeito == ""
+    assert Fato(**(dados | {"sujeito": calcular_hash("parte")})).sujeito == calcular_hash("parte")
+    for alteracao in ({"id": "x"}, {"sujeito": "apelante"}):
+        with pytest.raises(ValidationError):
+            Fato(**(dados | alteracao))

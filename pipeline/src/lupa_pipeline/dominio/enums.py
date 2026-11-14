@@ -3,18 +3,6 @@
 from enum import StrEnum
 
 
-class Materia(StrEnum):
-    """Matéria do processo.
-
-    Attributes:
-        CRIMINAL: Processo penal; regido pelo CPP e CP.
-        CIVEL: Processo cível; regido pelo CPC.
-    """
-
-    CRIMINAL = "criminal"
-    CIVEL = "civel"
-
-
 class StatusProcesso(StrEnum):
     """Situação do processo dentro do Lupa.
 
@@ -37,63 +25,40 @@ class StatusProcesso(StrEnum):
 
 
 class TipoPeca(StrEnum):
-    """Tipo de peça processual; extensível acrescentando valores.
+    """Peças processuais cíveis conforme a seção 3.2 da especificação."""
 
-    Attributes:
-        DENUNCIA: Denúncia do Ministério Público.
-        RECEBIMENTO: Decisão de recebimento da denúncia.
-        DECISAO_PRISAO: Decisão que decreta ou revisa prisão.
-        SENTENCA: Sentença.
-        CERTIDAO: Certidão cartorária (intimação, publicação, trânsito).
-        RECURSO: Petição de recurso.
-        CONTRARRAZOES: Contrarrazões de recurso.
-        ACORDAO: Acórdão.
-        LAUDO: Laudo pericial.
-        TERMO_DEPOIMENTO: Termo de depoimento ou interrogatório.
-        OUTROS: Peça não classificada.
-    """
-
-    DENUNCIA = "denuncia"
-    RECEBIMENTO = "recebimento"
-    DECISAO_PRISAO = "decisao_prisao"
+    PETICAO_INICIAL = "peticao_inicial"
+    CONTESTACAO = "contestacao"
+    REPLICA = "replica"
+    DECISAO_INTERLOCUTORIA = "decisao_interlocutoria"
     SENTENCA = "sentenca"
-    CERTIDAO = "certidao"
-    RECURSO = "recurso"
+    EMBARGOS_DECLARACAO = "embargos_declaracao"
+    APELACAO = "apelacao"
+    AGRAVO_INSTRUMENTO = "agravo_instrumento"
+    AGRAVO_INTERNO = "agravo_interno"
     CONTRARRAZOES = "contrarrazoes"
     ACORDAO = "acordao"
-    LAUDO = "laudo"
-    TERMO_DEPOIMENTO = "termo_depoimento"
+    CERTIDAO = "certidao"
+    PROCURACAO = "procuracao"
+    COMPROVANTE_PREPARO = "comprovante_preparo"
+    LAUDO_PERICIAL = "laudo_pericial"
+    PARECER_MP = "parecer_mp"
     OUTROS = "outros"
 
 
 class MetodoClassificacao(StrEnum):
-    """Como a peça foi identificada.
-
-    Attributes:
-        REGRA: Por regra determinística.
-        LLM: Por modelo de linguagem.
-        MANUAL: Por pessoa.
-    """
+    """Método utilizado na classificação vigente da peça."""
 
     REGRA = "regra"
-    LLM = "llm"
     MANUAL = "manual"
 
 
 class OrigemPeca(StrEnum):
-    """Quem produziu a peça.
-
-    Attributes:
-        JUIZO: O juízo ou a secretaria.
-        MP: O Ministério Público.
-        DEFESA: A defesa.
-        TERCEIRO: Terceiro (perito, testemunha, outro órgão).
-        DESCONHECIDA: Não identificada.
-    """
+    """Origem identificada da peça processual."""
 
     JUIZO = "juizo"
     MP = "mp"
-    DEFESA = "defesa"
+    PARTE = "parte"
     TERCEIRO = "terceiro"
     DESCONHECIDA = "desconhecida"
 
@@ -137,41 +102,23 @@ class FlagPagina(StrEnum):
 
 
 class TipoFato(StrEnum):
-    """Tipos iniciais de fato extraído dos autos.
+    """Fatos jurídicos cíveis extraídos com evidência de página."""
 
-    Attributes:
-        DATA_FATO: Data do fato criminoso.
-        DATA_DENUNCIA: Data de oferecimento da denúncia.
-        DATA_RECEBIMENTO_DENUNCIA: Data do recebimento da denúncia (marco do art. 117, I, CP).
-        DATA_SENTENCA: Data da sentença.
-        DATA_PUBLICACAO_SENTENCA: Data de publicação da sentença (marco do art. 117, IV, CP).
-        DATA_INTIMACAO_DEFESA: Data de intimação do defensor.
-        DATA_INTIMACAO_MP: Data de intimação do Ministério Público.
-        DATA_INTIMACAO_REU: Data de intimação pessoal do réu.
-        DATA_INTERPOSICAO_RECURSO: Data de interposição do recurso.
-        TIPO_RECURSO: Espécie do recurso interposto.
-        DATA_DECRETACAO_PREVENTIVA: Data da decretação da prisão preventiva.
-        DATA_REVISAO_PREVENTIVA: Data de cada revisão da preventiva (art. 316 CPP).
-        PENA_MAXIMA_ABSTRATA: Pena máxima em abstrato, em meses.
-        DATA_NASCIMENTO_REU: Data de nascimento do réu (art. 115 CP).
-        REINCIDENTE: Se o réu é reincidente.
-    """
-
-    DATA_FATO = "data_fato"
-    DATA_DENUNCIA = "data_denuncia"
-    DATA_RECEBIMENTO_DENUNCIA = "data_recebimento_denuncia"
-    DATA_SENTENCA = "data_sentenca"
-    DATA_PUBLICACAO_SENTENCA = "data_publicacao_sentenca"
-    DATA_INTIMACAO_DEFESA = "data_intimacao_defesa"
-    DATA_INTIMACAO_MP = "data_intimacao_mp"
-    DATA_INTIMACAO_REU = "data_intimacao_reu"
-    DATA_INTERPOSICAO_RECURSO = "data_interposicao_recurso"
+    DATA_DECISAO_RECORRIDA = "data_decisao_recorrida"
+    DATA_INTIMACAO = "data_intimacao"
     TIPO_RECURSO = "tipo_recurso"
-    DATA_DECRETACAO_PREVENTIVA = "data_decretacao_preventiva"
-    DATA_REVISAO_PREVENTIVA = "data_revisao_preventiva"
-    PENA_MAXIMA_ABSTRATA = "pena_maxima_abstrata"
-    DATA_NASCIMENTO_REU = "data_nascimento_reu"
-    REINCIDENTE = "reincidente"
+    DATA_INTERPOSICAO = "data_interposicao"
+    QUALIDADE_RECORRENTE = "qualidade_recorrente"
+    COMPROVANTE_PREPARO = "comprovante_preparo"
+    GRATUIDADE_PEDIDO = "gratuidade_pedido"
+    GRATUIDADE_DECISAO = "gratuidade_decisao"
+    ADVOGADO_SUBSCRITOR = "advogado_subscritor"
+    PROCURACAO = "procuracao"
+    HIPOTESE_DECISAO_AGRAVADA = "hipotese_decisao_agravada"
+    DATA_AJUIZAMENTO = "data_ajuizamento"
+    DATA_CITACAO = "data_citacao"
+    DATA_CONTESTACAO = "data_contestacao"
+    DATA_ACORDAO = "data_acordao"
 
 
 class StatusFato(StrEnum):

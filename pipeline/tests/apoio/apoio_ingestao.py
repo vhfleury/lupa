@@ -4,12 +4,15 @@ Fase 3 (D23): as dependências do worker e a extração da sessão voltam com o 
 (T3.8 e T3.9).
 """
 
+from __future__ import annotations
+
 import hashlib
 import io
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import pytest
@@ -28,17 +31,9 @@ from lupa_pipeline.ingestao.recepcao import (
 )
 from lupa_pipeline.ingestao.storage import ArmazenamentoMemoria, ObjectStorage, StorageCifrado
 from lupa_pipeline.seguranca.contexto import ativar_processo
-from lupa_pipeline.sinteticos.empacotamento import exportar
-from lupa_pipeline.sinteticos.gabarito import TODOS_VETORES, Cenario, Composicao, Gabarito
-from lupa_pipeline.sinteticos.gerador import gerar_conteudo
-from lupa_pipeline.sinteticos.roteiro import Configuracao
 
-MISTURA_4C = {
-    Composicao.NATIVA: 0.4,
-    Composicao.DIGITALIZADA: 0.3,
-    Composicao.HIBRIDA_CORPO: 0.15,
-    Composicao.HIBRIDA_ASSINATURA: 0.15,
-}
+if TYPE_CHECKING:
+    from lupa_pipeline.sinteticos.gabarito import Cenario, Gabarito
 
 
 @dataclass(frozen=True)
@@ -220,8 +215,19 @@ class AutosSinteticos:
 @pytest.fixture(scope="session")
 def autos_sinteticos(tmp_path_factory: pytest.TempPathFactory) -> AutosSinteticos:
     """Processo de ~45 folhas com todas as composições de página e todas as injeções."""
+    from lupa_pipeline.sinteticos.empacotamento import exportar
+    from lupa_pipeline.sinteticos.gabarito import TODOS_VETORES, Composicao, Gabarito
+    from lupa_pipeline.sinteticos.gerador import gerar_conteudo
+    from lupa_pipeline.sinteticos.roteiro import Configuracao
+
+    mistura = {
+        Composicao.NATIVA: 0.4,
+        Composicao.DIGITALIZADA: 0.3,
+        Composicao.HIBRIDA_CORPO: 0.15,
+        Composicao.HIBRIDA_ASSINATURA: 0.15,
+    }
     config = Configuracao(
-        semente=7, paginas_alvo=45, mistura=MISTURA_4C, injecoes=TODOS_VETORES,
+        semente=7, paginas_alvo=45, mistura=mistura, injecoes=TODOS_VETORES,
         proporcao_vazias=0.3,
     )  # fmt: skip
     destino = tmp_path_factory.mktemp("autos-4c")

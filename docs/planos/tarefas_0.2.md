@@ -342,7 +342,10 @@ a saída resumida (vermelho inicial e verde final).
 
 ## Fase 4 — Conteúdo cível
 
-- [ ] **T4.1** Enums cíveis (`TipoPeca`, `TipoFato`, `OrigemPeca`, `Polo`, `QualidadeParte`, `MetodoClassificacao`). D15.
+- [x] **T4.1** Enums cíveis (`TipoPeca`, `TipoFato`, `OrigemPeca`, `Polo`, `QualidadeParte`, `MetodoClassificacao`). D15.
+  - Os dois testes do vocabulário falharam com os tipos criminais da 0.1. Na imagem do worker,
+    `python -m pytest pipeline/tests/dominio/test_enums_civeis.py pipeline/tests/dominio/test_esquemas.py --no-cov -q`
+    passou nos 19 testes, incluindo o vínculo de fatos e achados ao sujeito por hash.
 - [ ] **T4.2** Sintéticos das cinco classes, com templates e gabarito. RNF-04, RNF-05.
 - [ ] **T4.3** Classificação e fronteiras de peças cíveis. RF-PEC-01.
 - [ ] **T4.4** Partes. A6 passos 1 e 2. RF-FAT-04.
