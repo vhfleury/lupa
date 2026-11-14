@@ -262,7 +262,39 @@ a saída resumida (vermelho inicial e verde final).
 - O Vault de desenvolvimento precisa de `bash scripts/vault_inicializar.sh` para ganhar a chave
   `lupa` e a política nova; o banco de desenvolvimento continua na 0.1 (nenhuma migração rodou
   nele).
-- [ ] **T3.6** Processos: cadastro com classe, lista, responsáveis, sem `materia`, `sigiloso` e 403. D12, D15 (`ClasseProcessual`, `StatusProcesso`). RF-PRO-01 a 04.
+- [x] **T3.6** Processos: cadastro com classe, lista, responsáveis, sem `materia`, `sigiloso` e 403. D12, D15 (`ClasseProcessual`, `StatusProcesso`). RF-PRO-01 a 04.
+  - `api/rotas/processos.py` reescrito sobre `v_processo`, `v_arquivo`, `v_responsavel` e
+    `v_usuario`: `POST /processos` com `classe` do enum `ClasseProcessual` (corpo sem `materia`,
+    `sigiloso` e `gabinete_id`; campo extra dá 422) grava hub, dados, estado `criado` e DEK;
+    número repetido dá 409 com `processo_id` do existente; o assessor que cadastra vira o
+    responsável inicial (o trigger `processo_responsavel_inicial` da 0.1 passou à aplicação). A
+    lista é a mesma para todos, com classe, resumo da ingestão (só `processo_id`, `estado` e
+    `criado_em` de `v_arquivo`, sem decifrar nada) e responsáveis vigentes; `meus=true` filtra
+    pela vigência. Responsáveis mudam por linha nova de `sat_processo_responsavel_vigencia`, só
+    pelo desembargador, serializados por `pg_advisory_xact_lock` (o `FOR UPDATE` da 0.1 exige
+    `UPDATE`, que `lupa_app` não tem). Ids em hex (D12); o número CNJ volta com máscara por
+    `dominio.cnj.formatar_numero_cnj` (o hub guarda só os 20 dígitos).
+  - Ajustes fora de `processos.py` necessários à rota: `api/middleware.py` grava o evento
+    automático com `hk_usuario` e `hk_processo` (saem `gabinete_id`, `definir_contexto` e o
+    `admin_acesso_conteudo`); o `app_teste` da intranet passou a montar as rotas de processos e
+    a auditoria automática; `apoio_comum.criar_processo_teste(engine, autor)` grava com commit.
+  - Testes reescritos: `intranet/api/tests/api/test_processos.py` (5),
+    `test_processos_lista.py` (14) e `test_responsaveis.py` (2); novo
+    `pipeline/tests/dominio/test_cnj.py` (4). Saíram com a funcionalidade: isolamento por
+    gabinete, administrador e o teste da migração `0010` dos responsáveis
+    (`test_migracao_preserva_responsavel_dos_processos_existentes`).
+  - Comandos: `docker compose run --rm --no-deps api python -m pytest -c
+    intranet/api/pyproject.toml intranet/api/tests/api/test_processos.py
+    intranet/api/tests/api/test_processos_lista.py intranet/api/tests/api/test_responsaveis.py
+    --no-cov -q` e `docker compose run --rm --no-deps worker python -m pytest -c
+    pipeline/pyproject.toml pipeline/tests/dominio/test_cnj.py --no-cov -q` (código montado em
+    `/app`).
+  - Vermelho: os testes novos não importam sobre a rota da 0.1 (`pode`, `ProcessoTabela`); com a
+    rota nova e cinco mutações (sem responsável inicial, 409 sem `processo_id`, corpo com
+    `extra="ignore"`, transferência sem linha `vigente = false`, evento automático sem
+    `hk_processo`): `8 failed, 13 passed`. Verde, cada arquivo sozinho: `5`, `14`, `2` e `4
+    passed`; `intranet/api/tests/acesso` e `test_registrador.py` continuam `61 passed`. `ruff
+    check`, `ruff format --check` e `mypy` nos arquivos da tarefa: ok.
 - [ ] **T3.7** Recepção e estado da ingestão em satélites de `hub_arquivo`. A3. D9. RF-ING-01, 02, 06.
 - [ ] **T3.8** Worker sem Redis e RQ; remoção de `fila.py`, `redis` e `rq`. A4. D10. RF-ING-07, RES-07.
 - [ ] **T3.9** Páginas, diagnóstico, lotes e peças em satélites (conteúdo jurídico ainda da 0.1). A5 passos 1 a 7. RF-ING-03.

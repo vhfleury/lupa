@@ -320,8 +320,8 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
   - Usuários feito em T3.4 (`test_usuarios.py`); auditoria fica com T3.11, que monta a rota.
 - [x] I: criação, desativação, reativação e redefinição de assessor (RF-ACE-04). T3.4.
 - [x] I: `criar_desembargador.py` cria um e não repete (RF-ACE-05). T3.4.
-- [ ] I: cadastro recusa CNJ inválido e duplicado; lista igual para dois usuários (RF-PRO-01, 02).
-- [ ] I: responsável não restringe acesso (RF-PRO-03).
+- [x] I: cadastro recusa CNJ inválido e duplicado; lista igual para dois usuários (RF-PRO-01, 02). T3.6.
+- [x] I: responsável não restringe acesso (RF-PRO-03). T3.6.
 - [ ] I: arquivo com marca de sigilo é aceito (RF-PRO-04).
 - [ ] I: upload lacra, detecta duplicado e deixa `recebido` (A3; RF-ING-01).
 - [ ] I: PDF com senha vai a quarentena (RF-ING-02).

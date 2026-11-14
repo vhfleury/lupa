@@ -1,20 +1,22 @@
-"""Rotas de processo: lista do gabinete, criação, leitura e arquivos com o estado da ingestão.
+"""Rotas de processo: cadastro com classe, lista, leitura, arquivos e responsáveis.
 
-`GET /processos` lista os processos visíveis (RLS do gabinete; o administrador vê todos) com o
-resumo da ingestão vindo de `job_ingestao`; é auditada como `busca` (só metadados). `POST
-/processos` cria o processo no gabinete do ator (número CNJ validado no servidor, dígito
-verificador incluído) e grava `processo_criado`. `GET /processos/{id}` e `GET
-/processos/{id}/arquivos` usam `exige_processo` (404 para outro gabinete, tentativa auditada).
+`GET /processos` lista todos os processos, igual para qualquer usuário (RF-PRO-02), com classe,
+resumo da ingestão (de `v_arquivo`) e responsáveis vigentes (de `v_responsavel`); é auditada
+como `busca`. `POST /processos` grava `hub_processo`, `sat_processo_dados`, `sat_processo_estado`
+e a DEK (RF-PRO-01); o assessor que cadastra vira o responsável inicial. Número repetido dá 409
+com o `processo_id` do existente. `GET /processos/{id}` e as rotas abaixo dele usam
+`exige_processo`: responsável não restringe acesso (RF-PRO-03) e não há sigilo (RF-PRO-04).
+Responsáveis mudam por linha nova de `sat_processo_responsavel_vigencia`, só pelo desembargador.
 """
 
 from datetime import datetime
 from typing import Annotated, Any
-from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import delete, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import Select, func, select
+from sqlalchemy.orm import Session
 
 from lupa_intranet.acesso.autorizacao import (
     AtorAutenticado,
@@ -24,39 +26,54 @@ from lupa_intranet.acesso.autorizacao import (
     exige_processo,
 )
 from lupa_intranet.acesso.erros import ConflitoError, DadosInvalidosError, PermissaoNegadaError
-from lupa_intranet.acesso.papeis import Permissao, pode
+from lupa_intranet.acesso.papeis import Permissao, tem_permissao
 from lupa_intranet.acesso.servico import Ator, auditar
 from lupa_intranet.api.middleware import auditar_rota
-from lupa_intranet.auditoria.eventos import AcaoAuditoria, ResultadoEvento
-from lupa_pipeline.dominio.cnj import NumeroCnjInvalidoError, validar_numero_cnj
-from lupa_pipeline.dominio.enums import EstadoJob, Materia, StatusProcesso
-from lupa_pipeline.dominio.tabelas import (
-    ArquivoTabela,
-    JobIngestaoTabela,
-    ProcessoResponsavelTabela,
-    ProcessoTabela,
-    UsuarioTabela,
+from lupa_intranet.auditoria.eventos import AcaoAuditoria
+from lupa_pipeline.dominio.cnj import (
+    NumeroCnjInvalidoError,
+    formatar_numero_cnj,
+    validar_numero_cnj,
 )
+from lupa_pipeline.dominio.enums import ClasseProcessual, EstadoJob, PapelUsuario, StatusProcesso
+from lupa_pipeline.dominio.gravacao import chave_do_hub, gravar_hub, gravar_link, gravar_satelite
+from lupa_pipeline.dominio.tabelas import (
+    hub_processo,
+    link_processo_responsavel,
+    sat_processo_dados,
+    sat_processo_estado,
+    sat_processo_responsavel_vigencia,
+)
+from lupa_pipeline.dominio.visoes import (
+    VisaoArquivo,
+    VisaoProcesso,
+    VisaoResponsavel,
+    VisaoUsuario,
+    atual,
+)
+from lupa_pipeline.seguranca.chaves import criar_chave_processo
+from lupa_pipeline.seguranca.contexto import obter_cofre
 
 router = APIRouter()
 
-Processo = Annotated[ProcessoTabela, Depends(exige_processo)]
+Processo = Annotated[VisaoProcesso, Depends(exige_processo)]
 Leitor = Annotated[Ator, Depends(exige_papel(Permissao.VER_PROCESSO))]
+Cadastrador = Annotated[Ator, Depends(exige_papel(Permissao.SUBIR_PROCESSO))]
 
+ORIGEM = "intranet.processos"
 ESTADOS_FINAIS = frozenset({EstadoJob.CONCLUIDO, EstadoJob.QUARENTENA, EstadoJob.FALHO})
 ESTADOS_COM_PENDENCIA = frozenset({EstadoJob.PARCIAL, EstadoJob.EM_REVISAO})
+MENSAGEM_DUPLICADO = "número CNJ já cadastrado"
+TRAVA_RESPONSAVEIS = 0x4C555041
 
 
 class CorpoProcesso(BaseModel):
-    """Dados do processo novo."""
+    """Dados do processo novo: número CNJ e classe da seção 3.1."""
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     numero_cnj: str = Field(min_length=25, max_length=25)
-    classe: str = Field(min_length=2, max_length=120)
-    materia: Materia
-    sigiloso: bool = False
-    gabinete_id: UUID | None = None
+    classe: ClasseProcessual
 
     @field_validator("numero_cnj")
     @classmethod
@@ -67,28 +84,36 @@ class CorpoProcesso(BaseModel):
             raise ValueError(str(erro)) from None
 
 
-def _serializar(processo: ProcessoTabela) -> dict[str, Any]:
+class CorpoResponsaveis(BaseModel):
+    """Conjunto desejado e conjunto conhecido, para evitar sobrescritas concorrentes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    usuarios: list[str] = Field(min_length=1, max_length=100)
+    anteriores: list[str] = Field(max_length=100)
+
+
+def _serializar(processo: VisaoProcesso) -> dict[str, Any]:
     return {
         "id": processo.id,
-        "gabinete_id": processo.gabinete_id,
-        "numero_cnj": processo.numero_cnj,
+        "numero_cnj": formatar_numero_cnj(processo.numero_cnj),
         "classe": processo.classe,
-        "materia": processo.materia,
-        "sigiloso": processo.sigiloso,
         "status": processo.status,
+        "em_revisao": processo.em_revisao,
+        "criador_id": processo.criador_id,
         "criado_em": processo.criado_em,
     }
 
 
 def resumir_ingestao(estados: list[str]) -> str:
-    """Situação agregada da ingestão a partir dos estados dos jobs do processo.
+    """Situação agregada da ingestão a partir dos estados dos arquivos do processo.
 
     Args:
-        estados: Estado de cada job.
+        estados: Estado corrente de cada arquivo.
 
     Returns:
-        `sem_arquivos`, `processando` (algum job não final), `quarentena` (todos os jobs em
-        quarentena), `falho`, `pendencias` (parcial/em revisão) ou `concluido`.
+        `sem_arquivos`, `processando` (algum arquivo não final), `quarentena` (todos em
+        quarentena), `falho`, `pendencias` (parcial ou em revisão) ou `concluido`.
     """
     if not estados:
         return "sem_arquivos"
@@ -104,152 +129,156 @@ def resumir_ingestao(estados: list[str]) -> str:
     return "concluido"
 
 
-@router.get("/processos")
-@auditar_rota(AcaoAuditoria.BUSCA, conteudo=False)
-def listar_processos(ator: Leitor, sessao: SessaoBanco, meus: bool = False) -> list[dict[str, Any]]:
-    """Processos visíveis ao ator, mais recentes primeiro, com o resumo da ingestão.
-
-    Args:
-        ator: Ator com permissão de ver processos.
-        sessao: Sessão (RLS restringe ao gabinete; o administrador vê todos).
-        meus: Restringe aos processos atribuídos ao usuário como responsável.
-
-    Returns:
-        Processos com `ingestao: {situacao, por_estado, ultimo_envio}`.
-    """
-    consulta = select(ProcessoTabela).order_by(ProcessoTabela.criado_em.desc())
-    if ator.gabinete_id is not None:
-        consulta = consulta.where(ProcessoTabela.gabinete_id == ator.gabinete_id)
-    if meus:
-        consulta = consulta.where(
-            ProcessoTabela.id.in_(
-                select(ProcessoResponsavelTabela.processo_id).where(
-                    ProcessoResponsavelTabela.usuario_id == ator.usuario_id
-                )
-            )
+def _responsaveis_vigentes(
+    sessao: Session, processo_ids: list[str]
+) -> dict[str, list[dict[str, Any]]]:
+    consulta = (
+        select(VisaoResponsavel.processo_id, VisaoUsuario)
+        .join(VisaoUsuario, VisaoUsuario.hk_usuario == VisaoResponsavel.hk_usuario)
+        .where(
+            VisaoResponsavel.processo_id.in_(processo_ids),
+            VisaoResponsavel.vigente.is_(True),
         )
-    processos = list(sessao.scalars(consulta))
-    responsaveis: dict[UUID, list[dict[str, Any]]] = {}
-    if processos:
-        vinculos = sessao.execute(
-            select(ProcessoResponsavelTabela.processo_id, UsuarioTabela)
-            .join(UsuarioTabela, UsuarioTabela.id == ProcessoResponsavelTabela.usuario_id)
-            .where(ProcessoResponsavelTabela.processo_id.in_([p.id for p in processos]))
-            .order_by(UsuarioTabela.nome_usuario)
-        )
-        for processo_id, usuario in vinculos:
-            responsaveis.setdefault(processo_id, []).append(
-                {"id": usuario.id, "nome_usuario": usuario.nome_usuario, "ativo": usuario.ativo}
-            )
-    jobs: dict[UUID, list[tuple[str, datetime]]] = {}
-    if processos:
-        linhas = sessao.execute(
-            select(
-                JobIngestaoTabela.processo_id, JobIngestaoTabela.estado, JobIngestaoTabela.criado_em
-            ).where(JobIngestaoTabela.processo_id.in_([p.id for p in processos]))
-        )
-        for processo_id, estado, criado_em in linhas:
-            jobs.setdefault(processo_id, []).append((estado, criado_em))
-    resultado = []
-    for processo in processos:
-        do_processo = jobs.get(processo.id, [])
-        estados = [estado for estado, _ in do_processo]
-        por_estado: dict[str, int] = {}
-        for estado in estados:
-            por_estado[estado] = por_estado.get(estado, 0) + 1
-        resultado.append(
-            _serializar(processo)
-            | {
-                "responsaveis": responsaveis.get(processo.id, []),
-                "ingestao": {
-                    "situacao": resumir_ingestao(estados),
-                    "por_estado": por_estado,
-                    "ultimo_envio": max((c for _, c in do_processo), default=None),
-                },
-            }
-        )
+        .order_by(VisaoUsuario.nome_usuario)
+        .execution_options(populate_existing=True)
+    )
+    linhas = sessao.execute(consulta)
+    resultado: dict[str, list[dict[str, Any]]] = {}
+    for processo_id, usuario in linhas:
+        resultado.setdefault(processo_id, []).append(_usuario(usuario))
     return resultado
 
 
-@router.post("/processos", status_code=201)
-def criar_processo(
-    corpo: CorpoProcesso, ator: AtorAutenticado, sessao: SessaoBanco, ctx: ContextoReq
-) -> dict[str, Any]:
-    """Cria o processo no gabinete do ator (o administrador informa `gabinete_id`).
+def _usuario(usuario: VisaoUsuario) -> dict[str, Any]:
+    return {"id": usuario.id, "nome_usuario": usuario.nome_usuario, "ativo": usuario.ativo}
+
+
+def _ingestao(sessao: Session, processo_ids: list[str]) -> dict[str, dict[str, Any]]:
+    linhas = sessao.execute(
+        select(VisaoArquivo.processo_id, VisaoArquivo.estado, VisaoArquivo.criado_em).where(
+            VisaoArquivo.processo_id.in_(processo_ids)
+        )
+    )
+    por_processo: dict[str, list[tuple[str | None, datetime]]] = {}
+    for processo_id, estado, criado_em in linhas:
+        por_processo.setdefault(processo_id, []).append((estado, criado_em))
+    return {processo_id: _resumo(arquivos) for processo_id, arquivos in por_processo.items()}
+
+
+def _resumo(arquivos: list[tuple[str | None, datetime]]) -> dict[str, Any]:
+    estados = [estado for estado, _ in arquivos if estado]
+    por_estado: dict[str, int] = {}
+    for estado in estados:
+        por_estado[estado] = por_estado.get(estado, 0) + 1
+    return {
+        "situacao": resumir_ingestao(estados),
+        "por_estado": por_estado,
+        "ultimo_envio": max((criado_em for _, criado_em in arquivos), default=None),
+    }
+
+
+def _ids_meus(ator: Ator) -> Select[tuple[str]]:
+    return select(VisaoResponsavel.processo_id).where(
+        VisaoResponsavel.hk_usuario == ator.hk_usuario, VisaoResponsavel.vigente.is_(True)
+    )
+
+
+@router.get("/processos")
+@auditar_rota(AcaoAuditoria.BUSCA, conteudo=False)
+def listar_processos(ator: Leitor, sessao: SessaoBanco, meus: bool = False) -> list[dict[str, Any]]:
+    """Todos os processos, mais recentes primeiro, com ingestão e responsáveis (RF-PRO-02).
 
     Args:
-        corpo: Número CNJ, classe, matéria e sigilo.
-        ator: Quem cria.
+        ator: Ator com permissão de ver processos.
+        sessao: Sessão da requisição.
+        meus: Restringe aos processos de que o usuário é responsável vigente (RF-PRO-03).
+
+    Returns:
+        Processos com `responsaveis` e `ingestao: {situacao, por_estado, ultimo_envio}`.
+    """
+    consulta = select(VisaoProcesso).order_by(VisaoProcesso.criado_em.desc(), VisaoProcesso.id)
+    if meus:
+        consulta = consulta.where(VisaoProcesso.id.in_(_ids_meus(ator)))
+    processos = list(sessao.scalars(consulta))
+    ids = [p.id for p in processos]
+    responsaveis = _responsaveis_vigentes(sessao, ids)
+    ingestao = _ingestao(sessao, ids)
+    return [
+        _serializar(processo)
+        | {
+            "responsaveis": responsaveis.get(processo.id, []),
+            "ingestao": ingestao.get(processo.id) or _resumo([]),
+        }
+        for processo in processos
+    ]
+
+
+def _ligar_responsavel(
+    sessao: Session, hk_processo: bytes, hk_usuario: bytes, vigente: bool
+) -> None:
+    ligacao = {"hk_processo": hk_processo, "hk_usuario": hk_usuario}
+    hk_link = gravar_link(sessao, link_processo_responsavel, ligacao, ORIGEM)
+    vigencia = {"vigente": vigente}
+    gravar_satelite(sessao, sat_processo_responsavel_vigencia, hk_link, vigencia, ORIGEM)
+
+
+def _gravar_processo(sessao: Session, corpo: CorpoProcesso, ator: Ator) -> bytes:
+    hk = gravar_hub(sessao, hub_processo, {"numero_cnj": corpo.numero_cnj}, ORIGEM)
+    dados = {"classe": corpo.classe.value, "hk_usuario": ator.hk_usuario}
+    gravar_satelite(sessao, sat_processo_dados, hk, dados, ORIGEM)
+    estado = {"status": StatusProcesso.CRIADO.value}
+    gravar_satelite(sessao, sat_processo_estado, hk, estado, ORIGEM)
+    criar_chave_processo(sessao, obter_cofre(), hk, ORIGEM)
+    if ator.papel is PapelUsuario.ASSESSOR:
+        _ligar_responsavel(sessao, hk, ator.hk_usuario, vigente=True)
+    return hk
+
+
+def _consulta_processo(hk_processo: bytes) -> Select[tuple[VisaoProcesso]]:
+    return atual(select(VisaoProcesso).where(VisaoProcesso.hk_processo == hk_processo))
+
+
+@router.post("/processos", status_code=201, response_model=None)
+def criar_processo(
+    corpo: CorpoProcesso, ator: Cadastrador, sessao: SessaoBanco, ctx: ContextoReq
+) -> dict[str, Any] | JSONResponse:
+    """Cadastra o processo com número CNJ e classe (RF-PRO-01).
+
+    Args:
+        corpo: Número CNJ (dígito verificador conferido) e classe.
+        ator: Quem cadastra.
         sessao: Sessão da requisição.
         ctx: Contexto para a auditoria.
 
     Returns:
-        Processo criado.
-
-    Raises:
-        PermissaoNegadaError: Papel sem `subir_processo` no gabinete-alvo.
-        DadosInvalidosError: Administrador sem gabinete-alvo.
-        ConflitoError: Número já cadastrado no gabinete.
+        Processo criado, ou 409 com o `processo_id` do existente.
     """
-    alvo = corpo.gabinete_id or ator.gabinete_id
-    if alvo is None:
-        raise DadosInvalidosError("informe o gabinete do processo")
-    if not pode(ator.papel, Permissao.SUBIR_PROCESSO, ator.gabinete_id, alvo):
-        auditar(
-            sessao,
-            ctx,
-            AcaoAuditoria.PROCESSO_CRIADO,
-            ResultadoEvento.NEGADO,
-            usuario_id=ator.usuario_id,
-            gabinete_id=ator.gabinete_id,
-            objeto_tipo="processo",
+    hk = chave_do_hub(hub_processo, {"numero_cnj": corpo.numero_cnj})
+    if sessao.scalars(_consulta_processo(hk)).one_or_none() is not None:
+        return JSONResponse(
+            status_code=409, content={"detail": MENSAGEM_DUPLICADO, "processo_id": hk.hex()}
         )
-        raise PermissaoNegadaError("ação não permitida para o seu papel")
-    existente = sessao.scalar(
-        select(ProcessoTabela.id).where(
-            ProcessoTabela.gabinete_id == alvo, ProcessoTabela.numero_cnj == corpo.numero_cnj
-        )
-    )
-    if existente is not None:
-        raise ConflitoError("número CNJ já cadastrado no gabinete")
-    processo = ProcessoTabela(
-        id=uuid4(),
-        gabinete_id=alvo,
-        numero_cnj=corpo.numero_cnj,
-        classe=corpo.classe,
-        materia=corpo.materia.value,
-        sigiloso=corpo.sigiloso,
-        status=StatusProcesso.CRIADO.value,
-        criado_por=ator.usuario_id,
-    )
-    sessao.add(processo)
-    try:
-        sessao.flush()
-    except IntegrityError:  # pragma: no cover (corrida entre dois envios iguais)
-        raise ConflitoError("número CNJ já cadastrado no gabinete") from None
-    sessao.refresh(processo)
+    _gravar_processo(sessao, corpo, ator)
+    processo = sessao.scalars(_consulta_processo(hk)).one()
     auditar(
         sessao,
         ctx,
         AcaoAuditoria.PROCESSO_CRIADO,
-        usuario_id=ator.usuario_id,
-        gabinete_id=alvo,
-        processo_id=processo.id,
+        hk_usuario=ator.hk_usuario,
+        hk_processo=hk,
         objeto_tipo="processo",
-        objeto_id=str(processo.id),
+        objeto_id=hk.hex(),
     )
     return _serializar(processo)
 
 
 @router.get("/processos/{processo_id}")
 @auditar_rota(AcaoAuditoria.PROCESSO_ABERTO, conteudo=True)
-def abrir_processo(
-    processo: Annotated[ProcessoTabela, Depends(exige_processo)],
-) -> dict[str, object]:
-    """Devolve os dados do processo; gera `processo_aberto` (e `admin_acesso_conteudo`).
+def abrir_processo(processo: Processo) -> dict[str, Any]:
+    """Devolve os dados do processo; gera `processo_aberto`.
 
     Args:
-        processo: Processo já autorizado.
+        processo: Processo já carregado por `exige_processo`.
 
     Returns:
         Dados básicos do processo.
@@ -260,36 +289,35 @@ def abrir_processo(
 @router.get("/processos/{processo_id}/arquivos")
 @auditar_rota(AcaoAuditoria.PROCESSO_ABERTO, conteudo=False)
 def listar_arquivos(processo: Processo, sessao: SessaoBanco) -> dict[str, Any]:
-    """Arquivos do processo com o estado do job de ingestão (para o acompanhamento na tela).
+    """Arquivos do processo com o estado corrente da ingestão (RF-ING-06).
 
     Args:
-        processo: Processo autorizado.
+        processo: Processo carregado.
         sessao: Sessão da requisição.
 
     Returns:
         `{processo_id, status, situacao, arquivos: [...]}`, mais recentes primeiro.
     """
-    linhas = sessao.execute(
-        select(ArquivoTabela, JobIngestaoTabela)
-        .outerjoin(JobIngestaoTabela, JobIngestaoTabela.arquivo_id == ArquivoTabela.id)
-        .where(ArquivoTabela.processo_id == processo.id)
-        .order_by(ArquivoTabela.enviado_em.desc())
-    ).all()
+    linhas = sessao.scalars(
+        select(VisaoArquivo)
+        .where(VisaoArquivo.hk_processo == processo.hk_processo)
+        .order_by(VisaoArquivo.criado_em.desc(), VisaoArquivo.id)
+    )
     arquivos = [
         {
             "arquivo_id": arquivo.id,
             "nome": arquivo.nome_original,
             "mime": arquivo.mime,
             "tamanho_bytes": arquivo.tamanho_bytes,
-            "enviado_em": arquivo.enviado_em,
-            "job_id": job.id if job else None,
-            "estado": job.estado if job else None,
-            "motivo_quarentena": job.motivo_quarentena if job else None,
-            "motivo_falha": job.motivo_falha if job else None,
-            "total_paginas": job.total_paginas if job else None,
-            "finalizado_em": job.finalizado_em if job else None,
+            "enviado_em": arquivo.criado_em,
+            "estado": arquivo.estado,
+            "motivo_quarentena": arquivo.motivo_quarentena,
+            "motivo_falha": arquivo.motivo_falha,
+            "total_paginas": arquivo.total_paginas,
+            "relatorio": arquivo.relatorio,
+            "estado_em": arquivo.estado_em,
         }
-        for arquivo, job in linhas
+        for arquivo in linhas
     ]
     return {
         "processo_id": processo.id,
@@ -299,25 +327,24 @@ def listar_arquivos(processo: Processo, sessao: SessaoBanco) -> dict[str, Any]:
     }
 
 
-class CorpoResponsaveis(BaseModel):
-    """Conjunto desejado e conjunto conhecido, para evitar sobrescritas concorrentes."""
-
-    model_config = ConfigDict(extra="forbid")
-    usuarios: list[UUID] = Field(min_length=1, max_length=100)
-    anteriores: list[UUID] = Field(max_length=100)
-
-
-def _responsaveis(processo: ProcessoTabela, sessao: SessaoBanco) -> list[dict[str, Any]]:
-    usuarios = sessao.scalars(
-        select(UsuarioTabela)
-        .join(
-            ProcessoResponsavelTabela,
-            ProcessoResponsavelTabela.usuario_id == UsuarioTabela.id,
-        )
-        .where(ProcessoResponsavelTabela.processo_id == processo.id)
-        .order_by(UsuarioTabela.nome_usuario)
+def _vigentes(sessao: Session, processo: VisaoProcesso) -> set[str]:
+    consulta = select(VisaoResponsavel.usuario_id).where(
+        VisaoResponsavel.hk_processo == processo.hk_processo, VisaoResponsavel.vigente.is_(True)
     )
-    return [{"id": u.id, "nome_usuario": u.nome_usuario, "ativo": u.ativo} for u in usuarios]
+    return set(sessao.scalars(atual(consulta)))
+
+
+def _assessores_ativos(sessao: Session, ids: set[str] | None = None) -> list[VisaoUsuario]:
+    consulta = select(VisaoUsuario).where(
+        VisaoUsuario.papel == PapelUsuario.ASSESSOR.value, VisaoUsuario.ativo.is_(True)
+    )
+    if ids is not None:
+        consulta = consulta.where(VisaoUsuario.id.in_(ids))
+    return list(sessao.scalars(atual(consulta.order_by(VisaoUsuario.nome_usuario))))
+
+
+def _listar_responsaveis(sessao: Session, processo: VisaoProcesso) -> list[dict[str, Any]]:
+    return _responsaveis_vigentes(sessao, [processo.id]).get(processo.id, [])
 
 
 @router.get("/processos/{processo_id}/responsaveis")
@@ -325,27 +352,38 @@ def _responsaveis(processo: ProcessoTabela, sessao: SessaoBanco) -> list[dict[st
 def listar_responsaveis(
     processo: Processo, ator: AtorAutenticado, sessao: SessaoBanco
 ) -> dict[str, Any]:
-    """Lista os responsáveis; gestores também recebem assessores elegíveis do gabinete."""
-    pode_gerir = pode(ator.papel, Permissao.GERIR_ASSESSOR, ator.gabinete_id, processo.gabinete_id)
-    disponiveis = []
-    if pode_gerir:
-        usuarios = sessao.scalars(
-            select(UsuarioTabela)
-            .where(
-                UsuarioTabela.gabinete_id == processo.gabinete_id,
-                UsuarioTabela.papel == "assessor",
-                UsuarioTabela.ativo.is_(True),
-            )
-            .order_by(UsuarioTabela.nome_usuario)
-        )
-        disponiveis = [
-            {"id": u.id, "nome_usuario": u.nome_usuario, "ativo": u.ativo} for u in usuarios
-        ]
+    """Responsáveis vigentes; o desembargador também recebe os assessores ativos elegíveis.
+
+    Args:
+        processo: Processo carregado.
+        ator: Ator autenticado.
+        sessao: Sessão da requisição.
+
+    Returns:
+        `{responsaveis, disponiveis, pode_gerir}`.
+    """
+    pode_gerir = tem_permissao(ator.papel, Permissao.GERIR_ASSESSOR)
+    disponiveis = [_usuario(u) for u in _assessores_ativos(sessao)] if pode_gerir else []
     return {
-        "responsaveis": _responsaveis(processo, sessao),
+        "responsaveis": _listar_responsaveis(sessao, processo),
         "disponiveis": disponiveis,
         "pode_gerir": pode_gerir,
     }
+
+
+def _travar_responsaveis(sessao: Session, processo: VisaoProcesso) -> None:
+    chave = int.from_bytes(processo.hk_processo[:4], "big", signed=True)
+    sessao.execute(select(func.pg_advisory_xact_lock(TRAVA_RESPONSAVEIS, chave)))
+
+
+def _conferir_novos(sessao: Session, corpo: CorpoResponsaveis) -> dict[str, VisaoUsuario]:
+    novos = {usuario_id.lower() for usuario_id in corpo.usuarios}
+    if len(novos) != len(corpo.usuarios):
+        raise DadosInvalidosError("não repita responsáveis")
+    validos = {u.id: u for u in _assessores_ativos(sessao, novos)}
+    if set(validos) != novos:
+        raise DadosInvalidosError("selecione apenas assessores ativos")
+    return validos
 
 
 @router.post("/processos/{processo_id}/responsaveis")
@@ -356,69 +394,44 @@ def definir_responsaveis(
     sessao: SessaoBanco,
     ctx: ContextoReq,
 ) -> dict[str, Any]:
-    """Adiciona ou transfere responsabilidade a assessores ativos do mesmo gabinete."""
-    if not pode(ator.papel, Permissao.GERIR_ASSESSOR, ator.gabinete_id, processo.gabinete_id):
-        raise PermissaoNegadaError("somente o gestor do gabinete pode alterar responsáveis")
-    # Serializa alterações por processo, inclusive quando a lista inicial está vazia.
-    sessao.execute(
-        select(ProcessoTabela.id).where(ProcessoTabela.id == processo.id).with_for_update()
-    )
-    atuais = set(
-        sessao.scalars(
-            select(ProcessoResponsavelTabela.usuario_id).where(
-                ProcessoResponsavelTabela.processo_id == processo.id
-            )
-        )
-    )
-    if atuais != set(corpo.anteriores):
+    """Adiciona ou transfere a responsabilidade a assessores ativos (RF-PRO-03).
+
+    Args:
+        corpo: Conjunto desejado e o conjunto que o cliente conhecia.
+        processo: Processo carregado.
+        ator: Desembargador.
+        sessao: Sessão da requisição.
+        ctx: Contexto para a auditoria.
+
+    Returns:
+        `{responsaveis}` depois da mudança.
+
+    Raises:
+        PermissaoNegadaError: Papel sem `gerir_assessor`.
+        ConflitoError: Os responsáveis mudaram desde a leitura do cliente.
+        DadosInvalidosError: Usuário repetido, inexistente, inativo ou que não é assessor.
+    """
+    if not tem_permissao(ator.papel, Permissao.GERIR_ASSESSOR):
+        raise PermissaoNegadaError("somente o desembargador pode alterar responsáveis")
+    _travar_responsaveis(sessao, processo)
+    atuais = _vigentes(sessao, processo)
+    if atuais != {usuario_id.lower() for usuario_id in corpo.anteriores}:
         raise ConflitoError("Os responsáveis mudaram. Recarregue a lista antes de salvar.")
-    novos = set(corpo.usuarios)
-    if len(novos) != len(corpo.usuarios):
-        raise DadosInvalidosError("não repita responsáveis")
-    validos = set(
-        sessao.scalars(
-            select(UsuarioTabela.id)
-            .where(
-                UsuarioTabela.id.in_(novos),
-                UsuarioTabela.gabinete_id == processo.gabinete_id,
-                UsuarioTabela.papel == "assessor",
-                UsuarioTabela.ativo.is_(True),
-            )
-            .with_for_update()
-        )
+    novos = _conferir_novos(sessao, corpo)
+    mudancas = (
+        (set(novos) - atuais, True, AcaoAuditoria.RESPONSAVEL_ADICIONADO),
+        (atuais - set(novos), False, AcaoAuditoria.RESPONSAVEL_REMOVIDO),
     )
-    if validos != novos:
-        raise DadosInvalidosError("selecione apenas assessores ativos do gabinete do processo")
-    removidos, adicionados = atuais - novos, novos - atuais
-    if removidos:
-        sessao.execute(
-            delete(ProcessoResponsavelTabela).where(
-                ProcessoResponsavelTabela.processo_id == processo.id,
-                ProcessoResponsavelTabela.usuario_id.in_(removidos),
-            )
-        )
-    for usuario_id in adicionados:
-        sessao.add(
-            ProcessoResponsavelTabela(
-                processo_id=processo.id,
-                usuario_id=usuario_id,
-                gabinete_id=processo.gabinete_id,
-            )
-        )
-    for ids, acao in (
-        (adicionados, AcaoAuditoria.RESPONSAVEL_ADICIONADO),
-        (removidos, AcaoAuditoria.RESPONSAVEL_REMOVIDO),
-    ):
-        for usuario_id in ids:
+    for ids, vigente, acao in mudancas:
+        for usuario_id in sorted(ids):
+            _ligar_responsavel(sessao, processo.hk_processo, bytes.fromhex(usuario_id), vigente)
             auditar(
                 sessao,
                 ctx,
                 acao,
-                usuario_id=ator.usuario_id,
-                gabinete_id=processo.gabinete_id,
-                processo_id=processo.id,
+                hk_usuario=ator.hk_usuario,
+                hk_processo=processo.hk_processo,
                 objeto_tipo="usuario",
-                objeto_id=str(usuario_id),
+                objeto_id=usuario_id,
             )
-    sessao.flush()
-    return {"responsaveis": _responsaveis(processo, sessao)}
+    return {"responsaveis": _listar_responsaveis(sessao, processo)}

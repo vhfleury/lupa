@@ -336,6 +336,26 @@ def criar_processo(
     return hk
 
 
+def criar_processo_teste(
+    engine: Engine,
+    autor: UsuarioTeste | None = None,
+    *,
+    classe: ClasseProcessual = ClasseProcessual.APELACAO_CIVEL,
+) -> bytes:
+    """Grava, com commit, um processo sintético criado pelo autor (sem responsável).
+
+    Args:
+        engine: Engine do banco de teste.
+        autor: Usuário criador; sem ele, grava um assessor sintético.
+        classe: Classe processual.
+
+    Returns:
+        O `hk_processo`.
+    """
+    with Session(engine) as session, session.begin():
+        return criar_processo(session, classe=classe, criador=autor.hk if autor else None)
+
+
 def criar_pagina(sessao: Session, hk_processo: bytes, texto: str = TEXTO_PAGINA) -> bytes:
     """Grava arquivo e página 1 sintéticos do processo, com o texto cifrado.
 

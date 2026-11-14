@@ -1,8 +1,9 @@
-"""Validação do número único de processo do CNJ (Resolução CNJ 65/2008)."""
+"""Número único de processo do CNJ (Resolução CNJ 65/2008): validação e máscara."""
 
 import re
 
 PADRAO_CNJ = re.compile(r"^(\d{7})-(\d{2})\.(\d{4})\.(\d)\.(\d{2})\.(\d{4})$")
+DIGITOS_CNJ = 20
 
 
 class NumeroCnjInvalidoError(ValueError):
@@ -47,3 +48,18 @@ def validar_numero_cnj(numero: str) -> str:
     if calcular_digito_verificador(sequencial, ano, justica, tribunal, origem) != digito:
         raise NumeroCnjInvalidoError("dígito verificador CNJ inválido")
     return numero
+
+
+def formatar_numero_cnj(digitos: str) -> str:
+    """Aplica a máscara NNNNNNN-DD.AAAA.J.TR.OOOO aos 20 dígitos guardados no hub.
+
+    Args:
+        digitos: Número só com dígitos (`hub_processo.numero_cnj`).
+
+    Returns:
+        O número com máscara; texto que não tem 20 dígitos volta sem mudança.
+    """
+    if len(digitos) != DIGITOS_CNJ or not digitos.isdigit():
+        return digitos
+    partes = (digitos[:7], digitos[7:9], digitos[9:13], digitos[13], digitos[14:16], digitos[16:])
+    return "{}-{}.{}.{}.{}.{}".format(*partes)

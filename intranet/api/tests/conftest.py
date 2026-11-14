@@ -1,8 +1,8 @@
 """Fixtures da intranet (aplicação, login e MFA); as comuns vêm de `pipeline/tests/apoio/`.
 
-Fase 3 (D23): até as rotas de processos, ingestão, auditoria e agente importarem sobre o Data
-Vault (T3.6 a T3.14), `app_teste` monta só as rotas de acesso, sem `create_app`, e
-`apoio_ingestao` fica fora de `pytest_plugins` (volta em T3.7 a T3.9).
+Fase 3 (D23): até as rotas de ingestão, auditoria e agente importarem sobre o Data Vault (T3.11
+a T3.14), `app_teste` monta só as rotas de acesso e de processos, com a auditoria automática e
+sem `create_app`, e `apoio_ingestao` fica fora de `pytest_plugins` (volta em T3.7 a T3.9).
 """
 
 from collections.abc import Iterator
@@ -22,6 +22,8 @@ from lupa_intranet.acesso import rotas as rotas_acesso
 from lupa_intranet.acesso import senhas
 from lupa_intranet.acesso.autorizacao import relogio
 from lupa_intranet.acesso.erros import RecusaAcessoError, tratar_erro_acesso
+from lupa_intranet.api.middleware import auditoria_middleware
+from lupa_intranet.api.rotas import processos as rotas_processos
 from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.dominio.visoes import VisaoUsuario
 
@@ -58,12 +60,14 @@ def resolvedor_falso() -> ResolvedorFalso:
 
 @pytest.fixture
 def app_teste(fabrica_sessao: sessionmaker[Session], resolvedor_falso: ResolvedorFalso) -> FastAPI:
-    """Aplicação com as rotas de acesso, ligada ao banco de teste e ao resolvedor falso."""
+    """Aplicação com as rotas de acesso e de processos, ligada ao banco de teste."""
     app = FastAPI()
     app.state.fabrica_sessao = fabrica_sessao
     app.state.resolvedor = resolvedor_falso
     app.add_exception_handler(RecusaAcessoError, tratar_erro_acesso)
+    app.middleware("http")(auditoria_middleware)
     app.include_router(rotas_acesso.router)
+    app.include_router(rotas_processos.router)
     return app
 
 

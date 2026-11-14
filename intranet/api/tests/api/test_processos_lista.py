@@ -1,22 +1,34 @@
-"""Lista, criação e arquivos do processo (Etapa 6.4): isolamento, validação CNJ e auditoria."""
+"""Cadastro, lista e arquivos do processo (RF-PRO-01, RF-PRO-02, RF-PRO-03)."""
+
+from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
+from sqlalchemy.orm import Session
 
-from apoio_arquivos import pdf_com_senha, pdf_minimo
 from apoio_comum import (
+    ORIGEM_TESTE,
     UsuarioTeste,
-    criar_gabinete_teste,
     criar_processo_teste,
     eventos_do_banco,
     gerar_numero_cnj,
 )
 from lupa_intranet.api.rotas.processos import resumir_ingestao
-from lupa_pipeline.dominio.enums import PapelUsuario
-from lupa_pipeline.ingestao.fila import FilaMemoria
-from lupa_pipeline.ingestao.storage import ArmazenamentoMemoria
+from lupa_pipeline.dominio.chaves import chave_hash
+from lupa_pipeline.dominio.enums import EstadoJob, PapelUsuario
+from lupa_pipeline.dominio.esquemas import calcular_hash
+from lupa_pipeline.dominio.gravacao import gravar_hub, gravar_link, gravar_satelite
+from lupa_pipeline.dominio.tabelas import (
+    hub_arquivo,
+    link_processo_arquivo,
+    sat_arquivo_dados,
+    sat_arquivo_ingestao,
+)
+from lupa_pipeline.dominio.visoes import VisaoProcesso
+from lupa_pipeline.ingestao.storage import chave_objeto
+from lupa_pipeline.seguranca.contexto import ativar_processo
 from tests.conftest import criar_usuario_teste, logar
 
 pytestmark = pytest.mark.integracao
@@ -28,100 +40,119 @@ def _cliente(app: FastAPI, engine: Engine, usuario: UsuarioTeste) -> TestClient:
     return cliente
 
 
-def _corpo(sequencial: int) -> dict[str, object]:
-    return {
-        "numero_cnj": gerar_numero_cnj(sequencial),
-        "classe": "Apelação Criminal",
-        "materia": "criminal",
-    }
+def _corpo(sequencial: int, classe: str = "agravo_instrumento") -> dict[str, object]:
+    return {"numero_cnj": gerar_numero_cnj(sequencial), "classe": classe}
 
 
-def test_assessor_cria_processo_valida_cnj_e_recusa_duplicado(
+def _semear_arquivo(engine: Engine, hk_processo: bytes, nome: str, estado: EstadoJob) -> None:
+    with Session(engine) as session, session.begin():
+        processo = session.scalars(
+            select(VisaoProcesso).where(VisaoProcesso.hk_processo == hk_processo)
+        ).one()
+        ativar_processo(hk_processo, processo.chave_dados_cifrada)
+        sha256 = calcular_hash(uuid4().hex)
+        chave = {"numero_cnj": processo.numero_cnj, "sha256": sha256}
+        hk_arquivo = gravar_hub(session, hub_arquivo, chave, ORIGEM_TESTE)
+        ligacao = {"hk_processo": hk_processo, "hk_arquivo": hk_arquivo}
+        gravar_link(session, link_processo_arquivo, ligacao, ORIGEM_TESTE)
+        dados = {
+            "tamanho_bytes": 10,
+            "nome_original": nome,
+            "mime": "application/pdf",
+            "chave_storage": chave_objeto(hk_processo, sha256),
+            "hk_usuario": processo.hk_criador,
+        }
+        gravar_satelite(session, sat_arquivo_dados, hk_arquivo, dados, ORIGEM_TESTE)
+        ingestao = {
+            "estado": estado.value,
+            "motivo_quarentena": "senha" if estado is EstadoJob.QUARENTENA else None,
+            "motivo_falha": None,
+            "tentativas": 0,
+            "total_paginas": None,
+            "manifesto": None,
+            "relatorio": None,
+            "versao_extrator": None,
+        }
+        gravar_satelite(session, sat_arquivo_ingestao, hk_arquivo, ingestao, ORIGEM_TESTE)
+
+
+def test_cadastro_com_classe_valida_o_cnj_e_recusa_duplicado_apontando_o_existente(
     app_teste: FastAPI, engine_teste: Engine
 ) -> None:
-    """201 com auditoria; CNJ com dígito errado dá 422; repetido no gabinete dá 409."""
-    gabinete = criar_gabinete_teste(engine_teste)
-    assessor = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR, gabinete)
+    """RF-PRO-01: 201 auditado; dígito errado dá 422; repetido dá 409 com o id do existente."""
+    assessor = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
     cliente = _cliente(app_teste, engine_teste, assessor)
-    resposta = cliente.post("/processos", json=_corpo(4321))
+    sequencial = uuid4().int % 9_000_000 + 1
+    resposta = cliente.post("/processos", json=_corpo(sequencial))
     assert resposta.status_code == 201, resposta.text
     criado = resposta.json()
-    assert criado["status"] == "criado" and criado["gabinete_id"] == str(gabinete)
+    numero = gerar_numero_cnj(sequencial)
+    assert criado["id"] == chave_hash([numero.replace("-", "").replace(".", "")]).hex()
+    assert (criado["classe"], criado["status"], criado["numero_cnj"]) == (
+        "agravo_instrumento",
+        "criado",
+        numero,
+    )
     eventos = eventos_do_banco(engine_teste, acao="processo_criado", objeto_id=criado["id"])
-    assert [e.resultado for e in eventos] == ["ok"]
-    assert cliente.post("/processos", json=_corpo(4321)).status_code == 409
-    valido = gerar_numero_cnj(4322)
+    assert [(e.resultado, e.processo_id) for e in eventos] == [("ok", criado["id"])]
+    repetido = cliente.post("/processos", json=_corpo(sequencial, "apelacao_civel"))
+    assert repetido.status_code == 409
+    assert repetido.json()["processo_id"] == criado["id"]
+    assert "já cadastrado" in repetido.json()["detail"]
+    valido = gerar_numero_cnj(sequencial + 1)
     digito_errado = f"{(int(valido[8:10]) + 1) % 100:02d}"
-    errado = _corpo(4322) | {"numero_cnj": valido[:8] + digito_errado + valido[10:]}
+    errado = _corpo(1) | {"numero_cnj": valido[:8] + digito_errado + valido[10:]}
     assert cliente.post("/processos", json=errado).status_code == 422
-    assert cliente.post("/processos", json=_corpo(1) | {"numero_cnj": "123"}).status_code == 422
 
 
-def test_admin_precisa_informar_gabinete_e_desembargador_de_outro_gabinete_e_negado(
+@pytest.mark.parametrize(
+    "extra",
+    [{"classe": "Apelação Criminal"}, {"materia": "civel"}, {"sigiloso": True}, {"classe": None}],
+)
+def test_cadastro_recusa_classe_fora_da_lista_e_campos_da_versao_anterior(
+    app_teste: FastAPI, engine_teste: Engine, extra: dict[str, object]
+) -> None:
+    """RF-PRO-01, RF-PRO-04: classe só da seção 3.1; `materia` e `sigiloso` não existem."""
+    assessor = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
+    corpo = _corpo(uuid4().int % 9_000_000 + 1) | extra
+    resposta = _cliente(app_teste, engine_teste, assessor).post("/processos", json=corpo)
+    assert resposta.status_code == 422
+
+
+def test_lista_e_igual_para_dois_usuarios_com_classe_estado_e_responsaveis(
     app_teste: FastAPI, engine_teste: Engine
 ) -> None:
-    """Admin sem gabinete-alvo: 422; com gabinete: 201. Outro gabinete: 403 auditado."""
-    gabinete = criar_gabinete_teste(engine_teste)
-    admin = criar_usuario_teste(engine_teste, PapelUsuario.ADMINISTRADOR, None)
-    cliente = _cliente(app_teste, engine_teste, admin)
-    assert cliente.post("/processos", json=_corpo(5101)).status_code == 422
-    corpo = _corpo(5101) | {"gabinete_id": str(gabinete)}
-    assert cliente.post("/processos", json=corpo).status_code == 201
-    desembargador = criar_usuario_teste(
-        engine_teste, PapelUsuario.DESEMBARGADOR, criar_gabinete_teste(engine_teste)
-    )
-    outro = _cliente(app_teste, engine_teste, desembargador)
-    assert (
-        outro.post("/processos", json=_corpo(5102) | {"gabinete_id": str(gabinete)}).status_code
-        == 403
-    )
-    negados = eventos_do_banco(
-        engine_teste, acao="processo_criado", usuario_id=desembargador.id, resultado="negado"
-    )
-    assert len(negados) == 1
+    """RF-PRO-02: dois usuários veem a mesma lista, com classe, ingestão e responsáveis."""
+    assessor = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
+    desembargador = criar_usuario_teste(engine_teste, PapelUsuario.DESEMBARGADOR)
+    cliente_assessor = _cliente(app_teste, engine_teste, assessor)
+    cliente_desembargador = _cliente(app_teste, engine_teste, desembargador)
+    criado = cliente_assessor.post("/processos", json=_corpo(uuid4().int % 9_000_000 + 1)).json()
+    alheio = criar_processo_teste(engine_teste)
+    _semear_arquivo(engine_teste, bytes.fromhex(criado["id"]), "a.pdf", EstadoJob.RECEBIDO)
+    _semear_arquivo(engine_teste, bytes.fromhex(criado["id"]), "b.pdf", EstadoJob.QUARENTENA)
 
-
-def test_lista_mostra_so_o_gabinete_com_situacao_da_ingestao_e_e_auditada(
-    app_teste: FastAPI, engine_teste: Engine
-) -> None:
-    """Lista isolada por gabinete, com a situação vinda de `job_ingestao`; evento `busca`."""
-    assessor = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
-    vizinho = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
-    app_teste.state.storage = ArmazenamentoMemoria()
-    app_teste.state.fila = FilaMemoria()
-    meu = criar_processo_teste(engine_teste, assessor)
-    alheio = criar_processo_teste(engine_teste, vizinho)
-    cliente = _cliente(app_teste, engine_teste, assessor)
-    assert (
-        cliente.post(f"/processos/{meu}/arquivos?nome=a.pdf", content=pdf_minimo(2)).status_code
-        == 201
-    )
-    assert (
-        cliente.post(f"/processos/{meu}/arquivos?nome=b.pdf", content=pdf_com_senha()).status_code
-        == 201
-    )
-
-    lista = cliente.get("/processos")
-    assert lista.status_code == 200
-    ids = [p["id"] for p in lista.json()]
-    assert str(meu) in ids and str(alheio) not in ids
-    item = next(p for p in lista.json() if p["id"] == str(meu))
+    lista_assessor = cliente_assessor.get("/processos")
+    lista_desembargador = cliente_desembargador.get("/processos")
+    assert lista_assessor.status_code == lista_desembargador.status_code == 200
+    assert lista_assessor.json() == lista_desembargador.json()
+    ids = [p["id"] for p in lista_assessor.json()]
+    assert criado["id"] in ids and alheio.hex() in ids
+    item = next(p for p in lista_assessor.json() if p["id"] == criado["id"])
+    assert item["classe"] == "agravo_instrumento"
     assert item["ingestao"]["situacao"] == "processando"
-    assert item["ingestao"]["por_estado"] == {"recebido": 2}
+    assert item["ingestao"]["por_estado"] == {"recebido": 1, "quarentena": 1}
+    assert [r["id"] for r in item["responsaveis"]] == [assessor.id]
     assert eventos_do_banco(engine_teste, acao="busca", usuario_id=assessor.id)
 
-    arquivos = cliente.get(f"/processos/{meu}/arquivos")
+    arquivos = cliente_desembargador.get(f"/processos/{criado['id']}/arquivos")
     assert arquivos.status_code == 200
     corpo = arquivos.json()
-    assert {a["nome"] for a in corpo["arquivos"]} == {"a.pdf", "b.pdf"}
-    assert all(a["estado"] == "recebido" for a in corpo["arquivos"])
-    assert cliente.get(f"/processos/{alheio}/arquivos").status_code == 404
-    aberto = cliente.get(f"/processos/{meu}").json()
-    assert aberto["sigiloso"] is False and "criado_em" in aberto
+    assert {(a["nome"], a["estado"]) for a in corpo["arquivos"]} == {
+        ("a.pdf", "recebido"),
+        ("b.pdf", "quarentena"),
+    }
+    assert {a["motivo_quarentena"] for a in corpo["arquivos"]} == {None, "senha"}
 
 
 @pytest.mark.parametrize(
@@ -132,31 +163,29 @@ def test_lista_mostra_so_o_gabinete_com_situacao_da_ingestao_e_e_auditada(
         (["quarentena"], "quarentena"),
         (["quarentena", "falho"], "falho"),
         (["concluido", "em_revisao"], "pendencias"),
+        (["concluido", "parcial"], "pendencias"),
         (["concluido", "quarentena"], "concluido"),
     ],
 )
 def test_resumo_da_ingestao(estados: list[str], esperado: str) -> None:
-    """Situação agregada a partir dos estados dos jobs."""
+    """RF-PRO-02: situação agregada a partir dos estados dos arquivos."""
     assert resumir_ingestao(estados) == esperado
 
 
-def test_meus_processos_filtra_responsavel_sem_restringir_visao_do_gabinete(
+def test_meus_processos_filtra_pelo_responsavel_sem_restringir_a_lista(
     app_teste: FastAPI, engine_teste: Engine
 ) -> None:
-    """O responsável é quem cadastrou; o desembargador continua vendo o gabinete."""
-    gabinete = criar_gabinete_teste(engine_teste)
-    a = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR, gabinete)
-    b = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR, gabinete)
-    des = criar_usuario_teste(engine_teste, PapelUsuario.DESEMBARGADOR, gabinete)
-    vizinho = criar_usuario_teste(
-        engine_teste, PapelUsuario.ASSESSOR, criar_gabinete_teste(engine_teste)
-    )
-    meu = criar_processo_teste(engine_teste, a)
-    colega = criar_processo_teste(engine_teste, b)
-    criar_processo_teste(engine_teste, vizinho)
-    cliente = _cliente(app_teste, engine_teste, a)
-    assert {p["id"] for p in cliente.get("/processos?meus=true").json()} == {str(meu)}
-    assert {p["id"] for p in cliente.get("/processos").json()} == {str(meu), str(colega)}
-    gestor = _cliente(app_teste, engine_teste, des)
-    assert {p["id"] for p in gestor.get("/processos").json()} == {str(meu), str(colega)}
+    """RF-PRO-03: o assessor que cadastra é o responsável; a lista completa não muda."""
+    a = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
+    b = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
+    desembargador = criar_usuario_teste(engine_teste, PapelUsuario.DESEMBARGADOR)
+    cliente_a = _cliente(app_teste, engine_teste, a)
+    cliente_b = _cliente(app_teste, engine_teste, b)
+    gestor = _cliente(app_teste, engine_teste, desembargador)
+    meu = cliente_a.post("/processos", json=_corpo(uuid4().int % 9_000_000 + 1)).json()["id"]
+    colega = cliente_b.post("/processos", json=_corpo(uuid4().int % 9_000_000 + 1)).json()["id"]
+    do_gestor = gestor.post("/processos", json=_corpo(uuid4().int % 9_000_000 + 1)).json()["id"]
+    assert {p["id"] for p in cliente_a.get("/processos?meus=true").json()} == {meu}
+    assert {meu, colega, do_gestor} <= {p["id"] for p in cliente_a.get("/processos").json()}
     assert gestor.get("/processos?meus=true").json() == []
+    assert cliente_b.get(f"/processos/{meu}").status_code == 200

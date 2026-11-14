@@ -11,11 +11,10 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.concurrency import run_in_threadpool
 
-from lupa_intranet.acesso.servico import Ator, definir_contexto
+from lupa_intranet.acesso.servico import Ator
 from lupa_intranet.api.banco import sessao_aplicacao
 from lupa_intranet.auditoria.eventos import AcaoAuditoria, NovoEvento
 from lupa_intranet.auditoria.registrador import registrar
-from lupa_pipeline.dominio.enums import PapelUsuario
 
 CABECALHO_REQUEST_ID = "X-Request-ID"
 MENSAGEM_FALHA_AUDITORIA = "falha ao registrar a auditoria; conteúdo não entregue"
@@ -50,7 +49,7 @@ class MarcaAuditoria:
 
     Attributes:
         acao: Ação registrada quando a rota responde com sucesso.
-        conteudo: Se a rota devolve conteúdo de autos (gera `admin_acesso_conteudo` para admin).
+        conteudo: Se a rota devolve conteúdo de autos.
     """
 
     acao: AcaoAuditoria
@@ -88,29 +87,22 @@ def auditar_rota(acao: AcaoAuditoria, *, conteudo: bool) -> Callable[[Funcao], F
     return _decorar
 
 
-def _eventos_automaticos(marca: MarcaAuditoria, ator: Ator, request: Request) -> list[NovoEvento]:
-    processo_id, gabinete_id = getattr(request.state, "processo", (None, ator.gabinete_id))
+def _evento_automatico(marca: MarcaAuditoria, ator: Ator, request: Request) -> NovoEvento:
     ip = request.client.host if request.client else None
-    base = {
-        "usuario_id": ator.usuario_id,
-        "gabinete_id": gabinete_id,
-        "processo_id": processo_id,
-        "objeto_tipo": "rota",
-        "objeto_id": request.url.path,
-        "ip": ip,
-        "localizacao": request.app.state.resolvedor.resolver(ip),
-    }
-    eventos = [NovoEvento(acao=marca.acao, **base)]
-    if marca.conteudo and ator.papel is PapelUsuario.ADMINISTRADOR:
-        eventos.append(NovoEvento(acao=AcaoAuditoria.ADMIN_ACESSO_CONTEUDO, **base))
-    return eventos
+    return NovoEvento(
+        acao=marca.acao,
+        hk_usuario=ator.hk_usuario,
+        hk_processo=getattr(request.state, "processo", None),
+        objeto_tipo="rota",
+        objeto_id=request.url.path,
+        ip=ip,
+        localizacao=request.app.state.resolvedor.resolver(ip),
+    )
 
 
-def _gravar(fabrica: sessionmaker[Session], ator: Ator, eventos: list[NovoEvento]) -> None:
+def _gravar(fabrica: sessionmaker[Session], evento: NovoEvento) -> None:
     with sessao_aplicacao(fabrica) as session:
-        definir_contexto(session, ator.papel.value, ator.gabinete_id)
-        for evento in eventos:
-            registrar(session, evento)
+        registrar(session, evento)
 
 
 async def auditoria_middleware(
@@ -119,8 +111,8 @@ async def auditoria_middleware(
     """Registra `processo_aberto`, `pagina_vista` e `busca` das rotas marcadas.
 
     Só registra respostas de sucesso de usuário autenticado; tentativas negadas são gravadas
-    por `exige_processo`. Quando o usuário é administrador e a rota devolve conteúdo de autos,
-    grava também `admin_acesso_conteudo` na cadeia do gabinete do processo.
+    por `exige_processo`. O processo do evento é o `hk_processo` que `exige_processo` deixou em
+    `request.state.processo`, quando a rota tem processo.
 
     O evento é gravado (e confirmado) ANTES de a resposta sair deste middleware: `call_next`
     devolve uma resposta em streaming cujo corpo ainda não foi enviado ao cliente. Se a gravação
@@ -140,8 +132,8 @@ async def auditoria_middleware(
     if marca is None or ator is None or response.status_code >= 400:
         return response
     try:
-        eventos = _eventos_automaticos(marca, ator, request)
-        await run_in_threadpool(_gravar, request.app.state.fabrica_sessao, ator, eventos)
+        evento = _evento_automatico(marca, ator, request)
+        await run_in_threadpool(_gravar, request.app.state.fabrica_sessao, evento)
     except Exception:
         structlog.get_logger(__name__).exception("auditoria_automatica_falhou", acao=marca.acao)
         await _descartar_corpo(response)
