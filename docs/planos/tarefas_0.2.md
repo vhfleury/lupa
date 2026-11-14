@@ -217,8 +217,7 @@ a saída resumida (vermelho inicial e verde final).
     plano), o que não foi feito porque o script regrava o `.env`.
   - `test_gravacao.py` (T3.3) passou a contar linhas pelo `hk` do teste: com `criar_processo`
     gravando com commit em outros testes, a contagem da tabela inteira deixava de ser estável.
-  - Não feito: o teste da saúde com cofre selado (RF-SEG-02) depende de `create_app` (T3.14); a
-    varredura pela API (`intranet/api/tests/seguranca/test_cifra_banco.py`) também.
+  - T3.14 verificou o retorno 503 da rota de saúde com o cofre selado. T3.16 completou a varredura do conteúdo cifrado pela API em `intranet/api/tests/seguranca/test_cifra_banco.py`.
 
 ### Notas para as próximas tarefas
 
@@ -346,7 +345,8 @@ a saída resumida (vermelho inicial e verde final).
   - A calibração concorrente com o worker produziu a transição inválida de falho para quarentena. A trava da fila eliminou o processamento duplicado. A medição antes perdia um achado ao comparar três recorrentes com a mesma regra.
   - `pytest pipeline/tests/ingestao/test_calibracao.py pipeline/tests/sinteticos/test_comparacao_achados.py --no-cov -q` cobre a concorrência e o relatório. Nos três empacotamentos, a medição encontrou todos os eventos e os três achados esperados, com os mesmos valores e folhas.
   - `pytest intranet/api/tests/auditoria/test_limpar_dev.py intranet/api/tests/acesso/test_banco_acesso.py --no-cov -q` verificou o descarte seletivo e a criação de usuários. Os três scripts E2E semearam a stack usada nas dez capturas, com três processos cíveis marcados pela origem `scripts.e2e`.
-- [ ] **T3.16** Suíte completa verde nos dois pacotes. D23.
+- [x] **T3.16** Suíte completa verde nos dois pacotes. D23.
+  - Na instalação 0.2 com serviços reais, `python -m pytest -c pipeline/pyproject.toml pipeline/tests` passou nos 697 testes (95,87%). `python -m pytest -c intranet/api/pyproject.toml intranet/api/tests` passou nos 262 testes (98,24%). A cifra em repouso foi conferida no banco e no storage. Os dois testes de modelo externo e o teste de carga usam marcadores próprios. A falha histórica da 0.1 permanece registrada em T1.7.
 
 ## Fase 4 — Conteúdo cível
 

@@ -320,7 +320,7 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [x] I: fato sem evidência é recusado no commit (RF-FAT-01). T3.2.
 - [x] I: login, falha, bloqueio, desafio e sessão (A14; RF-ACE-01, 02). T3.4.
 - [x] I: assessor recebe 403 em auditoria e usuários; desembargador não (RF-ACE-03).
-  - Usuários feito em T3.4 (`test_usuarios.py`); auditoria fica com T3.11, que monta a rota.
+  - As rotas de usuários passaram em T3.4 e as de auditoria em T3.11.
 - [x] I: criação, desativação, reativação e redefinição de assessor (RF-ACE-04). T3.4.
 - [x] I: `criar_desembargador.py` cria um e não repete (RF-ACE-05). T3.4.
 - [x] I: cadastro recusa CNJ inválido e duplicado; lista igual para dois usuários (RF-PRO-01, 02). T3.6.
@@ -338,11 +338,9 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 - [x] I: descarte apaga satélites e chave, mantém hubs, links e auditoria; conteúdo responde
   indisponível (A13; RF-PRO-05).
 - [x] I: varredura do banco e do storage não acha texto em claro; valor em claro é recusado
-  (RF-SEG-01). T3.5 (`test_cifra_satelites.py`, no nível dos satélites e do
-  storage; a varredura pela API, em `intranet/api/tests/seguranca/test_cifra_banco.py`, volta em
-  T3.14).
+  (RF-SEG-01). T3.5 verificou os satélites e o storage. T3.16 verificou os dados gravados pela API em `intranet/api/tests/seguranca/test_cifra_banco.py`.
 - [x] I: cofre selado dá 503 na saúde (RF-SEG-02).
-  - Não feito em T3.5: a saúde não mudou e o teste da rota depende de `create_app` (T3.14).
+  - A rota real montada em T3.14 respondeu com 503 quando o cofre estava selado.
 - [x] I: teto de conversa e processo em revisão bloqueiam a chamada; liberação restaura (A16;
   RF-CHA-06, 08).
 
@@ -387,7 +385,6 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
 
 ### Revisão manual
 
-- Componentes Svelte só de apresentação.
-- Chamada real ao modelo (marcador `llm`).
-- Capturas de tela dos guias.
-- Regras jurídicas da seção 11 da especificação, pelo gabinete.
+- As telas foram exercitadas no Chromium, nos temas claro e escuro. As 11 capturas dos guias foram geradas com autos sintéticos, com conferência visual das telas de evidência, correção e relatório.
+- Os dois testes com o marcador `llm` foram pulados por ausência de credencial no contêiner. A suíte do agente usou o cliente roteirizado.
+- O aceite das regras jurídicas indicadas na seção 11 da especificação cabe ao gabinete.
