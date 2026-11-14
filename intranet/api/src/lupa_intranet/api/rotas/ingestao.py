@@ -1,4 +1,4 @@
-"""Rotas da ingestão: envio de arquivo, diagnóstico, relatório de qualidade, alertas e métricas.
+"""Rotas da ingestão: envio de arquivo, diagnóstico, relatório de qualidade e alertas.
 
 `POST /processos/{id}/arquivos` recebe o arquivo como corpo binário (`application/octet-stream`)
 com o nome em `?nome=`, em streaming; não há multipart. A rota usa `exige_processo` (404 para
@@ -10,16 +10,14 @@ do processo são auditadas automaticamente (`processo_aberto`).
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from fastapi.responses import JSONResponse
-from prometheus_client import CONTENT_TYPE_LATEST
 from starlette.concurrency import run_in_threadpool
 
 from lupa_intranet.acesso.autorizacao import (
     AtorAutenticado,
     ContextoReq,
     SessaoBanco,
-    exige_papel,
     exige_processo,
 )
 from lupa_intranet.acesso.erros import NaoEncontradoError, PermissaoNegadaError
@@ -31,7 +29,6 @@ from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.dominio.tabelas import ArquivoTabela, ProcessoTabela
 from lupa_pipeline.ingestao import repositorio
 from lupa_pipeline.ingestao.fila import FilaIngestao
-from lupa_pipeline.ingestao.metricas import gerar_metricas
 from lupa_pipeline.ingestao.recepcao import (
     MotivoRecusa,
     RecepcaoRecusadaError,
@@ -54,7 +51,6 @@ MENSAGEM_SIGILOSO = "processo sigiloso: ingestão bloqueada na v1"
 
 Processo = Annotated[ProcessoTabela, Depends(exige_processo)]
 Configuracao = Annotated[Settings, Depends(get_settings)]
-Administrador = Annotated[Ator, Depends(exige_papel(Permissao.GERIR_GABINETES))]
 
 
 def _auditar_envio(
@@ -165,21 +161,6 @@ async def enviar_arquivo(
     if not lacre.duplicado:
         tarefas.add_task(_enfileirar, request.app.state.fila, lacre.job_id, processo.gabinete_id)
     return _resposta(lacre, recebido.sha256, recebido.tamanho_bytes, recebido.tipo.value)
-
-
-@router.get("/metricas")
-def metricas(_admin: Administrador, sessao: SessaoBanco, ctx: ContextoReq) -> Response:
-    """Métricas Prometheus da ingestão; só para o administrador.
-
-    Args:
-        _admin: Administrador autenticado.
-        sessao: Sessão com visão de todos os gabinetes (política do administrador).
-        ctx: Contexto (instante de referência).
-
-    Returns:
-        Texto de exposição do Prometheus.
-    """
-    return Response(content=gerar_metricas(sessao, ctx.agora), media_type=CONTENT_TYPE_LATEST)
 
 
 def _conferir_arquivo(sessao: SessaoBanco, processo: ProcessoTabela, arquivo_id: UUID) -> None:

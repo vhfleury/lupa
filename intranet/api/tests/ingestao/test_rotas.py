@@ -183,25 +183,3 @@ def test_fila_fora_do_ar_nao_derruba_o_envio(app_ingestao: FastAPI, engine_teste
         _cliente(app_ingestao, engine_teste, assessor), processo, pdf_minimo(), "a.pdf"
     )
     assert resposta.status_code == 201
-
-
-def test_metricas_so_para_administrador(app_ingestao: FastAPI, engine_teste: Engine) -> None:
-    """Admin lê o texto Prometheus; assessor recebe 403; anônimo 401."""
-    admin = criar_usuario_teste(engine_teste, PapelUsuario.ADMINISTRADOR, None)
-    assessor = _assessor(engine_teste)
-    processo = _processo(engine_teste, assessor)
-    _enviar(_cliente(app_ingestao, engine_teste, assessor), processo, pdf_minimo(), "a.pdf")
-    resposta = _cliente(app_ingestao, engine_teste, admin).get("/metricas")
-    assert resposta.status_code == 200
-    assert resposta.headers["content-type"].startswith("text/plain")
-    for nome in (
-        "lupa_ingestao_jobs",
-        "lupa_ingestao_idade_fila_segundos",
-        "lupa_ingestao_paginas_por_segundo",
-        "lupa_ingestao_retries_total",
-        "lupa_ingestao_falhas_total",
-    ):
-        assert nome in resposta.text
-    assert _cliente(app_ingestao, engine_teste, assessor).get("/metricas").status_code == 403
-    anonimo = TestClient(app_ingestao, base_url="https://testserver")
-    assert anonimo.get("/metricas").status_code == 401

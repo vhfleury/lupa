@@ -30,7 +30,7 @@ intranet/web/e2e/playwright-report/
 .backup-chaves/
 # Vault de desenvolvimento (Etapa 7.2): chave de unseal e token raiz, nunca no repositorio
 .vault-dev/
-# Segredos em arquivo para Prometheus e Grafana (Etapa 8.1), nunca no repositorio
+# Segredos em arquivo da 0.1 (Prometheus e Grafana, removidos na 0.2), nunca no repositorio
 .segredos/
 dados/
 # Claude Code: permissoes locais de cada maquina

@@ -60,8 +60,6 @@ class Settings(BaseSettings):
     vault_transit_montagem: str = "transit"
     vault_timeout_segundos: float = Field(default=5.0, gt=0)
     busca_max_paginas: int = Field(default=5000, ge=1)
-    # Etapa 8.1: token do Prometheus para GET /metricas/servico (sem ele, a rota responde 404).
-    metricas_token: SecretStr | None = None
 
     def url_banco_aplicacao(self) -> str:
         """URL usada pela API em tempo de execução.

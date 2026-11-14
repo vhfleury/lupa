@@ -5,7 +5,7 @@
 # - Nenhuma porta publicada alem do proxy: 443 (HTTPS) e 80 (so desafio ACME e redirecionamento).
 #   A porta direta da API (API_PORTA_HOST) e o console do MinIO deixam de existir.
 # - restart: unless-stopped, limites de memoria e CPU e logs com rotacao em todos os servicos.
-# - read_only onde a imagem ja permite (front, proxy, redis, backup-agendado, prometheus).
+# - read_only onde a imagem ja permite (front, proxy, redis, backup-agendado).
 # - Vault com mlock (cap IPC_LOCK, vault/producao/lupa.hcl).
 # - Dados em LUPA_DADOS_DIR (de preferencia outro disco), um subdiretorio por volume; o
 #   instalar_piloto.sh cria os subdiretorios com o dono certo de cada imagem.
@@ -110,18 +110,6 @@ services:
       resources:
         limits: {cpus: "1", memory: 512m}
 
-  prometheus:
-    <<: *comum
-    deploy:
-      resources:
-        limits: {cpus: "0.5", memory: 512m}
-
-  grafana:
-    <<: *comum
-    deploy:
-      resources:
-        limits: {cpus: "0.5", memory: 256m}
-
 volumes:
   db-dados:
     driver: local
@@ -135,9 +123,3 @@ volumes:
   caddy-dados:
     driver: local
     driver_opts: {type: none, o: bind, device: "${LUPA_DADOS_DIR:-/srv/lupa/dados}/caddy"}
-  prometheus-dados:
-    driver: local
-    driver_opts: {type: none, o: bind, device: "${LUPA_DADOS_DIR:-/srv/lupa/dados}/prometheus"}
-  grafana-dados:
-    driver: local
-    driver_opts: {type: none, o: bind, device: "${LUPA_DADOS_DIR:-/srv/lupa/dados}/grafana"}

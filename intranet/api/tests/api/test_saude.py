@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
@@ -11,6 +12,8 @@ from lupa_intranet.api.app import create_app
 from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.logging import get_logger
 from lupa_pipeline.seguranca.cofre import CHAVE_SAUDE, CofreError, CofreMemoria
+
+CREDENCIAL_FICTICIA = "valor-ficticio-de-metricas"
 
 
 def _cliente(settings: Settings) -> TestClient:
@@ -52,6 +55,23 @@ def test_verificacoes_retornam_falso_sem_servicos(settings_ficticias: Settings) 
     )
     assert saude.verificar_db(inalcancavel) is False
     assert saude.verificar_minio(inalcancavel) is False
+
+
+@pytest.mark.integracao
+@pytest.mark.parametrize("rota", ["/metricas/servico", "/metricas"])
+def test_rotas_de_metricas_nao_existem(
+    app_teste: FastAPI,
+    settings_ficticias: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    rota: str,
+) -> None:
+    """D27 e decisão 16 da especificação: sem métricas Prometheus, mesmo com token configurado."""
+    monkeypatch.setenv("LUPA_METRICAS_TOKEN", CREDENCIAL_FICTICIA)
+    configurado = Settings(**settings_ficticias.model_dump(exclude={"metricas_token"}))
+    app_teste.dependency_overrides[get_settings] = lambda: configurado
+    cliente = TestClient(app_teste, base_url="https://testserver")
+    resposta = cliente.get(rota, headers={"Authorization": f"Bearer {CREDENCIAL_FICTICIA}"})
+    assert resposta.status_code == 404
 
 
 def test_cada_requisicao_recebe_request_id_unico(

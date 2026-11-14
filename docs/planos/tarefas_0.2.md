@@ -53,7 +53,30 @@ a saída resumida (vermelho inicial e verde final).
 
 ## Fase 2 — Remoções de infraestrutura
 
-- [ ] **T2.1** Remover Prometheus, Grafana, `monitoramento/`, `ingestao/metricas.py`, as rotas `/metricas` e `/metricas/servico`, `prometheus-client` e os testes correspondentes. D27. Decisão 16.
+- [x] **T2.1** Remover Prometheus, Grafana, `monitoramento/`, `ingestao/metricas.py`, as rotas `/metricas` e `/metricas/servico`, `prometheus-client` e os testes correspondentes. D27. Decisão 16.
+  - Saíram os serviços `prometheus` e `grafana`, os segredos `metricas_token` e `grafana_senha` e
+    os volumes do compose (os volumes `lupa_prometheus-dados` e `lupa_grafana-dados` ficam órfãos
+    no Docker até a execução do plano), os blocos correspondentes de `docker-compose.prod.yml`,
+    `monitoramento/`, `ingestao/metricas.py`, `GET /metricas`, `GET /metricas/servico`,
+    `Settings.metricas_token`, as variáveis de `.env.example` e `prometheus-client` (lock com os
+    argumentos do alvo `lock`). Nenhuma outra funcionalidade lia as métricas.
+  - Testes removidos com o código: `intranet/api/tests/api/test_metricas_servico.py`,
+    `test_rotas.py::test_metricas_so_para_administrador` e os dois testes de métricas de
+    `pipeline/tests/ingestao/test_observabilidade.py`; o teste de logs do worker sem texto dos
+    autos fica no arquivo.
+  - Testes novos: `pipeline/tests/unit/test_config.py::test_configuracao_ignora_chaves_de_metricas_e_backup`
+    e `intranet/api/tests/api/test_saude.py::test_rotas_de_metricas_nao_existem`. Comandos:
+    `docker compose exec worker python -m pytest -c pipeline/pyproject.toml
+    pipeline/tests/unit/test_config.py --no-cov -q` e `docker compose exec api python -m pytest -c
+    intranet/api/pyproject.toml intranet/api/tests/api/test_saude.py --no-cov -q`.
+  - Vermelho (testes copiados para os contêineres antes da remoção): `1 failed, 5 passed`
+    (`metricas_token` ainda é campo; as chaves de backup já não eram) e `2 failed, 10 passed`
+    (`/metricas/servico` 200 com o token, `/metricas` 401). Verde, depois do rebuild: `6 passed` e
+    `12 passed`.
+  - Suítes completas: pipeline 604 passed, 1 failed (`test_rls_ativa_em_todas_as_tabelas_com_gabinete`,
+    já na linha de base), cobertura 93,98%; intranet 282 passed, 1 failed
+    (`test_remove_dados_em_cascata_do_processo`, já na linha de base), 2 skipped, 3 deselected,
+    cobertura 98,71%. `ruff check`, `ruff format --check` e `mypy` nos dois pacotes: ok.
 - [ ] **T2.2** Remover backup: serviços do compose, scripts, `tests/backup/`, marcador `backup` e `docs/operacao/backup.md`. Decisão 16.
 - [ ] **T2.3** Remover o perfil de produção: `docker-compose.prod.yml`, `instalar_piloto.sh`, `conferir_piloto.py`, `preparar_repositorio.md`, `vault/producao/` e os modos `acme` e `fornecido` do proxy. D25. RES-11.
 
