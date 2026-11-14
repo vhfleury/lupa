@@ -1,50 +1,42 @@
-"""Registro das validações disponíveis por matéria e versão do catálogo."""
+"""Tabela de validações aplicáveis a cada classe processual (RF-VAL-01)."""
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
-from typing import Literal
 
-from lupa_pipeline.validacoes.criminal import prescricao, preventiva, tempestividade
+from lupa_pipeline.validacoes.civel import cabimento, preparo, representacao, tempestividade
 from lupa_pipeline.validacoes.modelo import AchadoValidacao, ModeloProcesso
 from lupa_pipeline.validacoes.versao import VERSAO_CATALOGO
 
-Materia = Literal["criminal", "civel"]
-
-__all__ = ["CATALOGO", "VERSAO_CATALOGO", "Materia", "Validacao", "validacoes_de"]
+__all__ = ["CATALOGO", "VERSAO_CATALOGO", "Validacao", "validacoes_de"]
 
 
 @dataclass(frozen=True)
 class Validacao:
-    """Entrada do catálogo: nome, fatos usados, base legal e função pura."""
+    """Regra de conferência e base jurídica do achado."""
 
     nome: str
-    fatos_necessarios: tuple[str, ...]
     base_legal: str
     executar: Callable[[ModeloProcesso, date], AchadoValidacao]
 
 
+TEMPESTIVIDADE = Validacao(tempestividade.NOME, tempestividade.BASE_LEGAL, tempestividade.executar)
+PREPARO = Validacao(preparo.NOME, preparo.BASE_LEGAL, preparo.executar)
+REPRESENTACAO = Validacao(representacao.NOME, representacao.BASE_LEGAL, representacao.executar)
+CABIMENTO = Validacao(cabimento.NOME, cabimento.BASE_LEGAL, cabimento.executar)
+REGRAS_COM_PREPARO = (TEMPESTIVIDADE, PREPARO, REPRESENTACAO)
 CATALOGO: Mapping[str, tuple[Validacao, ...]] = {
-    "criminal": tuple(
-        Validacao(m.NOME, m.FATOS_NECESSARIOS, m.BASE_LEGAL, m.executar)
-        for m in (tempestividade, prescricao, preventiva)
-    ),
-    "civel": (),
+    "apelacao_civel": REGRAS_COM_PREPARO,
+    "agravo_instrumento": (*REGRAS_COM_PREPARO, CABIMENTO),
+    "embargos_declaracao": (TEMPESTIVIDADE, REPRESENTACAO),
+    "agravo_interno": REGRAS_COM_PREPARO,
+    "acao_originaria": (),
 }
 
 
-def validacoes_de(materia: str) -> tuple[Validacao, ...]:
-    """Lista as validações de uma matéria.
-
-    Args:
-        materia: ``criminal`` ou ``civel``.
-
-    Returns:
-        Validações registradas.
-
-    Raises:
-        ValueError: Se a matéria não existir no catálogo.
-    """
-    if materia not in CATALOGO:
-        raise ValueError(f"matéria desconhecida: {materia}")
-    return CATALOGO[materia]
+def validacoes_de(classe: str) -> tuple[Validacao, ...]:
+    """Devolve as regras da classe em ordem ou recusa uma classe desconhecida."""
+    try:
+        return CATALOGO[classe]
+    except KeyError as erro:
+        raise ValueError(f"classe desconhecida: {classe}") from erro

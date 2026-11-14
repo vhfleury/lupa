@@ -1,0 +1,5 @@
+versao: "0.2.0"
+fonte: "https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2015/lei/l13105compilada.htm"
+suspensoes:
+  - {inicio: 2025-12-20, fim: 2026-01-20, descricao: "Suspensão de prazos 2025/2026", base_legal: "art. 220 do CPC"}
+  - {inicio: 2026-12-20, fim: 2027-01-20, descricao: "Suspensão de prazos 2026/2027", base_legal: "art. 220 do CPC"}

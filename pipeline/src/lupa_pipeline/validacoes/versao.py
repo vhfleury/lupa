@@ -1,3 +1,3 @@
-"""Versão do catálogo de validações gravada em cada achado."""
+"""Versão das regras gravada em cada achado."""
 
-VERSAO_CATALOGO = "2026.10.0"
+VERSAO_CATALOGO = "0.2.0"

@@ -350,7 +350,9 @@ a saída resumida (vermelho inicial e verde final).
 - [ ] **T4.3** Classificação e fronteiras de peças cíveis. RF-PEC-01.
 - [ ] **T4.4** Partes. A6 passos 1 e 2. RF-FAT-04.
 - [ ] **T4.5** Extratores de fatos cíveis. A6 passos 3 a 8. D17. RF-FAT-01, RF-FAT-02.
-- [ ] **T4.6** Catálogo por classe e dados do CPC (`prazos_recursos.yaml`, `preparo.yaml`, `cabimento_art1015.yaml`). D16. RF-VAL-01.
+- [x] **T4.6** Catálogo por classe e dados do CPC (`prazos_recursos.yaml`, `preparo.yaml`, `cabimento_art1015.yaml`). D16. RF-VAL-01.
+  - As cinco consultas por classe falharam no catálogo por matéria da 0.1. No worker,
+    `python -m pytest pipeline/tests/validacoes/test_catalogo_civel.py --no-cov -q` passou nos cinco casos da tabela 3.1.
 - [ ] **T4.7** Tempestividade. A7. RF-VAL-02.
 - [ ] **T4.8** Preparo. A8. RF-VAL-03.
 - [ ] **T4.9** Representação. A9. RF-VAL-04.
