@@ -27,6 +27,7 @@ from lupa_pipeline.dominio.visoes import (
     VisaoProcesso,
     atual,
 )
+from lupa_pipeline.ingestao.eventos.modelo import PaginaTexto, evidencia_de
 from lupa_pipeline.ingestao.repositorio_pecas import gravar_evidencia
 from lupa_pipeline.validacoes.catalogo import validacoes_de
 from lupa_pipeline.validacoes.modelo import ModeloProcesso
@@ -47,7 +48,7 @@ def processo_para_gravar(session: Session, hk: bytes) -> VisaoProcesso:
 
 
 def evidencia_da_pagina(session: Session, processo_id: bytes, evidencia: Evidencia) -> bytes:
-    """Verifica a página do processo e o trecho no texto normalizado ou no texto original."""
+    """Resolve a seleção na página do processo e grava offsets e trecho do original."""
     pagina = session.scalar(
         select(VisaoPagina).where(
             VisaoPagina.hk_processo == processo_id, VisaoPagina.id == evidencia.pagina_id
@@ -55,20 +56,24 @@ def evidencia_da_pagina(session: Session, processo_id: bytes, evidencia: Evidenc
     )
     if pagina is None:
         raise ValueError("página não pertence ao processo")
-    trecho = evidencia.trecho
-    for texto in (pagina.texto_normalizado, pagina.texto):
-        if texto and texto[evidencia.inicio : evidencia.fim] == trecho:
-            dados = {
-                "numero_cnj": pagina.numero_cnj,
-                "sha256": pagina.sha256,
-                "numero": pagina.numero,
-                "hk_pagina": pagina.hk_pagina,
-                "texto": texto,
-            }
-            return gravar_evidencia(
-                session, dados, evidencia.inicio, evidencia.fim, trecho, evidencia.bbox
-            )
-    raise ValueError("o trecho não confere com o texto da página")
+    texto = pagina.texto or ""
+    original = evidencia
+    if evidencia.fim > len(texto) or texto[evidencia.inicio : evidencia.fim] != evidencia.trecho:
+        fonte = PaginaTexto(pagina.id, pagina.numero, texto, pagina.texto_normalizado or "")
+        mapeada = evidencia_de(fonte, evidencia.inicio, evidencia.fim, evidencia.trecho)
+        if mapeada is None:
+            raise ValueError("o trecho não confere com o texto da página")
+        original = mapeada
+    dados = {
+        "numero_cnj": pagina.numero_cnj,
+        "sha256": pagina.sha256,
+        "numero": pagina.numero,
+        "hk_pagina": pagina.hk_pagina,
+        "texto": texto,
+    }
+    return gravar_evidencia(
+        session, dados, original.inicio, original.fim, original.trecho, evidencia.bbox
+    )
 
 
 def vincular_evidencia(session: Session, fato: bytes, evidencia: bytes, vigente: bool) -> None:

@@ -7,14 +7,19 @@ from sqlalchemy.orm import Session
 from apoio_comum import criar_pagina, criar_processo
 from lupa_pipeline.dominio.correcoes import corrigir_fato
 from lupa_pipeline.dominio.enums import ResultadoAchado, StatusFato, TipoFato
-from lupa_pipeline.dominio.esquemas import Achado, Evidencia, Fato
+from lupa_pipeline.dominio.esquemas import Achado, Evidencia, Fato, calcular_hash
+from lupa_pipeline.dominio.gravacao import gravar_satelite
 from lupa_pipeline.dominio.repositorios import (
     listar_achados,
     listar_fatos_por_processo,
     salvar_achado,
     salvar_fato,
 )
-from lupa_pipeline.dominio.tabelas import sat_achado_resultado, sat_fato_valor
+from lupa_pipeline.dominio.tabelas import (
+    sat_achado_resultado,
+    sat_fato_valor,
+    sat_pagina_saneamento,
+)
 from lupa_pipeline.dominio.visoes import VisaoProcesso
 
 pytestmark = pytest.mark.integracao
@@ -27,14 +32,34 @@ def evidencia(pagina: bytes, trecho: str, inicio: int) -> Evidencia:
     )
 
 
-def test_correcao_troca_evidencias_preserva_id_e_reprocessamento(sessao: Session) -> None:
+def gravar_normalizado(sessao: Session, pagina: bytes, texto: str) -> None:
+    """Grava a versão de análise ao lado do texto original da página sintética."""
+    dados = {
+        "texto_normalizado": texto,
+        "flags": {},
+        "trechos_ocultos": [],
+        "trechos_suspeitos": [],
+    }
+    gravar_satelite(sessao, sat_pagina_saneamento, pagina, dados, "teste.saneamento")
+
+
+@pytest.mark.parametrize("selecao_normalizada", [False, True])
+def test_correcao_troca_evidencias_preserva_id_e_reprocessamento(
+    sessao: Session, selecao_normalizada: bool
+) -> None:
     """RF-FAT-03. A prova humana permanece sob o mesmo identificador no replay."""
     processo = criar_processo(sessao)
     autor = sessao.get_one(VisaoProcesso, processo).hk_criador
     assert autor
-    pagina = criar_pagina(sessao, processo, "intimado em 03/03, retificado para 05/03")
+    literal = "05/\u200b03"
+    original = f"intimado em 03/03, \u200bretificado para {literal}"
+    normalizado = "intimado em 03/03, retificado para 05/03"
+    pagina = criar_pagina(sessao, processo, original)
+    gravar_normalizado(sessao, pagina, normalizado)
     origem = evidencia(pagina, "03/03", 12)
-    novo = evidencia(pagina, "05/03", 35)
+    base, selecao = (normalizado, "05/03") if selecao_normalizada else (original, literal)
+    bbox = {"x0": 15, "y0": 24, "x1": 45, "y1": 36}
+    novo = evidencia(pagina, selecao, base.index(selecao)).model_copy(update={"bbox": bbox})
     candidato = Fato(
         id="0" * 64,
         processo_id=processo.hex(),
@@ -56,7 +81,10 @@ def test_correcao_troca_evidencias_preserva_id_e_reprocessamento(sessao: Session
         "2025-03-05",
         StatusFato.CORRIGIDO,
     )
-    assert [e.trecho for e in vigente.evidencias] == ["05/03"]
+    (prova,) = vigente.evidencias
+    assert prova.inicio == original.index(literal) and prova.fim == prova.inicio + len(literal)
+    assert prova.trecho == original[prova.inicio : prova.fim] == literal
+    assert prova.hash_trecho == calcular_hash(literal) and prova.bbox == bbox
     assert (
         sessao.scalar(
             select(func.count()).select_from(sat_fato_valor).where(sat_fato_valor.c.hk_fato == hk)
@@ -71,7 +99,9 @@ def test_recusa_evidencia_de_outro_processo_ou_trecho_incorreto(sessao: Session)
     pagina_externa = criar_pagina(sessao, externo, "origem")
     processo = criar_processo(sessao)
     pagina = criar_pagina(sessao, processo, "outra")
-    for pagina_id in (pagina_externa, pagina):
+    pagina_inconsistente = criar_pagina(sessao, processo, "outra")
+    gravar_normalizado(sessao, pagina_inconsistente, "origem")
+    for pagina_id in (pagina_externa, pagina, pagina_inconsistente):
         candidato = Fato(
             id="0" * 64,
             processo_id=processo.hex(),
