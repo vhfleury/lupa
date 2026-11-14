@@ -1,41 +1,25 @@
 <script lang="ts">
-  // Dossiê do processo: ficha (réus só por pseudônimo), índice de peças, linha do tempo
-  // clicável (abre o visualizador na página da evidência), alertas de saneamento e achados.
-  // Todo campo produzido por modelo vem rotulado `gerado` e aparece destacado como tal.
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { chamar, mensagemErro } from '$lib/api';
   import Aviso from '$lib/componentes/Aviso.svelte';
-  import { formatarData, legivel, RESULTADO } from '$lib/processos/rotulos';
-  import type { Dossie, Fato, Indice } from '$lib/processos/tipos';
+  import { formatarData, legivel, RESULTADO, SITUACAO } from '$lib/processos/rotulos';
+  import type { Dossie, Indice } from '$lib/processos/tipos';
 
   const id = $derived(page.params['id'] ?? '');
   let dossie = $state<Dossie | null>(null);
   let indice = $state<Indice | null>(null);
-  let fatos = $state<Fato[]>([]);
   let erro = $state('');
   let gerando = $state(false);
 
-  const paginaParaArquivo = $derived(
-    new Map(
-      fatos.flatMap((f) =>
-        f.evidencias.map(
-          (e) => [e.pagina_id, { arquivo: e.arquivo_id, pagina: e.pagina }] as const,
-        ),
-      ),
-    ),
-  );
-
   async function carregar(resumos = false): Promise<void> {
     try {
-      const [d, i, f] = await Promise.all([
+      const [d, i] = await Promise.all([
         chamar<Dossie>('GET', `/processos/${id}/dossie${resumos ? '?resumos=true' : ''}`),
         chamar<Indice>('GET', `/processos/${id}/indice`),
-        chamar<{ fatos: Fato[] }>('GET', `/processos/${id}/fatos`),
       ]);
       dossie = d;
       indice = i;
-      fatos = f.fatos;
     } catch (e) {
       erro = mensagemErro(e);
     }
@@ -47,16 +31,6 @@
     gerando = true;
     await carregar(true);
     gerando = false;
-  }
-
-  function linkEvento(fatoId: string, paginaId: string): string {
-    const fato = fatos.find((f) => f.id === fatoId);
-    const evidencia = fato?.evidencias.find((e) => e.pagina_id === paginaId) ?? fato?.evidencias[0];
-    if (evidencia) return `/processos/${id}/visualizador?evidencia=${evidencia.id}`;
-    const local = paginaParaArquivo.get(paginaId);
-    return local?.arquivo
-      ? `/processos/${id}/visualizador?arquivo=${local.arquivo}&pagina=${local.pagina ?? 1}`
-      : `/processos/${id}/visualizador`;
   }
 
   function linkPagina(arquivoId: string, pagina: number): string {
@@ -81,16 +55,25 @@
       <dt>Número</dt>
       <dd class="mono">{dossie.ficha.numero_cnj}</dd>
       <dt>Classe</dt>
-      <dd>{dossie.ficha.classe}</dd>
-      <dt>Matéria</dt>
-      <dd>{legivel(dossie.ficha.materia)}</dd>
+      <dd>{legivel(dossie.ficha.classe)}</dd>
       <dt>Status</dt>
       <dd>{legivel(dossie.ficha.status)}</dd>
-      <dt>Réus</dt>
-      <dd data-testid="reus">
-        {dossie.ficha.reus.length ? dossie.ficha.reus.join(', ') : '—'}
-        <span class="dica">(pseudônimos)</span>
+      <dt>Partes</dt>
+      <dd data-testid="partes">
+        {#each dossie.ficha.partes as parte (parte.id)}
+          <div>
+            <a href="/processos/{id}/visualizador?evidencia={parte.evidencia_id}">{parte.nome}</a> ·
+            Polo {parte.polo} · {legivel(parte.qualidade)}
+          </div>
+        {:else}Nenhuma parte identificada.{/each}
       </dd>
+      <dt>Responsáveis</dt>
+      <dd>
+        {dossie.ficha.responsaveis.map((r) => r.nome_usuario).join(', ') ||
+          'Sem responsável atribuído'}
+      </dd>
+      <dt>Ingestão</dt>
+      <dd>{SITUACAO[dossie.ficha.ingestao.situacao]}</dd>
     </dl>
   </section>
 
@@ -102,7 +85,7 @@
       {#each dossie.linha_do_tempo as ev, i (`${ev.fato_id}-${i}`)}
         <li>
           <a
-            href={linkEvento(ev.fato_id, ev.pagina_id)}
+            href="/processos/{id}/visualizador?evidencia={ev.evidencia_id}"
             data-testid="evento"
             data-pagina={ev.pagina}
           >
@@ -200,6 +183,9 @@
       {#each dossie.achados as a (a.achado_id)}
         <li>
           <strong>{legivel(a.validacao)}</strong>: {RESULTADO[a.resultado] ?? a.resultado} — {a.explicacao}
+          {#each a.fontes as fonte, i (`${fonte.fato_id}-${fonte.evidencia_id}`)}
+            <a href="/processos/{id}/visualizador?evidencia={fonte.evidencia_id}">Fonte {i + 1}</a>
+          {/each}
         </li>
       {/each}
     </ul>

@@ -1,12 +1,12 @@
 <script lang="ts">
-  // Processos do gabinete: lista com o status da ingestão (polling leve enquanto algo
+  // Processos: lista com o status da ingestão (polling leve enquanto algo
   // processa) e criação de processo com o número CNJ validado aqui e no servidor.
   import { onDestroy, onMount } from 'svelte';
   import { chamar, mensagemErro } from '$lib/api';
   import Aviso from '$lib/componentes/Aviso.svelte';
   import { mascararCnj, problemaCnj } from '$lib/processos/cnj';
-  import { formatarData, legivel, SITUACAO } from '$lib/processos/rotulos';
-  import type { Materia, Processo, ProcessoNaLista } from '$lib/processos/tipos';
+  import { formatarData, CLASSES, SITUACAO } from '$lib/processos/rotulos';
+  import type { ClasseProcessual, Processo, ProcessoNaLista } from '$lib/processos/tipos';
   import { repetirEnquanto } from '$lib/repeticao';
   import { sessao, tem } from '$lib/sessao.svelte';
 
@@ -21,14 +21,12 @@
   let erro = $state('');
   let aviso = $state('');
   let numero = $state('');
-  let classe = $state('');
-  let materia = $state<Materia>('criminal');
-  let sigiloso = $state(false);
+  let classe = $state<ClasseProcessual | ''>('');
   let tocado = $state(false);
   let enviando = $state(false);
 
   const atual = $derived(sessao.atual);
-  const podeCriar = $derived(tem(atual, 'subir_processo') && atual?.gabinete_id !== null);
+  const podeCriar = $derived(tem(atual, 'subir_processo'));
   const problema = $derived(problemaCnj(numero));
   const processando = $derived(processos.some((p) => p.ingestao.situacao === 'processando'));
 
@@ -40,7 +38,7 @@
   const filtrados = $derived(
     processos.filter((p) => {
       const texto =
-        `${p.numero_cnj} ${p.classe} ${(p.responsaveis ?? []).map((u) => u.nome_usuario).join(' ')}`.toLocaleLowerCase(
+        `${p.numero_cnj} ${CLASSES[p.classe]} ${(p.responsaveis ?? []).map((u) => u.nome_usuario).join(' ')}`.toLocaleLowerCase(
           'pt-BR',
         );
       return (
@@ -72,19 +70,16 @@
     evento.preventDefault();
     tocado = true;
     aviso = '';
-    if (problema || classe.trim().length < 2) return;
+    if (problema || !classe) return;
     enviando = true;
     try {
       const criado = await chamar<Processo>('POST', '/processos', {
         numero_cnj: numero.trim(),
-        classe: classe.trim(),
-        materia,
-        sigiloso,
+        classe,
       });
       aviso = `Processo ${criado.numero_cnj} criado.`;
       numero = '';
       classe = '';
-      sigiloso = false;
       tocado = false;
       await atualizacao.executar();
     } catch (e) {
@@ -139,26 +134,15 @@
           </div>
           <div class="campo">
             <label for="classe">Classe</label>
-            <input
-              id="classe"
-              bind:value={classe}
-              placeholder="Apelação Criminal"
-              maxlength="120"
-            />
-          </div>
-          <div class="campo">
-            <label for="materia">Matéria</label>
-            <select id="materia" bind:value={materia}>
-              <option value="criminal">Criminal</option>
-              <option value="civel">Cível</option>
+            <select id="classe" bind:value={classe} required>
+              <option value="" disabled>Selecione a classe</option>
+              {#each Object.entries(CLASSES) as [valor, rotulo]}<option value={valor}
+                  >{rotulo}</option
+                >{/each}
             </select>
           </div>
         </div>
-        <div class="campo linha">
-          <input id="sigiloso" type="checkbox" bind:checked={sigiloso} />
-          <label for="sigiloso">Processo sigiloso (a ingestão fica bloqueada na v1)</label>
-        </div>
-        <button type="submit" disabled={enviando}>Criar processo</button>
+        <button type="submit" disabled={enviando || !classe}>Criar processo</button>
       </form>
     </section>
   {/if}
@@ -166,9 +150,6 @@
   <section class="acervo" aria-labelledby="titulo-acervo">
     <div class="cabecalho-lista">
       <div>
-        <span class="sobretitulo"
-          >{atual?.papel === 'administrador' ? 'TODOS OS GABINETES' : 'ACERVO DO GABINETE'}</span
-        >
         <h2 id="titulo-acervo">Lista de processos</h2>
       </div>
       <span class="contagem" aria-live="polite"
@@ -240,9 +221,8 @@
             {#each filtrados as p (p.id)}<tr data-processo={p.id}>
                 <td data-rotulo="Processo"
                   ><a class="numero-processo" href="/processos/{p.id}">{p.numero_cnj}</a><span
-                    class="descricao"
-                    >{p.classe} · {p.materia === 'civel' ? 'Cível' : legivel(p.materia)}</span
-                  >{#if p.sigiloso}<span class="selo sigiloso">Sigiloso</span>{/if}</td
+                    class="descricao">{CLASSES[p.classe]}</span
+                  ></td
                 >
                 <td data-rotulo="Assessores responsáveis"
                   ><div class="responsaveis">
@@ -478,18 +458,6 @@
     grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
     gap: 0 1rem;
   }
-  .linha {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-  }
-  .linha input {
-    width: auto;
-  }
-  .linha label {
-    margin: 0;
-    font-weight: 400;
-  }
   .erro-campo {
     color: var(--perigo);
     margin: 0.25rem 0 0;
@@ -512,8 +480,7 @@
     color: var(--perigo);
   }
   .selo.processando,
-  .selo.pendencias,
-  .selo.sigiloso {
+  .selo.pendencias {
     background: var(--aviso-fundo);
     color: var(--aviso-texto);
   }

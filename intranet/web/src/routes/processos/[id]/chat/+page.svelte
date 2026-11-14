@@ -2,7 +2,7 @@
   // Chat sobre os autos (Etapa 6.8). Pergunta → resposta com citações conferidas (cada uma abre
   // a página no visualizador), recusa explicada, teto, contador de descartes e histórico das
   // conversas do usuário. Processo em revisão (incidente de injeção): aviso, chat suspenso e,
-  // para desembargador ou administrador, o botão de liberar (o servidor reconfere o papel).
+  // para desembargador, o botão de liberar (o servidor reconfere o papel).
   import { onMount, tick } from 'svelte';
   import { page } from '$app/state';
   import { mensagemErro } from '$lib/api';
@@ -106,7 +106,7 @@
     <strong>Processo em revisão.</strong>
     Uma resposta do assistente foi bloqueada porque {MOTIVO_REVISAO[revisao.motivo ?? ''] ??
       'violou a conferência automática'}. O chat e os resumos gerados ficam suspensos até um
-    desembargador ou o administrador liberar.
+    desembargador liberar.
     {#if podeLiberar}
       <button type="button" onclick={() => (confirmandoLiberacao = true)}>Liberar revisão</button>
     {/if}

@@ -37,7 +37,9 @@
   let envio: EnvioEmCurso | null = null;
   let seletor = $state<HTMLInputElement | null>(null);
 
-  const podeEnviar = $derived(tem(sessao.atual, 'subir_processo') && processo?.sigiloso === false);
+  const podeEnviar = $derived(
+    tem(sessao.atual, 'subir_processo') && processo !== null && processo.status !== 'descartado',
+  );
   const pendente = $derived(
     dados?.arquivos.some((a) => a.estado !== null && !ESTADOS_FINAIS.has(a.estado)) ?? false,
   );
@@ -110,13 +112,13 @@
 {#if processo}
   <h1 class="mono">{processo.numero_cnj}</h1>
   <p>
-    {processo.classe} · {legivel(processo.materia)} · status {legivel(processo.status)}
-    {#if processo.sigiloso}· <strong>sigiloso (ingestão bloqueada na v1)</strong>{/if}
+    {legivel(processo.classe)} · {legivel(processo.status)}
   </p>
   <nav class="atalhos" aria-label="Telas do processo">
     <a href="/processos/{id}/dossie">Dossiê e linha do tempo</a>
     <a href="/processos/{id}/validacoes">Validações</a>
     <a href="/processos/{id}/visualizador">Visualizador</a>
+    <a href="/processos/{id}/chat">Chat</a>
   </nav>
 {/if}
 
@@ -196,6 +198,8 @@
                 <p class="motivo" data-testid="motivo-quarentena">
                   {motivoQuarentena(a.motivo_quarentena)}
                 </p>
+              {:else if a.estado === 'parcial' && a.relatorio?.faltantes?.length}
+                <p>Páginas faltantes: {a.relatorio.faltantes.join(', ')}</p>
               {:else if a.estado === 'falho'}
                 <p class="motivo">{motivoFalha(a.motivo_falha)}</p>
               {/if}

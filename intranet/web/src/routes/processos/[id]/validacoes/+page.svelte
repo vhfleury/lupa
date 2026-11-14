@@ -1,7 +1,6 @@
 <script lang="ts">
   // Validações: achados vigentes com resultado, valores completos (datas com link para a página
   // e a evidência), explicação, fatos usados (confirmar ou corrigir), anotações e histórico.
-  // Corrigir grava um fato NOVO ligado ao original; os achados antigos continuam no histórico.
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { chamar, mensagemErro } from '$lib/api';
@@ -14,7 +13,6 @@
     RESULTADO,
     STATUS_FATO,
     textoDoValor,
-    valorDoFato,
   } from '$lib/processos/rotulos';
   import type { Achado, Anotacao, Fato } from '$lib/processos/tipos';
   import { sessao, tem } from '$lib/sessao.svelte';
@@ -23,6 +21,7 @@
   let achados = $state<Achado[]>([]);
   let historico = $state<Achado[]>([]);
   let fatos = $state<Fato[]>([]);
+  let historicoFatos = $state<Fato[]>([]);
   let anotacoes = $state<Anotacao[]>([]);
   let erro = $state('');
   let aviso = $state('');
@@ -35,19 +34,21 @@
   const podeAnotar = $derived(tem(sessao.atual, 'anotar'));
   const porId = $derived(new Map(fatos.map((f) => [f.id, f])));
   const antigos = $derived(historico.filter((a) => !a.vigente));
-  const substituidos = $derived(fatos.filter((f) => !f.vigente));
+  const substituidos = $derived(historicoFatos.filter((f) => !f.vigente));
 
   async function carregar(): Promise<void> {
     try {
-      const [v, h, f, n] = await Promise.all([
+      const [v, h, f, versoes, n] = await Promise.all([
         chamar<{ achados: Achado[] }>('GET', `/processos/${id}/achados`),
         chamar<{ achados: Achado[] }>('GET', `/processos/${id}/achados/historico`),
         chamar<{ fatos: Fato[] }>('GET', `/processos/${id}/fatos`),
+        chamar<{ fatos: Fato[] }>('GET', `/processos/${id}/fatos/historico`),
         chamar<{ anotacoes: Anotacao[] }>('GET', `/processos/${id}/anotacoes`),
       ]);
       achados = v.achados;
       historico = h.achados;
       fatos = f.fatos;
+      historicoFatos = versoes.fatos;
       anotacoes = n.anotacoes;
     } catch (e) {
       erro = mensagemErro(e);
@@ -67,7 +68,7 @@
   function fatoDaData(achado: Achado, data: string): Fato | undefined {
     return achado.fatos_usados
       .map((fid) => porId.get(fid))
-      .find((f) => f !== undefined && valorDoFato(f.valor) === data);
+      .find((f) => f !== undefined && f.valor === data);
   }
 
   function notasDe(alvo: { achado?: string; fato?: string }): Anotacao[] {
@@ -78,12 +79,12 @@
 
   function iniciarCorrecao(fato: Fato): void {
     editando = fato.id;
-    const valor = valorDoFato(fato.valor);
+    const valor = fato.valor;
     valorNovo = typeof valor === 'string' ? valor : JSON.stringify(valor);
   }
 
   function interpretar(fato: Fato, texto: string): unknown {
-    const original = valorDoFato(fato.valor);
+    const original = fato.valor;
     if (typeof original === 'string') return texto.trim();
     try {
       return JSON.parse(texto) as unknown;
@@ -290,7 +291,7 @@
         >
       </thead>
       <tbody>
-        {#each antigos as a (a.id)}
+        {#each antigos as a (`${a.id}-${a.criado_em}`)}
           <tr>
             <td>{legivel(a.validacao)}</td>
             <td>{RESULTADO[a.resultado] ?? a.resultado}</td>
@@ -304,11 +305,11 @@
   {#if substituidos.length}
     <h3>Fatos substituídos</h3>
     <ul data-testid="historico-fatos">
-      {#each substituidos as f (f.id)}
-        {@const novo = f.substituido_por ? porId.get(f.substituido_por) : undefined}
-        <li>
-          {legivel(f.tipo)}: {textoDoValor(f.valor)} ({STATUS_FATO[f.status] ?? f.status})
-          {#if novo}→ {textoDoValor(novo.valor)} ({STATUS_FATO[novo.status] ?? novo.status}){/if}
+      {#each substituidos as f (`${f.id}-${f.criado_em}`)}
+        <li data-fato={f.id}>
+          {legivel(f.tipo)}: {textoDoValor(f.valor)} ({STATUS_FATO[f.status] ?? f.status}) · {formatarData(
+            f.criado_em,
+          )}
         </li>
       {/each}
     </ul>
