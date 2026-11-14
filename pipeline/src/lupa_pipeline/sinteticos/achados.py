@@ -1,46 +1,69 @@
-"""Comparação dos achados da pipeline com o ``resultado_esperado`` do gabarito (Etapa 4F.7).
+"""Compara os resultados persistidos aos achados esperados por regra, parte e folha de conteúdo."""
 
-Os ids de fato e de evidência mudam entre o gabarito e a pipeline, então a comparação ignora as
-chaves de id (``IDS``) em qualquer nível de ``valores``. Um achado "bate" quando o resultado é o
-mesmo e os valores sem ids são iguais (datas, prazos, intervalos, pena, faixa, cadeia); a
-explicação é comparada à parte, porque o texto cita só esses mesmos valores.
-"""
-
-from collections.abc import Iterable, Sequence
+import json
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Protocol
 
 from pydantic import BaseModel
 
-from lupa_pipeline.sinteticos.gabarito import ResultadoEsperado
+from lupa_pipeline.sinteticos.gabarito import Gabarito, ResultadoEsperado
+from lupa_pipeline.sinteticos.gerador import fatos_do_gabarito
+from lupa_pipeline.sinteticos.medicao import mapa_folhas
+from lupa_pipeline.sinteticos.saida_pipeline import RefPagina
 
-IDS = frozenset({"fato_id", "evidencia_id", "evidencia_ids", "fato_ids"})
+
+def referencias_do_gabarito(gabarito: Gabarito) -> dict[str, str]:
+    """Resolve os ids sintéticos de parte e página aos nomes e folhas do gabarito."""
+    fatos = fatos_do_gabarito(gabarito.processo.numero_cnj, gabarito.eventos)
+    referencias = {}
+    for fato, evento in zip(fatos, gabarito.eventos, strict=True):
+        if fato.sujeito:
+            referencias[fato.sujeito] = evento.sujeito
+        for evidencia in fato.evidencias:
+            referencias[evidencia.pagina_id] = f"folha {evento.pagina}"
+    return referencias
+
+
+def referencias_de_paginas(gabarito: Gabarito, paginas: Mapping[str, RefPagina]) -> dict[str, str]:
+    """Resolve a página física da extração à folha de conteúdo comum aos empacotamentos."""
+    folhas = mapa_folhas(gabarito)
+    return {
+        pid: f"folha {folha}"
+        for pid, p in paginas.items()
+        if (folha := folhas.get((p.arquivo, p.pagina))) is not None
+    }
 
 
 class AchadoComparavel(Protocol):
-    """O que a comparação lê de um achado (do motor ou do domínio)."""
+    """Campos comuns ao gabarito e ao resultado do motor cível."""
 
     @property
     def validacao(self) -> str:
         """Nome da validação."""
 
     @property
-    def resultado(self) -> Any:
-        """Resultado."""
+    def sujeito(self) -> str:
+        """Parte à qual se aplica o resultado."""
+
+    @property
+    def resultado(self) -> object:
+        """Conclusão da regra."""
 
     @property
     def valores(self) -> dict[str, Any]:
-        """Valores."""
+        """Valores e fatos usados pela regra."""
 
     @property
     def explicacao(self) -> str:
-        """Explicação."""
+        """Texto justificado pelo motor."""
 
 
 class ComparacaoAchado(BaseModel):
-    """Resultado da comparação de uma validação."""
+    """Resultado de uma regra sobre uma parte, incluindo ausências e resultados inesperados."""
 
     validacao: str
-    esperado: str
+    sujeito: str
+    esperado: str | None
     obtido: str | None
     resultado_igual: bool
     valores_iguais: bool
@@ -48,20 +71,32 @@ class ComparacaoAchado(BaseModel):
     diferencas: list[str]
 
 
-def sem_ids(valor: Any) -> Any:
-    """Remove as chaves de id em qualquer nível.
-
-    Args:
-        valor: Valores do achado.
-
-    Returns:
-        Cópia sem ids.
-    """
+def _referenciar(valor: Any, referencias: Mapping[str, str]) -> Any:
     if isinstance(valor, dict):
-        return {k: sem_ids(v) for k, v in valor.items() if k not in IDS}
+        return {k: _referenciar(v, referencias) for k, v in valor.items()}
     if isinstance(valor, list | tuple):
-        return [sem_ids(v) for v in valor]
-    return valor
+        return [_referenciar(v, referencias) for v in valor]
+    return referencias.get(valor, valor) if isinstance(valor, str) else valor
+
+
+def _valores(
+    achado: AchadoComparavel | None, referencias: Mapping[str, str]
+) -> dict[str, Any] | None:
+    if achado is None:
+        return None
+    por_fato = dict(referencias)
+    fontes = []
+    for fato in achado.valores.get("fatos", []):
+        fonte = _referenciar(
+            {k: v for k, v in fato.items() if k not in {"fato_id", "evidencia_ids"}}, referencias
+        )
+        fontes.append(fonte)
+        if "fato_id" in fato:
+            por_fato[fato["fato_id"]] = json.dumps(fonte, sort_keys=True, ensure_ascii=False)
+    dados = _referenciar(achado.valores, por_fato)
+    if "fatos" in dados:
+        dados["fatos"] = sorted(fontes, key=lambda f: json.dumps(f, sort_keys=True))
+    return dict(dados)
 
 
 def _diferencas(esperado: Any, obtido: Any, caminho: str = "") -> list[str]:
@@ -70,40 +105,43 @@ def _diferencas(esperado: Any, obtido: Any, caminho: str = "") -> list[str]:
         return [
             d for k in chaves for d in _diferencas(esperado.get(k), obtido.get(k), f"{caminho}.{k}")
         ]
-    if esperado != obtido:
-        return [caminho or "."]
-    return []
+    return [caminho or "."] if esperado != obtido else []
 
 
 def comparar(
-    esperados: Sequence[ResultadoEsperado], obtidos: Iterable[AchadoComparavel]
+    esperados: Sequence[ResultadoEsperado],
+    obtidos: Iterable[AchadoComparavel],
+    referencias_gabarito: Mapping[str, str] | None = None,
+    referencias_banco: Mapping[str, str] | None = None,
 ) -> list[ComparacaoAchado]:
-    """Compara validação a validação.
+    """Compara cada regra por recorrente, com nomes e folhas comuns aos dois conjuntos.
 
-    Args:
-        esperados: ``resultado_esperado`` do gabarito.
-        obtidos: Achados da pipeline.
-
-    Returns:
-        Uma comparação por validação esperada.
+    As chaves de evidência variam com os offsets da extração. Os campos tipo, valor e folhas
+    de cada fato e a sequência dos fatos da cadeia de representação são confrontados.
     """
-    por_nome = {a.validacao: a for a in obtidos}
+    gabarito = referencias_gabarito or {}
+    banco = referencias_banco or {}
+    esperados_por_parte = {(a.validacao, a.sujeito): a for a in esperados}
+    obtidos_por_parte = {(a.validacao, banco.get(a.sujeito, a.sujeito)): a for a in obtidos}
     saida = []
-    for esperado in esperados:
-        obtido = por_nome.get(esperado.validacao)
-        valores_esperados = sem_ids(esperado.valores)
-        valores_obtidos = sem_ids(obtido.valores) if obtido else None
-        diferencas = _diferencas(valores_esperados, valores_obtidos)
+    for nome, sujeito in sorted(esperados_por_parte.keys() | obtidos_por_parte.keys()):
+        esperado = esperados_por_parte.get((nome, sujeito))
+        obtido = obtidos_por_parte.get((nome, sujeito))
+        diferencas = _diferencas(_valores(esperado, gabarito), _valores(obtido, banco))
         saida.append(
             ComparacaoAchado(
-                validacao=esperado.validacao,
-                esperado=str(esperado.resultado),
-                obtido=str(obtido.resultado) if obtido else None,
-                resultado_igual=obtido is not None
-                and str(obtido.resultado) == str(esperado.resultado),
+                validacao=nome,
+                sujeito=sujeito,
+                esperado=str(esperado.resultado) if esperado is not None else None,
+                obtido=str(obtido.resultado) if obtido is not None else None,
+                resultado_igual=esperado is not None
+                and obtido is not None
+                and esperado.resultado == obtido.resultado,
                 valores_iguais=not diferencas,
-                explicacao_igual=obtido is not None and obtido.explicacao == esperado.explicacao,
                 diferencas=diferencas[:10],
+                explicacao_igual=esperado is not None
+                and obtido is not None
+                and esperado.explicacao == obtido.explicacao,
             )
         )
     return saida

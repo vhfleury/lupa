@@ -222,13 +222,16 @@ def _ligar_responsavel(
     gravar_satelite(sessao, sat_processo_responsavel_vigencia, hk_link, vigencia, ORIGEM)
 
 
-def _gravar_processo(sessao: Session, corpo: CorpoProcesso, ator: Ator) -> bytes:
-    hk = gravar_hub(sessao, hub_processo, {"numero_cnj": corpo.numero_cnj}, ORIGEM)
+def gravar_processo(
+    sessao: Session, corpo: CorpoProcesso, ator: Ator, *, origem: str = ORIGEM
+) -> bytes:
+    """Cadastra o processo, abre a DEK e atribui o assessor que o cadastrou."""
+    hk = gravar_hub(sessao, hub_processo, {"numero_cnj": corpo.numero_cnj}, origem)
     dados = {"classe": corpo.classe.value, "hk_usuario": ator.hk_usuario}
-    gravar_satelite(sessao, sat_processo_dados, hk, dados, ORIGEM)
+    gravar_satelite(sessao, sat_processo_dados, hk, dados, origem)
     estado = {"status": StatusProcesso.CRIADO.value}
-    gravar_satelite(sessao, sat_processo_estado, hk, estado, ORIGEM)
-    criar_chave_processo(sessao, obter_cofre(), hk, ORIGEM)
+    gravar_satelite(sessao, sat_processo_estado, hk, estado, origem)
+    criar_chave_processo(sessao, obter_cofre(), hk, origem)
     if ator.papel is PapelUsuario.ASSESSOR:
         _ligar_responsavel(sessao, hk, ator.hk_usuario, vigente=True)
     return hk
@@ -258,7 +261,7 @@ def criar_processo(
         return JSONResponse(
             status_code=409, content={"detail": MENSAGEM_DUPLICADO, "processo_id": hk.hex()}
         )
-    _gravar_processo(sessao, corpo, ator)
+    gravar_processo(sessao, corpo, ator)
     processo = sessao.scalars(_consulta_processo(hk)).one()
     auditar(
         sessao,

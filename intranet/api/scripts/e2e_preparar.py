@@ -1,87 +1,36 @@
-"""Prepara o banco de DESENVOLVIMENTO para os testes ponta a ponta do front (Etapa 6).
-
-Uso (no contêiner): `python intranet/api/scripts/e2e_preparar.py`. Recusa rodar fora de `desenvolvimento`/`teste`.
-
-1. Garante o administrador pelo mesmo caso de uso de `intranet/api/scripts/criar_admin.py`
-   (`servico.criar_administrador`), com nome de `LUPA_ADMIN_USUARIO` (padrão `admin`).
-2. Dá a ele uma senha temporária aleatória, gerada agora, com troca obrigatória; apaga o
-   autenticador (o E2E cadastra outro lendo o segredo exibido na tela) e revoga as sessões.
-   Grava `senha_resetada` na auditoria.
-3. Limpa falhas e bloqueios de login: o E2E provoca bloqueios de propósito.
-
-Saída: duas linhas na saída padrão, o nome do administrador e a senha temporária. Nada é
-gravado em arquivo.
-"""
+"""Cria o desembargador do E2E pela instalação A14 e imprime seu nome e senha temporária."""
 
 import os
-import sys
 from datetime import UTC, datetime
 
-from sqlalchemy import create_engine, delete, select
-from sqlalchemy.orm import Session
-
-from lupa_intranet.acesso import senhas, sessoes
-from lupa_intranet.acesso.servico import Contexto, auditar, criar_administrador, definir_contexto
-from lupa_intranet.auditoria.eventos import AcaoAuditoria
+from lupa_intranet.acesso.senhas import gerar_senha_temporaria
+from lupa_intranet.acesso.servico import Contexto, criar_desembargador
 from lupa_pipeline.config import get_settings
-from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao
-from lupa_pipeline.dominio.tabelas import BloqueioLoginTabela, FalhaLoginTabela, UsuarioTabela
-
-AMBIENTES_PERMITIDOS = frozenset({"desenvolvimento", "teste"})
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 
 def preparar() -> tuple[str, str]:
-    """Garante e reseta o administrador e limpa os bloqueios de login.
-
-    Returns:
-        Nome do administrador e a senha temporária.
-    """
+    """Entrega uma credencial nova, sem redefinir a conta de outra execução."""
     settings = get_settings()
-    nome = os.environ.get("LUPA_ADMIN_USUARIO") or "admin"
-    senha = senhas.gerar_senha_temporaria()
-    ctx = Contexto(None, None, datetime.now(UTC))
+    if settings.ambiente not in {"teste", "desenvolvimento"}:
+        raise SystemExit("e2e_preparar exige ambiente de teste ou desenvolvimento")
+    nome = os.environ.get("LUPA_DESEMBARGADOR_USUARIO") or "desembargador.e2e"
+    senha = gerar_senha_temporaria()
     engine = create_engine(settings.url_banco_aplicacao())
     try:
-        with Session(engine) as session, session.begin():
-            assumir_papel_aplicacao(session)
-            definir_contexto(session, PapelUsuario.ADMINISTRADOR.value, None)
-            criado = criar_administrador(session, nome, senha, ctx)
-            admin = session.scalars(
-                select(UsuarioTabela).where(UsuarioTabela.papel == PapelUsuario.ADMINISTRADOR.value)
-            ).one()
+        with Session(engine) as sessao, sessao.begin():
+            assumir_papel_aplicacao(sessao)
+            criado = criar_desembargador(
+                sessao, nome, senha, Contexto(None, None, datetime.now(UTC))
+            )
             if not criado:
-                admin.senha_hash = senhas.gerar_hash(senha)
-                admin.troca_senha_obrigatoria = True
-                admin.ativo = True
-                admin.mfa_segredo = None
-                admin.mfa_confirmado = False
-                admin.mfa_ultimo_passo = None
-                sessoes.revogar_sessoes_do_usuario(session, admin.id)
-                auditar(
-                    session,
-                    ctx,
-                    AcaoAuditoria.SENHA_RESETADA,
-                    usuario_id=admin.id,
-                    objeto_tipo="usuario",
-                    objeto_id=str(admin.id),
-                )
-            nome_admin = admin.nome_usuario
+                raise SystemExit("já existe um desembargador. Inicie o E2E em uma stack nova.")
     finally:
         engine.dispose()
-    dono = create_engine(settings.database_url.get_secret_value())
-    try:
-        with dono.begin() as conexao:
-            conexao.execute(delete(FalhaLoginTabela))
-            conexao.execute(delete(BloqueioLoginTabela))
-    finally:
-        dono.dispose()
-    return nome_admin, senha
+    return nome, senha
 
 
 if __name__ == "__main__":
-    if get_settings().ambiente not in AMBIENTES_PERMITIDOS:
-        sys.stderr.write("e2e_preparar: recusado fora de desenvolvimento/teste\n")
-        sys.exit(2)
-    usuario, temporaria = preparar()
-    sys.stdout.write(f"{usuario}\n{temporaria}\n")
+    print(*preparar(), sep="\n")

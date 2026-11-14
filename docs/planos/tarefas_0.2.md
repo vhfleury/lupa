@@ -340,7 +340,10 @@ a saída resumida (vermelho inicial e verde final).
     incluindo 403 para assessor, eliminação da DEK e repetição após falha no storage.
 - [x] **T3.14** Rotas da API com ids em texto; remoção de `/gabinetes*`. D12, D27.
   - A coleta anterior ainda importava as tabelas da 0.1. Com create_app real, 12 testes de saúde, os 8 de fatos, peças, diagnóstico e visualizador e os 4 de auditoria e sessão passaram. Os esquemas também passaram nos 89 casos de hash público e estado de ingestão.
-- [ ] **T3.15** Scripts sem gabinete e administrador (`e2e_*`, `limpar_dev`, `calibrar`, `ponta_a_ponta`, `criar_usuario_banco`).
+- [x] **T3.15** Scripts sem gabinete e administrador (`e2e_*`, `limpar_dev`, `calibrar`, `ponta_a_ponta`, `criar_usuario_banco`).
+  - A calibração concorrente com o worker produziu a transição inválida de falho para quarentena. A trava da fila eliminou o processamento duplicado. A medição antes perdia um achado ao comparar três recorrentes com a mesma regra.
+  - `pytest pipeline/tests/ingestao/test_calibracao.py pipeline/tests/sinteticos/test_comparacao_achados.py --no-cov -q` cobre a concorrência e o relatório. Nos três empacotamentos, a medição encontrou todos os eventos e os três achados esperados, com os mesmos valores e folhas.
+  - `pytest intranet/api/tests/auditoria/test_limpar_dev.py intranet/api/tests/acesso/test_banco_acesso.py --no-cov -q` verificou o descarte seletivo e a criação de usuários. Os três scripts E2E semearam a stack usada nas dez capturas, com três processos cíveis marcados pela origem `scripts.e2e`.
 - [ ] **T3.16** Suíte completa verde nos dois pacotes. D23.
 
 ## Fase 4 — Conteúdo cível

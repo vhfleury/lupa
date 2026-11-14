@@ -1,136 +1,112 @@
-"""Prepara os dados SINTÉTICOS dos testes ponta a ponta das telas de processo (Etapas 6.4 a 6.7).
-
-Uso (no contêiner da API, depois de `intranet/api/scripts/e2e_preparar.py`): `python intranet/api/scripts/e2e_processos.py`.
-Recusa rodar fora de `desenvolvimento`/`teste`.
-
-1. Cria um gabinete e um assessor novos (senha temporária gerada agora, troca obrigatória; o
-   E2E cadastra o autenticador pela tela), pelos mesmos casos de uso da gestão de usuários.
-2. Cria um processo criminal sintético no gabinete e gera os autos sintéticos (lupa_pipeline.sinteticos,
-   só páginas nativas, para a ingestão ser rápida), lacra o PDF no storage real e enfileira o job:
-   o worker real processa até os achados, e o E2E acompanha o status pela tela.
-
-Saída: três linhas, o nome do assessor, a senha temporária e o id do processo. Nada é gravado
-fora do banco e do storage da própria stack.
-"""
+"""Gera autos cíveis, cria um assessor e lacra o PDF para o worker da stack E2E."""
 
 import hashlib
 import secrets
-import sys
-import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from uuid import uuid4
+from tempfile import TemporaryDirectory
 
+from lupa_intranet.acesso.servico import Ator, Contexto, auditar, criar_usuario
+from lupa_intranet.api.rotas.processos import CorpoProcesso, gravar_processo
+from lupa_intranet.auditoria.eventos import AcaoAuditoria
+from lupa_pipeline.config import get_settings
+from lupa_pipeline.dominio.enums import ClasseProcessual, PapelUsuario
+from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao
+from lupa_pipeline.dominio.visoes import VisaoUsuario
+from lupa_pipeline.ingestao.recepcao import ArquivoRecebido, TipoArquivo, lacrar
+from lupa_pipeline.ingestao.storage import criar_storage
+from lupa_pipeline.seguranca.cofre import criar_cofre
+from lupa_pipeline.seguranca.contexto import contexto_cifra, definir_cofre
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from lupa_intranet.acesso.servico import (
-    Ator,
-    Contexto,
-    auditar,
-    criar_gabinete,
-    criar_usuario,
-    definir_contexto,
-)
-from lupa_intranet.auditoria.eventos import AcaoAuditoria
-from lupa_pipeline.config import get_settings
-from lupa_pipeline.dominio.cnj import calcular_digito_verificador
-from lupa_pipeline.dominio.enums import Materia, PapelUsuario, StatusProcesso
-from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao
-from lupa_pipeline.dominio.tabelas import ProcessoTabela, UsuarioTabela
-from lupa_pipeline.ingestao.recepcao import ArquivoRecebido, TipoArquivo, lacrar
-from lupa_pipeline.ingestao.storage import criar_storage
-from lupa_pipeline.sinteticos.empacotamento import exportar
-from lupa_pipeline.sinteticos.gabarito import Cenario, Composicao
-from lupa_pipeline.sinteticos.gerador import gerar_conteudo
-from lupa_pipeline.sinteticos.roteiro import Configuracao
-
-AMBIENTES_PERMITIDOS = frozenset({"desenvolvimento", "teste"})
+ORIGEM = "scripts.e2e"
 
 
-def _numero_cnj() -> str:
-    sequencial = f"{secrets.randbelow(9_000_000) + 1_000_000:07d}"
-    ano, justica, tribunal, origem = "2025", "8", "09", "0001"
-    digito = calcular_digito_verificador(sequencial, ano, justica, tribunal, origem)
-    return f"{sequencial}-{digito}.{ano}.{justica}.{tribunal}.{origem}"
+@contextmanager
+def sessao_e2e() -> Iterator[Session]:
+    """Abre uma transação com o papel da aplicação e o cofre real da stack sintética."""
+    settings = get_settings()
+    if settings.ambiente not in {"teste", "desenvolvimento"}:
+        raise SystemExit("E2E exige ambiente de teste ou desenvolvimento")
+    engine = create_engine(settings.url_banco_aplicacao())
+    definir_cofre(criar_cofre(settings))
+    try:
+        with Session(engine) as sessao, sessao.begin(), contexto_cifra():
+            assumir_papel_aplicacao(sessao)
+            yield sessao
+    finally:
+        engine.dispose()
 
 
-def _autos(destino: Path) -> Path:
-    config = Configuracao(
-        semente=secrets.randbelow(10_000) + 100,
-        paginas_alvo=18,
-        mistura={Composicao.NATIVA: 1.0},
-        proporcao_vazias=0.0,
+def ator(usuario: VisaoUsuario) -> Ator:
+    """Representa o autor da preparação, executada fora de uma sessão HTTP."""
+    return Ator(
+        usuario.hk_usuario, usuario.id, PapelUsuario(str(usuario.papel)), usuario.nome_usuario, b""
     )
-    gerados = exportar(gerar_conteudo(config), destino, (Cenario.PDF_INDICE,))
-    return gerados[0].caminho
+
+
+def desembargador(sessao: Session) -> Ator:
+    """Lê o usuário criado por e2e_preparar na instalação do E2E."""
+    usuario = sessao.scalars(
+        select(VisaoUsuario).where(VisaoUsuario.papel == PapelUsuario.DESEMBARGADOR.value)
+    ).one()
+    return ator(usuario)
+
+
+def enfileirar_pdf(sessao: Session, autor: Ator, numero: str, pdf: Path) -> str:
+    """Cadastra a apelação cível e lacra o arquivo usando a mesma DEK e fila da intranet."""
+    ctx = Contexto(None, None, datetime.now(UTC))
+    corpo = CorpoProcesso(numero_cnj=numero, classe=ClasseProcessual.APELACAO_CIVEL)
+    processo = gravar_processo(sessao, corpo, autor, origem=ORIGEM)
+    auditar(
+        sessao,
+        ctx,
+        AcaoAuditoria.PROCESSO_CRIADO,
+        hk_usuario=autor.hk_usuario,
+        hk_processo=processo,
+        objeto_tipo="processo",
+        objeto_id=processo.hex(),
+    )
+    with pdf.open("rb") as arquivo:
+        sha = hashlib.file_digest(arquivo, "sha256").hexdigest()
+    recebido = ArquivoRecebido(pdf, sha, pdf.stat().st_size, TipoArquivo.PDF)
+    lacrar(
+        sessao,
+        criar_storage(get_settings()),
+        recebido,
+        hk_processo=processo,
+        enviado_por=autor.hk_usuario,
+        nome_original=pdf.name,
+    )
+    return processo.hex()
 
 
 def preparar() -> tuple[str, str, str]:
-    """Cria gabinete, assessor e processo sintético com o job enfileirado.
+    """Entrega credenciais do assessor e o id do processo sintético que ele cadastrou."""
+    from lupa_pipeline.sinteticos.empacotamento import exportar
+    from lupa_pipeline.sinteticos.gabarito import Cenario, Composicao, Gabarito
+    from lupa_pipeline.sinteticos.gerador import gerar_conteudo
+    from lupa_pipeline.sinteticos.roteiro import Configuracao
 
-    Returns:
-        Nome do assessor, senha temporária e id do processo.
-    """
-    settings = get_settings()
-    agora = datetime.now(UTC)
-    ctx = Contexto(None, None, agora)
-    sufixo = secrets.token_hex(3)
-    engine = create_engine(settings.url_banco_aplicacao())
-    storage = criar_storage(settings)
-    try:
-        with Session(engine) as session, session.begin():
-            assumir_papel_aplicacao(session)
-            definir_contexto(session, PapelUsuario.ADMINISTRADOR.value, None)
-            admin = session.scalars(
-                select(UsuarioTabela).where(UsuarioTabela.papel == PapelUsuario.ADMINISTRADOR.value)
-            ).one()
-            ator = Ator(admin.id, None, PapelUsuario.ADMINISTRADOR, admin.nome_usuario, "e2e")
-            gabinete = criar_gabinete(session, ator, f"Gabinete Processos E2E {sufixo}", ctx)
-            criado = criar_usuario(
-                session, ator, f"proc.e2e.{sufixo}", PapelUsuario.ASSESSOR, gabinete.id, ctx
-            )
-            assessor_id, gabinete_id = criado.usuario.id, gabinete.id
-            nome, senha = criado.usuario.nome_usuario, criado.senha_temporaria
-        with Session(engine) as session, session.begin():
-            assumir_papel_aplicacao(session)
-            definir_contexto(session, PapelUsuario.ASSESSOR.value, gabinete_id)
-            processo = ProcessoTabela(
-                id=uuid4(),
-                gabinete_id=gabinete_id,
-                numero_cnj=_numero_cnj(),
-                classe="Apelação Criminal",
-                materia=Materia.CRIMINAL.value,
-                sigiloso=False,
-                status=StatusProcesso.CRIADO.value,
-                criado_por=assessor_id,
-            )
-            session.add(processo)
-            session.flush()
-            auditar(
-                session, ctx, AcaoAuditoria.PROCESSO_CRIADO, usuario_id=assessor_id,
-                gabinete_id=gabinete_id, processo_id=processo.id, objeto_tipo="processo",
-                objeto_id=str(processo.id),
-            )  # fmt: skip
-            with tempfile.TemporaryDirectory(prefix="lupa-e2e-") as diretorio:
-                caminho = _autos(Path(diretorio))
-                dados = caminho.read_bytes()
-                recebido = ArquivoRecebido(
-                    caminho, hashlib.sha256(dados).hexdigest(), len(dados), TipoArquivo.PDF
-                )
-                lacrar(
-                    session, storage, recebido, gabinete_id=gabinete_id, processo_id=processo.id,
-                    enviado_por=assessor_id, nome_original="autos-sinteticos.pdf",
-                )  # fmt: skip
-            processo_id = processo.id
-    finally:
-        engine.dispose()
-    return nome, senha, str(processo_id)
+    with sessao_e2e() as sessao, TemporaryDirectory(prefix="lupa-e2e-") as diretorio:
+        nome = f"assessor.autos.{secrets.token_hex(3)}"
+        ctx = Contexto(None, None, datetime.now(UTC))
+        criado = criar_usuario(sessao, desembargador(sessao), nome, PapelUsuario.ASSESSOR, ctx)
+        config = Configuracao(
+            semente=751,
+            classe=ClasseProcessual.APELACAO_CIVEL,
+            paginas_alvo=18,
+            mistura={Composicao.NATIVA: 1.0},
+            proporcao_vazias=0.0,
+        )
+        gerado = exportar(gerar_conteudo(config), Path(diretorio), (Cenario.PDF_INDICE,))[0]
+        numero = Gabarito.model_validate_json(gerado.gabarito.read_bytes()).processo.numero_cnj
+        processo = enfileirar_pdf(sessao, ator(criado.usuario), numero, gerado.caminho)
+        return nome, criado.senha_temporaria, processo
 
 
 if __name__ == "__main__":
-    if get_settings().ambiente not in AMBIENTES_PERMITIDOS:
-        sys.stderr.write("e2e_processos: recusado fora de desenvolvimento/teste\n")
-        sys.exit(2)
-    usuario, temporaria, processo_id = preparar()
-    sys.stdout.write(f"{usuario}\n{temporaria}\n{processo_id}\n")
+    print(*preparar(), sep="\n")

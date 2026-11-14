@@ -1,30 +1,21 @@
-"""Calibração da pipeline sobre um arquivo (Etapa 4F.10).
-
-Roteiro em ``docs/piloto/calibracao-projudi.md``.
-
-Roda dentro do contêiner ``api``: cria um gabinete de calibração no banco configurado, lacra o
-arquivo no storage configurado, processa com o código do worker até os achados e escreve o
-relatório Markdown (diagnóstico, páginas, peças, eventos com trecho e achados) com colunas
-"Confere?" para o assessor. Também grava o JSON bruto ao lado.
-
-Uso::
-
-    docker compose exec api python pipeline/scripts/calibrar.py /caminho/autos.pdf --saida /tmp/calib
-
-O relatório contém trechos dos autos: fica no contêiner (``/tmp``) e não vai para o repositório.
-"""
+"""Calibra a ingestão de um PDF ou ZIP cível e grava as evidências para conferência manual."""
 
 import argparse
 import json
-from dataclasses import replace
 from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from lupa_pipeline.config import get_settings
-from lupa_pipeline.ingestao.calibracao import coletar, enviar_e_processar, para_markdown, semear_gabinete
-from lupa_pipeline.ingestao.worker import dependencias_da_configuracao, sessao_gabinete
+from lupa_pipeline.dominio.enums import ClasseProcessual
+from lupa_pipeline.ingestao.calibracao import (
+    coletar,
+    enviar_e_processar,
+    para_markdown,
+    semear_assessor,
+)
+from lupa_pipeline.ingestao.storage import criar_storage
 from lupa_pipeline.logging import configurar_logging
 
 
@@ -41,19 +32,33 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("arquivo", type=Path, help="PDF ou ZIP dos autos")
     parser.add_argument("--saida", type=Path, default=Path("/tmp/calibracao"))  # noqa: S108
     parser.add_argument("--titulo", default="processo de calibração")
+    parser.add_argument(
+        "--classe", choices=list(ClasseProcessual), default=ClasseProcessual.APELACAO_CIVEL.value
+    )
     args = parser.parse_args(argv)
     settings = get_settings()
     configurar_logging(nivel="WARNING")
-    deps = replace(dependencias_da_configuracao(settings), fila=None, fatia_paginas=0)
-    dono = sessionmaker(create_engine(settings.database_url.get_secret_value()))
-    with dono() as session, session.begin():
-        gabinete_id, usuario_id = semear_gabinete(session, "Gabinete de calibração")
-    execucao = enviar_e_processar(deps, dono, gabinete_id, usuario_id, args.arquivo)
-    with sessao_gabinete(deps.fabrica, gabinete_id) as session:
-        dados = coletar(session, execucao.processo_id, execucao.arquivo_id)
+    engine = create_engine(settings.database_url.get_secret_value())
+    fabrica = sessionmaker(engine)
+    try:
+        with fabrica.begin() as session:
+            usuario = semear_assessor(session, "scripts.calibrar")
+        execucao = enviar_e_processar(
+            fabrica,
+            settings,
+            criar_storage(settings),
+            usuario,
+            args.arquivo,
+            ClasseProcessual(args.classe),
+            "scripts.calibrar",
+        )
+        with fabrica() as session:
+            dados = coletar(session, execucao.processo_id, execucao.arquivo_id)
+    finally:
+        engine.dispose()
     dados["execucao"] = {
-        "processo_id": str(execucao.processo_id),
-        "estado": execucao.estado.value if execucao.estado else None,
+        "processo_id": execucao.processo_id.hex(),
+        "estado": execucao.estado.value,
         "segundos": round(execucao.segundos, 2),
     }
     args.saida.mkdir(parents=True, exist_ok=True)

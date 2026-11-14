@@ -1,22 +1,7 @@
-"""Ponta a ponta nos processos de referência (Etapa 4F.9), pelo código do worker.
+"""Executa os autos de referência na ingestão cível e compara o banco com cada gabarito.
 
-Roda dentro do contêiner ``api`` (``.sinteticos`` montado só leitura). Para cada processo e
-cenário pedido: lacra o arquivo no storage configurado (MinIO) num processo novo do banco
-configurado e roda ``processar_job`` (validação no sandbox, diagnóstico, extração ou cache,
-índice, eventos e achados). Depois lê do banco fatos, peças e achados, mede eventos e datas com
-``lupa_pipeline.sinteticos.medicao.medir`` e compara os achados com o ``resultado_esperado`` na data de
-referência do gabarito.
-
-``--volume DIR`` reaproveita a extração de páginas da 4E (``DIR/<processo>/pdf_liso/
-linhas.json.gz``): antes do upload, as páginas são gravadas num arquivo-fonte do mesmo gabinete
-com o SHA-256 do PDF, e o upload as recebe pelo cache da 4F.8 (sem OCR). Só vale para o cenário
-``pdf_liso`` (o cache é por hash do arquivo). As páginas do volume foram extraídas pela versão
-4e.0 e são gravadas com a versão corrente só para que o cache as aceite: a única diferença da
-4f.0 é o OCR de detecção em imagens de páginas nativas, que não muda texto nem eventos.
-``--repetir`` envia o mesmo arquivo uma segunda vez em outro processo do gabinete e mede o tempo
-do cache.
-
-Saída em JSON no stdout; o progresso vai para stderr.
+Execute no contêiner da API, com os autos disponíveis em LUPA_SINTETICOS_DIR/referencia.
+A opção --volume reaproveita linhas previamente extraídas na versão corrente, no PDF liso.
 """
 
 import argparse
@@ -24,37 +9,30 @@ import gzip
 import json
 import os
 import sys
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
-from uuid import UUID, uuid4
 
-from sqlalchemy import create_engine, insert, select
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from lupa_pipeline.config import get_settings
-from lupa_pipeline.dominio.esquemas import calcular_hash
-from lupa_pipeline.dominio.repositorios import listar_fatos_por_processo
-from lupa_pipeline.dominio.tabelas import ArquivoTabela, PaginaTabela, PecaTabela
-from lupa_pipeline.ingestao import repositorio
-from lupa_pipeline.ingestao.calibracao import (
-    enviar_e_processar,
-    novo_processo,
-    semear_gabinete,
-    sha256_arquivo,
-)
-from lupa_pipeline.ingestao.eventos.etapa import achados_do_processo
-from lupa_pipeline.ingestao.eventos.modelo import PaginaTexto
+from lupa_pipeline.config import Settings, get_settings
+from lupa_pipeline.dominio.enums import ClasseProcessual, OrigemPeca, TipoPeca
+from lupa_pipeline.dominio.repositorios import listar_achados, listar_fatos_por_processo
+from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoPagina, VisaoParte, VisaoPeca
+from lupa_pipeline.ingestao.calibracao import enviar_e_processar, semear_assessor
 from lupa_pipeline.ingestao.eventos.saida import eventos_saida
-from lupa_pipeline.ingestao.extrator_paginas import VERSAO_EXTRATOR
-from lupa_pipeline.ingestao.worker import Dependencias, dependencias_da_configuracao, sessao_gabinete
+from lupa_pipeline.ingestao.storage import ObjectStorage, criar_storage
 from lupa_pipeline.logging import configurar_logging
-from lupa_pipeline.sinteticos.achados import comparar
+from lupa_pipeline.sinteticos.achados import (
+    comparar,
+    referencias_de_paginas,
+    referencias_do_gabarito,
+)
 from lupa_pipeline.sinteticos.gabarito import Cenario, Gabarito
 from lupa_pipeline.sinteticos.medicao import medir
 from lupa_pipeline.sinteticos.saida_pipeline import PecaSaida, RefPagina, SaidaPipeline
 
-RAIZ = Path("/app/.sinteticos/referencia")
+ORIGEM = "scripts.ponta_a_ponta"
 NOMES = {
     Cenario.ZIP_POR_PECA: "autos.zip",
     Cenario.PDF_INDICE: "autos.pdf",
@@ -62,95 +40,103 @@ NOMES = {
 }
 
 
-def _semear_paginas(
-    dono: sessionmaker[Session], gabinete: UUID, usuario: UUID, pdf: Path, linhas_gz: Path
-) -> int:
-    with gzip.open(linhas_gz, "rt", encoding="utf-8") as arquivo:
-        linhas = json.load(arquivo)["linhas"]
-    with dono() as session, session.begin():
-        processo = novo_processo(session, gabinete, usuario)
-        arquivo_id = uuid4()
-        session.add(
-            ArquivoTabela(
-                id=arquivo_id, gabinete_id=gabinete, processo_id=processo,
-                sha256=sha256_arquivo(pdf), tamanho_bytes=pdf.stat().st_size,
-                nome_original="autos.pdf", mime="application/pdf",
-                chave_storage=f"volume-4e/{arquivo_id}", enviado_por=usuario,
-            )
-        )  # fmt: skip
-        session.flush()
-        for inicio in range(0, len(linhas), 500):
-            session.execute(
-                insert(PaginaTabela),
-                [
-                    linha | {"id": uuid4(), "gabinete_id": gabinete, "arquivo_id": arquivo_id,
-                             "hash_texto": calcular_hash(linha["texto"]),
-                             "versao_extrator": VERSAO_EXTRATOR}
-                    for linha in linhas[inicio : inicio + 500]
-                ],
-            )  # fmt: skip
-    return len(linhas)
-
-
-def _saida(session: Session, processo: UUID, arquivo: UUID) -> tuple[SaidaPipeline, int]:
+def _saida(
+    session: Session, processo: bytes, arquivo: bytes, gabarito: Gabarito
+) -> tuple[SaidaPipeline, int, dict[str, str]]:
     paginas = {
-        p.id: PaginaTexto(p.id, p.numero, p.texto, p.origem_arquivo, p.pagina_origem)
-        for p in session.scalars(select(PaginaTabela).where(PaginaTabela.arquivo_id == arquivo))
+        p.id: p
+        for p in session.scalars(select(VisaoPagina).where(VisaoPagina.hk_arquivo == arquivo))
     }
     por_numero = {p.numero: p for p in paginas.values()}
 
-    def ref(numero: int) -> RefPagina:
-        pagina = por_numero[numero]
+    nomes = {
+        p.id: p.nome
+        for p in session.scalars(select(VisaoParte).where(VisaoParte.hk_processo == processo))
+        if p.nome
+    }
+    origens = {f"entrada-{i}.pdf": a.nome for i, a in enumerate(gabarito.arquivos, start=1)}
+
+    def ref(pagina: VisaoPagina) -> RefPagina:
         return RefPagina(
-            arquivo=pagina.origem_arquivo or "autos.pdf", pagina=pagina.pagina_origem or numero
+            arquivo=origens.get(pagina.origem_arquivo or "", pagina.origem_arquivo or "autos.pdf"),
+            pagina=pagina.pagina_origem or pagina.numero,
         )
 
     pecas = session.scalars(
-        select(PecaTabela).where(PecaTabela.arquivo_id == arquivo, PecaTabela.vigente.is_(True))
+        select(VisaoPeca)
+        .where(VisaoPeca.hk_arquivo == arquivo, VisaoPeca.vigente.is_(True))
+        .order_by(VisaoPeca.pagina_inicial)
     )
     fatos = listar_fatos_por_processo(session, processo)
+
+    referencias = {pid: ref(p) for pid, p in paginas.items()}
     saida = SaidaPipeline(
         pecas=tuple(
             PecaSaida(
-                tipo=p.tipo,
-                origem=p.origem,
-                inicio=ref(p.pagina_inicial),
-                fim=ref(p.pagina_final),
+                tipo=TipoPeca(p.tipo or TipoPeca.OUTROS),
+                origem=OrigemPeca(p.origem or OrigemPeca.DESCONHECIDA),
+                inicio=ref(por_numero[p.pagina_inicial]),
+                fim=ref(por_numero[p.pagina_final or p.pagina_inicial]),
                 data=p.data,
             )
             for p in pecas
-        ),  # fmt: skip
-        eventos=eventos_saida(fatos, paginas),
+        ),
+        eventos=eventos_saida(fatos, referencias, nomes),
     )
-    literais = sum(
-        1
+    nao_literais = sum(
+        all(
+            (base or "")[e.inicio : e.fim] != e.trecho
+            for base in (paginas[e.pagina_id].texto, paginas[e.pagina_id].texto_normalizado)
+        )
         for f in fatos
         for e in f.evidencias
-        if paginas[e.pagina_id].texto[e.inicio : e.fim] != e.trecho
     )
-    return saida, literais
+    return saida, nao_literais, nomes | referencias_de_paginas(gabarito, referencias)
 
 
 def _rodar(
-    deps: Dependencias, dono: sessionmaker[Session], gabinete: UUID, usuario: UUID,
-    pasta: Path, cenario: Cenario,
-) -> dict[str, Any]:  # fmt: skip
+    fabrica: sessionmaker[Session],
+    settings: Settings,
+    storage: ObjectStorage,
+    usuario: bytes,
+    pasta: Path,
+    cenario: Cenario,
+    volume: Path | None = None,
+) -> dict[str, Any]:
     gabarito = Gabarito.model_validate_json((pasta / "gabarito.json").read_text(encoding="utf-8"))
-    execucao = enviar_e_processar(deps, dono, gabinete, usuario, pasta / NOMES[cenario])
-    with sessao_gabinete(deps.fabrica, gabinete) as session:
-        saida, nao_literais = _saida(session, execucao.processo_id, execucao.arquivo_id)
-        achados = achados_do_processo(
-            session, execucao.processo_id, "criminal", gabarito.processo.data_referencia
+    volume_lido = None
+    if volume and cenario is Cenario.PDF_LISO:
+        with gzip.open(
+            volume / pasta.parent.name / cenario.value / "linhas.json.gz", "rt", encoding="utf-8"
+        ) as entrada:
+            volume_lido = json.load(entrada)
+    execucao = enviar_e_processar(
+        fabrica,
+        settings,
+        storage,
+        usuario,
+        pasta / NOMES[cenario],
+        ClasseProcessual(gabarito.processo.classe),
+        ORIGEM,
+        volume=volume_lido,
+    )
+    with fabrica() as session:
+        saida, nao_literais, referencias = _saida(
+            session, execucao.processo_id, execucao.arquivo_id, gabarito
         )
-        job = repositorio.obter_relatorio(session, execucao.arquivo_id) or {}
+        achados = listar_achados(session, execucao.processo_id)
+        relatorio = session.get_one(VisaoArquivo, execucao.arquivo_id).relatorio or {}
     medicao = medir(gabarito, saida)
-    comparacao = comparar(gabarito.resultado_esperado, achados)
-    relatorio = job.get("relatorio") or {}
+    comparacao = comparar(
+        gabarito.resultado_esperado, achados, referencias_do_gabarito(gabarito), referencias
+    )
     return {
         "processo": pasta.parent.name,
+        "classe": gabarito.processo.classe,
         "cenario": cenario.value,
         "folhas": len(gabarito.paginas),
-        "estado": execucao.estado.value if execucao.estado else None,
+        "estado": execucao.estado.value,
+        "paginas_do_volume": execucao.paginas_do_volume,
         "segundos_total": round(execucao.segundos, 2),
         "segundos_por_mil_paginas": round(execucao.segundos / len(gabarito.paginas) * 1000, 1),
         "extracao_parede_segundos": (relatorio.get("tempo") or {}).get("parede_segundos"),
@@ -168,48 +154,41 @@ def _rodar(
 
 
 def main() -> int:
-    """Interpreta a linha de comando, roda e imprime o JSON.
-
-    Returns:
-        Código de saída.
-    """
-    parser = argparse.ArgumentParser(prog="ponta_a_ponta.py")
+    """Interpreta as opções e imprime a medição para cada processo e empacotamento."""
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--processos", default="semente_01")
     parser.add_argument("--cenarios", default="pdf_liso")
-    parser.add_argument("--volume", type=Path, default=None)
+    parser.add_argument("--volume", type=Path)
     parser.add_argument("--repetir", action="store_true")
     args = parser.parse_args()
+    raiz = Path(os.environ.get("LUPA_SINTETICOS_DIR", "/app/.sinteticos")) / "referencia"
     settings = get_settings()
     configurar_logging(nivel="WARNING")
-    deps = replace(dependencias_da_configuracao(settings), fila=None, fatia_paginas=0)
-    dono = sessionmaker(create_engine(settings.database_url.get_secret_value()))
-    with dono() as session, session.begin():
-        gabinete, usuario = semear_gabinete(session, "Gabinete ponta a ponta 4F")
+    engine = create_engine(settings.database_url.get_secret_value())
+    fabrica = sessionmaker(engine)
+    storage = criar_storage(settings)
     linhas = []
-    for processo in args.processos.split(","):
-        for cenario in (Cenario(c) for c in args.cenarios.split(",")):
-            pasta = RAIZ / processo / cenario.value
-            semeadas = 0
-            if args.volume and cenario is Cenario.PDF_LISO:
-                linhas_gz = args.volume / processo / "pdf_liso" / "linhas.json.gz"
-                semeadas = _semear_paginas(dono, gabinete, usuario, pasta / "autos.pdf", linhas_gz)
-            linha = _rodar(deps, dono, gabinete, usuario, pasta, cenario) | {
-                "paginas_do_volume": semeadas
-            }
-            if args.repetir:
-                repetida = _rodar(deps, dono, gabinete, usuario, pasta, cenario)
-                linha["repeticao_segundos"] = repetida["segundos_total"]
-            linhas.append(linha)
-            resumo = {
-                k: linha[k]
-                for k in ("processo", "cenario", "estado", "segundos_total", "achados_iguais")
-            }
-            print(json.dumps(resumo | {"eventos": linha["eventos"]}), file=sys.stderr, flush=True)
+    try:
+        with fabrica.begin() as session:
+            usuario = semear_assessor(session, ORIGEM)
+        for processo in args.processos.split(","):
+            for cenario in (Cenario(c) for c in args.cenarios.split(",")):
+                pasta = raiz / processo / cenario.value
+                linha = _rodar(fabrica, settings, storage, usuario, pasta, cenario, args.volume)
+                if args.repetir:
+                    repetida = _rodar(fabrica, settings, storage, usuario, pasta, cenario)
+                    linha["repeticao_segundos"] = repetida["segundos_total"]
+                linhas.append(linha)
+                resumo = {
+                    k: linha[k]
+                    for k in ("processo", "cenario", "estado", "segundos_total", "achados_iguais")
+                }
+                print(json.dumps(resumo), file=sys.stderr, flush=True)
+    finally:
+        engine.dispose()
     configuracao = {
         "cpus": os.cpu_count(),
         "paginas_por_lote": settings.extracao_paginas_por_lote,
-        "lotes_por_job": settings.extracao_lotes_por_job,
-        "lotes_por_gabinete": settings.extracao_lotes_por_gabinete,
         "sandbox": {
             "memoria_mb": settings.sandbox_memoria_mb,
             "cpu_segundos": settings.sandbox_cpu_segundos,

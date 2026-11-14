@@ -23,6 +23,7 @@ Subcomandos:
 
 import argparse
 import gzip
+import hashlib
 import json
 import random
 import re
@@ -32,15 +33,14 @@ import time
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 import fitz
 
+from lupa_pipeline.dominio.chaves import chave_hash
 from lupa_pipeline.ingestao.diagnostico import diagnosticar_pdf, diagnosticar_zip
-from lupa_pipeline.ingestao.eventos.etapa import executar_validacoes
-from lupa_pipeline.ingestao.eventos.fatos import extrair_fatos
+from lupa_pipeline.ingestao.eventos.fatos import candidatos_da_peca, confirmar
 from lupa_pipeline.ingestao.eventos.modelo import PaginaTexto, PecaTexto
-from lupa_pipeline.ingestao.eventos.reus import identificar_reus
+from lupa_pipeline.ingestao.eventos.partes import chave_nome, extrair_partes
 from lupa_pipeline.ingestao.eventos.saida import eventos_saida
 from lupa_pipeline.ingestao.extracao import (
     FontePaginas,
@@ -57,16 +57,19 @@ from lupa_pipeline.ingestao.ocr import ocr_pagina
 from lupa_pipeline.ingestao.qualidade import para_saida_pipeline, relatorio_qualidade
 from lupa_pipeline.ingestao.roteador import rotear
 from lupa_pipeline.ingestao.sandbox import LimitesSandbox, inspecionar_pdf, inspecionar_pdfs
+from lupa_pipeline.ingestao.saneamento_pagina import mapa_saneado
 from lupa_pipeline.ingestao.sinais import medir_sinais
 from lupa_pipeline.ingestao.texto_nativo import extrair_texto_nativo
 from lupa_pipeline.sinteticos.achados import comparar as comparar_achados
+from lupa_pipeline.sinteticos.achados import referencias_de_paginas, referencias_do_gabarito
 from lupa_pipeline.sinteticos.gabarito import Cenario, Gabarito
 from lupa_pipeline.sinteticos.medicao import levenshtein, mapa_folhas, medir, normalizar
 from lupa_pipeline.sinteticos.saida_pipeline import PaginaSaida, RefPagina, SaidaPipeline
 from lupa_pipeline.validacoes.adaptador import para_modelo
+from lupa_pipeline.validacoes.motor import executar_catalogo
 
 RAIZ = Path("/app/.sinteticos/referencia")
-SAIDA = Path("/tmp/medicao-4c")
+SAIDA = Path(tempfile.gettempdir()) / "medicao-4c"
 LIMITES_INSPECAO = LimitesSandbox(memoria_mb=2048, cpu_segundos=300, tempo_segundos=600)
 LIMITES_LOTE = LimitesSandbox(memoria_mb=1024, cpu_segundos=120, tempo_segundos=300)
 DATA = re.compile(r"\b\d{2}/\d{2}/\d{4}\b")
@@ -96,11 +99,15 @@ def _diagnosticar(pasta: Path, cenario: Cenario) -> Any:
             entradas = [
                 (e.manifesto.nome, r.dados) for e, r in zip(extraidas, inspecoes, strict=False)
             ]
-        return diagnosticar_zip(uuid4(), entradas)
+        with (pasta / "autos.zip").open("rb") as original:
+            return diagnosticar_zip(hashlib.file_digest(original, "sha256").hexdigest(), entradas)
     resultado = inspecionar_pdf(pasta / "autos.pdf", LIMITES_INSPECAO)
     if not resultado.ok:
         raise RuntimeError(f"inspeção falhou: {resultado.motivo_falha}")
-    return diagnosticar_pdf(uuid4(), "autos.pdf", resultado.dados)
+    with (pasta / "autos.pdf").open("rb") as original:
+        return diagnosticar_pdf(
+            hashlib.file_digest(original, "sha256").hexdigest(), "autos.pdf", resultado.dados
+        )
 
 
 def comando_diagnostico(_args: argparse.Namespace) -> dict[str, Any]:
@@ -205,7 +212,7 @@ def comando_roteador(_args: argparse.Namespace) -> dict[str, Any]:
 
 def comando_ocr(args: argparse.Namespace) -> dict[str, Any]:
     """CER e datas literais por nível, em amostra estratificada de páginas digitalizadas."""
-    rng = random.Random(args.semente)
+    rng = random.Random(args.semente)  # noqa: S311 - amostra reprodutível para comparar o OCR.
     acumulado: dict[str, list[float]] = defaultdict(lambda: [0, 0, 0, 0, 0, 0.0])
     for semente in _sementes():
         pasta = semente / Cenario.PDF_LISO.value
@@ -326,8 +333,12 @@ def comando_extrair(args: argparse.Namespace) -> dict[str, Any]:
     )
     destino = Path(args.destino) / args.processo / args.cenario
     destino.mkdir(parents=True, exist_ok=True)
+    with caminho.open("rb") as original:
+        sha256 = hashlib.file_digest(original, "sha256").hexdigest()
     with gzip.open(destino / "linhas.json.gz", "wt", encoding="utf-8") as arquivo:
-        json.dump({"segundos": segundos, "linhas": linhas}, arquivo, ensure_ascii=False)
+        json.dump(
+            {"sha256": sha256, "segundos": segundos, "linhas": linhas}, arquivo, ensure_ascii=False
+        )
     saida = para_saida_pipeline(linhas, segundos)
     (destino / "saida.json").write_text(saida.model_dump_json(), encoding="utf-8")
     (destino / "relatorio.json").write_text(json.dumps(relatorio, ensure_ascii=False), "utf-8")
@@ -345,8 +356,13 @@ def comando_extrair(args: argparse.Namespace) -> dict[str, Any]:
         datas[f"{pagina.degradacao.value}_encontradas"] += sum(
             1 for d in esperadas if d in textos.get(fisica, "")
         )
-    return {"processo": args.processo, "relatorio": relatorio, "datas_ocr": dict(datas),
-            "gabarito": str(pasta / "gabarito.json"), "saida": str(destino / "saida.json")}  # fmt: skip
+    return {
+        "processo": args.processo,
+        "relatorio": relatorio,
+        "datas_ocr": dict(datas),
+        "gabarito": str(pasta / "gabarito.json"),
+        "saida": str(destino / "saida.json"),
+    }
 
 
 def _linhas_liso(destino: Path, processo: str) -> list[dict[str, Any]]:
@@ -514,26 +530,22 @@ def comando_pecas(args: argparse.Namespace) -> dict[str, Any]:
 
 def _pecas_texto(
     paginas: list[dict[str, Any]], resultado: Any
-) -> tuple[list[PecaTexto], dict[Any, PaginaTexto]]:
-    por_numero = {
-        int(p["numero"]): PaginaTexto(
-            uuid4(),
-            int(p["numero"]),
-            str(p.get("texto") or ""),
-            p["origem_arquivo"],
-            int(p["pagina_origem"]),
-        )  # fmt: skip
-        for p in paginas
-    }
+) -> tuple[list[PecaTexto], dict[str, PaginaTexto], dict[str, RefPagina]]:
+    por_numero = {}
+    referencias = {}
+    for linha in paginas:
+        numero = int(linha["numero"])
+        original = str(linha.get("texto") or "")
+        id_pagina = chave_hash([linha["origem_arquivo"], numero]).hex()
+        por_numero[numero] = PaginaTexto(id_pagina, numero, original, mapa_saneado(original).texto)
+        referencias[id_pagina] = RefPagina(
+            arquivo=linha["origem_arquivo"], pagina=linha["pagina_origem"]
+        )
     pecas = [
-        PecaTexto(
-            p.tipo,
-            p.origem,
-            tuple(por_numero[n] for n in range(p.pagina_inicial, p.pagina_final + 1)),
-        )  # fmt: skip
+        PecaTexto(p.tipo, tuple(por_numero[n] for n in range(p.pagina_inicial, p.pagina_final + 1)))
         for p in resultado.pecas
     ]
-    return pecas, {p.id: p for p in por_numero.values()}
+    return pecas, {p.id: p for p in por_numero.values()}, referencias
 
 
 def _evidencias_nao_literais(fatos: list[Any], paginas: dict[Any, PaginaTexto]) -> int:
@@ -552,34 +564,48 @@ def _eventos_cenario(
     gabarito = _gabarito(pasta)
     paginas = _paginas_do_cenario(pasta, gabarito, liso, linhas)
     resultado = montar_indice(paginas, _diagnosticar(pasta, cenario).model_dump(mode="json"))
-    pecas, por_id = _pecas_texto(paginas, resultado)
+    pecas, por_id, referencias = _pecas_texto(paginas, resultado)
     inicio = time.perf_counter()
-    reus = identificar_reus(pecas)
-    extracao = extrair_fatos(uuid4(), pecas, reus, {r.pseudonimo: uuid4() for r in reus})
+    processo = chave_hash([gabarito.processo.numero_cnj]).hex()
+    partes = [p for peca in pecas for p in extrair_partes(peca)]
+    sujeitos = {
+        chave_nome(p.nome): chave_hash(
+            [gabarito.processo.numero_cnj, "parte-sintetica", p.nome]
+        ).hex()
+        for p in partes
+    }
+    nomes = {sujeitos[chave_nome(p.nome)]: p.nome for p in partes}
+    candidatos = [c for peca in pecas for c in candidatos_da_peca(peca, sujeitos)]
+    fatos = [f for c in candidatos if (f := confirmar(c, processo)) is not None]
     segundos = time.perf_counter() - inicio
-    achados = executar_validacoes(
-        para_modelo(extracao.fatos), "criminal", gabarito.processo.data_referencia
+    achados = executar_catalogo(
+        para_modelo(fatos), gabarito.processo.classe, gabarito.processo.data_referencia
     )
     saida = SaidaPipeline(
         pecas=pecas_saida(resultado.pecas, paginas, "autos.pdf"),
-        eventos=eventos_saida(extracao.fatos, por_id),
+        eventos=eventos_saida(fatos, referencias, nomes),
     )
     pasta_saida = destino / semente.name / cenario.value
     pasta_saida.mkdir(parents=True, exist_ok=True)
     (pasta_saida / "saida_eventos.json").write_text(saida.model_dump_json(), "utf-8")
     relatorio = medir(gabarito, saida)
-    comparacao = comparar_achados(gabarito.resultado_esperado, achados)
+    comparacao = comparar_achados(
+        gabarito.resultado_esperado,
+        achados,
+        referencias_do_gabarito(gabarito),
+        nomes | referencias_de_paginas(gabarito, referencias),
+    )
     return {
         "processo": semente.name,
         "cenario": cenario.value,
         "folhas": len(gabarito.paginas),
         "eventos": relatorio.eventos.model_dump(),
         "datas": relatorio.datas.model_dump() if relatorio.datas else None,
-        "fatos": len(extracao.fatos),
-        "fatos_sem_evidencia": sum(1 for f in extracao.fatos if not f.evidencias),
-        "evidencias_nao_literais": _evidencias_nao_literais(extracao.fatos, por_id),
-        "extracao": extracao.resumo(),
-        "reus": len(reus),
+        "fatos": len(fatos),
+        "fatos_sem_evidencia": sum(1 for f in fatos if not f.evidencias),
+        "evidencias_nao_literais": _evidencias_nao_literais(fatos, por_id),
+        "extracao": {"candidatos": len(candidatos), "sem_trecho": len(candidatos) - len(fatos)},
+        "partes": len(sujeitos),
         "segundos_eventos": round(segundos, 3),
         "achados": [c.model_dump() for c in comparacao],
         "achados_iguais": sum(c.resultado_igual and c.valores_iguais for c in comparacao),
