@@ -376,8 +376,8 @@ Marcar na fase de tarefas. `U` é unitário; `I`, integração (marcador `integr
   RNF-03).
 - [x] I (`agente`): nenhuma instrução dos autos é seguida (RF-CHA-05).
 - [ ] E2E: login, processos, dossiê, visualizador, chat, auditoria, gestão de assessores (RNF-09).
-- [ ] Cabeçalhos de segurança do proxy (RF-SEG-03).
-- [ ] I: worker não abre conexão externa (RF-SEG-04).
+- [x] Cabeçalhos de segurança do proxy (RF-SEG-03).
+- [x] I: worker não abre conexão externa (RF-SEG-04).
 
 ### Revisão manual
 

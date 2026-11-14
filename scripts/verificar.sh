@@ -31,6 +31,8 @@ docker build --target verificacao -q intranet/web >/dev/null && echo "front: lin
 # faltar algum ou se a CSP afrouxar; com o proxy fora do ar so avisa (LUPA_EXIGIR_CABECALHOS=1 exige).
 echo "== cabecalhos de seguranca =="
 "${INTRANET[@]}" intranet/api/scripts/verificar_cabecalhos.py --url "${LUPA_PROXY_URL:-https://proxy:8443}" ${LUPA_EXIGIR_CABECALHOS:+--exigir}
+echo "== isolamento de rede do worker =="
+"${PIPELINE[@]}" pipeline/scripts/verificar_rede.py
 # Etapa 5.8: suite de injecao do agente sobre autos ingeridos (cliente falso roteirizado), sem skip.
 echo "== suite de injecao do agente (Etapa 5.8, sem skip) =="
 METRICAS_AGENTE=/tmp/metricas_agente.json
@@ -38,7 +40,7 @@ docker compose exec -T -e LUPA_EXIGIR_INTEGRACAO=1 -e LUPA_METRICAS_AGENTE="$MET
   python -m pytest -c intranet/api/pyproject.toml -m agente intranet/api/tests/agente --no-cov -q
 "${INTRANET[@]}" -c "import json,sys; m=json.load(open(sys.argv[1])); print({k: m[k] for k in ('versao_modelo','versao_prompt','cenarios','achados_suprimidos','achados_criados','vazamentos','embutidas_executadas','respostas_bloqueadas')})" "$METRICAS_AGENTE"
 # Etapa 6.10: suite E2E (Playwright), opcional. Ative com LUPA_VERIFICAR_E2E=1; o e2e.sh sobe a
-# stack com o cliente falso e, ao terminar, recria a API sem ele.
+# stack isolada com o cliente falso e, ao terminar, remove o ambiente sintético.
 if [ "${LUPA_VERIFICAR_E2E:-0}" = "1" ]; then
   echo "== e2e =="
   bash intranet/web/scripts/e2e.sh

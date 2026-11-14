@@ -412,7 +412,8 @@ a saída resumida (vermelho inicial e verde final).
   - A suíte anterior referenciava tabelas e peças criminais. No worker, `pytest pipeline/tests/ingestao/test_injecao_corpus.py --no-cov -q` passou nos dois testes, com dez variantes, recall mínimo de 90% e até 5% de páginas limpas sinalizadas.
   - Na API, `pytest intranet/api/tests/agente/test_injecao_agente.py --no-cov -q` passou nos 11 testes. Dois autos com nove vetores passaram por ingestão, ferramentas, chat e dossiê. Nos 16 ataques roteirizados, nenhum achado foi criado ou suprimido, nenhum dado de outro processo foi exposto e nenhuma ferramenta embutida executou. Uma resposta legítima com citação literal foi aceita.
 - [ ] **T6.2** E2E e capturas adaptados. RNF-09.
-- [ ] **T6.3** Cabeçalhos do proxy e saída de rede do worker. RF-SEG-03, RF-SEG-04.
+- [x] **T6.3** Cabeçalhos do proxy e saída de rede do worker. RF-SEG-03, RF-SEG-04.
+  - verificar_cabecalhos.py --exigir passou nas quatro rotas HTTPS no proxy real. No worker, PostgreSQL aceitou a conexão interna e o kernel devolveu ENETUNREACH para TCP externo. verificar.sh executa a prova de isolamento.
 - [ ] **T6.4** `scripts/verificar.sh` completo verde.
 
 ## Fase 7 — Documentação e versão
