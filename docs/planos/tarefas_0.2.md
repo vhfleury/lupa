@@ -423,7 +423,10 @@ a saída resumida (vermelho inicial e verde final).
 
 ## Fase 7 — Documentação e versão
 
-- [ ] **T7.1** `docs/arquitetura.md` e `docs/sistema/*.md`. RF-DOC-03.
+- [x] **T7.1** `docs/arquitetura.md` e `docs/sistema/*.md`. RF-DOC-03.
+  - A documentação descreve a conexão que detém a fila, a evidência na página, o sujeito do achado,
+    o histórico e o descarte. A conferência de links e âncoras locais incluiu os nove documentos
+    de arquitetura e sistema. Os exemplos de CLI usam o gabarito verificado em T4.11.
 - [ ] **T7.2** Guias do assessor e do desembargador. RF-DOC-01.
 - [ ] **T7.3** `docs/conformidade/CONFORMIDADE.md` e `docs/operacao/operacao.md`. RF-DOC-02.
 - [ ] **T7.4** ADRs 0013 a 0016 e `docs/decisoes/registro.md`.
