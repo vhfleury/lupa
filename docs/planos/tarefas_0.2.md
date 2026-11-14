@@ -19,7 +19,11 @@ a saída resumida (vermelho inicial e verde final).
     `ingestao/test_eventos_banco.py`, `seguranca/test_cifra_banco.py`, o último teste de
     `ingestao/test_worker_extracao.py` (em `test_worker_extracao_api.py`) e o teste de
     `unit/test_config.py` que chama `create_app`.
-- [ ] **T1.3** Teste que impede `lupa_pipeline` de importar `lupa_intranet`. D2. RES-12.
+- [x] **T1.3** Teste que impede `lupa_pipeline` de importar `lupa_intranet`. D2. RES-12.
+  - `pipeline/tests/unit/test_dependencias.py`. Comando: `docker compose exec worker python -m
+    pytest -c pipeline/pyproject.toml pipeline/tests/unit/test_dependencias.py --no-cov -q`.
+  - Vermelho (com `import lupa_intranet.api.app` temporário num módulo da pipeline, só no
+    contêiner): `1 failed, 1 passed`. Verde (sem ele): `2 passed`.
 - [ ] **T1.4** Mover `front/` para `intranet/web/` e `proxy/` para `intranet/proxy/`. D1. RES-04, RES-06.
 - [x] **T1.5** Distribuir `scripts/` entre `pipeline/scripts/`, `intranet/api/scripts/` e a raiz. D1.
   - Junto com T1.1 e T1.2. `criar_usuario_banco.py` ficou em `intranet/api/scripts/` (importa
