@@ -1,10 +1,6 @@
 <script lang="ts">
-  // Tela de auditoria (Etapa 6.9). Desembargador: só o próprio gabinete (a API resolve o
-  // gabinete pela sessão). Administrador: escolhe o gabinete ou vê todos. Consulta com filtros
-  // e paginação por cursor, exportação CSV/JSON, verificação da cadeia e relatório de uso com
-  // custo estimado. Todo acesso a esta tela também é auditado pelo servidor.
   import { onMount } from 'svelte';
-  import { chamar, mensagemErro } from '$lib/api';
+  import { mensagemErro } from '$lib/api';
   import Aviso from '$lib/componentes/Aviso.svelte';
   import {
     ACOES,
@@ -13,6 +9,7 @@
     formatarDinheiro,
     formatarInstante,
     linkExportacao,
+    linkRelatorio,
     textoVerificacao,
     validarFiltros,
     type EventoAuditoria,
@@ -21,15 +18,12 @@
     type Verificacao,
   } from '$lib/auditoria/auditoria';
   import { sessao, tem } from '$lib/sessao.svelte';
-  import type { Gabinete } from '$lib/tipos';
 
   const atual = $derived(sessao.atual);
-  const ehAdmin = $derived(tem(atual, 'gerir_gabinetes'));
   const permitido = $derived(tem(atual, 'ver_auditoria'));
 
   let filtros = $state<Filtros>({ ...FILTROS_VAZIOS });
   let aplicados = $state<Filtros>({ ...FILTROS_VAZIOS });
-  let gabinetes = $state<Gabinete[]>([]);
   let eventos = $state<EventoAuditoria[]>([]);
   let cursor = $state<string | null>(null);
   let consultando = $state(false);
@@ -68,11 +62,6 @@
 
   onMount(() => {
     if (!permitido) return;
-    if (ehAdmin) {
-      chamar<Gabinete[]>('GET', '/gabinetes')
-        .then((lista) => (gabinetes = lista))
-        .catch((e: unknown) => (erro = mensagemErro(e)));
-    }
     void consultar();
   });
 
@@ -90,7 +79,7 @@
     verificando = true;
     verificacao = null;
     try {
-      verificacao = await apiAuditoria.verificar(filtros.gabinete_id);
+      verificacao = await apiAuditoria.verificar();
     } catch (e) {
       erro = mensagemErro(e);
     } finally {
@@ -111,7 +100,7 @@
       return;
     }
     try {
-      relatorio = await apiAuditoria.relatorio(filtros.gabinete_id, tipoRelatorio, idRelatorio);
+      relatorio = await apiAuditoria.relatorio(tipoRelatorio, idRelatorio, aplicados);
     } catch (e) {
       erroRelatorio = mensagemErro(e);
     }
@@ -128,11 +117,6 @@
   function curto(id: string | null): string {
     return id ? id.slice(0, 8) : '—';
   }
-
-  function nomeGabinete(id: string | null): string {
-    if (id === null) return 'global';
-    return gabinetes.find((g) => g.id === id)?.nome ?? curto(id);
-  }
 </script>
 
 <svelte:head><title>Auditoria · Lupa</title></svelte:head>
@@ -142,25 +126,9 @@
 {#if !permitido}
   <Aviso tipo="erro">Ação não permitida para o seu papel.</Aviso>
 {:else}
-  <p class="contexto">
-    {ehAdmin
-      ? 'Administrador: escolha um gabinete ou deixe em branco para ver todos.'
-      : 'Você vê os eventos do seu gabinete.'}
-  </p>
   {#if erro}<Aviso tipo="erro">{erro}</Aviso>{/if}
 
   <form class="filtros" onsubmit={enviar} aria-label="Filtros da auditoria">
-    {#if ehAdmin}
-      <div>
-        <label for="f-gabinete">Gabinete</label>
-        <select id="f-gabinete" bind:value={filtros.gabinete_id}>
-          <option value="">Todos</option>
-          {#each gabinetes as g (g.id)}
-            <option value={g.id}>{g.nome}</option>
-          {/each}
-        </select>
-      </div>
-    {/if}
     <div>
       <label for="f-usuario">Usuário (id)</label>
       <input id="f-usuario" bind:value={filtros.usuario_id} autocomplete="off" />
@@ -216,7 +184,7 @@
           <th scope="col">Quando</th>
           <th scope="col">Ação</th>
           <th scope="col">Resultado</th>
-          {#if ehAdmin}<th scope="col">Gabinete</th>{/if}
+
           <th scope="col">Usuário</th>
           <th scope="col">Processo</th>
           <th scope="col">Objeto</th>
@@ -226,11 +194,11 @@
       </thead>
       <tbody>
         {#each eventos as e (e.id)}
-          <tr data-testid="evento" data-gabinete={e.gabinete_id ?? ''}>
+          <tr data-testid="evento">
             <td>{formatarInstante(e.ocorrido_em)}</td>
             <td>{e.acao}</td>
             <td>{e.resultado}</td>
-            {#if ehAdmin}<td>{nomeGabinete(e.gabinete_id)}</td>{/if}
+
             <td>
               {#if e.usuario_id}
                 <button
@@ -259,7 +227,7 @@
             <td>{e.localizacao ?? '—'}</td>
           </tr>
         {:else}
-          <tr><td colspan={ehAdmin ? 9 : 8}>Nenhum evento com esses filtros.</td></tr>
+          <tr><td colspan="8">Nenhum evento com esses filtros.</td></tr>
         {/each}
       </tbody>
     </table>
@@ -277,11 +245,6 @@
 
   <section aria-labelledby="titulo-verificacao">
     <h2 id="titulo-verificacao">Integridade da cadeia</h2>
-    <p>
-      Recalcula o hash de cada evento {ehAdmin && !filtros.gabinete_id
-        ? 'da cadeia global (sem gabinete); escolha um gabinete para conferir a dele'
-        : 'da cadeia do gabinete'}.
-    </p>
     <button type="button" onclick={verificar} disabled={verificando}>
       {verificando ? 'Verificando…' : 'Verificar integridade'}
     </button>
@@ -298,6 +261,11 @@
 
   <section aria-labelledby="titulo-relatorio">
     <h2 id="titulo-relatorio">Relatório de uso</h2>
+    <p>
+      <a href={linkRelatorio(aplicados)} download="relatorio-uso.csv"
+        >Exportar uso por processo e usuário em CSV</a
+      >
+    </p>
     <form class="relatorio" onsubmit={gerarRelatorio}>
       <div>
         <label for="r-tipo">Por</label>
@@ -377,10 +345,6 @@
 {/if}
 
 <style>
-  .contexto {
-    color: var(--texto-suave);
-    margin-top: 0;
-  }
   .filtros,
   .relatorio {
     display: grid;

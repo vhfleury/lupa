@@ -1,5 +1,4 @@
 <script lang="ts">
-  // Gestão de usuários. Desembargador: assessores do próprio gabinete. Administrador: todos.
   // Botões que o papel não tem não aparecem; o servidor reconfere cada ação.
   import { onMount } from 'svelte';
   import { chamar, mensagemErro } from '$lib/api';
@@ -7,9 +6,9 @@
   import Confirmacao from '$lib/componentes/Confirmacao.svelte';
   import FormNovoUsuario from '$lib/componentes/FormNovoUsuario.svelte';
   import SenhaTemporaria from '$lib/componentes/SenhaTemporaria.svelte';
-  import { acoesSobre, gereUsuarios, papeisCriaveis } from '$lib/permissoes';
-  import { sessao, tem } from '$lib/sessao.svelte';
-  import { ROTULO_PAPEL, type Gabinete, type Usuario, type UsuarioComSenha } from '$lib/tipos';
+  import { acoesSobre, gereUsuarios } from '$lib/permissoes';
+  import { sessao } from '$lib/sessao.svelte';
+  import { ROTULO_PAPEL, type Usuario, type UsuarioComSenha } from '$lib/tipos';
 
   type Acao = 'desativar' | 'reativar' | 'resetar-senha' | 'resetar-mfa';
 
@@ -21,7 +20,6 @@
   };
 
   let usuarios = $state<Usuario[]>([]);
-  let gabinetes = $state<Gabinete[]>([]);
   let erro = $state('');
   let aviso = $state('');
   let carregando = $state(true);
@@ -36,13 +34,10 @@
   }
 
   const atual = $derived(sessao.atual);
-  const ehAdmin = $derived(tem(atual, 'gerir_gabinetes'));
-  const papeis = $derived(papeisCriaveis(atual));
 
   async function carregar(): Promise<void> {
     try {
       usuarios = await chamar<Usuario[]>('GET', '/usuarios');
-      if (ehAdmin) gabinetes = await chamar<Gabinete[]>('GET', '/gabinetes');
     } catch (e) {
       erro = mensagemErro(e);
     } finally {
@@ -54,11 +49,6 @@
     if (gereUsuarios(atual)) void carregar();
     else carregando = false;
   });
-
-  function nomeGabinete(id: string | null): string {
-    if (id === null) return '—';
-    return gabinetes.find((g) => g.id === id)?.nome ?? id;
-  }
 
   function mostrarSenha(criado: UsuarioComSenha): void {
     senhaMostrada = { nome: criado.nome_usuario, senha: criado.senha_temporaria };
@@ -109,14 +99,12 @@
     <p role="status">Carregando…</p>
   {:else}
     <table>
-      <caption class="visualmente-oculto"
-        >Usuários {ehAdmin ? 'de todos os gabinetes' : 'do gabinete'}</caption
-      >
+      <caption class="visualmente-oculto">Usuários cadastrados</caption>
       <thead>
         <tr>
           <th scope="col">Usuário</th>
           <th scope="col">Papel</th>
-          {#if ehAdmin}<th scope="col">Gabinete</th>{/if}
+
           <th scope="col">Situação</th>
           <th scope="col">Autenticador</th>
           <th scope="col">Ações</th>
@@ -128,7 +116,7 @@
           <tr data-testid="linha-usuario" data-usuario={usuario.nome_usuario}>
             <th scope="row">{usuario.nome_usuario}</th>
             <td>{ROTULO_PAPEL[usuario.papel]}</td>
-            {#if ehAdmin}<td>{nomeGabinete(usuario.gabinete_id)}</td>{/if}
+
             <td data-testid="situacao">
               {usuario.ativo ? 'Ativo' : 'Inativo'}{usuario.troca_senha_obrigatoria
                 ? ' · troca de senha pendente'
@@ -172,18 +160,13 @@
             </td>
           </tr>
         {:else}
-          <tr><td colspan={ehAdmin ? 6 : 5}>Nenhum usuário.</td></tr>
+          <tr><td colspan="5">Nenhum usuário.</td></tr>
         {/each}
       </tbody>
     </table>
 
     <div class="novo">
-      <FormNovoUsuario
-        {papeis}
-        gabinetes={ehAdmin ? gabinetes : []}
-        titulo={ehAdmin ? 'Novo usuário' : 'Novo assessor'}
-        {aoCriar}
-      />
+      <FormNovoUsuario {aoCriar} />
     </div>
   {/if}
 {/if}

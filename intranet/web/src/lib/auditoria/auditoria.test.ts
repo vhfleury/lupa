@@ -5,12 +5,13 @@ import {
   formatarDinheiro,
   formatarInstante,
   linkExportacao,
+  linkRelatorio,
   montarQuery,
   textoVerificacao,
   validarFiltros,
 } from './auditoria';
 
-const ID = '11111111-2222-3333-4444-555555555555';
+const ID = '0f'.repeat(32);
 
 describe('filtros da auditoria', () => {
   it('query leva só os campos preenchidos e os extras', () => {
@@ -36,6 +37,7 @@ describe('filtros da auditoria', () => {
 
   it('valida identificadores e a ordem do intervalo', () => {
     expect(validarFiltros(FILTROS_VAZIOS)).toBeNull();
+    expect(validarFiltros({ ...FILTROS_VAZIOS, usuario_id: ID })).toBeNull();
     expect(validarFiltros({ ...FILTROS_VAZIOS, processo_id: 'xyz' })).toMatch(/processo/);
     expect(
       validarFiltros({ ...FILTROS_VAZIOS, inicio: '2026-02-01T00:00', fim: '2026-01-01T00:00' }),
@@ -49,6 +51,28 @@ describe('filtros da auditoria', () => {
     );
   });
 
+  it('CSV de uso filtra pelo processo, usuário e período da consulta', () => {
+    const link = new URL(
+      linkRelatorio({
+        ...FILTROS_VAZIOS,
+        processo_id: ID,
+        usuario_id: ID,
+        inicio: '2026-01-01T10:00',
+        fim: '2026-01-02T10:00',
+        acao: 'login_ok',
+      }),
+      'https://lupa.test',
+    );
+    expect(link.pathname).toBe('/api/auditoria/relatorio-uso');
+    expect(Object.fromEntries(link.searchParams)).toEqual({
+      formato: 'csv',
+      processo: ID,
+      usuario: ID,
+      inicio: new Date('2026-01-01T10:00').toISOString(),
+      fim: new Date('2026-01-02T10:00').toISOString(),
+    });
+  });
+
   it('lista de ações inclui a revisão de processo', () => {
     expect(ACOES).toContain('processo_em_revisao');
     expect(ACOES).toContain('revisao_liberada');
@@ -57,11 +81,11 @@ describe('filtros da auditoria', () => {
 
 describe('textos', () => {
   it('verificação íntegra e quebrada', () => {
-    const base = { gabinete_id: null, total: 3, primeiro_evento_quebrado: null, motivo: null };
+    const base = { total: 3, primeira_sequencia_quebrada: null, motivo: null };
     expect(textoVerificacao({ ...base, integra: true })).toMatch(/íntegra: 3/);
     expect(
-      textoVerificacao({ ...base, integra: false, primeiro_evento_quebrado: 'e9', motivo: 'hash' }),
-    ).toBe('Cadeia QUEBRADA a partir do evento e9 (hash).');
+      textoVerificacao({ ...base, integra: false, primeira_sequencia_quebrada: 9, motivo: 'hash' }),
+    ).toBe('Cadeia QUEBRADA a partir da sequência 9 (hash).');
   });
 
   it('instante e dinheiro', () => {
@@ -79,7 +103,6 @@ describe('menu', () => {
       usuario_id: '1',
       nome_usuario: 'x',
       papel: 'desembargador' as const,
-      gabinete_id: 'g',
       troca_senha_obrigatoria: false,
     };
     render(MenuLateral, { sessao: { ...base, permissoes: ['ver_auditoria'] }, caminho: '/' });

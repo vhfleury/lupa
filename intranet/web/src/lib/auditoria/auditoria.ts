@@ -6,7 +6,6 @@ export interface EventoAuditoria {
   sequencia: number;
   ocorrido_em: string;
   usuario_id: string | null;
-  gabinete_id: string | null;
   processo_id: string | null;
   acao: string;
   objeto_tipo: string | null;
@@ -24,10 +23,9 @@ export interface PaginaEventos {
 }
 
 export interface Verificacao {
-  gabinete_id: string | null;
   integra: boolean;
   total: number;
-  primeiro_evento_quebrado: string | null;
+  primeira_sequencia_quebrada: number | null;
   motivo: string | null;
 }
 
@@ -59,7 +57,6 @@ export interface RelatorioUso {
 
 /** Filtros como digitados na tela (strings vazias não filtram). */
 export interface Filtros {
-  gabinete_id: string;
   usuario_id: string;
   processo_id: string;
   acao: string;
@@ -69,7 +66,6 @@ export interface Filtros {
 }
 
 export const FILTROS_VAZIOS: Filtros = {
-  gabinete_id: '',
   usuario_id: '',
   processo_id: '',
   acao: '',
@@ -92,7 +88,8 @@ export const ACOES = [
   'usuario_criado',
   'usuario_desativado',
   'usuario_reativado',
-  'gabinete_criado',
+  'responsavel_adicionado',
+  'responsavel_removido',
   'processo_criado',
   'arquivo_enviado',
   'processo_aberto',
@@ -104,14 +101,16 @@ export const ACOES = [
   'peca_reclassificada',
   'validacao_executada',
   'chamada_modelo',
-  'admin_acesso_conteudo',
+  'citacao_descartada',
+  'processo_descartado',
+  'descarte_objetos_pendente',
   'auditoria_consultada',
   'auditoria_exportada',
   'processo_em_revisao',
   'revisao_liberada',
 ] as const;
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ID_PUBLICO = /^[a-f0-9]{64}$/i;
 
 /** Mensagem de erro do primeiro filtro inválido, ou null. */
 export function validarFiltros(f: Filtros): string | null {
@@ -120,7 +119,7 @@ export function validarFiltros(f: Filtros): string | null {
     ['processo_id', 'processo'],
   ] as const) {
     const valor = f[campo].trim();
-    if (valor && !UUID.test(valor)) return `O identificador de ${rotulo} não é válido.`;
+    if (valor && !ID_PUBLICO.test(valor)) return `O identificador de ${rotulo} não é válido.`;
   }
   if (f.inicio && f.fim && new Date(f.inicio) >= new Date(f.fim)) {
     return 'O início do intervalo deve ser anterior ao fim.';
@@ -136,7 +135,7 @@ function instante(valor: string): string {
 /** Query string dos filtros (só os preenchidos), mais os parâmetros extras. */
 export function montarQuery(f: Filtros, extras: Record<string, string> = {}): string {
   const busca = new URLSearchParams();
-  for (const campo of ['gabinete_id', 'usuario_id', 'processo_id', 'acao', 'ip'] as const) {
+  for (const campo of ['usuario_id', 'processo_id', 'acao', 'ip'] as const) {
     const valor = f[campo].trim();
     if (valor) busca.set(campo, valor);
   }
@@ -155,8 +154,8 @@ export function linkExportacao(f: Filtros, formato: 'csv' | 'json'): string {
 export function textoVerificacao(v: Verificacao): string {
   if (v.integra)
     return `Cadeia íntegra: ${v.total} evento(s) conferido(s), nenhum hash divergente.`;
-  const onde = v.primeiro_evento_quebrado ?? 'desconhecido';
-  return `Cadeia QUEBRADA a partir do evento ${onde}${v.motivo ? ` (${v.motivo})` : ''}.`;
+  const onde = v.primeira_sequencia_quebrada ?? 'desconhecida';
+  return `Cadeia QUEBRADA a partir da sequência ${onde}${v.motivo ? ` (${v.motivo})` : ''}.`;
 }
 
 export function formatarInstante(iso: string | null): string {
@@ -180,11 +179,18 @@ export const apiAuditoria = {
       'GET',
       `/auditoria${montarQuery(f, { limite: String(limite), ...(cursor ? { cursor } : {}) })}`,
     ),
-  verificar: (gabinete: string) =>
-    chamar<Verificacao>('GET', `/auditoria/verificar${gabinete ? `?gabinete_id=${gabinete}` : ''}`),
-  relatorio: (gabinete: string, tipo: 'processo' | 'usuario', id: string) => {
-    const busca = new URLSearchParams({ [tipo]: id.trim() });
-    if (gabinete) busca.set('gabinete_id', gabinete);
-    return chamar<RelatorioUso>('GET', `/auditoria/relatorio-uso?${busca.toString()}`);
-  },
+  verificar: () => chamar<Verificacao>('GET', '/auditoria/verificar'),
+  relatorio: (tipo: 'processo' | 'usuario', id: string, f: Filtros) =>
+    chamar<RelatorioUso>(
+      'GET',
+      `/auditoria/relatorio-uso${queryRelatorio(f, { [tipo]: id.trim() })}`,
+    ),
 };
+
+function queryRelatorio(f: Filtros, extras: Record<string, string>) {
+  return montarQuery({ ...FILTROS_VAZIOS, inicio: f.inicio, fim: f.fim }, extras);
+}
+
+export function linkRelatorio(f: Filtros): string {
+  return `${BASE_API}/auditoria/relatorio-uso${queryRelatorio(f, { formato: 'csv', ...(f.processo_id && { processo: f.processo_id }), ...(f.usuario_id && { usuario: f.usuario_id }) })}`;
+}

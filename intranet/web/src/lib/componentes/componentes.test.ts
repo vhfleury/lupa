@@ -12,7 +12,7 @@ const DESEMBARGADOR: Sessao = {
   usuario_id: '1',
   nome_usuario: 'des.silva',
   papel: 'desembargador',
-  gabinete_id: 'g1',
+
   troca_senha_obrigatoria: false,
   permissoes: ['ver_processo', 'gerir_assessor', 'resetar_assessor'],
 };
