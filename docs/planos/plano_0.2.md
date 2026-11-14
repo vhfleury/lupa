@@ -83,7 +83,7 @@ O banco é recriado do zero. Convenções que valem para todas as linhas da tabe
 | `sat_chave_login_falha` (multiativo) | sem atributo além dos técnicos; `load_dts` é o instante da falha |
 | `sat_chave_login_bloqueio` | `bloqueado_ate TIMESTAMPTZ` (nulo: um login certo zerou as falhas) |
 | Views `v_usuario`, `v_processo`, `v_arquivo`, `v_pagina`, `v_peca`, `v_evidencia`, `v_fato`, `v_achado`, `v_parte`, `v_conversa`, `v_sessao`, `v_desafio_mfa`, `v_bloqueio_login` | uma linha por hub com a linha mais recente de cada satélite; `id TEXT` é o hex do `hk`; `v_processo` traz `em_revisao BOOLEAN`; `v_peca` e `v_fato` trazem `vigente` e os `id` do pai (`v_fato.vigente`: o fato tem ao menos uma evidência com vigência corrente verdadeira); `v_bloqueio_login` traz `bloqueado_ate`, `zerado_em` e `falhas TIMESTAMPTZ[]` (instantes das falhas depois do último zeramento) |
-| Views `v_peca_historico`, `v_fato_historico` | todas as linhas do satélite, com `load_dts` e autor |
+| Views `v_peca_historico`, `v_fato_historico`, `v_achado_historico` | versões dos satélites, com instante de gravação e autoria quando houver |
 | View `v_mensagem` | linhas de `sat_conversa_mensagem` por conversa, em ordem de `sequencia` |
 | View `v_anotacao` | união de `sat_fato_anotacao` e `sat_achado_anotacao`, com `alvo_tipo`, `alvo_id`, autor e data |
 | View `v_responsavel` | pares processo–usuário com `vigente` |
@@ -156,8 +156,8 @@ Removidos da 0.1: as 26 tabelas (`gabinete`, `usuario`, `processo`, `processo_re
 | `intranet/web/src/lib/{permissoes,tipos,api,sessao.svelte}.ts`, `lib/processos/{tipos,rotulos,envio}.ts`, `lib/auditoria/auditoria.ts`, `lib/componentes/{MenuLateral,FormNovoUsuario}.svelte`, `routes/processos/**`, `routes/usuarios/`, `routes/auditoria/` | altera: dois papéis, classe, partes, tipos cíveis, ids em texto |
 | `intranet/web/e2e/testes/auditoria-admin.spec.ts` | renomeia para `auditoria.spec.ts`; demais specs e `capturas.spec.ts` adaptados |
 | `proxy/` | → `intranet/proxy/`; ficam `Caddyfile` e `modos/interno.caddy`; saem `acme.caddy`, `fornecido.caddy`, `sem-certificado.pem` |
-| `scripts/{gerar_autos,medir,medir_extracao,ponta_a_ponta,calibrar}.py` | → `pipeline/scripts/` |
-| `scripts/{limpar_dev,criar_usuario_banco}.py` | → `intranet/api/scripts/` |
+| `scripts/{gerar_autos,medir,medir_extracao,ponta_a_ponta,calibrar,limpar_dev}.py` | → `pipeline/scripts/` |
+| `scripts/criar_usuario_banco.py` | → `intranet/api/scripts/` |
 | `scripts/criar_admin.py` | → `intranet/api/scripts/criar_desembargador.py` |
 | `scripts/{e2e_preparar,e2e_processos,e2e_semear_chat,verificar_cabecalhos}.py`, `scripts/validar_caddyfile.sh` | → `intranet/api/scripts/`; sem gabinete e administrador |
 | `scripts/{backup,backup_comum,backup_conteiner,cron_backup,expurgar_backups,restaurar,instalar_piloto}.sh`, `scripts/conferir_piloto.py`, `scripts/preparar_repositorio.md` | remove |
