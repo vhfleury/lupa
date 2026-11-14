@@ -22,7 +22,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function montar(): unknown[] {
+function montar(valores: Record<string, unknown> = {}, comComprovante = false): unknown[] {
   const enviados: unknown[] = [];
   const fato = {
     id: fatoId,
@@ -33,13 +33,21 @@ function montar(): unknown[] {
     criado_em: '2025-04-06T12:00:00Z',
     evidencias: [fonte],
   };
+  const fatos = [fato];
+  if (comComprovante)
+    fatos.push({
+      ...fato,
+      id: '08'.repeat(32),
+      tipo: 'comprovante_preparo',
+      evidencias: [{ ...fonte, id: '09'.repeat(32), pagina: 6 }],
+    });
   const achado = {
     id: '05'.repeat(32),
     validacao: 'tempestividade_recurso',
     resultado: 'conforme',
     explicacao: 'Confira a intimação.',
-    valores: {},
-    fatos_usados: [fatoId],
+    valores,
+    fatos_usados: fatos.map((item) => item.id),
     vigente: true,
   };
   vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
@@ -48,7 +56,7 @@ function montar(): unknown[] {
       return Response.json({ achados_gravados: 1 });
     }
     if (url.endsWith('/anotacoes')) return Response.json({ anotacoes: [] });
-    if (url.includes('/fatos')) return Response.json({ fatos: [fato] });
+    if (url.includes('/fatos')) return Response.json({ fatos });
     return Response.json({ achados: [achado] });
   });
   sessao.definir({
@@ -61,6 +69,34 @@ function montar(): unknown[] {
   render(Validacoes);
   return enviados;
 }
+
+it('RF-VAL-01 mostra os dias descontados e as fontes do cálculo em campos legíveis', async () => {
+  montar({
+    dias_nao_contados: [{ data: '2025-04-05', motivo: 'sábado', fonte: 'art. 216 do CPC' }],
+    fatos: [{ tipo: 'data_intimacao', evidencia_ids: [fonte.id] }],
+    faltantes: [],
+    pecas_procuradas: {},
+  });
+  expect(await screen.findByText('05/04/2025')).toBeTruthy();
+  expect(screen.getByText('sábado')).toBeTruthy();
+  expect(screen.getByText('art. 216 do CPC')).toBeTruthy();
+  expect(screen.queryByText(/evidencia_ids/)).toBeNull();
+  expect(screen.queryByText('Faltantes')).toBeNull();
+  expect(screen.getByTestId('link-evidencia').getAttribute('href')).toContain(fonte.id);
+});
+
+it('RF-VAL-01 distingue intimação, preparo e vencimento quando caem no mesmo dia', async () => {
+  montar(
+    { data_intimacao: '2025-04-03', data_comprovante: '2025-04-03', vencimento: '2025-04-03' },
+    true,
+  );
+  const links = await screen.findAllByTestId('link-data');
+  expect(links.map((link) => link.getAttribute('href')?.split('=').at(-1))).toEqual([
+    fonte.id,
+    '09'.repeat(32),
+  ]);
+  expect(screen.getByText('Vencimento').nextElementSibling?.querySelector('a')).toBeNull();
+});
 
 it('RF-FAT-03 envia página, intervalo e trecho ao corrigir o valor', async () => {
   const enviados = montar();

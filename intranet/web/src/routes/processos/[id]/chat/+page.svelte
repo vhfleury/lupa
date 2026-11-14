@@ -150,7 +150,7 @@
         maxlength={LIMITE_PERGUNTA}
         rows="3"
         disabled={Boolean(encerramento) || emRevisao || enviando}
-        placeholder="Ex.: Em que página está a certidão de intimação da defesa?"
+        placeholder="Em que página está a certidão de intimação da parte apelada?"
       ></textarea>
       <div class="acoes">
         <span class="restante">{LIMITE_PERGUNTA - pergunta.length} caracteres restantes</span>

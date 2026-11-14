@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import { chamar, mensagemErro } from '$lib/api';
   import Aviso from '$lib/componentes/Aviso.svelte';
+  import { mascararCnj } from '$lib/processos/cnj';
   import { formatarData, legivel, RESULTADO, SITUACAO } from '$lib/processos/rotulos';
   import type { Dossie, Indice } from '$lib/processos/tipos';
 
@@ -53,7 +54,7 @@
     <h2 id="t-ficha">Ficha</h2>
     <dl class="ficha" data-testid="ficha">
       <dt>Número</dt>
-      <dd class="mono">{dossie.ficha.numero_cnj}</dd>
+      <dd class="mono">{mascararCnj(dossie.ficha.numero_cnj)}</dd>
       <dt>Classe</dt>
       <dd>{legivel(dossie.ficha.classe)}</dd>
       <dt>Status</dt>

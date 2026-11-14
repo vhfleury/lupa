@@ -32,6 +32,28 @@ const ROTULOS: Record<string, string> = {
   preparo_recurso: 'Preparo do recurso',
   representacao_recurso: 'Representação do recorrente',
   cabimento_agravo: 'Cabimento do agravo',
+  data_decisao_recorrida: 'Data da decisão recorrida',
+  data_intimacao: 'Data da intimação',
+  data_interposicao: 'Data de interposição',
+  data_comprovante: 'Data do comprovante',
+  data_ajuizamento: 'Data do ajuizamento',
+  data_citacao: 'Data da citação',
+  data_contestacao: 'Data da contestação',
+  data_acordao: 'Data do acórdão',
+  tipo_recurso: 'Tipo de recurso',
+  qualidade_recorrente: 'Qualidade do recorrente',
+  gratuidade_pedido: 'Pedido de gratuidade',
+  gratuidade_decisao: 'Decisão sobre a gratuidade',
+  advogado_subscritor: 'Advogado subscritor',
+  hipotese_decisao_agravada: 'Hipótese da decisão agravada',
+  prazo_dias: 'Prazo em dias úteis',
+  atraso_dias_uteis: 'Atraso em dias úteis',
+  dias_nao_contados: 'Dias não contados',
+  versoes_dados: 'Versões dos dados',
+  versao_dados: 'Versão dos dados',
+  pecas_procuradas: 'Peças consultadas',
+  paginas_mandato: 'Folhas do mandato',
+  oab: 'OAB',
 };
 
 export const ESTADO_JOB: Record<string, string> = {
@@ -120,24 +142,19 @@ export function formatarData(iso: string | null): string {
 }
 
 export function textoDoValor(v: unknown): string {
-  if (typeof v === 'string') return /^\d{4}-\d{2}-\d{2}$/.test(v) ? formatarData(v) : v;
-  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-  return JSON.stringify(v);
+  if (v == null) return '—';
+  if (typeof v === 'boolean') return v ? 'Sim' : 'Não';
+  if (typeof v === 'string') {
+    if (DATA_ISO.test(v)) return formatarData(v);
+    if (/^[0-9a-f]{64}$/.test(v)) return v.slice(0, 8) + '…';
+    return ROTULOS[v] ?? v;
+  }
+  if (Array.isArray(v)) return v.map(textoDoValor).join(' · ');
+  if (typeof v === 'object')
+    return Object.entries(v)
+      .map(([chave, valor]) => `${legivel(chave)}: ${textoDoValor(valor)}`)
+      .join(' · ');
+  return String(v);
 }
 
 export const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
-
-/** Datas ISO encontradas (recursivamente) nos valores de um achado, com o caminho da chave. */
-export function datasDosValores(valores: unknown, caminho = ''): { chave: string; data: string }[] {
-  if (typeof valores === 'string')
-    return DATA_ISO.test(valores) ? [{ chave: caminho, data: valores }] : [];
-  if (Array.isArray(valores)) {
-    return valores.flatMap((v, i) => datasDosValores(v, `${caminho}[${i}]`));
-  }
-  if (typeof valores === 'object' && valores !== null) {
-    return Object.entries(valores).flatMap(([k, v]) =>
-      datasDosValores(v, caminho ? `${caminho}.${k}` : k),
-    );
-  }
-  return [];
-}

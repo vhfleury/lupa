@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { estiloDestaque, paginaDestino, proximoZoom } from '$lib/visualizador/geometria';
 import { digitoVerificador, mascararCnj, problemaCnj } from './cnj';
 import { formatarBytes, problemaArquivo } from './envio';
-import { datasDosValores, motivoQuarentena, textoDoValor, legivel, CLASSES } from './rotulos';
+import { motivoQuarentena, textoDoValor, legivel, CLASSES } from './rotulos';
 
 describe('número CNJ', () => {
   it('calcula o dígito pelo módulo 97 como o servidor', () => {
@@ -46,11 +46,11 @@ describe('rótulos', () => {
     expect(Object.keys(CLASSES)).toHaveLength(5);
     expect(legivel('apelacao_civel')).toBe('Apelação cível');
     expect(legivel('peticao_inicial')).toBe('Petição inicial');
+    expect(legivel('data_interposicao')).toBe('Data de interposição');
+    expect(legivel('data_citacao')).toBe('Data da citação');
     expect(textoDoValor(8)).toBe('8');
-    expect(datasDosValores({ a: '2024-01-02', b: { c: ['2023-05-06', 'x'] }, d: 3 })).toEqual([
-      { chave: 'a', data: '2024-01-02' },
-      { chave: 'b.c[0]', data: '2023-05-06' },
-    ]);
+    expect(textoDoValor({ nome: 'Ana', oab: 'GO 123' })).toBe('Nome: Ana · OAB: GO 123');
+    expect(textoDoValor(false)).toBe('Não');
   });
 });
 

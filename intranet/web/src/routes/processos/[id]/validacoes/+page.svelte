@@ -6,7 +6,6 @@
   import { chamar, mensagemErro } from '$lib/api';
   import Aviso from '$lib/componentes/Aviso.svelte';
   import {
-    datasDosValores,
     DATA_ISO,
     formatarData,
     legivel,
@@ -38,6 +37,9 @@
 
   const podeAnotar = $derived(tem(sessao.atual, 'anotar'));
   const porId = $derived(new Map(fatos.map((f) => [f.id, f])));
+  const porPagina = $derived(
+    new Map(fatos.flatMap((f) => f.evidencias.map((ev) => [ev.pagina_id, ev] as const))),
+  );
   const antigos = $derived(historico.filter((a) => !a.vigente));
   const substituidos = $derived(historicoFatos.filter((f) => !f.vigente));
 
@@ -69,11 +71,12 @@
     return evidencia ? `/processos/${id}/visualizador?evidencia=${evidencia.id}` : null;
   }
 
-  /** Fato usado pelo achado cujo valor é a data (para o link da página). */
-  function fatoDaData(achado: Achado, data: string): Fato | undefined {
+  /** Localiza a origem da data no marco processual indicado pela validação. */
+  function fatoDaData(achado: Achado, chave: string, data: string): Fato | undefined {
+    const tipo = chave === 'data_comprovante' ? 'comprovante_preparo' : chave;
     return achado.fatos_usados
       .map((fid) => porId.get(fid))
-      .find((f) => f !== undefined && f.valor === data);
+      .find((f) => f?.tipo === tipo && f.valor === data);
   }
 
   function notasDe(alvo: { achado?: string; fato?: string }): Anotacao[] {
@@ -174,6 +177,40 @@
 {#if erro}<Aviso tipo="erro">{erro}</Aviso>{/if}
 {#if aviso}<Aviso tipo="sucesso">{aviso}</Aviso>{/if}
 
+{#snippet valorDoAchado(achado: Achado, chave: string, valor: unknown)}
+  {#if typeof valor === 'string' && DATA_ISO.test(valor)}
+    {@const fato = fatoDaData(achado, chave, valor)}
+    {#if fato && linkEvidencia(fato)}
+      <a href={linkEvidencia(fato)} data-testid="link-data">{formatarData(valor)}</a>
+    {:else}
+      {formatarData(valor)}
+    {/if}
+  {:else if typeof valor === 'string' && /^[0-9a-f]{64}$/.test(valor)}
+    {@const fato = porId.get(valor)}
+    {@const fonte = porPagina.get(valor)}
+    {#if fato && linkEvidencia(fato)}
+      <a href={linkEvidencia(fato)}>{legivel(fato.tipo)}</a>
+    {:else if fonte}
+      <a href="/processos/{id}/visualizador?evidencia={fonte.id}">Folha {fonte.pagina ?? '?'}</a>
+    {:else}
+      <span title={valor}>{valor.slice(0, 8)}…</span>
+    {/if}
+  {:else if Array.isArray(valor)}
+    <ul class="itens-valor">
+      {#each valor as item, i (i)}<li>{@render valorDoAchado(achado, chave, item)}</li>{/each}
+    </ul>
+  {:else if valor !== null && typeof valor === 'object'}
+    <dl class="valores">
+      {#each Object.entries(valor) as [campo, item] (campo)}
+        <dt>{legivel(campo)}</dt>
+        <dd>{@render valorDoAchado(achado, campo, item)}</dd>
+      {/each}
+    </dl>
+  {:else}
+    {textoDoValor(valor)}
+  {/if}
+{/snippet}
+
 {#snippet notas(lista: Anotacao[])}
   {#if lista.length}
     <ul class="notas">
@@ -228,27 +265,10 @@
       <h3>Valores</h3>
       <dl class="valores">
         {#each Object.entries(a.valores) as [chave, valor] (chave)}
-          <dt>{legivel(chave)}</dt>
-          <dd>
-            {#if typeof valor === 'string' && DATA_ISO.test(valor)}
-              {@const fato = fatoDaData(a, valor)}
-              {#if fato && linkEvidencia(fato)}
-                <a href={linkEvidencia(fato)} data-testid="link-data">{formatarData(valor)}</a>
-              {:else}
-                {formatarData(valor)}
-              {/if}
-            {:else}
-              <span class="mono">{typeof valor === 'string' ? valor : JSON.stringify(valor)}</span>
-              {#each datasDosValores(valor) as d (d.chave)}
-                {@const fato = fatoDaData(a, d.data)}
-                {#if fato && linkEvidencia(fato)}
-                  <a class="data-interna" href={linkEvidencia(fato)} data-testid="link-data"
-                    >{formatarData(d.data)}</a
-                  >
-                {/if}
-              {/each}
-            {/if}
-          </dd>
+          {#if chave !== 'fatos' && valor != null && (typeof valor !== 'object' || Object.keys(valor).length > 0)}
+            <dt>{legivel(chave)}</dt>
+            <dd>{@render valorDoAchado(a, chave, valor)}</dd>
+          {/if}
         {/each}
       </dl>
 
@@ -443,8 +463,12 @@
   dd {
     margin: 0;
   }
-  .data-interna {
-    margin-left: 0.5rem;
+  .itens-valor {
+    margin: 0;
+    padding-left: 1.2rem;
+  }
+  .itens-valor li + li {
+    margin-top: 0.5rem;
   }
   .fatos li {
     margin-bottom: 0.6rem;

@@ -404,6 +404,7 @@ a saída resumida (vermelho inicial e verde final).
 - [x] **T5.2** Tipos, API e rótulos cíveis; ids em texto. D12.
   - `npx vitest run src/lib/processos/processos.test.ts` passou nos 8 casos, incluindo as cinco classes, tipos de peça e valores de fatos.
 - [x] **T5.3** Telas de processos: cadastro com classe, lista, dossiê com partes, validações, visualizador. RF-DOS-01 a 05.
+  - As capturas mostraram referências em JSON e dois marcos com a mesma data remetiam à primeira folha. O teste de RF-VAL-01 em `correcao.test.ts` distingue a folha de cada marco do vencimento calculado. Os valores do cálculo, as fontes, os rótulos cíveis e a máscara CNJ estão legíveis no dossiê e nas validações.
   - RF-FAT-03 e RF-CHA-06. O formulário enviava a correção sem evidência e aceitava perguntas depois do teto. Após a correção, os quatro casos em `src/lib/processos/correcao.test.ts` e `src/lib/chat/limite.test.ts` passaram.
   - `npx vitest run src/lib/processos/cadastro.test.ts` confirmou pelo formulário o envio do número CNJ com a classe selecionada. O dossiê abre a página de cada fonte e as versões do fato conservam o mesmo identificador.
 - [x] **T5.4** Telas de usuários e auditoria. RF-ACE-04, RF-AUD-04, RF-AUD-05.
