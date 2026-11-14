@@ -428,7 +428,8 @@ a saída resumida (vermelho inicial e verde final).
   - `bash intranet/web/scripts/capturas.sh` passou nos dez cenários de acesso e captura. As 11 imagens em `docs/imagens/` mostram autos sintéticos da classe apelação cível. O chat usa o cliente roteirizado. Cada script cria seu projeto Compose com PostgreSQL, MinIO e Vault e remove seus próprios volumes ao sair.
 - [x] **T6.3** Cabeçalhos do proxy e saída de rede do worker. RF-SEG-03, RF-SEG-04.
   - verificar_cabecalhos.py --exigir passou nas quatro rotas HTTPS no proxy real. No worker, PostgreSQL aceitou a conexão interna e o kernel devolveu ENETUNREACH para TCP externo. verificar.sh executa a prova de isolamento.
-- [ ] **T6.4** `scripts/verificar.sh` completo verde.
+- [x] **T6.4** `scripts/verificar.sh` completo verde.
+  - `LUPA_EXIGIR_CABECALHOS=1 LUPA_VERIFICAR_E2E=1 bash scripts/verificar.sh` terminou com código 0 em uma instalação temporária da 0.2, com PostgreSQL, MinIO e Vault reais. As duas suítes passaram sem pulos (697 e 262), assim como os seis casos de ingestão, o corpus, o agente, o build do front, os cabeçalhos de quatro rotas, o isolamento do worker e os 35 cenários Playwright. O controle de integração falhou como esperado ao desligar cada dependência e ao simular erro no build.
 
 ## Fase 7 — Documentação e versão
 
