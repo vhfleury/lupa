@@ -112,6 +112,10 @@ test.describe('6.10 segurança do front', () => {
           await page.goto(caminho);
           await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
           await expect(page.getByText(/^Carregando/)).toHaveCount(0, { timeout: 30_000 });
+          if (caminho === '/processos') {
+            await page.getByRole('button', { name: /Novo processo/ }).click();
+            await expect(page.getByLabel(/Arquivo PDF ou ZIP/)).toBeVisible();
+          }
           // Interações que mexem em estilo dinâmico (zoom do visualizador, tema).
           if (caminho.endsWith('/visualizador')) {
             await page.getByRole('button', { name: 'Aumentar zoom' }).click();

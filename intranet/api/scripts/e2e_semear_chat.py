@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 
 import fitz
 from e2e_processos import desembargador, enfileirar_pdf, sessao_e2e
+
 from lupa_pipeline.dominio.cnj import calcular_digito_verificador
 
 TEXTOS = (
@@ -36,8 +37,9 @@ def semear() -> tuple[str, str]:
             digito = calcular_digito_verificador(sequencial, "2025", "8", "09", "0001")
             numero = f"{sequencial}-{digito}.2025.8.09.0001"
             caminho = Path(diretorio) / f"autos-{sequencial}.pdf"
-            _pdf(caminho, folhas)
-            processos.append(enfileirar_pdf(sessao, autor, numero, caminho))
+            identificacao = f"Processo nº {numero}\nClasse processual: Apelação cível"
+            _pdf(caminho, (f"{folhas[0]}\n{identificacao}", *folhas[1:]))
+            processos.append(enfileirar_pdf(sessao, autor, caminho))
         return processos[0], processos[1]
 
 

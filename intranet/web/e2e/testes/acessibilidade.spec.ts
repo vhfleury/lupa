@@ -71,6 +71,10 @@ test.describe('6.10 acessibilidade', () => {
         try {
           await page.goto(tela.caminho());
           await esperarCarregada(page, tela.titulo);
+          if (tela.caminho() === '/processos') {
+            await page.getByRole('button', { name: /Novo processo/ }).click();
+            await expect(page.getByLabel(/Arquivo PDF ou ZIP/)).toBeVisible();
+          }
           await expect(page.locator('html')).toHaveAttribute('data-tema', tema);
           const resultado = await new AxeBuilder({ page })
             .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

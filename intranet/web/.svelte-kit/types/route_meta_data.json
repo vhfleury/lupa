@@ -1,0 +1,36 @@
+{
+	"/": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/auditoria": [
+		"src/routes/+layout.ts"
+	],
+	"/login": [
+		"src/routes/+layout.ts"
+	],
+	"/processos": [
+		"src/routes/+layout.ts"
+	],
+	"/processos/[id]": [
+		"src/routes/+layout.ts"
+	],
+	"/processos/[id]/chat": [
+		"src/routes/+layout.ts"
+	],
+	"/processos/[id]/dossie": [
+		"src/routes/+layout.ts"
+	],
+	"/processos/[id]/validacoes": [
+		"src/routes/+layout.ts"
+	],
+	"/processos/[id]/visualizador": [
+		"src/routes/+layout.ts"
+	],
+	"/trocar-senha": [
+		"src/routes/+layout.ts"
+	],
+	"/usuarios": [
+		"src/routes/+layout.ts"
+	]
+}

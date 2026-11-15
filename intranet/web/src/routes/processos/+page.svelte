@@ -1,12 +1,10 @@
 <script lang="ts">
-  // Processos: lista com o status da ingestão (polling leve enquanto algo
-  // processa) e criação de processo com o número CNJ validado aqui e no servidor.
   import { onDestroy, onMount } from 'svelte';
   import { chamar, mensagemErro } from '$lib/api';
   import Aviso from '$lib/componentes/Aviso.svelte';
-  import { mascararCnj, problemaCnj } from '$lib/processos/cnj';
+  import NovoProcesso from '$lib/processos/NovoProcesso.svelte';
   import { formatarData, CLASSES, SITUACAO } from '$lib/processos/rotulos';
-  import type { ClasseProcessual, Processo, ProcessoNaLista } from '$lib/processos/tipos';
+  import type { ProcessoNaLista } from '$lib/processos/tipos';
   import { repetirEnquanto } from '$lib/repeticao';
   import { sessao, tem } from '$lib/sessao.svelte';
 
@@ -19,15 +17,9 @@
   let processos = $state<ProcessoNaLista[]>([]);
   let carregando = $state(true);
   let erro = $state('');
-  let aviso = $state('');
-  let numero = $state('');
-  let classe = $state<ClasseProcessual | ''>('');
-  let tocado = $state(false);
-  let enviando = $state(false);
 
   const atual = $derived(sessao.atual);
   const podeCriar = $derived(tem(atual, 'subir_processo'));
-  const problema = $derived(problemaCnj(numero));
   const processando = $derived(processos.some((p) => p.ingestao.situacao === 'processando'));
 
   const assessores = $derived(
@@ -65,29 +57,6 @@
   const atualizacao = repetirEnquanto(carregar, () => processando, INTERVALO_MS);
   onMount(() => void atualizacao.executar());
   onDestroy(atualizacao.parar);
-
-  async function criar(evento: SubmitEvent): Promise<void> {
-    evento.preventDefault();
-    tocado = true;
-    aviso = '';
-    if (problema || !classe) return;
-    enviando = true;
-    try {
-      const criado = await chamar<Processo>('POST', '/processos', {
-        numero_cnj: numero.trim(),
-        classe,
-      });
-      aviso = `Processo ${criado.numero_cnj} criado.`;
-      numero = '';
-      classe = '';
-      tocado = false;
-      await atualizacao.executar();
-    } catch (e) {
-      erro = mensagemErro(e);
-    } finally {
-      enviando = false;
-    }
-  }
 </script>
 
 <svelte:head><title>Processos · Lupa</title></svelte:head>
@@ -110,41 +79,9 @@
   </header>
 
   {#if erro}<Aviso tipo="erro">{erro}</Aviso>{/if}
-  {#if aviso}<Aviso tipo="sucesso">{aviso}</Aviso>{/if}
 
   {#if podeCriar && novoAberto}
-    <section id="cadastro-processo" class="cartao" aria-labelledby="titulo-novo">
-      <h2 id="titulo-novo">Novo processo</h2>
-      <form onsubmit={criar} novalidate>
-        <div class="grade">
-          <div class="campo">
-            <label for="cnj">Número CNJ</label>
-            <input
-              id="cnj"
-              inputmode="numeric"
-              autocomplete="off"
-              placeholder="0000000-00.0000.0.00.0000"
-              value={numero}
-              oninput={(e) => (numero = mascararCnj(e.currentTarget.value))}
-              onblur={() => (tocado = true)}
-              aria-invalid={tocado && problema !== ''}
-              aria-describedby="cnj-erro"
-            />
-            {#if tocado && problema}<p id="cnj-erro" class="erro-campo">{problema}</p>{/if}
-          </div>
-          <div class="campo">
-            <label for="classe">Classe</label>
-            <select id="classe" bind:value={classe} required>
-              <option value="" disabled>Selecione a classe</option>
-              {#each Object.entries(CLASSES) as [valor, rotulo]}<option value={valor}
-                  >{rotulo}</option
-                >{/each}
-            </select>
-          </div>
-        </div>
-        <button type="submit" disabled={enviando || !classe}>Criar processo</button>
-      </form>
-    </section>
+    <NovoProcesso />
   {/if}
 
   <section class="acervo" aria-labelledby="titulo-acervo">
@@ -288,10 +225,6 @@
     min-height: 46px;
     padding: 0.6rem 1.1rem;
     white-space: nowrap;
-  }
-  .cartao {
-    border-radius: 16px;
-    margin-bottom: 1.5rem;
   }
   .acervo {
     background: var(--superficie);
@@ -452,16 +385,6 @@
       color: var(--texto-suave);
       margin-bottom: 0.35rem;
     }
-  }
-  .grade {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-    gap: 0 1rem;
-  }
-  .erro-campo {
-    color: var(--perigo);
-    margin: 0.25rem 0 0;
-    font-size: 0.9rem;
   }
   .selo {
     display: inline-block;

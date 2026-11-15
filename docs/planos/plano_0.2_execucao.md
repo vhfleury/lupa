@@ -37,6 +37,8 @@ saída.
 
 ### A3. Recepção de arquivo (`ingestao/recepcao.py`, rota `POST /processos/{id}/arquivos`)
 
+O envio que identifica ou cria o processo usa `POST /processos/arquivos` e segue os algoritmos A1 a A3 do [plano de cadastro pelo arquivo](plano_cadastro_pelo_arquivo.md). Os passos abaixo se aplicam ao processo já aberto.
+
 1. Entrada: `id` do processo e corpo. Ação: ler `v_processo`. Saída: processo ou 404.
 2. Desvio: processo `descartado`. Saída: 409.
 3. Entrada: corpo. Ação: gravar em arquivo temporário calculando SHA-256 e tamanho; recusar acima

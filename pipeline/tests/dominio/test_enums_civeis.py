@@ -28,8 +28,8 @@ def test_pecas_correspondem_a_secao_tres_da_especificacao() -> None:
     assert set(MetodoClassificacao) == {"regra", "manual"}
 
 
-def test_fatos_cobrem_os_dados_das_validacoes_e_os_marcos() -> None:
-    """RF-FAT-01: enum aceita os quinze tipos de fato da especificação cível."""
+def test_fatos_cobrem_a_capa_as_validacoes_e_os_marcos() -> None:
+    """RF-FAT-01: enum aceita os 21 tipos de fato da especificação cível."""
     assert set(TipoFato) == {
         "data_decisao_recorrida",
         "data_intimacao",
@@ -46,4 +46,10 @@ def test_fatos_cobrem_os_dados_das_validacoes_e_os_marcos() -> None:
         "data_citacao",
         "data_contestacao",
         "data_acordao",
+        "relator",
+        "orgao_julgador",
+        "assunto",
+        "valor_causa",
+        "juizo_origem",
+        "data_distribuicao",
     }

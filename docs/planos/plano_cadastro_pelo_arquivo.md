@@ -1,6 +1,6 @@
 # Plano — cadastro do processo pelo arquivo
 
-15 de novembro de 2026 · Estado: **aguardando aprovação** · Atende a
+15 de novembro de 2026 · Estado: **executado** · Atende a
 [especificação da 0.2](../especificacao/0.2/especificacao.md): RF-PRO-01, RF-PRO-06, RF-ING-01,
 RF-ING-02, RF-ING-04, RF-FAT-01, RF-FAT-04.
 
@@ -50,7 +50,7 @@ As colunas novas de `v_processo` entram no fim, por `CREATE OR REPLACE VIEW`.
 | `intranet/web/e2e/testes/processos.spec.ts`, `acessibilidade.spec.ts`, `seguranca.spec.ts`, `intranet/web/e2e/capturas.spec.ts` | cadastro pelo envio |
 | `docs/guias/guia-assessor.md`, `docs/imagens/processos.png`, `docs/imagens/processo.png` | passo 2 e capturas |
 | `docs/sistema/ingestao.md`, `docs/sistema/modelo-de-dados.md`, `docs/sistema/front.md`, `docs/sistema/sinteticos.md`, `docs/arquitetura.md` | comportamento novo |
-| `docs/decisoes/registro.md` | D1 a D12 |
+| `docs/decisoes/registro.md` | D1 a D14 |
 | `docs/adr/0017-cadastro-pelo-arquivo.md`, `docs/adr/README.md` | ADR novo, ligado ao 0003 |
 | `docs/planos/plano_0.2_execucao.md` | A3 passa a remeter a este plano para o envio que cria processo |
 | `docs/planos/tarefas_0.2.md` | fase 8 com as tarefas deste plano |
@@ -239,43 +239,43 @@ As colunas novas de `v_processo` entram no fim, por `CREATE OR REPLACE VIEW`.
 
 Cada teste cita o requisito na docstring. U: unitário; I: integração.
 
-- [ ] I: `v0002` sobe e desce; `v_processo` devolve criador da primeira linha e os campos de
+- [x] I: `v0002` sobe e desce; `v_processo` devolve criador da primeira linha e os campos de
   correção (RF-PRO-06).
-- [ ] U: A2 com rótulo, com número único sem rótulo, com dois números sem rótulo, com dígito
+- [x] U: A2 com rótulo, com número único sem rótulo, com dois números sem rótulo, com dígito
   inválido e sem número (RF-PRO-01).
-- [ ] U: A2 reconhece as cinco classes, recusa "apelação criminal" e texto fora da tabela
+- [x] U: A2 reconhece as cinco classes, recusa "apelação criminal" e texto fora da tabela
   (RF-PRO-01).
-- [ ] U: A1 com executor injetado: PDF, ZIP, tipo desconhecido, motivo de quarentena e tempo
+- [x] U: A1 com executor injetado: PDF, ZIP, tipo desconhecido, motivo de quarentena e tempo
   esgotado (RF-PRO-01, RF-ING-02).
-- [ ] I: o subprocesso de A1 falha ao abrir conexão e não recebe variável com credencial
+- [x] I: o subprocesso de A1 falha ao abrir conexão e não recebe variável com credencial
   (RF-ING-04).
-- [ ] I: envio de autos sintéticos de cada classe cria o processo com número, classe, criador,
+- [x] I: envio de autos sintéticos de cada classe cria o processo com número, classe, criador,
   responsável e arquivo `recebido`, com `processo_criado` e `upload` na auditoria (RF-PRO-01,
   RF-ING-01).
-- [ ] I: capa sem classe devolve 422 com `faltando`; o reenvio com `classe` cria o processo;
+- [x] I: capa sem classe devolve 422 com `faltando`; o reenvio com `classe` cria o processo;
   entre os dois nada foi gravado (RF-PRO-01).
-- [ ] I: número informado com dígito inválido é recusado (RF-PRO-01).
-- [ ] I: número já cadastrado anexa o arquivo, mantém a classe e devolve `processo_criado`
+- [x] I: número informado com dígito inválido é recusado (RF-PRO-01).
+- [x] I: número já cadastrado anexa o arquivo, mantém a classe e devolve `processo_criado`
   falso; os mesmos bytes devolvem 200 com `duplicado` (RF-PRO-01, RF-ING-01).
-- [ ] I: número de processo descartado devolve 409 (RF-PRO-01).
-- [ ] I: PDF com senha devolve 422 `senha` e nenhuma linha nova em hub, link ou satélite
+- [x] I: número de processo descartado devolve 409 (RF-PRO-01).
+- [x] I: PDF com senha devolve 422 `senha` e nenhuma linha nova em hub, link ou satélite
   (RF-PRO-01, RF-ING-02).
-- [ ] I: dois envios simultâneos do mesmo número novo resultam em um processo e dois arquivos
+- [x] I: dois envios simultâneos do mesmo número novo resultam em um processo e dois arquivos
   (RF-PRO-01).
-- [ ] I: `POST /processos` devolve 405 (RF-PRO-01).
-- [ ] U: `capa.extrair` gera os seis candidatos com o intervalo do valor; valor e data
+- [x] I: `POST /processos` devolve 405 (RF-PRO-01).
+- [x] U: `capa.extrair` gera os seis candidatos com o intervalo do valor; valor e data
   inválidos não geram candidato (RF-FAT-01).
-- [ ] I: ingestão do sintético de referência grava os seis fatos do gabarito com evidência que
+- [x] I: ingestão do sintético de referência grava os seis fatos do gabarito com evidência que
   confere, e `data_distribuicao` aparece na linha do tempo (RF-FAT-01).
-- [ ] I: fato da capa corrigido continua vigente depois do reprocessamento (RF-FAT-03,
+- [x] I: fato da capa corrigido continua vigente depois do reprocessamento (RF-FAT-03,
   RF-ING-08).
-- [ ] I: correção de classe grava a linha, mantém o criador, refaz os achados para a nova classe
+- [x] I: correção de classe grava a linha, mantém o criador, refaz os achados para a nova classe
   e registra `classe_corrigida`; classe igual não grava; descartado devolve 409 (RF-PRO-06).
-- [ ] U (front): `NovoProcesso` envia, mostra o complemento só dos campos que faltam e reenvia
+- [x] U (front): `NovoProcesso` envia, mostra o complemento só dos campos que faltam e reenvia
   o mesmo arquivo; `enviarProcesso` monta a query (RF-PRO-01).
-- [ ] U (front): `CabecalhoProcesso` mostra partes com polo, os seis dados e a classe anterior
+- [x] U (front): `CabecalhoProcesso` mostra partes com polo, os seis dados e a classe anterior
   (RF-FAT-04, RF-PRO-06).
-- [ ] Medição dos sintéticos dentro da meta do RNF-02 com os seis tipos novos.
+- [x] Medição dos sintéticos dentro da meta do RNF-02 com os seis tipos novos.
 
 Revisão manual: fluxo E2E do Playwright (`processos.spec.ts`), capturas dos guias e conferência
 da tela no navegador.
@@ -285,3 +285,5 @@ da tela no navegador.
 1. Commits em `feat/versao-0.2`, um por tarefa.
 2. `docker compose up -d --build --wait`.
 3. `docker compose exec api alembic -c pipeline/src/lupa_pipeline/migrations/alembic.ini upgrade head`.
+
+Os resultados dos testes e da medição dos autos sintéticos estão na [fase 8 do registro de tarefas](tarefas_0.2.md#fase-8--cadastro-pelo-arquivo).

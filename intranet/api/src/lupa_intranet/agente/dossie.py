@@ -26,6 +26,7 @@ from lupa_pipeline.dominio.visoes import (
     VisaoResponsavel,
 )
 from lupa_pipeline.ingestao import repositorio_eventos, repositorio_pecas
+from lupa_pipeline.ingestao.eventos.capa import TIPOS_CAPA
 from lupa_pipeline.validacoes.modelo import valor_de
 
 MAX_FRASES_RESUMO = 2
@@ -55,6 +56,16 @@ class Responsavel(_Base):
     nome_usuario: str
 
 
+class DadoCapa(_Base):
+    """Valor vigente da capa e a evidência que permite conferi-lo."""
+
+    tipo: str
+    valor: str
+    fato_id: str
+    evidencia_id: str
+    pagina_id: str
+
+
 class Ficha(_Base):
     """Identificação e situação do processo."""
 
@@ -63,6 +74,7 @@ class Ficha(_Base):
     classe: str
     status: str
     partes: list[ParteDossie]
+    dados_capa: list[DadoCapa]
     responsaveis: list[Responsavel]
     ingestao: dict[str, str]
     em_revisao: bool
@@ -146,7 +158,7 @@ class Dossie(_Base):
     achados: list[AchadoDossie]
 
 
-def _ficha(session: Session, processo: VisaoProcesso) -> Ficha:
+def _ficha(session: Session, processo: VisaoProcesso, fatos: list[Fato]) -> Ficha:
     hk = processo.hk_processo
     partes = session.execute(
         select(VisaoParte, VisaoEvidencia.pagina_id)
@@ -168,6 +180,17 @@ def _ficha(session: Session, processo: VisaoProcesso) -> Ficha:
         status=processo.status or "",
         em_revisao=aberta,
         aviso_revisao=revisao.MSG_EM_REVISAO if aberta else None,
+        dados_capa=[
+            DadoCapa(
+                tipo=f.tipo.value,
+                valor=str(valor_de(f)),
+                fato_id=f.id,
+                evidencia_id=f.evidencias[0].id,
+                pagina_id=f.evidencias[0].pagina_id,
+            )
+            for f in fatos
+            if f.tipo in TIPOS_CAPA
+        ],
         partes=[
             ParteDossie(
                 id=p.id,
@@ -273,7 +296,7 @@ def montar_dossie(session: Session, processo: VisaoProcesso) -> Dossie:
     hk = processo.hk_processo
     fatos = listar_fatos_por_processo(session, hk)
     return Dossie(
-        ficha=_ficha(session, processo),
+        ficha=_ficha(session, processo, fatos),
         pecas=_pecas(session, hk),
         linha_do_tempo=_linha_do_tempo(session, hk, fatos),
         alertas=_alertas(session, hk),
@@ -370,5 +393,6 @@ def preencher_resumos(chat: ContextoChat, dossie: Dossie, maximo: int) -> Dossie
             break
         pecas[indice] = peca.model_copy(update={"resumo_peca": resumir_peca(chat, peca)})
     if revisao.em_revisao(processo):
-        return dossie.model_copy(update={"ficha": _ficha(chat.session, processo)})
+        fatos = listar_fatos_por_processo(chat.session, processo.hk_processo)
+        return dossie.model_copy(update={"ficha": _ficha(chat.session, processo, fatos)})
     return dossie.model_copy(update={"pecas": pecas})

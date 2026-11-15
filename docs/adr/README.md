@@ -24,6 +24,7 @@ crie um ADR novo e ligue os dois.
 | [0014](0014-fila-no-banco.md) | Fila de arquivos no PostgreSQL | Aceito |
 | [0015](0015-gabinete-unico-sem-pseudonimizacao.md) | Gabinete único e nomes das partes | Aceito |
 | [0016](0016-dois-pacotes.md) | Pacotes de pipeline e intranet | Aceito |
+| [0017](0017-cadastro-pelo-arquivo.md) | Cadastro pela leitura da capa no sandbox da API | Aceito |
 
 ## Modelo
 

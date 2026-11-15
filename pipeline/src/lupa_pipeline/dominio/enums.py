@@ -119,6 +119,12 @@ class TipoFato(StrEnum):
     DATA_CITACAO = "data_citacao"
     DATA_CONTESTACAO = "data_contestacao"
     DATA_ACORDAO = "data_acordao"
+    RELATOR = "relator"
+    ORGAO_JULGADOR = "orgao_julgador"
+    ASSUNTO = "assunto"
+    VALOR_CAUSA = "valor_causa"
+    JUIZO_ORIGEM = "juizo_origem"
+    DATA_DISTRIBUICAO = "data_distribuicao"
 
 
 class StatusFato(StrEnum):

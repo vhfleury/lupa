@@ -42,7 +42,6 @@ from lupa_pipeline.sinteticos.roteiro import Configuracao, Roteiro, montar_rotei
 from lupa_pipeline.validacoes.adaptador import para_modelo
 from lupa_pipeline.validacoes.motor import executar_catalogo
 
-_TIPOS_FATO = {t.value for t in TipoFato}
 TENTATIVAS_TAMANHO = 6
 PESOS_DEGRADACAO = {Degradacao.LEVE: 0.4, Degradacao.MEDIA: 0.4, Degradacao.FORTE: 0.2}
 
@@ -252,7 +251,7 @@ def _ler_marcas(
                         fim=marca.fim,
                     )
                 )
-            elif marca.rotulo in _TIPOS_FATO:
+            else:
                 tipo = TipoFato(marca.rotulo)
                 eventos.append(
                     EventoGabarito(
