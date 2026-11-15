@@ -4,6 +4,9 @@ declare global {
     interface Error {
       message: string;
     }
+    interface PageState {
+      avisoCadastro?: string;
+    }
   }
 }
 

@@ -4,7 +4,7 @@
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { primeiroAcesso } from './testes/acesso';
-import { contextoComo } from './testes/credenciais';
+import { contextoComo, guardarConta, guardarSessao } from './testes/credenciais';
 
 const SAIDA = process.env['LUPA_CAPTURAS_DIR'] ?? '/capturas';
 const PROCESSO = process.env['LUPA_E2E_PROC_ID'] ?? '';
@@ -25,20 +25,30 @@ test.describe.serial('capturas dos guias', () => {
     await contexto.close();
   });
 
-  test('telas do assessor', async ({ browser }) => {
+  test('cadastro pelo arquivo e cabeçalho do processo', async ({ browser }) => {
     const contexto = await browser.newContext();
     const page = await contexto.newPage();
-    await primeiroAcesso(
+    const conta = await primeiroAcesso(
       page,
       process.env['LUPA_E2E_PROC_USUARIO'] ?? '',
       process.env['LUPA_E2E_PROC_SENHA'] ?? '',
     );
+    guardarConta('assessor-processos', conta);
+    await guardarSessao('assessor-processos', contexto);
     await page.goto('/processos');
     await expect(page.getByRole('link', { name: /\d{7}-\d{2}/ }).first()).toBeVisible();
+    await page.getByRole('button', { name: /Novo processo/ }).click();
+    await expect(page.getByLabel(/Arquivo PDF ou ZIP/)).toBeVisible();
     await foto(page, 'processos');
     await page.goto(`/processos/${PROCESSO}`);
     await expect(page.getByRole('heading', { name: 'Enviar autos' })).toBeVisible();
+    await expect(page.getByText('Terceira Câmara Cível')).toBeVisible({ timeout: 60_000 });
     await foto(page, 'processo');
+    await contexto.close();
+  });
+
+  test('consulta e correção pelo assessor', async ({ browser }) => {
+    const { contexto, page } = await contextoComo(browser, 'assessor-processos');
     await page.goto(`/processos/${PROCESSO}/dossie`);
     await expect(page.getByTestId('indice-pecas').locator('tbody tr').first()).toBeVisible();
     await foto(page, 'dossie');

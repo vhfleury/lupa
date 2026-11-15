@@ -1,9 +1,11 @@
-// Envio de PDF/ZIP em stream para POST /processos/{id}/arquivos?nome= (corpo binário, sem
-// multipart). Usa XMLHttpRequest só para ter o progresso do upload; o navegador lê o File do
-// disco em partes, então um arquivo de centenas de MB não passa pela memória do JavaScript nem
-// trava a interface.
 import { BASE_API, ErroApi } from '$lib/api';
-import type { RespostaEnvio } from './tipos';
+import { visualizacao } from '$lib/visualizacao.svelte';
+import type {
+  Complemento,
+  IdentificacaoIncompleta,
+  RespostaEnvio,
+  RespostaEnvioProcesso,
+} from './tipos';
 
 export const LIMITE_BYTES = 512 * 1024 * 1024;
 const EXTENSOES = ['.pdf', '.zip'];
@@ -13,8 +15,8 @@ export interface Progresso {
   total: number;
 }
 
-export interface EnvioEmCurso {
-  promessa: Promise<RespostaEnvio>;
+export interface EnvioEmCurso<T = RespostaEnvio> {
+  promessa: Promise<T>;
   cancelar: () => void;
 }
 
@@ -27,17 +29,23 @@ export function problemaArquivo(arquivo: { name: string; size: number }): string
   return '';
 }
 
-function detalhe(texto: string): string {
-  try {
-    const corpo: unknown = JSON.parse(texto);
-    if (typeof corpo === 'object' && corpo !== null && 'detail' in corpo) {
-      const valor = (corpo as { detail: unknown }).detail;
-      if (typeof valor === 'string') return valor;
-    }
-  } catch {
-    // corpo não JSON
+export class ErroIdentificacao extends ErroApi {
+  constructor(readonly identificacao: IdentificacaoIncompleta) {
+    super(422, 'informe os dados que faltam');
   }
-  return '';
+}
+
+function erroEnvio(status: number, texto: string): ErroApi {
+  try {
+    const corpo = JSON.parse(texto);
+    if (status === 422 && corpo?.motivo === 'identificacao_incompleta') {
+      return new ErroIdentificacao(corpo);
+    }
+    if (typeof corpo?.detail === 'string') return new ErroApi(status, corpo.detail);
+  } catch {
+    return new ErroApi(status, 'resposta inválida do servidor');
+  }
+  return new ErroApi(status, 'não foi possível receber o arquivo');
 }
 
 export function enviarArquivo(
@@ -45,10 +53,31 @@ export function enviarArquivo(
   arquivo: File,
   aoProgredir: (p: Progresso) => void,
 ): EnvioEmCurso {
+  return enviar(`/processos/${encodeURIComponent(processoId)}/arquivos`, arquivo, {}, aoProgredir);
+}
+
+export function enviarProcesso(
+  arquivo: File,
+  complemento: Complemento,
+  aoProgredir: (p: Progresso) => void,
+): EnvioEmCurso<RespostaEnvioProcesso> {
+  return enviar('/processos/arquivos', arquivo, complemento, aoProgredir);
+}
+
+function enviar<T extends RespostaEnvio>(
+  rota: string,
+  arquivo: File,
+  complemento: Complemento,
+  aoProgredir: (p: Progresso) => void,
+): EnvioEmCurso<T> {
   const xhr = new XMLHttpRequest();
-  const url = `${BASE_API}/processos/${encodeURIComponent(processoId)}/arquivos?nome=${encodeURIComponent(arquivo.name)}`;
-  const promessa = new Promise<RespostaEnvio>((resolver, rejeitar) => {
-    xhr.open('POST', url);
+  const query = new URLSearchParams({ nome: arquivo.name, ...complemento });
+  const promessa = new Promise<T>((resolver, rejeitar) => {
+    if (visualizacao.ativa) {
+      rejeitar(new ErroApi(403, 'Encerre a prévia de perfil para realizar alterações.'));
+      return;
+    }
+    xhr.open('POST', `${BASE_API}${rota}?${query}`);
     xhr.withCredentials = true;
     xhr.setRequestHeader('Content-Type', 'application/octet-stream');
     xhr.setRequestHeader('Accept', 'application/json');
@@ -58,11 +87,16 @@ export function enviarArquivo(
         total: evento.lengthComputable ? evento.total : arquivo.size,
       });
     };
+    xhr.upload.onload = () => aoProgredir({ enviados: arquivo.size, total: arquivo.size });
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolver(JSON.parse(xhr.responseText) as RespostaEnvio);
-      } else {
-        rejeitar(new ErroApi(xhr.status, detalhe(xhr.responseText)));
+      if (xhr.status < 200 || xhr.status >= 300) {
+        rejeitar(erroEnvio(xhr.status, xhr.responseText));
+        return;
+      }
+      try {
+        resolver(JSON.parse(xhr.responseText) as T);
+      } catch {
+        rejeitar(new ErroApi(xhr.status, 'resposta inválida do servidor'));
       }
     };
     xhr.onerror = () => rejeitar(new ErroApi(0, 'falha de rede durante o envio'));
