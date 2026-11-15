@@ -4,8 +4,8 @@ Convenções (plano da 0.2, "O que muda"): `hk_*` é `BYTEA` de 32 bytes; hub te
 única; link tem os `hk` dos hubs ligados, únicos em conjunto e com um índice por FK; satélite tem
 PK `(hk_<pai>, load_dts)` (mais a subchave, se multiativo), `hash_diff` e `record_source`; toda
 tabela tem `load_dts` com `clock_timestamp()` e é imutável (trigger `<tabela>_imutavel`). Colunas
-de enum são `TEXT` com `CHECK` gerado do enum. Colunas cifradas usam `TextoCifrado` ou
-`JsonCifrado`, com o rótulo que entra no AAD.
+de enum são `TEXT` com `CHECK` gerado do enum. Colunas de JSON guardadas em `TEXT` usam
+`JsonTexto`.
 
 O `info` de cada tabela diz o tipo (`hub`, `link`, `satelite`) e o que `gravacao` precisa: as
 colunas da chave de negócio do hub, as colunas de hub do link, a coluna do pai, a subchave
@@ -60,7 +60,7 @@ from lupa_pipeline.dominio.enums import (
     TipoPagina,
     TipoPeca,
 )
-from lupa_pipeline.seguranca.tipos import JsonCifrado, TextoCifrado
+from lupa_pipeline.dominio.tipos import JsonTexto
 
 CONVENCAO_NOMES = {
     "ix": "ix_%(table_name)s_%(column_0_N_name)s",
@@ -137,12 +137,8 @@ def _real(nome: str) -> Column[Any]:
     return Column(nome, Double, nullable=False)
 
 
-def _cifrado(nome: str, rotulo: str, *, nulo: bool = False) -> Column[Any]:
-    return Column(nome, TextoCifrado(rotulo), nullable=nulo)
-
-
-def _json_cifrado(nome: str, rotulo: str, *, nulo: bool = False) -> Column[Any]:
-    return Column(nome, JsonCifrado(rotulo), nullable=nulo)
+def _json_texto(nome: str, *, nulo: bool = False) -> Column[Any]:
+    return Column(nome, JsonTexto, nullable=nulo)
 
 
 def _usuario(nome: str = "hk_usuario", *, nulo: bool = False) -> Column[Any]:
@@ -269,18 +265,6 @@ def atributos_do_satelite(tabela: Table) -> list[str]:
     """
     pai = tabela.info["pai"]
     return [c.name for c in tabela.columns if c.name != pai and c.name not in COLUNAS_TECNICAS]
-
-
-def satelite_cifrado(tabela: Table) -> bool:
-    """Diz se o satélite tem coluna cifrada com a DEK do processo (D5).
-
-    Args:
-        tabela: Satélite.
-
-    Returns:
-        Verdadeiro se alguma coluna é `TextoCifrado` ou `JsonCifrado`.
-    """
-    return any(isinstance(c.type, TextoCifrado | JsonCifrado) for c in tabela.columns)
 
 
 hub_usuario = hub("hub_usuario", "usuario", _texto("nome_usuario"))
@@ -434,7 +418,6 @@ sat_processo_dados = satelite(
 sat_processo_estado = satelite(
     "sat_processo_estado", *PROCESSO, _texto("status"), checar_enum("status", StatusProcesso)
 )
-sat_processo_chave = satelite("sat_processo_chave", *PROCESSO, _texto("chave_dados_cifrada"))
 sat_processo_revisao = satelite(
     "sat_processo_revisao",
     *PROCESSO,
@@ -448,7 +431,7 @@ sat_arquivo_dados = satelite(
     "sat_arquivo_dados",
     *ARQUIVO,
     _inteiro("tamanho_bytes"),
-    _cifrado("nome_original", "sat_arquivo_dados.nome_original"),
+    _texto("nome_original"),
     _texto("mime"),
     _texto("chave_storage"),
     _usuario(),
@@ -498,10 +481,10 @@ sat_pagina_extracao = satelite(
     "sat_pagina_extracao",
     *PAGINA,
     _texto("tipo"),
-    _cifrado("texto", "sat_pagina_extracao.texto"),
+    _texto("texto"),
     _texto("hash_texto"),
-    _cifrado("texto_nativo", "sat_pagina_extracao.texto_nativo", nulo=True),
-    _cifrado("texto_ocr", "sat_pagina_extracao.texto_ocr", nulo=True),
+    _texto("texto_nativo", nulo=True),
+    _texto("texto_ocr", nulo=True),
     _json("coordenadas"),
     _json("sinais"),
     _json("extracao"),
@@ -513,10 +496,10 @@ sat_pagina_extracao = satelite(
 sat_pagina_saneamento = satelite(
     "sat_pagina_saneamento",
     *PAGINA,
-    _cifrado("texto_normalizado", "sat_pagina_saneamento.texto_normalizado", nulo=True),
+    _texto("texto_normalizado", nulo=True),
     _json("flags"),
-    _json_cifrado("trechos_ocultos", "sat_pagina_saneamento.trechos_ocultos"),
-    _json_cifrado("trechos_suspeitos", "sat_pagina_saneamento.trechos_suspeitos"),
+    _json_texto("trechos_ocultos"),
+    _json_texto("trechos_suspeitos"),
 )
 sat_pagina_fronteira = satelite("sat_pagina_fronteira", *PAGINA, _json("sinais_fronteira"))
 sat_peca_classificacao = satelite(
@@ -542,14 +525,14 @@ sat_peca_classificacao = satelite(
 sat_evidencia_trecho = satelite(
     "sat_evidencia_trecho",
     *EVIDENCIA,
-    _cifrado("trecho", "sat_evidencia_trecho.trecho"),
+    _texto("trecho"),
     _texto("hash_trecho"),
     _json("bbox", nulo=True),
 )
 sat_fato_valor = satelite(
     "sat_fato_valor",
     *FATO,
-    _json_cifrado("valor", "sat_fato_valor.valor"),
+    _json_texto("valor"),
     _texto("extraido_por"),
     _texto("versao_extrator"),
     *_confianca(),
@@ -560,7 +543,7 @@ sat_fato_valor = satelite(
 sat_fato_anotacao = satelite(
     "sat_fato_anotacao",
     *FATO,
-    _cifrado("texto", "anotacao.texto"),
+    _texto("texto"),
     _usuario(),
     sempre_insere=True,
 )
@@ -573,21 +556,21 @@ sat_achado_resultado = satelite(
     _texto("versao_catalogo"),
     _texto("resultado"),
     Column("fatos_usados", ARRAY(BYTEA), nullable=False),
-    _json_cifrado("valores", "sat_achado_resultado.valores"),
-    _cifrado("explicacao", "sat_achado_resultado.explicacao"),
+    _json_texto("valores"),
+    _texto("explicacao"),
     checar_enum("resultado", ResultadoAchado),
 )
 sat_achado_anotacao = satelite(
     "sat_achado_anotacao",
     *ACHADO,
-    _cifrado("texto", "anotacao.texto"),
+    _texto("texto"),
     _usuario(),
     sempre_insere=True,
 )
 sat_parte_identidade = satelite(
     "sat_parte_identidade",
     *PARTE,
-    _cifrado("nome", "sat_parte_identidade.nome"),
+    _texto("nome"),
     _texto("polo"),
     _texto("qualidade"),
     _hk("hk_evidencia", "hub_evidencia.hk_evidencia"),
@@ -616,7 +599,7 @@ sat_conversa_mensagem = satelite(
     _inteiro("sequencia"),
     _texto("papel"),
     _texto("status"),
-    _cifrado("texto", "sat_conversa_mensagem.texto"),
+    _texto("texto"),
     _json("citacoes"),
     _json("avisos"),
     checar_enum("papel", PapelMensagem),

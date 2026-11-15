@@ -13,7 +13,6 @@ from lupa_intranet.api.banco import sessao_aplicacao
 from lupa_intranet.auditoria.eventos import AcaoAuditoria, ResultadoEvento
 from lupa_pipeline.dominio.enums import StatusProcesso
 from lupa_pipeline.dominio.gravacao import travar_processo
-from lupa_pipeline.seguranca.contexto import esquecer_processo
 from lupa_pipeline.seguranca.descarte import apagar_objetos, descartar
 
 router = APIRouter()
@@ -34,18 +33,17 @@ def descartar_processo(
     if processo is None:
         raise NaoEncontradoError("processo não encontrado")
     if processo.status != StatusProcesso.DESCARTADO.value:
-        hash_chave = descartar(sessao, hk)
+        descartar(sessao, hk)
         auditar(
             sessao,
             ctx,
             AcaoAuditoria.PROCESSO_DESCARTADO,
             hk_usuario=ator.hk_usuario,
             hk_processo=hk,
-            objeto_tipo="dek_sha256",
-            objeto_id=hash_chave,
+            objeto_tipo="processo",
+            objeto_id=hk.hex(),
         )
     sessao.commit()
-    esquecer_processo(hk)
     try:
         quantidade = apagar_objetos(request.app.state.storage, hk)
     except (BotoCoreError, ClientError, OSError) as erro:

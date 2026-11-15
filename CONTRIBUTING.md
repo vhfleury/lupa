@@ -7,7 +7,7 @@ A especificação vigente é a [0.2](docs/especificacao/0.2/especificacao.md). A
 - Python 3.12. A pipeline vive em `pipeline/src/lupa_pipeline/` e a intranet em `intranet/api/src/lupa_intranet/`. Cada pacote tem seu próprio `pyproject.toml`, dependências travadas e testes. A API pode importar a pipeline.
 - SvelteKit e TypeScript vivem em `intranet/web/`. Testes Vitest ficam junto ao código de interface, e os fluxos com navegador ficam em `intranet/web/e2e/`.
 - O banco usa a revisão do Data Vault na pipeline. As views, contratos de gravação e evidências são descritos em [modelo de dados](docs/sistema/modelo-de-dados.md).
-- Todo teste usa dados inventados. As fixtures comuns ficam em `pipeline/tests/apoio/`. Os testes com serviços usam bases sintéticas. Dados de autos reais, material do Vault e credenciais da instalação ficam fora de testes, logs e commits.
+- Todo teste usa dados inventados. As fixtures comuns ficam em `pipeline/tests/apoio/`. Os testes com serviços usam bases sintéticas. Dados de autos reais e credenciais da instalação ficam fora de testes, logs e commits.
 
 ## Verificar
 

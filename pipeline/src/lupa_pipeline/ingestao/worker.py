@@ -18,7 +18,6 @@ from lupa_pipeline.ingestao.repositorio import atualizar_status_processo, mudar_
 from lupa_pipeline.ingestao.reprocessamento import reagendar_desatualizados
 from lupa_pipeline.ingestao.storage import ObjectStorage, criar_storage
 from lupa_pipeline.logging import configurar_logging, get_logger
-from lupa_pipeline.seguranca.contexto import ativar_processo, contexto_cifra
 
 TRAVA_WORKER = 0x4C55504146494C41
 Processador = Callable[[sessionmaker[Session], Settings, ObjectStorage, bytes, Event], None]
@@ -55,11 +54,8 @@ def _processar_proximo(
             log.warning("tentativas_esgotadas", arquivo_id=hk.hex())
             return True
         mudar_estado(sessao, hk, EstadoJob(arquivo.estado), tentativas=arquivo.tentativas + 1)
-        chave_cifrada = processo.chave_dados_cifrada
     try:
-        with contexto_cifra():
-            ativar_processo(hk_processo, chave_cifrada)
-            processar(fabrica, settings, storage, hk, parar)
+        processar(fabrica, settings, storage, hk, parar)
     except ConexaoDoWorkerPerdidaError:
         raise
     except Exception as erro:
@@ -78,9 +74,9 @@ def executar_worker(
     Args:
         engine: Banco de dados da aplicação.
         settings: Intervalo de consulta, tentativas e configuração do processamento.
-        storage: Armazenamento cifrado.
+        storage: Armazenamento de objetos.
         parar: Sinal do processo, observado também pelos lotes de A5.
-        processar: Processador de um arquivo, com sua DEK ativa.
+        processar: Processador de um arquivo.
 
     Returns:
         Zero no encerramento normal ou um se já existe outro worker.

@@ -138,7 +138,7 @@ def ler_pagina_estruturada(sessao: SessaoAgente, argumentos: dict[str, Any]) -> 
 
 
 def limite_paginas_busca() -> int:
-    """Teto de páginas decifradas por busca (`LUPA_BUSCA_MAX_PAGINAS`).
+    """Teto de páginas lidas por busca (`LUPA_BUSCA_MAX_PAGINAS`).
 
     Returns:
         O teto configurado (padrão da configuração se o ambiente não carregar).
@@ -152,9 +152,9 @@ def limite_paginas_busca() -> int:
 def _paginas_com_termo(
     sessao: SessaoAgente, termo: str, limite_paginas: int | None = None
 ) -> list[VisaoPagina]:
-    """Busca em memória (Etapa 7.5): o texto está cifrado no banco, então ILIKE não serve.
+    """Busca em memória, sem diferenciar maiúsculas de minúsculas.
 
-    Percorre as páginas do processo na ordem dos autos, decifrando sob demanda em blocos, até
+    Percorre as páginas do processo na ordem dos autos, lidas em blocos, até
     `MAX_RESULTADOS_BUSCA` acertos ou `limite_paginas` páginas lidas.
     """
     limite = limite_paginas or limite_paginas_busca()

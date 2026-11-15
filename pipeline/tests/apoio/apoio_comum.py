@@ -49,8 +49,6 @@ from lupa_pipeline.dominio.tabelas import (
 )
 from lupa_pipeline.dominio.visoes import VisaoAuditoria, VisaoProcesso
 from lupa_pipeline.ingestao.storage import chave_objeto
-from lupa_pipeline.seguranca.chaves import criar_chave_processo
-from lupa_pipeline.seguranca.contexto import ativar_processo, limpar_contexto_padrao, obter_cofre
 
 VARIAVEIS_FICTICIAS = {
     "LUPA_AMBIENTE": "teste",
@@ -60,10 +58,6 @@ VARIAVEIS_FICTICIAS = {
     "LUPA_MINIO_ACCESS_KEY": "lupa-ficticio",
     "LUPA_MINIO_SECRET_KEY": "segredo-ficticio",
 }
-
-# Etapa 7: os testes usam o cofre em memória (o contrato com o Vault real fica em
-# tests/seguranca, marcado `integracao`, com as variáveis LUPA_VAULT_* do contêiner).
-os.environ["LUPA_COFRE_BACKEND"] = "memoria"
 
 CAMINHO_ALEMBIC_INI = Path(lupa_pipeline.migrations.__file__).parent / "alembic.ini"
 TEXTO_PAGINA = "Certidão: intimado o defensor em 10/03/2025. Recurso interposto em 14/03/2025."
@@ -320,10 +314,9 @@ def criar_processo(
     classe: ClasseProcessual = ClasseProcessual.APELACAO_CIVEL,
     criador: bytes | None = None,
 ) -> bytes:
-    """Grava um processo sintético no Data Vault, com DEK própria (RF-SEG-01).
+    """Grava um processo sintético no Data Vault.
 
-    Grava `hub_processo`, `sat_processo_dados`, `sat_processo_estado` (`criado`) e
-    `sat_processo_chave`; a DEK fica aberta no contexto de cifra como a do processo atual.
+    Grava `hub_processo`, `sat_processo_dados`, `sat_processo_estado` (`criado`).
 
     Args:
         sessao: Sessão com transação aberta.
@@ -340,7 +333,6 @@ def criar_processo(
     gravar_satelite(sessao, sat_processo_dados, hk, dados, ORIGEM_TESTE)
     estado = {"status": StatusProcesso.CRIADO.value}
     gravar_satelite(sessao, sat_processo_estado, hk, estado, ORIGEM_TESTE)
-    criar_chave_processo(sessao, obter_cofre(), hk, ORIGEM_TESTE)
     return hk
 
 
@@ -365,11 +357,11 @@ def criar_processo_teste(
 
 
 def criar_pagina(sessao: Session, hk_processo: bytes, texto: str = TEXTO_PAGINA) -> bytes:
-    """Grava arquivo e página 1 sintéticos do processo, com o texto cifrado.
+    """Grava arquivo e página 1 sintéticos do processo.
 
     Args:
         sessao: Sessão com transação aberta.
-        hk_processo: Processo dono do arquivo (ativado no contexto de cifra).
+        hk_processo: Processo dono do arquivo.
         texto: Texto da página.
 
     Returns:
@@ -378,7 +370,6 @@ def criar_pagina(sessao: Session, hk_processo: bytes, texto: str = TEXTO_PAGINA)
     processo = sessao.scalars(
         select(VisaoProcesso).where(VisaoProcesso.hk_processo == hk_processo)
     ).one()
-    ativar_processo(hk_processo, processo.chave_dados_cifrada)
     sha256 = calcular_hash(uuid4().hex)
     chave = {"numero_cnj": processo.numero_cnj, "sha256": sha256}
     hk_arquivo = gravar_hub(sessao, hub_arquivo, chave, ORIGEM_TESTE)
@@ -434,11 +425,3 @@ def _sem_usuario_de_conexao_do_ambiente(monkeypatch: pytest.MonkeyPatch) -> None
     """
     for variavel in VARIAVEIS_DE_AMBIENTE_ISOLADAS:
         monkeypatch.delenv(variavel, raising=False)
-
-
-@pytest.fixture(autouse=True)
-def _contexto_de_cifra_limpo() -> Iterator[None]:
-    """Cada teste começa e termina sem DEK aberta no contexto padrão de cifra."""
-    limpar_contexto_padrao()
-    yield
-    limpar_contexto_padrao()

@@ -21,7 +21,6 @@ from lupa_pipeline.ingestao.paginas import gravar_pagina
 from lupa_pipeline.ingestao.repositorio import registrar_recebido
 from lupa_pipeline.ingestao.repositorio_pecas import gravar_evidencia
 from lupa_pipeline.ingestao.saneamento import normalizar
-from lupa_pipeline.seguranca.contexto import ativar_processo
 from tests.conftest import criar_usuario_teste
 
 NOME_PARTE = "Marina Lima"
@@ -311,12 +310,11 @@ def capturados() -> EventosCapturados:
 def sessao_agente(
     engine_teste: Engine, processo_agente: ProcessoAgente, capturados: EventosCapturados
 ) -> Iterator[SessaoAgente]:
-    """Sessão de ferramentas com a DEK exclusivamente do processo consultado."""
+    """Sessão de ferramentas restrita ao processo consultado."""
     hk = bytes.fromhex(processo_agente.processo_id)
     with Session(engine_teste) as session:
         processo = session.get(VisaoProcesso, hk)
         assert processo is not None
-        ativar_processo(hk, processo.chave_dados_cifrada)
         yield SessaoAgente(
             session=session,
             processo_id=hk,

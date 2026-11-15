@@ -2,7 +2,7 @@
 
 | Status | Data | Responsável |
 | --- | --- | --- |
-| Substituído por [ADR 0012](0012-recusa-de-dado-em-claro.md) | `{{data exata da decisão}}` (até 2026-10-22, data do primeiro commit) | Executor da Etapa 7.4 |
+| Substituído por [ADR 0012](0012-recusa-de-dado-em-claro.md) e pelo [ADR 0018](0018-remocao-do-cofre-e-da-cifra.md) | `{{data exata da decisão}}` (até 2026-10-22, data do primeiro commit) | Executor da Etapa 7.4 |
 
 ## Contexto
 

@@ -301,7 +301,7 @@ def anotar(
     sessao: SessaoBanco,
     ctx: ContextoReq,
 ) -> dict[str, Any]:
-    """Grava uma nota cifrada sobre um fato ou achado do processo."""
+    """Grava uma nota sobre um fato ou achado do processo."""
     processo_para_gravar(sessao, processo.hk_processo)
     if corpo.fato_id:
         hk = sessao.scalar(

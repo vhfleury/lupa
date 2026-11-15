@@ -822,6 +822,21 @@ verificada na 0.2 pelo vínculo, pela view e pelas rotas atuais. [Tarefas e test
 
 [Plano com regras e algoritmos](../planos/plano_cadastro_pelo_arquivo.md) · [ADR 0017](../adr/0017-cadastro-pelo-arquivo.md).
 
+### Remoção do Vault e da cifra — 15/11/2026
+
+Substituem a decisão 8 da especificação da 0.2 (cofre com chave única e chave por processo) e, com ela, as entradas de cifra registradas acima (Etapa 7 e "Dado em claro é recusado na leitura").
+
+| Decisão | Tema | Resposta |
+| --- | --- | --- |
+| 40 | Cofre e cifra | Vault removido; toda a cifra da aplicação removida (banco e objetos) |
+| 41 | Cofre indisponível (RF-SEG-02) | requisito removido |
+| 42 | Dados gravados com cifra | não migrados; banco, objetos e volume do Vault recriados do zero |
+| 43 | Rotação de chave | removida |
+| 44 | Identificação interna do nome da parte | SHA-256 do nome normalizado, sem chave |
+| 45 | Objeto do evento de descarte | id do processo |
+
+[Plano](../planos/plano_remocao_vault.md) · [ADR 0018](../adr/0018-remocao-do-cofre-e-da-cifra.md).
+
 ## Resultado das revisões
 
 | Revisão | Resultado |

@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 
 from apoio_arquivos import pdf_minimo, pdf_texto, zip_por_peca
 from apoio_comum import criar_processo_teste, eventos_do_banco
-from lupa_intranet.api.cifra import cifra_middleware
 from lupa_intranet.api.rotas import ingestao
 from lupa_intranet.auditoria.eventos import AcaoAuditoria
 from lupa_pipeline.config import Settings, get_settings
@@ -21,7 +20,7 @@ from lupa_pipeline.dominio.gravacao import gravar_satelite
 from lupa_pipeline.dominio.tabelas import sat_arquivo_ingestao, sat_processo_estado
 from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoFilaIngestao
 from lupa_pipeline.ingestao.repositorio import mudar_estado
-from lupa_pipeline.ingestao.storage import ArmazenamentoMemoria, StorageCifrado, chave_objeto
+from lupa_pipeline.ingestao.storage import ArmazenamentoMemoria, ObjectStorage, chave_objeto
 from tests.conftest import criar_usuario_teste, logar
 
 pytestmark = pytest.mark.integracao
@@ -29,10 +28,9 @@ pytestmark = pytest.mark.integracao
 
 @pytest.fixture
 def app_ingestao(app_teste: FastAPI) -> FastAPI:
-    """Aplicação com a cifra por requisição e o mesmo adaptador de storage usado na API."""
-    app_teste.middleware("http")(cifra_middleware)
+    """Aplicação com as rotas de ingestão e o storage em memória."""
     app_teste.include_router(ingestao.router)
-    app_teste.state.storage = StorageCifrado(ArmazenamentoMemoria())
+    app_teste.state.storage = ArmazenamentoMemoria()
     return app_teste
 
 
@@ -59,7 +57,7 @@ def _contar_arquivos(engine: Engine, processo: bytes) -> int:
         return sessao.scalar(select(func.count()).where(VisaoArquivo.hk_processo == processo)) or 0
 
 
-def test_envio_de_pdf_lacra_original_cifrado_e_registra_upload(
+def test_envio_de_pdf_lacra_original_e_registra_upload(
     app_ingestao: FastAPI, cliente_envio: TestClient, engine_teste: Engine
 ) -> None:
     """RF-ING-01 e RF-PRO-04: PDF com marca de sigilo é recebido e entra na fila do banco."""
@@ -80,9 +78,8 @@ def test_envio_de_pdf_lacra_original_cifrado_e_registra_upload(
         "mime": "application/pdf",
     }
     chave = chave_objeto(processo, resumo)
-    storage: StorageCifrado = app_ingestao.state.storage
-    assert storage.interno.ler(chave).startswith(b"LUPAOBJ")
-    assert sha256(storage.ler(chave)).hexdigest() == resumo
+    storage: ObjectStorage = app_ingestao.state.storage
+    assert storage.ler(chave) == dados
     with Session(engine_teste) as sessao:
         assert (
             sessao.scalar(select(VisaoFilaIngestao.id).where(VisaoFilaIngestao.hk_arquivo == hk))
@@ -102,11 +99,11 @@ def test_mesmo_arquivo_duas_vezes_nao_duplica(
     assert primeiro.status_code == 201
     corpo = primeiro.json()
     chave = chave_objeto(processo, corpo["sha256"])
-    objeto = app_ingestao.state.storage.interno.ler(chave)
+    assert app_ingestao.state.storage.ler(chave) == dados
     repetido = _enviar(cliente_envio, processo, dados, "outro-nome.zip")
     assert repetido.status_code == 200
     assert repetido.json() == corpo | {"duplicado": True}
-    assert app_ingestao.state.storage.interno.ler(chave) == objeto
+    assert app_ingestao.state.storage.ler(chave) == dados
     assert _contar_arquivos(engine_teste, processo) == 1
     with Session(engine_teste) as sessao:
         hk = bytes.fromhex(corpo["arquivo_id"])
@@ -222,8 +219,7 @@ def test_falha_ao_auditar_desfaz_upload_e_reenvio_recupera_objeto(
             assert _enviar(cliente, processo, dados, "autos.pdf").status_code == 500
         assert _contar_arquivos(engine_teste, processo) == 0
         assert eventos_do_banco(engine_teste, processo_id=processo.hex(), acao="upload") == []
-        storage: StorageCifrado = app_ingestao.state.storage
-        primeiro = storage.interno.ler(chave)
+        storage: ObjectStorage = app_ingestao.state.storage
+        assert storage.ler(chave) == dados
         assert _enviar(cliente, processo, dados, "autos.pdf").status_code == 201
-        assert storage.interno.ler(chave) != primeiro
         assert storage.ler(chave) == dados

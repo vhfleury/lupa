@@ -2,8 +2,8 @@
 
 A API e os repositórios leem por estas classes; gravar é só por `dominio.gravacao`. Os metadados
 ficam separados de `dominio.tabelas.metadata`, para o autogenerate não tomar as views por
-tabelas. Use `atual` ao reler uma view depois de gravar na mesma transação. Colunas cifradas
-usam o mesmo tipo e rótulo do satélite de origem, e são decifradas na leitura. `id` é o hex do
+tabelas. Use `atual` ao reler uma view depois de gravar na mesma transação. Colunas de JSON
+guardadas em `TEXT` usam `JsonTexto`, como no satélite de origem. `id` é o hex do
 `hk` (D12). Qualquer tentativa de gravar uma view levanta `VisaoSomenteLeituraError`.
 """
 
@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import BYTEA, JSONB
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import DeclarativeBase, Mapped, Mapper, mapped_column
 
-from lupa_pipeline.seguranca.tipos import JsonCifrado, TextoCifrado
+from lupa_pipeline.dominio.tipos import JsonTexto
 
 Instante = DateTime(timezone=True)
 T = TypeVar("T")
@@ -99,7 +99,6 @@ class VisaoProcesso(BaseVisao):
     classe_corrigida_por_id: Mapped[str | None]
     classe_corrigida_em: Mapped[datetime | None]
     status: Mapped[str | None]
-    chave_dados_cifrada: Mapped[str | None]
     em_revisao: Mapped[bool]
     motivo_revisao: Mapped[str | None]
     status_anterior_revisao: Mapped[str | None]
@@ -119,9 +118,7 @@ class VisaoArquivo(BaseVisao):
     hk_processo: Mapped[bytes]
     processo_id: Mapped[str]
     tamanho_bytes: Mapped[int | None]
-    nome_original: Mapped[str | None] = mapped_column(
-        TextoCifrado("sat_arquivo_dados.nome_original")
-    )
+    nome_original: Mapped[str | None] = mapped_column(Text)
     mime: Mapped[str | None]
     chave_storage: Mapped[str | None]
     hk_enviado_por: Mapped[bytes | None]
@@ -157,12 +154,10 @@ class VisaoPagina(BaseVisao):
     hk_processo: Mapped[bytes]
     processo_id: Mapped[str]
     tipo: Mapped[str | None]
-    texto: Mapped[str | None] = mapped_column(TextoCifrado("sat_pagina_extracao.texto"))
+    texto: Mapped[str | None] = mapped_column(Text)
     hash_texto: Mapped[str | None]
-    texto_nativo: Mapped[str | None] = mapped_column(
-        TextoCifrado("sat_pagina_extracao.texto_nativo")
-    )
-    texto_ocr: Mapped[str | None] = mapped_column(TextoCifrado("sat_pagina_extracao.texto_ocr"))
+    texto_nativo: Mapped[str | None] = mapped_column(Text)
+    texto_ocr: Mapped[str | None] = mapped_column(Text)
     coordenadas: Mapped[Any] = mapped_column(JSONB)
     sinais: Mapped[Any] = mapped_column(JSONB)
     extracao: Mapped[Any] = mapped_column(JSONB)
@@ -170,16 +165,10 @@ class VisaoPagina(BaseVisao):
     origem_arquivo: Mapped[str | None]
     pagina_origem: Mapped[int | None]
     extraida_em: Mapped[datetime | None]
-    texto_normalizado: Mapped[str | None] = mapped_column(
-        TextoCifrado("sat_pagina_saneamento.texto_normalizado")
-    )
+    texto_normalizado: Mapped[str | None] = mapped_column(Text)
     flags: Mapped[Any] = mapped_column(JSONB)
-    trechos_ocultos: Mapped[Any] = mapped_column(
-        JsonCifrado("sat_pagina_saneamento.trechos_ocultos")
-    )
-    trechos_suspeitos: Mapped[Any] = mapped_column(
-        JsonCifrado("sat_pagina_saneamento.trechos_suspeitos")
-    )
+    trechos_ocultos: Mapped[Any] = mapped_column(JsonTexto)
+    trechos_suspeitos: Mapped[Any] = mapped_column(JsonTexto)
     sinais_fronteira: Mapped[Any] = mapped_column(JSONB)
 
 
@@ -228,7 +217,7 @@ class VisaoEvidencia(BaseVisao):
     pagina_id: Mapped[str]
     hk_processo: Mapped[bytes]
     processo_id: Mapped[str]
-    trecho: Mapped[str | None] = mapped_column(TextoCifrado("sat_evidencia_trecho.trecho"))
+    trecho: Mapped[str | None] = mapped_column(Text)
     hash_trecho: Mapped[str | None]
     bbox: Mapped[Any] = mapped_column(JSONB)
 
@@ -247,7 +236,7 @@ class VisaoFato(BaseVisao):
     evidencias_vigentes: Mapped[list[bytes]] = mapped_column(ARRAY(BYTEA))
     hk_processo: Mapped[bytes]
     processo_id: Mapped[str]
-    valor: Mapped[Any] = mapped_column(JsonCifrado("sat_fato_valor.valor"))
+    valor: Mapped[Any] = mapped_column(JsonTexto)
     extraido_por: Mapped[str | None]
     versao_extrator: Mapped[str | None]
     confianca: Mapped[float | None]
@@ -272,8 +261,8 @@ class VisaoAchado(BaseVisao):
     versao_catalogo: Mapped[str | None]
     resultado: Mapped[str | None]
     fatos_usados: Mapped[list[bytes] | None] = mapped_column(ARRAY(BYTEA))
-    valores: Mapped[Any] = mapped_column(JsonCifrado("sat_achado_resultado.valores"))
-    explicacao: Mapped[str | None] = mapped_column(TextoCifrado("sat_achado_resultado.explicacao"))
+    valores: Mapped[Any] = mapped_column(JsonTexto)
+    explicacao: Mapped[str | None] = mapped_column(Text)
     criado_em: Mapped[datetime | None]
 
 
@@ -288,7 +277,7 @@ class VisaoParte(BaseVisao):
     chave_nome: Mapped[bytes]
     hk_processo: Mapped[bytes]
     processo_id: Mapped[str]
-    nome: Mapped[str | None] = mapped_column(TextoCifrado("sat_parte_identidade.nome"))
+    nome: Mapped[str | None] = mapped_column(Text)
     polo: Mapped[str | None]
     qualidade: Mapped[str | None]
     hk_evidencia: Mapped[bytes | None]
@@ -398,7 +387,7 @@ class VisaoFatoHistorico(BaseVisao):
     evidencias_vigentes: Mapped[list[bytes]] = mapped_column(ARRAY(BYTEA))
     hk_usuario: Mapped[bytes | None]
     usuario_id: Mapped[str | None]
-    valor: Mapped[Any] = mapped_column(JsonCifrado("sat_fato_valor.valor"))
+    valor: Mapped[Any] = mapped_column(JsonTexto)
     extraido_por: Mapped[str]
     versao_extrator: Mapped[str]
     confianca: Mapped[float]
@@ -420,8 +409,8 @@ class VisaoAchadoHistorico(BaseVisao):
     versao_catalogo: Mapped[str]
     resultado: Mapped[str]
     fatos_usados: Mapped[list[bytes]] = mapped_column(ARRAY(BYTEA))
-    valores: Mapped[Any] = mapped_column(JsonCifrado("sat_achado_resultado.valores"))
-    explicacao: Mapped[str] = mapped_column(TextoCifrado("sat_achado_resultado.explicacao"))
+    valores: Mapped[Any] = mapped_column(JsonTexto)
+    explicacao: Mapped[str] = mapped_column(Text)
 
 
 class VisaoMensagem(BaseVisao):
@@ -434,7 +423,7 @@ class VisaoMensagem(BaseVisao):
     conversa_id: Mapped[str]
     papel: Mapped[str]
     status: Mapped[str]
-    texto: Mapped[str] = mapped_column(TextoCifrado("sat_conversa_mensagem.texto"))
+    texto: Mapped[str] = mapped_column(Text)
     citacoes: Mapped[Any] = mapped_column(JSONB)
     avisos: Mapped[Any] = mapped_column(JSONB)
     criada_em: Mapped[datetime]
@@ -451,7 +440,7 @@ class VisaoAnotacao(BaseVisao):
     alvo_id: Mapped[str]
     hk_processo: Mapped[bytes]
     processo_id: Mapped[str]
-    texto: Mapped[str] = mapped_column(TextoCifrado("anotacao.texto"))
+    texto: Mapped[str] = mapped_column(Text)
     hk_usuario: Mapped[bytes]
     usuario_id: Mapped[str]
     nome_usuario: Mapped[str]

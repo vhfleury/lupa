@@ -16,16 +16,15 @@ O formato segue o [Keep a Changelog 1.1.0](https://keepachangelog.com/pt-BR/1.1.
 
 ## [Não publicado]
 
-- **Cadastro de processos.** Envie o PDF ou ZIP dos autos para identificar número CNJ e classe. Se faltar informação, complete o campo pedido e reenvie. Um novo arquivo de um número já cadastrado entra no mesmo processo. A rota de cadastro manual foi substituída por `POST /api/processos/arquivos`.
-- **Ficha do processo.** Partes, polos, relator, órgão julgador, assunto, valor da causa, juízo de origem e distribuição aparecem com suas fontes. É possível corrigir a classe, consultar a alteração e conferir os achados recalculados.
-
-## [0.2.0] - 2026-11-14
+## [0.2.0] - 2026-11-15
 
 ### Adicionado
 
 - Dossiê cível com qualificação das partes, evidências de página, histórico de fatos e achados e conferência individual de cada recorrente.
 - Catálogo de tempestividade, preparo, representação e cabimento para apelações, agravos e embargos. As cinco classes, inclusive ação originária, têm autos sintéticos com gabarito.
-- Data Vault no PostgreSQL, chave de dados por processo, descarte com retomada de objetos pendentes e auditoria em cadeia única.
+- Data Vault no PostgreSQL, descarte com retomada de objetos pendentes e auditoria em cadeia única.
+- Cadastro do processo pelo envio do PDF ou ZIP dos autos, que identifica número CNJ e classe e pede só o campo que faltar. Um novo arquivo de um número já cadastrado entra no mesmo processo (`POST /api/processos/arquivos`).
+- Ficha do processo com partes, polos, relator, órgão julgador, assunto, valor da causa, juízo de origem e distribuição, cada um com sua fonte. A classe pode ser corrigida, com a alteração registrada e os achados recalculados.
 
 ### Alterado
 
@@ -35,6 +34,7 @@ O formato segue o [Keep a Changelog 1.1.0](https://keepachangelog.com/pt-BR/1.1.
 ### Removido
 
 - Módulos criminais do piloto, administrador e isolamento por gabinete, Redis/RQ, backup, monitoramento e configuração de produção da 0.1.
+- Vault e cifra da aplicação. Autos, nomes de partes e mensagens do chat ficam em claro no PostgreSQL e no MinIO, e `/api/saude` informa só `api`, `db` e `minio`. A atualização não converte dados antigos: apague os volumes do banco, do MinIO e `vault-dados`, refaça a instalação e reenvie os processos.
 
 ## [0.1.0] - 2026-11-13
 

@@ -13,15 +13,14 @@ from apoio_arquivos import pdf_com_senha, pdf_minimo, pdf_texto, zip_por_peca
 from apoio_ingestao import SemearArquivo
 from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.tabelas import sat_arquivo_lote, sat_pagina_extracao
-from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoPagina, VisaoPeca, VisaoProcesso
+from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoPagina, VisaoPeca
 from lupa_pipeline.ingestao import processamento
 from lupa_pipeline.ingestao.cache import copiar_do_cache
 from lupa_pipeline.ingestao.extracao import ResultadoTarefa, Tarefa, executar_tarefa
 from lupa_pipeline.ingestao.inventario import EntradaExtraida
 from lupa_pipeline.ingestao.processamento import processar_arquivo
 from lupa_pipeline.ingestao.sandbox import LimitesSandbox
-from lupa_pipeline.ingestao.storage import StorageCifrado
-from lupa_pipeline.seguranca.contexto import ativar_processo, contexto_cifra
+from lupa_pipeline.ingestao.storage import ObjectStorage
 
 pytestmark = pytest.mark.integracao
 
@@ -30,7 +29,7 @@ def test_pdf_com_senha_vai_a_quarentena_sem_paginas(
     fabrica_sessao: sessionmaker[Session],
     settings_ficticias: Settings,
     semear_arquivo: SemearArquivo,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
 ) -> None:
     """RF-ING-02: um PDF protegido termina em quarentena com o motivo senha."""
     hk = semear_arquivo(pdf_com_senha()).hk_arquivo
@@ -50,7 +49,7 @@ def test_extrai_paginas_pecas_e_diagnostico(
     fabrica_sessao: sessionmaker[Session],
     settings_ficticias: Settings,
     semear_arquivo: SemearArquivo,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
     dados: bytes,
     nome: str,
 ) -> None:
@@ -90,7 +89,7 @@ def test_interrupcao_retoma_sem_reextrair_pagina_gravada(
     fabrica_sessao: sessionmaker[Session],
     settings_ficticias: Settings,
     semear_arquivo: SemearArquivo,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """RF-ING-07: ao parar após o primeiro lote, a segunda execução só extrai o segundo."""
@@ -125,14 +124,14 @@ def test_interrupcao_retoma_sem_reextrair_pagina_gravada(
         )
 
 
-def test_cache_recifra_para_a_chave_do_destino_e_exige_a_mesma_versao(
+def test_cache_copia_as_paginas_para_o_destino_e_exige_a_mesma_versao(
     fabrica_sessao: sessionmaker[Session],
     settings_ficticias: Settings,
     semear_arquivo: SemearArquivo,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """RF-ING-08 e RF-SEG-01. Um segundo envio idêntico lê páginas sob a sua própria DEK."""
+    """RF-ING-08. Um segundo envio idêntico recebe as páginas do cache, sem reextrair."""
     conteudo = pdf_texto(["SENTINELA-CACHE-0.2"])
     fonte = semear_arquivo(conteudo)
     processar_arquivo(
@@ -151,9 +150,7 @@ def test_cache_recifra_para_a_chave_do_destino_e_exige_a_mesma_versao(
     processar_arquivo(
         fabrica_sessao, settings_ficticias, storage_memoria, destino.hk_arquivo, Event()
     )
-    with contexto_cifra(), fabrica_sessao() as s:
-        hk = destino.processo.hk_processo
-        ativar_processo(hk, s.get_one(VisaoProcesso, hk).chave_dados_cifrada)
+    with fabrica_sessao() as s:
         p = s.scalars(select(VisaoPagina).where(VisaoPagina.hk_arquivo == destino.hk_arquivo)).one()
         assert p.texto and "SENTINELA-CACHE" in p.texto
         assert s.get_one(VisaoArquivo, destino.hk_arquivo).estado == "concluido"
@@ -162,15 +159,15 @@ def test_cache_recifra_para_a_chave_do_destino_e_exige_a_mesma_versao(
             "USING (hk_pagina) WHERE l.hk_arquivo=:hk"
         )
         brutos = [s.execute(consulta, {"hk": a.hk_arquivo}).scalar_one() for a in (fonte, destino)]
-        assert brutos[0] != brutos[1]
-        assert all("SENTINELA" not in str(b) for b in brutos)
+        assert brutos[0] == brutos[1]
+        assert all("SENTINELA-CACHE" in str(b) for b in brutos)
 
 
 def test_abertura_de_zip_so_no_filho_e_membros_temporarios_opacos(
     fabrica_sessao: sessionmaker[Session],
     settings_ficticias: Settings,
     semear_arquivo: SemearArquivo,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
