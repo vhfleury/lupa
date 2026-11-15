@@ -469,6 +469,7 @@ Execução do [plano de cadastro pelo arquivo](plano_cadastro_pelo_arquivo.md).
 - [x] **T8.4** Extrair, medir e exibir os fatos da capa com evidência nos autos sintéticos. RF-FAT-01, RF-FAT-03, RF-ING-08, RNF-02.
   - O gabarito tinha zero fatos na capa e o dossiê não tinha o campo `dados_capa`. Com as marcas de evidência e o extrator, `pytest pipeline/tests/sinteticos --no-cov` passou nos 106 testes. `test_capa.py` e `test_reprocessamento.py` conferem os offsets, a janela de páginas, a coexistência de fontes e a preservação da revisão humana.
   - `pytest pipeline/tests/ingestao/test_calibracao.py --no-cov` mediu o PDF liso, o PDF com índice e o ZIP. Com a semente 88, o recall dos eventos e das fronteiras foi de 100% nos três formatos e a precisão de datas atingiu a meta de 99%. Na API, `test_ponta_a_ponta.py` confronta as cinco classes com os gabaritos no PostgreSQL e no MinIO.
-- [ ] **T8.5** Corrigir a classe, preservar a autoria e recalcular os achados. RF-PRO-06.
+- [x] **T8.5** Corrigir a classe, preservar a autoria e recalcular os achados. RF-PRO-06.
+  - `pytest intranet/api/tests/api/test_classe.py --no-cov` respondeu 404 antes da rota. Os três casos passaram com a nova rota, inclusive os dois papéis, repetição sem nova linha e recusa após descarte. A bateria com as regressões de lista, responsáveis, abertura e upload passou nos 28 testes.
 - [ ] **T8.6** Enviar os autos pela interface, completar a identificação e conferir a ficha no cabeçalho. RF-PRO-01, RF-PRO-06, RF-FAT-04.
 - [ ] **T8.7** Atualizar arquitetura, decisão, guia, capturas e documentação técnica. RF-DOC-01, RF-DOC-03.

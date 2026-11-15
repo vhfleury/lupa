@@ -12,17 +12,23 @@ from lupa_intranet.acesso.autorizacao import (
     AtorAutenticado,
     ContextoReq,
     SessaoBanco,
+    carregar_processo,
     exige_papel,
     exige_processo,
 )
-from lupa_intranet.acesso.erros import ConflitoError, DadosInvalidosError, PermissaoNegadaError
+from lupa_intranet.acesso.erros import (
+    ConflitoError,
+    DadosInvalidosError,
+    NaoEncontradoError,
+    PermissaoNegadaError,
+)
 from lupa_intranet.acesso.papeis import Permissao, tem_permissao
 from lupa_intranet.acesso.servico import Ator, auditar
 from lupa_intranet.api.middleware import auditar_rota
 from lupa_intranet.auditoria.eventos import AcaoAuditoria
 from lupa_pipeline.dominio.cnj import formatar_numero_cnj
 from lupa_pipeline.dominio.enums import ClasseProcessual, EstadoJob, PapelUsuario, StatusProcesso
-from lupa_pipeline.dominio.gravacao import gravar_hub, gravar_link, gravar_satelite
+from lupa_pipeline.dominio.gravacao import gravar_hub, gravar_link, gravar_satelite, travar_processo
 from lupa_pipeline.dominio.tabelas import (
     hub_processo,
     link_processo_responsavel,
@@ -37,8 +43,9 @@ from lupa_pipeline.dominio.visoes import (
     VisaoUsuario,
     atual,
 )
+from lupa_pipeline.ingestao.eventos.etapa import atualizar_achados
 from lupa_pipeline.seguranca.chaves import criar_chave_processo
-from lupa_pipeline.seguranca.contexto import obter_cofre
+from lupa_pipeline.seguranca.contexto import ativar_processo, obter_cofre
 
 router = APIRouter()
 
@@ -60,7 +67,14 @@ class CorpoResponsaveis(BaseModel):
     anteriores: list[str] = Field(max_length=100)
 
 
-def _serializar(processo: VisaoProcesso) -> dict[str, Any]:
+class CorpoClasse(BaseModel):
+    """Classe informada pelo autor da correção (RF-PRO-06)."""
+
+    model_config = ConfigDict(extra="forbid")
+    classe: ClasseProcessual
+
+
+def _dados_basicos(processo: VisaoProcesso) -> dict[str, Any]:
     return {
         "id": processo.id,
         "numero_cnj": formatar_numero_cnj(processo.numero_cnj),
@@ -69,6 +83,14 @@ def _serializar(processo: VisaoProcesso) -> dict[str, Any]:
         "em_revisao": processo.em_revisao,
         "criador_id": processo.criador_id,
         "criado_em": processo.criado_em,
+    }
+
+
+def _serializar(processo: VisaoProcesso) -> dict[str, Any]:
+    return _dados_basicos(processo) | {
+        "classe_anterior": processo.classe_anterior,
+        "classe_corrigida_por_id": processo.classe_corrigida_por_id,
+        "classe_corrigida_em": processo.classe_corrigida_em,
     }
 
 
@@ -171,7 +193,7 @@ def listar_processos(ator: Leitor, sessao: SessaoBanco, meus: bool = False) -> l
     responsaveis = _responsaveis_vigentes(sessao, ids)
     ingestao = _ingestao(sessao, ids)
     return [
-        _serializar(processo)
+        _dados_basicos(processo)
         | {
             "responsaveis": responsaveis.get(processo.id, []),
             "ingestao": ingestao.get(processo.id) or _resumo([]),
@@ -216,6 +238,40 @@ def abrir_processo(processo: Processo) -> dict[str, Any]:
         Dados básicos do processo.
     """
     return _serializar(processo)
+
+
+@router.post("/processos/{processo_id}/classe")
+def corrigir_classe(
+    corpo: CorpoClasse,
+    processo: Annotated[VisaoProcesso, Depends(carregar_processo)],
+    ator: Annotated[Ator, Depends(exige_papel(Permissao.ANOTAR))],
+    sessao: SessaoBanco,
+    ctx: ContextoReq,
+) -> dict[str, Any]:
+    """Registra autoria e classe, reexecuta o catálogo e audita na mesma transação."""
+    hk = processo.hk_processo
+    atual = travar_processo(sessao, hk)
+    if atual is None:
+        raise NaoEncontradoError("processo não encontrado")
+    if atual.status == StatusProcesso.DESCARTADO.value:
+        raise ConflitoError("processo descartado")
+    if atual.classe == corpo.classe:
+        return _serializar(atual)
+    dados = {"classe": corpo.classe.value, "hk_usuario": ator.hk_usuario}
+    gravar_satelite(sessao, sat_processo_dados, hk, dados, ORIGEM)
+    ativar_processo(hk, atual.chave_dados_cifrada)
+    atualizar_achados(sessao, hk, ctx.agora.date())
+    for acao in (AcaoAuditoria.CLASSE_CORRIGIDA, AcaoAuditoria.VALIDACAO_EXECUTADA):
+        auditar(
+            sessao,
+            ctx,
+            acao,
+            hk_usuario=ator.hk_usuario,
+            hk_processo=hk,
+            objeto_tipo="processo",
+            objeto_id=atual.id,
+        )
+    return _serializar(atual)
 
 
 @router.get("/processos/{processo_id}/arquivos")
