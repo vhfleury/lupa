@@ -2,7 +2,7 @@
 
 | Status | Data | Responsável |
 | --- | --- | --- |
-| Aceito | `{{data exata da decisão}}` (até 2026-10-22, data do primeiro commit) | Executor da Etapa 7; endossada na revisão 7.1-7.9 |
+| Substituído por [ADR 0018](0018-remocao-do-cofre-e-da-cifra.md) | `{{data exata da decisão}}` (até 2026-10-22, data do primeiro commit) | Executor da Etapa 7; endossada na revisão 7.1-7.9 |
 
 ## Contexto
 
@@ -28,7 +28,7 @@ Cada processo tem uma DEK, gerada na inserção e envelopada pela chave do gabin
 
 ## Consequências
 
-- Sem o Vault destravado nada dos autos é lido nem gravado: `/saude` responde 503 ([runbook](../runbooks/destravar-vault.md)).
+- Sem o Vault destravado nada dos autos é lido nem gravado: `/saude` responde 503.
 - A rotação da chave do gabinete reenvelopa as DEKs sem recifrar os dados.
 - O texto cifrado não aceita `ILIKE`.
 - O backup copia os bytes cifrados; a restauração exige o Vault com as chaves da época.
@@ -38,4 +38,4 @@ Cada processo tem uma DEK, gerada na inserção e envelopada pela chave do gabin
 
 - [especificacao/requisitos-v1.md](../especificacao/requisitos-v1.md), seção 6
 - [decisoes/registro.md](../decisoes/registro.md), "Endossadas na revisão 7.1-7.9"
-- [sistema/criptografia.md](../sistema/criptografia.md)
+- `docs/sistema/criptografia.md`, removido na T9.5 (ver histórico do Git)

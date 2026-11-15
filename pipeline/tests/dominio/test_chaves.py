@@ -1,4 +1,4 @@
-"""Chave por hash, `hash_diff` e HMAC por processo do Data Vault (A1; D4, D5; RES-02)."""
+"""Chave por hash, `hash_diff` e `hash_nome` do Data Vault (A1; D4, D5; RES-02)."""
 
 import hashlib
 from datetime import UTC, date, datetime, timedelta, timezone
@@ -11,13 +11,10 @@ from lupa_pipeline.dominio.chaves import (
     chave_hash,
     chave_link,
     hash_diff,
-    hmac_processo,
+    hash_nome,
     normalizar_cnj,
     normalizar_hash,
 )
-
-DEK = bytes(range(32))
-OUTRA_DEK = bytes(range(1, 33))
 
 
 def test_chave_hash_e_o_sha256_das_partes_unidas_por_barra() -> None:
@@ -135,23 +132,7 @@ def test_hash_diff_recusa_tipo_sem_forma_canonica() -> None:
         hash_diff({"x": object()})
 
 
-def test_hash_diff_com_dek_difere_do_sem_dek() -> None:
-    """D5: satélite cifrado usa HMAC com a DEK; o mesmo conteúdo dá outro `hash_diff`."""
-    atributos = {"texto": "Trecho sintético Quimbarelo."}
-    com_dek = hash_diff(atributos, dek=DEK)
-    assert com_dek != hash_diff(atributos)
-    assert com_dek == hash_diff(atributos, dek=DEK)
-    assert com_dek != hash_diff(atributos, dek=OUTRA_DEK)
-
-
-def test_hmac_processo_e_deterministico_e_depende_da_dek() -> None:
-    """D5: a `chave_nome` da parte é HMAC-SHA-256 do texto com a DEK do processo."""
-    assert hmac_processo(DEK, "Parte Sintética") == hmac_processo(DEK, "Parte Sintética")
-    assert hmac_processo(DEK, "Parte Sintética") != hmac_processo(OUTRA_DEK, "Parte Sintética")
-    assert len(hmac_processo(DEK, "Parte Sintética")) == 32
-
-
-def test_hmac_processo_recusa_dek_com_tamanho_errado() -> None:
-    """D5: só a DEK de 256 bits do processo serve de chave do HMAC."""
-    with pytest.raises(ValueError, match="DEK"):
-        hmac_processo(bytes(16), "Parte Sintética")
+def test_hash_nome_e_o_sha256_do_texto() -> None:
+    """RF-SEG-01 (D7): a `chave_nome` da parte é o SHA-256 do nome normalizado."""
+    assert hash_nome("Parte Sintética") == hashlib.sha256("Parte Sintética".encode()).digest()
+    assert hash_nome("Parte Sintética") != hash_nome("Outra Parte Sintética")

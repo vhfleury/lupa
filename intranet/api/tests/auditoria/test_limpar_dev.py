@@ -52,12 +52,11 @@ def test_so_descarta_conteudo_criado_por_scripts_e_preserva_a_cadeia(engine_test
         == 1
     )
     with Session(engine_teste) as sessao:
-        assert sessao.get_one(VisaoProcesso, hk).chave_dados_cifrada
+        assert sessao.get_one(VisaoProcesso, hk).status != "descartado"
     feito = script.limpar(engine_teste, executar=True, ambiente="teste", storage=storage)
     assert feito.processos == 1
     with Session(engine_teste) as sessao:
-        assert sessao.get_one(VisaoProcesso, hk).chave_dados_cifrada is None
-        assert sessao.get_one(VisaoProcesso, vizinho).chave_dados_cifrada
+        assert sessao.get_one(VisaoProcesso, vizinho).status != "descartado"
         assert verificar_cadeia(sessao).integra
         assert (
             sessao.scalar(select(VisaoProcesso.status).where(VisaoProcesso.hk_processo == hk))

@@ -10,7 +10,7 @@ from apoio_arquivos import TEXTO_SENTINELA, pdf_com_senha, pdf_texto, zip_por_pe
 from apoio_ingestao import SemearArquivo
 from lupa_pipeline.config import Settings
 from lupa_pipeline.ingestao.processamento import processar_arquivo
-from lupa_pipeline.ingestao.storage import StorageCifrado
+from lupa_pipeline.ingestao.storage import ObjectStorage
 from lupa_pipeline.logging import CAMPOS_PROIBIDOS, configurar_logging
 
 
@@ -18,7 +18,7 @@ from lupa_pipeline.logging import CAMPOS_PROIBIDOS, configurar_logging
 def test_nenhum_log_do_worker_carrega_texto_dos_autos(
     fabrica_sessao: sessionmaker[Session],
     settings_ficticias: Settings,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
     semear_arquivo: SemearArquivo,
     capsys: pytest.CaptureFixture[str],
 ) -> None:

@@ -21,9 +21,7 @@ from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.dominio.esquemas import calcular_hash
 from lupa_pipeline.dominio.tabelas import link_evento_auditoria
-from lupa_pipeline.dominio.visoes import VisaoProcesso
 from lupa_pipeline.ingestao.processamento import processar_arquivo
-from lupa_pipeline.seguranca.contexto import ativar_processo
 from tests.conftest import SENHA_TESTE, codigo_totp_e_instante, criar_usuario_teste, relogio_fixo
 
 pytestmark = pytest.mark.integracao
@@ -154,9 +152,6 @@ def fluxo(
         processo = envio.json()["processo_id"]
         base = f"/processos/{processo}"
         arquivo = envio.json()["arquivo_id"]
-        with fabrica_sessao() as session:
-            hk = bytes.fromhex(processo)
-            ativar_processo(hk, session.get_one(VisaoProcesso, hk).chave_dados_cifrada)
         processar_arquivo(
             fabrica_sessao,
             settings_ficticias,

@@ -2,15 +2,11 @@
 
 A implementação é escolhida por configuração (`LUPA_STORAGE_BACKEND`). As chaves seguem
 `processo/<hex do hk_processo>/<sha256>` (D14), de modo que o conteúdo é endereçado pelo hash e
-gravar o mesmo arquivo duas vezes não cria um segundo objeto.
-
-`criar_storage` devolve o storage embrulhado em `StorageCifrado`, que cifra cada objeto em
-stream com a DEK do processo (tirado do segmento `processo/<hex>/` da chave) e decifra na
-leitura. O que está no MinIO nunca é o PDF em claro; o `sha256` da chave continua o do claro.
+gravar o mesmo arquivo duas vezes não cria um segundo objeto. Os objetos são gravados como
+recebidos, sem cifra da aplicação (RF-SEG-01).
 """
 
 import io
-import re
 from typing import Any, BinaryIO, Protocol
 
 import boto3
@@ -18,11 +14,8 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from lupa_pipeline.config import Settings
-from lupa_pipeline.seguranca.contexto import dek_de
-from lupa_pipeline.seguranca.envelope import LeitorCifrado, decifrar_objeto
 
 CODIGOS_AUSENTE = frozenset({"404", "NoSuchKey", "NotFound"})
-PROCESSO_NA_CHAVE = re.compile(r"(?:^|/)processo/([0-9a-f]{64})/")
 
 
 class ObjetoAusenteError(LookupError):
@@ -223,94 +216,6 @@ class ArmazenamentoS3:
         return sorted(chaves)
 
 
-class ChaveSemProcessoError(ValueError):
-    """A chave do objeto não identifica o processo (não há DEK para cifrar)."""
-
-
-def processo_da_chave(chave: str) -> bytes:
-    """Processo dono do objeto, pela chave.
-
-    Args:
-        chave: Chave do objeto (`.../processo/<hex>/...`).
-
-    Returns:
-        `hk_processo`.
-
-    Raises:
-        ChaveSemProcessoError: Chave sem segmento `processo/<hex do hk>/`.
-    """
-    achado = PROCESSO_NA_CHAVE.search(chave)
-    if achado is None:
-        raise ChaveSemProcessoError("chave sem processo")
-    return bytes.fromhex(achado.group(1))
-
-
-class StorageCifrado:
-    """Embrulho que cifra em stream na gravação e decifra na leitura (Etapa 7.4)."""
-
-    def __init__(self, interno: ObjectStorage) -> None:
-        """Cria o embrulho.
-
-        Args:
-            interno: Storage real (S3 ou memória).
-        """
-        self.interno = interno
-
-    def gravar(self, chave: str, origem: BinaryIO) -> None:
-        """Cifra `origem` em blocos com a DEK do processo e grava.
-
-        Args:
-            chave: Chave do objeto.
-            origem: Conteúdo em claro.
-        """
-        dek = dek_de(processo_da_chave(chave))
-        self.interno.gravar(chave, io.BufferedReader(LeitorCifrado(dek, origem)))
-
-    def ler(self, chave: str) -> bytes:
-        """Lê e decifra.
-
-        Args:
-            chave: Chave do objeto.
-
-        Returns:
-            Conteúdo em claro.
-
-        Raises:
-            CifraInvalidaError: Objeto sem cabeçalho `LUPAOBJ` (em claro) ou adulterado.
-        """
-        return decifrar_objeto(dek_de(processo_da_chave(chave)), self.interno.ler(chave))
-
-    def existe(self, chave: str) -> bool:
-        """Diz se a chave existe.
-
-        Args:
-            chave: Chave do objeto.
-
-        Returns:
-            Verdadeiro se existir.
-        """
-        return self.interno.existe(chave)
-
-    def apagar(self, chave: str) -> None:
-        """Apaga a chave.
-
-        Args:
-            chave: Chave do objeto.
-        """
-        self.interno.apagar(chave)
-
-    def listar(self, prefixo: str) -> list[str]:
-        """Lista chaves pelo prefixo.
-
-        Args:
-            prefixo: Prefixo.
-
-        Returns:
-            Chaves em ordem.
-        """
-        return self.interno.listar(prefixo)
-
-
 def _ausente(erro: ClientError) -> bool:
     return str(erro.response.get("Error", {}).get("Code")) in CODIGOS_AUSENTE
 
@@ -342,8 +247,8 @@ def criar_storage(settings: Settings) -> ObjectStorage:
         settings: Configuração.
 
     Returns:
-        Storage S3 ou em memória, sempre embrulhado em `StorageCifrado`.
+        Storage S3 ou em memória.
     """
     if settings.storage_backend == "memoria":
-        return StorageCifrado(ArmazenamentoMemoria())
-    return StorageCifrado(ArmazenamentoS3(criar_cliente_s3(settings), settings.minio_bucket))
+        return ArmazenamentoMemoria()
+    return ArmazenamentoS3(criar_cliente_s3(settings), settings.minio_bucket)

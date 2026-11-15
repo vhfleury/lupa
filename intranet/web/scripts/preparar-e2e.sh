@@ -1,11 +1,10 @@
 # Preparo comum de e2e.sh e capturas.sh. Cada execução ganha um projeto Compose vazio.
-# A API e o worker usam PostgreSQL, MinIO e Vault desse projeto. O navegador usa o proxy interno.
+# A API e o worker usam PostgreSQL e MinIO desse projeto. O navegador usa o proxy interno.
 limpar_e2e() {
   local codigo=$?
   trap - EXIT INT TERM
   docker compose down --volumes --remove-orphans >&2 || codigo=1
-  rm -f -- "$LUPA_ENV_ARQUIVO" "$LUPA_VAULT_DEV_DIR/init.json"
-  rmdir "$LUPA_VAULT_DEV_DIR" 2>/dev/null || true
+  rm -f -- "$LUPA_ENV_ARQUIVO"
   rmdir "$LUPA_E2E_TEMP" || codigo=1
   exit "$codigo"
 }
@@ -17,10 +16,9 @@ preparar_e2e() {
   umask 077
   LUPA_E2E_TEMP="$(mktemp -d "${TMPDIR:-/tmp}/lupa-e2e.XXXXXXXX")"
   LUPA_ENV_ARQUIVO="$LUPA_E2E_TEMP/stack.env"
-  LUPA_VAULT_DEV_DIR="$LUPA_E2E_TEMP/cofre"
   LUPA_E2E_ENV="$LUPA_ENV_ARQUIVO"
   if command -v cygpath >/dev/null 2>&1; then LUPA_E2E_ENV="$(cygpath -m "$LUPA_ENV_ARQUIVO")"; fi
-  export LUPA_ENV_ARQUIVO LUPA_VAULT_DEV_DIR LUPA_E2E_ENV
+  export LUPA_ENV_ARQUIVO LUPA_E2E_ENV
   COMPOSE_PROJECT_NAME="lupa-e2e-$("$py" -c 'import secrets; print(secrets.token_hex(6))')"
   export COMPOSE_PROJECT_NAME
   echo "E2E no projeto $COMPOSE_PROJECT_NAME" >&2
@@ -45,17 +43,8 @@ PY
   trap 'exit 130' INT TERM
   docker compose config --quiet
   docker compose --profile e2e build api worker front e2e
-  docker compose up -d db vault minio minio-init
-  # O Vault novo começa selado. Aguarde a resposta de status antes do init/unseal.
-  local pronto=0
-  for _ in {1..30}; do
-    if docker compose exec -T vault vault status -format=json >/dev/null 2>&1; then pronto=1; break
-    elif [ "$?" = 2 ]; then pronto=1; break
-    fi
-    sleep 1
-  done
-  [ "$pronto" = 1 ] || { echo "Vault do E2E indisponível" >&2; return 1; }
-  bash scripts/vault_inicializar.sh
+  docker compose up -d --wait db minio
+  docker compose up minio-init
   # O script de migração usa o dono do banco. Os serviços passam a usar lupa_app.
   docker compose run --rm -T api alembic -c pipeline/src/lupa_pipeline/migrations/alembic.ini upgrade head
   docker compose run --rm --no-deps -T api python intranet/api/scripts/criar_usuario_banco.py

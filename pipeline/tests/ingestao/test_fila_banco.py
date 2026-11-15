@@ -15,9 +15,8 @@ from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.enums import EstadoJob, MotivoFalha
 from lupa_pipeline.dominio.visoes import VisaoArquivo
 from lupa_pipeline.ingestao.repositorio import mudar_estado
-from lupa_pipeline.ingestao.storage import ObjectStorage, StorageCifrado
+from lupa_pipeline.ingestao.storage import ObjectStorage
 from lupa_pipeline.ingestao.worker import executar_worker
-from lupa_pipeline.seguranca.contexto import contexto_atual
 
 pytestmark = pytest.mark.integracao
 
@@ -41,13 +40,13 @@ def _receber(engine: Engine, storage: ObjectStorage, tmp_path: Path) -> tuple[by
 def test_processa_em_ordem_e_segundo_worker_encerra_entre_commits(
     banco_fila: Engine,
     settings_ficticias: Settings,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """RES-07: uma conexão mantém o lock durante A5, entre commits e até o fim do laço."""
     arquivos = [_receber(banco_fila, storage_memoria, tmp_path) for _ in range(2)]
-    chamados: list[tuple[bytes, bytes | None]] = []
+    chamados: list[bytes] = []
     concorrentes: list[int] = []
     contagens: list[int | None] = []
     papeis: list[str | None] = []
@@ -60,7 +59,7 @@ def test_processa_em_ordem_e_segundo_worker_encerra_entre_commits(
         hk: bytes,
         sinal: Event,
     ) -> None:
-        chamados.append((hk, contexto_atual().atual))
+        chamados.append(hk)
         consulta = select(VisaoArquivo.tentativas).where(VisaoArquivo.hk_arquivo == hk)
         with Session(banco_fila) as observador:
             contagens.append(observador.scalar(consulta))
@@ -84,7 +83,7 @@ def test_processa_em_ordem_e_segundo_worker_encerra_entre_commits(
         pytest.fail("o segundo worker entrou no processador")
 
     assert executar_worker(banco_fila, settings_ficticias, storage_memoria, parar, processar) == 0
-    assert chamados == arquivos
+    assert chamados == [hk_arquivo for hk_arquivo, _ in arquivos]
     assert concorrentes == [1, 1]
     assert contagens == [1, 1]
     assert papeis == ["lupa_app", "lupa_app"]
@@ -98,7 +97,7 @@ def test_processa_em_ordem_e_segundo_worker_encerra_entre_commits(
 def test_erro_no_processamento_reentra_ate_o_teto_sem_expor_conteudo(
     banco_fila: Engine,
     settings_ficticias: Settings,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:

@@ -24,7 +24,7 @@ from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.enums import MotivoQuarentena
 from lupa_pipeline.dominio.visoes import VisaoArquivo
 from lupa_pipeline.ingestao.processamento import processar_arquivo
-from lupa_pipeline.ingestao.storage import StorageCifrado
+from lupa_pipeline.ingestao.storage import ObjectStorage
 
 pytestmark = pytest.mark.integracao
 
@@ -61,7 +61,7 @@ pytestmark = pytest.mark.integracao
 def test_cada_falha_vai_para_quarentena_com_motivo_e_nao_avanca(
     fabrica_sessao: sessionmaker[Session],
     settings_ficticias: Settings,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
     semear_arquivo: SemearArquivo,
     dados: bytes,
     nome: str,
@@ -78,7 +78,7 @@ def test_cada_falha_vai_para_quarentena_com_motivo_e_nao_avanca(
 def test_link_simbolico_do_zip_eh_recusado(
     fabrica_sessao: sessionmaker[Session],
     settings_ficticias: Settings,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
     semear_arquivo: SemearArquivo,
 ) -> None:
     """RF-ING-02: links simbólicos não são extraídos nem atravessam o diretório temporário."""
@@ -94,7 +94,7 @@ def test_link_simbolico_do_zip_eh_recusado(
 def test_bomba_de_descompressao_esgota_memoria_no_sandbox(
     fabrica_sessao: sessionmaker[Session],
     settings_ficticias: Settings,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
     semear_arquivo: SemearArquivo,
     tmp_path: Path,
 ) -> None:
@@ -113,7 +113,7 @@ def test_bomba_de_descompressao_esgota_memoria_no_sandbox(
 def test_objeto_ausente_marca_falho(
     fabrica_sessao: sessionmaker[Session],
     settings_ficticias: Settings,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
     semear_arquivo: SemearArquivo,
 ) -> None:
     """RF-ING-06: arquivo sem objeto termina com a falha específica."""

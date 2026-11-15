@@ -1,6 +1,6 @@
 # Lupa 0.2 — Especificação
 
-13 de novembro de 2026 · Estado: **aprovada**
+13 de novembro de 2026 · Estado: **aprovada** (alterada e aprovada em 15 de novembro de 2026: decisões 40 a 45)
 
 Fonte da verdade da versão 0.2. Diz o que o sistema faz e para quem, com requisitos e critérios
 de aceite verificáveis. Não decide implementação: isso é do plano, que só começa depois desta
@@ -461,20 +461,20 @@ usuário, para cumprir o dever de informar ao tribunal (art. 19, § 7º, Res. CN
 
 ### 4.10 Proteção dos dados (SEG)
 
-**RF-SEG-01 — Cifra em repouso.** Original, texto extraído, trechos de evidência, nomes de partes
-e mensagens do chat são gravados cifrados, com chave por processo protegida por uma chave única
-guardada em cofre.
+**RF-SEG-01 — Armazenamento sem cofre.** Original, texto extraído, trechos de evidência, nomes de
+partes e mensagens do chat são gravados sem cifra da aplicação no banco e no armazenamento de
+objetos. O sistema não depende de cofre de chaves para gravar, ler ou descartar um processo
+(decisão 40).
 
-- Dada uma varredura do banco e do armazenamento de objetos pelos textos sintéticos conhecidos,
-  então nenhum aparece em claro.
-- Dado um valor em claro num campo cifrado, quando é lido, então a leitura falha com erro
-  explícito.
+- Dado um processo enviado com o sistema recém-iniciado, sem nenhum passo de destravamento, então
+  o processo é criado e lido sem erro.
+- Dado um processo enviado, quando o banco e o armazenamento de objetos são lidos diretamente,
+  então o texto extraído e o original aparecem como foram gravados, sem envelope de cifra.
+- Dado o descarte de um processo, então os satélites de conteúdo e os objetos do processo são
+  apagados e o evento de auditoria tem como objeto o id do processo.
 
-**RF-SEG-02 — Cofre indisponível.** Sem acesso à chave, o sistema recusa as rotas de conteúdo e
-informa o estado na rota de saúde.
-
-- Dado o cofre selado, então a rota de saúde responde 503 e as rotas de processo respondem erro,
-  sem conteúdo.
+**RF-SEG-02 — Removido.** Sem cofre, não há chave indisponível; a rota de saúde verifica só a
+API, o banco e o armazenamento de objetos (decisão 41).
 
 **RF-SEG-03 — Tráfego.** Todo tráfego entre navegador e servidor usa HTTPS com cabeçalhos de
 segurança.
@@ -530,7 +530,7 @@ dívida técnica, incidente e pesquisa de contexto ficam em `relatorios/`, sem s
 | RNF-04 | Regressão | suíte com sintéticos de cada classe (3.1), corpus de injeção e casos de recusa roda antes de toda entrega; troca de modelo ou de prompt exige rodá-la |
 | RNF-05 | Dados de teste | todo teste usa dado sintético; nenhum teste lê `dados/` |
 | RNF-06 | Execução | tudo roda em contêineres, num único host, sem dependência instalada na máquina do desenvolvedor |
-| RNF-07 | Segredos | só em arquivo ignorado pelo git ou no cofre; nunca em código ou imagem |
+| RNF-07 | Segredos | só em arquivo ignorado pelo git; nunca em código ou imagem |
 | RNF-08 | Qualidade | lint, formatação, tipagem estrita e cobertura mínima de 90% no código Python; lint, formatação e checagem de tipos sem aviso no front |
 | RNF-09 | Ponta a ponta | suíte de navegador cobre login, processos, dossiê, chat, auditoria e gestão de assessores sobre dados sintéticos; as capturas de tela dos guias saem dela |
 
@@ -547,7 +547,7 @@ Vêm do escopo definido pelo usuário; o detalhe é do plano.
 | RES-05 | Tudo da pipeline de dados (worker, ingestão, fatos, validações, modelo e migrations do Data Vault, sintéticos) fica em `pipeline/`. |
 | RES-06 | A interface reaproveita o front SvelteKit da 0.1. |
 | RES-07 | Um único worker de ingestão, que lê a fila do próprio banco. Sem Redis. |
-| RES-08 | Cofre com chave única; chave de dados por processo. |
+| RES-08 | Sem cofre de chaves e sem cifra na aplicação; a proteção em repouso é a do host (decisões 40 e 42). |
 | RES-09 | O banco da 0.2 nasce vazio, com migration inicial nova. Os processos de `dados/` são enviados de novo, à mão, pela interface da 0.2; correções, anotações, conversas e auditoria da 0.1 não são migradas. |
 | RES-11 | A 0.2 é instalada só na máquina de desenvolvimento. Não há servidor do piloto nem perfil de produção. |
 | RES-12 | Dois pacotes Python: `lupa_pipeline` em `pipeline/` e `lupa_intranet` em `intranet/api/`, que depende do primeiro. O front fica em `intranet/web/`. |
@@ -567,7 +567,7 @@ Respostas do usuário em 13/11/2026 às decisões levantadas antes desta especif
 | 5 | Pseudonimização | removida |
 | 6 | `gabinete_id` e RLS | removidos; mantido o papel de banco só com DML |
 | 7 | Papéis | desembargador e assessor; primeiro usuário por comando |
-| 8 | Criptografia | cofre com chave única e chave por processo |
+| 8 | Criptografia | cofre com chave única e chave por processo (substituída pelas decisões 40 a 45) |
 | 9 | Alcance do Data Vault | todas as tabelas |
 | 10 | Composição do Data Vault | RES-03 como ponto de partida |
 | 11 | Convenções do Data Vault | RES-02 |
@@ -603,6 +603,18 @@ Respostas do usuário em 15/11/2026 sobre o cadastro pelo arquivo (RF-PRO-01, RF
 | 38 | Arquivo que não abre no envio que cria processo | recusado com o motivo |
 | 39 | Isolamento da leitura no envio | aceito o subprocesso na API, sem o isolamento de rede do worker |
 
+Respostas do usuário em 15/11/2026 sobre a remoção do Vault (RF-SEG-01, RF-SEG-02). Substituem a
+decisão 8.
+
+| Nº | Decisão | Resposta |
+| --- | --- | --- |
+| 40 | Cofre e cifra | Vault removido; toda a cifra da aplicação removida (banco e objetos) |
+| 41 | Cofre indisponível (RF-SEG-02) | requisito removido |
+| 42 | Dados gravados com cifra | não migrados; banco, objetos e volume do Vault recriados do zero |
+| 43 | Rotação de chave | removida |
+| 44 | Identificação interna do nome da parte | SHA-256 do nome normalizado, sem chave |
+| 45 | Objeto do evento de descarte | id do processo |
+
 ## 8. Removido em relação à 0.1.0
 
 - Vários gabinetes: tabela `gabinete`, `gabinete_id`, RLS por gabinete, tela de gabinetes, papel
@@ -630,7 +642,7 @@ Respostas do usuário em 15/11/2026 sobre o cadastro pelo arquivo (RF-PRO-01, RF
 
 ## 10. Riscos aceitos pelas decisões
 
-Consequências das decisões 2, 5 e 16 que o usuário deve ter à vista ao aprovar.
+Consequências das decisões 2, 5, 16 e 40 que o usuário deve ter à vista ao aprovar.
 
 1. **Nomes reais e processos sigilosos vão ao fornecedor do modelo.** Sem pseudonimização e sem
    bloqueio de sigiloso, os trechos enviados ao modelo levam nomes de partes e podem ser de
@@ -640,13 +652,17 @@ Consequências das decisões 2, 5 e 16 que o usuário deve ter à vista ao aprov
    conformidade precisa ser revista (RF-DOC-02) antes de processo sigiloso real entrar.
 2. **Sem backup, perda do host é perda dos dados.** Os originais continuam em `dados/`, fora do
    sistema; correções, anotações, conversas e auditoria não têm cópia.
-3. **Sem monitoramento, falha é percebida pelo usuário.** Não há alerta de fila parada, cofre
-   selado ou disco cheio.
+3. **Sem monitoramento, falha é percebida pelo usuário.** Não há alerta de fila parada ou disco
+   cheio.
 4. **A leitura no envio tem isolamento menor que o do worker.** Para criar o processo a partir do
    arquivo (decisões 30 e 39), a API abre as primeiras páginas em subprocesso sem credenciais, com
    rede bloqueada no próprio subprocesso e limites de memória, CPU e tempo. O contêiner da API
    tem saída de rede; o do worker não. Um PDF que explore falha do parser nesse subprocesso não
    encontra a barreira de rede do contêiner.
+5. **Autos em claro no host.** Sem cifra da aplicação (decisão 40), quem obtém o volume do
+   PostgreSQL ou do MinIO, ou uma cópia deles, lê o texto dos autos, os nomes das partes e as
+   conversas. A proteção em repouso passa a depender do disco do host e do controle de acesso a
+   ele.
 
 ## 11. Regras jurídicas a confirmar pelo gabinete
 

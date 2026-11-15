@@ -33,7 +33,7 @@ Regras que valem para todo código do repositório. As seções de "Linguagem e 
 
 ## Segurança
 
-- Segredos só por arquivo `.env` ignorado pelo git ou pelo Vault. Nunca em código ou em imagem.
+- Segredos só por arquivo `.env` ignorado pelo git. Nunca em código ou em imagem.
 - Nenhum conteúdo de autos, senha, token ou texto de pergunta entra em log.
 
 ## Entrega de cada tarefa
@@ -131,8 +131,6 @@ docs/
   views. Correção de fato ou de peça é linha nova de satélite, nunca `UPDATE`.
 - Não há `gabinete_id` nem RLS. A aplicação opera sob o papel `lupa_app`, só com DML; os
   privilégios seguem `docs/sistema/modelo-de-dados.md`.
-- Coluna nova com conteúdo de autos, identidade de parte ou mensagem do chat é cifrada conforme
-  `docs/sistema/criptografia.md`; nunca em claro.
 - Ao escrever SQL, priorize queries legíveis e evite `SELECT *` quando não for necessário.
 - Os nomes de tabelas, colunas e views são os do plano aprovado da 0.2; depois de criados, só
   mudam por plano.
@@ -209,11 +207,11 @@ docs/
 - Toda lógica nova ou alterada tem teste. Exceções admitidas: componente Svelte só de
   apresentação, chamada real ao modelo (marcador `llm`), teste de carga (marcador `carga`) e fluxo
   E2E do Playwright; cada uma entra em "revisão manual" do relatório final.
-- Teste unitário valida o comportamento de função pura, sem rede, banco, MinIO, Vault nem
+- Teste unitário valida o comportamento de função pura, sem rede, banco, MinIO nem
   modelo.
 - Teste de integração (marcador `integracao`) valida o fluxo inteiro com os serviços do
-  `docker-compose.yml`: PostgreSQL e MinIO reais; modelo, cofre e resolução de nomes por dublês
-  que já existem (cliente roteirizado do agente, cofre em memória, `ResolvedorFalso`).
+  `docker-compose.yml`: PostgreSQL e MinIO reais; modelo e resolução de nomes por dublês
+  que já existem (cliente roteirizado do agente, `ResolvedorFalso`).
 - Todos os dados são sintéticos. Nunca número de processo, nome ou trecho de autos reais em teste
   ou fixture; nunca ler `.env`, `.segredos/`, `.vault-dev/`, `.backups/`, `.backup-chaves/` ou
   `dados/` (processos reais, fora do git).

@@ -3,7 +3,7 @@ r"""Recepção e lacre: streaming com SHA-256, limite de tamanho, tipo pelo cont
 O corpo chega em blocos e vai direto para um arquivo temporário, com o hash calculado no
 caminho. Tipo desconhecido ou extensão `.pdf`/`.zip` incompatível com os bytes mágicos
 seguem como `application/octet-stream` para a quarentena (RF-ING-02).
-O lacre (A3, passos 4 a 7) cifra e grava o objeto em `processo/<hex do hk>/<sha256>` e, na
+O lacre (A3, passos 4 a 7) grava o objeto em `processo/<hex do hk>/<sha256>` e, na
 transação de quem chama, grava `hub_arquivo`, `link_processo_arquivo`, `sat_arquivo_dados` e o
 estado `recebido` em `sat_arquivo_ingestao`. O mesmo conteúdo no mesmo processo não grava nada
 novo: devolve o arquivo existente como duplicado (RF-ING-01). Dois envios simultâneos do mesmo
@@ -232,15 +232,14 @@ def lacrar(
     enviado_por: bytes,
     nome_original: str,
 ) -> ResultadoLacre:
-    """Grava o objeto cifrado e registra o arquivo em `recebido` (A3, passos 4 a 7).
+    """Grava o objeto e registra o arquivo em `recebido` (A3, passos 4 a 7).
 
-    A DEK do processo precisa estar ativa no contexto de cifra (`ativar_processo`), porque o
-    objeto e `nome_original` são cifrados com ela. Um objeto gravado por uma transação que
-    depois desfez fica órfão e é sobrescrito no próximo envio do mesmo arquivo (A3, passo 8).
+    Um objeto gravado por uma transação que depois desfez fica órfão e é sobrescrito no próximo
+    envio do mesmo arquivo (A3, passo 8).
 
     Args:
         session: Sessão da requisição, sob `lupa_app`.
-        storage: Object storage (cifrado).
+        storage: Object storage.
         recebido: Arquivo conferido.
         hk_processo: Processo.
         enviado_por: `hk_usuario` de quem enviou.

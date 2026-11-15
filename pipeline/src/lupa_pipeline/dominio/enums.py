@@ -13,7 +13,7 @@ class StatusProcesso(StrEnum):
         ARQUIVADO: Fora de uso; mantido para auditoria.
         EM_REVISAO: Incidente de injeção no agente; o chat fica bloqueado até o desembargador
             liberar (RF-CHA-08).
-        DESCARTADO: Exclusão criptográfica (Etapa 7.7): DEK apagada, só resta o registro.
+        DESCARTADO: Conteúdo e objetos apagados; só resta o registro.
     """
 
     CRIADO = "criado"

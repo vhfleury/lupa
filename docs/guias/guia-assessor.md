@@ -45,4 +45,4 @@ Perguntas como “Em que página está a procuração do recorrente?” e “Qua
 
 ![Chat com citação de página e recusa de pedido de minuta](../imagens/chat.png)
 
-Os trechos consultados podem incluir nomes reais e dados de processo sigiloso e podem ser enviados ao fornecedor externo do modelo. Siga as condições de uso acordadas com o tribunal. A auditoria registra atos, horários, identificadores e uso do modelo. Mensagens e páginas têm armazenamento cifrado próprio. [Condições de tratamento](../conformidade/CONFORMIDADE.md).
+Os trechos consultados podem incluir nomes reais e dados de processo sigiloso e podem ser enviados ao fornecedor externo do modelo. Siga as condições de uso acordadas com o tribunal. A auditoria registra atos, horários, identificadores e uso do modelo. Mensagens e páginas ficam no banco do Lupa, fora da auditoria. [Condições de tratamento](../conformidade/CONFORMIDADE.md).

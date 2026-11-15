@@ -30,10 +30,8 @@ from lupa_pipeline.dominio.visoes import (
     VisaoParte,
     VisaoPeca,
 )
-from lupa_pipeline.seguranca.tipos import cifrar_valor, decifrar_valor
 
 ORIGEM = "intranet.agente"
-ROTULO_TRECHO = "sat_conversa_mensagem.citacoes.trecho"
 
 
 @dataclass
@@ -123,18 +121,17 @@ def gravar_mensagem(
     citacoes: list[dict[str, Any]] | None = None,
     avisos: list[str] | None = None,
 ) -> VisaoMensagem:
-    """Acrescenta mensagem com sequência crescente e cifra cada trecho de autos nas citações."""
+    """Acrescenta mensagem com sequência crescente."""
     ultima = session.scalar(
         select(func.max(VisaoMensagem.sequencia)).where(VisaoMensagem.hk_conversa == conversa.hk)
     )
     sequencia = (ultima or 0) + 1
-    referencias = [c | {"trecho": cifrar_valor(ROTULO_TRECHO, c["trecho"])} for c in citacoes or []]
     dados = {
         "sequencia": sequencia,
         "papel": papel.value,
         "status": status.value,
         "texto": texto,
-        "citacoes": referencias,
+        "citacoes": citacoes or [],
         "avisos": avisos or [],
     }
     gravar_satelite(session, sat_conversa_mensagem, conversa.hk, dados, ORIGEM)
@@ -216,7 +213,7 @@ def historico(session: Session, hk_processo: bytes, hk_usuario: bytes) -> list[d
 def serializar_mensagem(
     session: Session, hk_processo: bytes, mensagem: VisaoMensagem
 ) -> dict[str, Any]:
-    """Decifra e localiza as citações e rotula a mensagem gerada pelo agente."""
+    """Localiza as citações e rotula a mensagem gerada pelo agente."""
     return {
         "mensagem_id": id_mensagem(mensagem),
         "papel": mensagem.papel,
@@ -263,7 +260,6 @@ def localizar_citacoes(
     return [
         c
         | {
-            "trecho": decifrar_valor(ROTULO_TRECHO, c["trecho"]),
             "pagina_numero": locais[c["pagina_id"]][0],
             "arquivo_id": locais[c["pagina_id"]][1],
         }

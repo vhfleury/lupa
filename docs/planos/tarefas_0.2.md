@@ -484,3 +484,18 @@ Execução do [plano de cadastro pelo arquivo](plano_cadastro_pelo_arquivo.md).
 - `docker compose up -d --build --wait` subiu os sete serviços de desenvolvimento. A aplicação de `alembic upgrade head` no contêiner da API e a consulta `alembic current` confirmaram `0002 (head)`.
 - No `scripts/verificar.sh`, Ruff, formatação e mypy estrito passaram nos dois pacotes. A pipeline passou nos 728 testes com 95,69% de cobertura, e a API passou nos 272 selecionados com 98,25%. A configuração padrão da API exclui três testes marcados como `carga` ou `llm`.
 - `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` terminou com código 0. Passaram os seis testes de ingestão ponta a ponta, o build do front, os cabeçalhos de quatro rotas e o isolamento de rede do worker. O corpus detectou 16 de 16 injeções textuais, com zero falsos positivos. Nos 16 cenários do agente com cliente roteirizado, houve zero vazamentos e zero instruções embutidas executadas. A suíte Playwright rodou separadamente pelo comando de T8.6.
+
+## Fase 9 — Remoção do Vault e da cifra
+
+Execução do [plano de remoção do Vault](plano_remocao_vault.md).
+
+- [x] **T9.1** Escrever o teste vermelho de armazenamento sem cofre e criar a migration `v0003` com teste. RF-SEG-01. D5.
+  - `pytest pipeline/tests/dominio/test_migracao_0003.py pipeline/tests/seguranca/test_sem_cofre.py --no-cov` no worker. No vermelho, contra o código anterior, 11 falhas e nenhum pulado (revisão `0003` inexistente, `hash_nome` ausente, módulos de cifra presentes, coluna sem processo ativo recusada). Com a revisão e o código sem cifra, 11 testes passaram com `LUPA_EXIGIR_INTEGRACAO=1`.
+- [x] **T9.2** Gravar e ler conteúdo sem cifra: tipos de coluna, `hash_diff`, `chave_nome` e storage sem envelope. RF-SEG-01. D3, D7.
+  - Os testes de `test_sem_cofre.py` sobre `hash_nome`, `hash_diff`, storage em memória e colunas em claro passaram. `test_chaves.py`, `test_recepcao.py`, `test_processamento.py` e `test_storage.py` passaram a fixar o conteúdo em claro (D3, D7).
+- [x] **T9.3** Retirar o contexto de DEK e o cofre da pipeline e da intranet; saúde sem cofre e descarte com o id do processo. RF-SEG-01, RF-SEG-02. D4, D6.
+  - Na API, `test_saude.py` (sem `cofre`, 503 quando o MinIO falha), `test_descarte.py` (`objeto_id` igual ao id do processo) e `test_rotas.py` passaram. Os cinco arquivos de teste da cifra saíram com o código (D1). A pipeline passou nos 702 testes com 95,25% de cobertura e a API nos 262 com 98,23%.
+- [x] **T9.4** Retirar o Vault do compose, dos scripts, do `.env.example` e do E2E. RNF-07, RES-08. D1, D2.
+  - `bash scripts/verificar.sh` terminou com código 0, sem o serviço `vault`: ingestão ponta a ponta (6), regressão de injeção (16 de 16, zero falso positivo), front, cabeçalhos em 4 rotas, isolamento do worker e 16 cenários do agente sem vazamento. `bash intranet/web/scripts/e2e.sh` passou nos 36 testes em Chromium, numa stack sem Vault.
+- [x] **T9.5** Atualizar documentação, ADR 0018, registro de decisões, `CLAUDE.md` e `CHANGELOG.md`. RF-SEG-01, RES-08. D1 a D7.
+  - A conferência de links locais nos 21 documentos alterados não achou link quebrado.

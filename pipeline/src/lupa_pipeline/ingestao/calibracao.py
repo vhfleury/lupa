@@ -37,8 +37,6 @@ from lupa_pipeline.ingestao.processamento import processar_arquivo
 from lupa_pipeline.ingestao.recepcao import ArquivoRecebido, detectar_tipo, lacrar
 from lupa_pipeline.ingestao.storage import ObjectStorage
 from lupa_pipeline.ingestao.worker import TRAVA_WORKER
-from lupa_pipeline.seguranca.chaves import criar_chave_processo
-from lupa_pipeline.seguranca.contexto import obter_cofre
 from lupa_pipeline.validacoes.modelo import valor_de
 
 TAMANHO_BLOCO = 1 << 20
@@ -108,7 +106,6 @@ def novo_processo(
     gravar_satelite(
         session, sat_processo_estado, hk, {"status": StatusProcesso.CRIADO.value}, origem
     )
-    criar_chave_processo(session, obter_cofre(), hk, origem)
     return hk
 
 
@@ -140,7 +137,7 @@ def enviar_e_processar(
     numero: str | None = None,
     volume: dict[str, Any] | None = None,
 ) -> Execucao:
-    """Recebe, cifra e processa um PDF ou ZIP pelo mesmo fluxo A3 e A5 da aplicação."""
+    """Recebe e processa um PDF ou ZIP pelo mesmo fluxo A3 e A5 da aplicação."""
     with caminho.open("rb") as entrada:
         tipo = detectar_tipo(entrada.read(8))
     if tipo is None:

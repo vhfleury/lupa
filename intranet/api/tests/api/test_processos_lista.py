@@ -28,7 +28,6 @@ from lupa_pipeline.dominio.tabelas import (
 )
 from lupa_pipeline.dominio.visoes import VisaoProcesso
 from lupa_pipeline.ingestao.storage import chave_objeto
-from lupa_pipeline.seguranca.contexto import ativar_processo
 from tests.conftest import criar_usuario_teste, logar
 
 pytestmark = pytest.mark.integracao
@@ -61,7 +60,6 @@ def _semear_arquivo(engine: Engine, hk_processo: bytes, nome: str, estado: Estad
         processo = session.scalars(
             select(VisaoProcesso).where(VisaoProcesso.hk_processo == hk_processo)
         ).one()
-        ativar_processo(hk_processo, processo.chave_dados_cifrada)
         sha256 = calcular_hash(uuid4().hex)
         chave = {"numero_cnj": processo.numero_cnj, "sha256": sha256}
         hk_arquivo = gravar_hub(session, hub_arquivo, chave, ORIGEM_TESTE)

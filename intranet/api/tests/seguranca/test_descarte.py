@@ -1,6 +1,5 @@
 """Descarte atômico e retomada da limpeza dos objetos sintéticos (RF-PRO-05)."""
 
-import hashlib
 import io
 from collections.abc import Iterator
 from uuid import uuid4
@@ -24,23 +23,22 @@ from lupa_pipeline.dominio.visoes import VisaoProcesso
 from lupa_pipeline.ingestao.renderizacao import chave_cache
 from lupa_pipeline.ingestao.storage import (
     ArmazenamentoS3,
-    StorageCifrado,
+    ObjectStorage,
     chave_objeto,
     criar_cliente_s3,
 )
-from lupa_pipeline.seguranca.contexto import ChaveIndisponivelError, dek_de
 from tests.conftest import criar_usuario_teste, logar
 
 pytestmark = pytest.mark.integracao
 
 
 @pytest.fixture
-def storage_isolado(app_teste: FastAPI) -> Iterator[StorageCifrado]:
-    """RF-PRO-05: MinIO cifrado em bucket exclusivo do teste."""
+def storage_isolado(app_teste: FastAPI) -> Iterator[ObjectStorage]:
+    """RF-PRO-05: MinIO em bucket exclusivo do teste."""
     s3 = criar_cliente_s3(Settings())
     bucket = "lupa-teste-descarte-" + uuid4().hex
     s3.create_bucket(Bucket=bucket)
-    storage = StorageCifrado(ArmazenamentoS3(s3, bucket))
+    storage = ArmazenamentoS3(s3, bucket)
     app_teste.state.storage = storage
     try:
         yield storage
@@ -63,21 +61,19 @@ def test_descarte_preserva_hubs_links_auditoria_e_conteudo_dos_outros_processos(
     cliente: TestClient,
     engine_teste: Engine,
     desembargador: UsuarioTeste,
-    storage_isolado: StorageCifrado,
+    storage_isolado: ObjectStorage,
 ) -> None:
-    """RF-PRO-05: o tombstone preserva as relações e apaga a DEK, satélites, originais e cache."""
+    """RF-PRO-05: o tombstone preserva as relações e apaga satélites, originais e cache."""
     hk = criar_processo_teste(engine_teste, desembargador)
     outro = criar_processo_teste(engine_teste, desembargador)
     with Session(engine_teste) as sessao, sessao.begin():
         pagina = criar_pagina(sessao, hk)
-        chave = sessao.get_one(VisaoProcesso, hk).chave_dados_cifrada
-        assert chave is not None
     original = chave_objeto(hk, "1" * 64)
     cache = chave_cache(original, 1, 2.0)
     vizinho = chave_objeto(outro, "1" * 64)
     for objeto in (original, cache, vizinho):
         storage_isolado.gravar(objeto, io.BytesIO(b"%PDF sintetico"))
-    assert storage_isolado.interno.ler(original).startswith(b"LUPAOBJ")
+    assert storage_isolado.ler(original) == b"%PDF sintetico"
     assert cliente.get(f"/processos/{hk.hex()}").status_code == 200
     rota = f"/processos/{hk.hex()}/descartar"
     resposta = cliente.post(rota)
@@ -91,21 +87,15 @@ def test_descarte_preserva_hubs_links_auditoria_e_conteudo_dos_outros_processos(
     assert storage_isolado.ler(vizinho) == b"%PDF sintetico"
     with Session(engine_teste) as sessao:
         estado = sessao.get_one(VisaoProcesso, hk)
-        assert (
-            estado.status == "descartado" and estado.chave_dados_cifrada is None and estado.classe
-        )
+        assert estado.status == "descartado" and estado.classe
         for tabela in (sat_pagina_extracao, sat_pagina_saneamento):
             assert sessao.scalar(select(func.count()).where(tabela.c.hk_pagina == pagina)) == 0
         for tabela in (hub_pagina, link_arquivo_pagina):
             assert sessao.scalar(select(func.count()).where(tabela.c.hk_pagina == pagina)) == 1
-    with pytest.raises(ChaveIndisponivelError):
-        dek_de(hk)
     assert cliente.get(f"/processos/{hk.hex()}").status_code == 404
     eventos = eventos_do_banco(engine_teste, processo_id=hk.hex())
     assert {e.acao for e in eventos} >= {"processo_aberto", "processo_descartado"}
-    assert [e.objeto_id for e in eventos if e.acao == "processo_descartado"] == [
-        hashlib.sha256(chave.encode()).hexdigest()
-    ]
+    assert [e.objeto_id for e in eventos if e.acao == "processo_descartado"] == [hk.hex()]
     assert cliente.post(rota).json()["objetos_apagados"] == 0
     assert len(eventos_do_banco(engine_teste, hk_processo=hk, acao="processo_descartado")) == 1
 
@@ -120,14 +110,14 @@ def test_assessor_nao_descarta_e_processo_inexistente_retorna_404(
     assert outro.post(f"/processos/{hk.hex()}/descartar").status_code == 403
     assert cliente.post(f"/processos/{'0' * 64}/descartar").status_code == 404
     with Session(engine_teste) as sessao:
-        assert sessao.get_one(VisaoProcesso, hk).chave_dados_cifrada is not None
+        assert sessao.get_one(VisaoProcesso, hk).status != "descartado"
 
 
 def test_falha_do_storage_registra_pendencia_e_repeticao_conclui(
     cliente: TestClient,
     engine_teste: Engine,
     desembargador: UsuarioTeste,
-    storage_isolado: StorageCifrado,
+    storage_isolado: ObjectStorage,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """RF-PRO-05: falha após o commit mantém conteúdo indisponível e permite retentar limpeza."""
@@ -140,7 +130,7 @@ def test_falha_do_storage_registra_pendencia_e_repeticao_conclui(
 
     def falhar(chave: str) -> None:
         with Session(engine_teste) as sessao:
-            assert sessao.get_one(VisaoProcesso, hk).chave_dados_cifrada is None
+            assert sessao.get_one(VisaoProcesso, hk).status == "descartado"
         if chave == cache:
             raise OSError("storage indisponível")
         apagar(chave)
