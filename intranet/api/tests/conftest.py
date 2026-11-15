@@ -19,8 +19,7 @@ from lupa_intranet.api.app import create_app
 from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.dominio.visoes import VisaoUsuario
-from lupa_pipeline.ingestao.storage import ArmazenamentoMemoria, StorageCifrado
-from lupa_pipeline.seguranca.contexto import definir_cofre, obter_cofre
+from lupa_pipeline.ingestao.storage import ArmazenamentoMemoria
 
 pytest_plugins = ["apoio_comum", "apoio_ingestao"]
 
@@ -60,13 +59,10 @@ def app_teste(
     settings_ficticias: Settings,
 ) -> FastAPI:
     """Sobe a fábrica pública e aponta suas dependências para o banco efêmero."""
-    cofre = obter_cofre()
-    app = create_app(settings_ficticias.model_copy(update={"cofre_backend": "memoria"}))
-    definir_cofre(cofre)
-    app.state.cofre = cofre
+    app = create_app(settings_ficticias)
     app.state.fabrica_sessao = fabrica_sessao
     app.state.resolvedor = resolvedor_falso
-    app.state.storage = StorageCifrado(ArmazenamentoMemoria())
+    app.state.storage = ArmazenamentoMemoria()
     return app
 
 

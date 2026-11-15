@@ -1,4 +1,4 @@
-"""Fixtures comuns da ingestão: processo semeado, storage cifrado em memória e arquivo lacrado.
+"""Fixtures comuns da ingestão: processo semeado, storage em memória e arquivo lacrado.
 
 Fase 3 (D23): as dependências do worker e a extração da sessão voltam com o worker novo
 (T3.8 e T3.9).
@@ -30,8 +30,7 @@ from lupa_pipeline.ingestao.recepcao import (
     detectar_tipo,
     lacrar,
 )
-from lupa_pipeline.ingestao.storage import ArmazenamentoMemoria, ObjectStorage, StorageCifrado
-from lupa_pipeline.seguranca.contexto import ativar_processo
+from lupa_pipeline.ingestao.storage import ArmazenamentoMemoria, ObjectStorage
 
 if TYPE_CHECKING:
     from lupa_pipeline.sinteticos.gabarito import Cenario, Gabarito
@@ -103,7 +102,7 @@ class PararAoEsvaziar(Event):
 def semear_processo(
     engine: Engine, *, classe: ClasseProcessual = ClasseProcessual.APELACAO_CIVEL
 ) -> ProcessoSemeado:
-    """Grava, com commit, um processo sintético com DEK e criador assessor.
+    """Grava, com commit, um processo sintético com criador assessor.
 
     Args:
         engine: Engine do banco de teste.
@@ -128,11 +127,11 @@ def lacrar_bytes(
     caminho: Path,
     nome: str = "autos.pdf",
 ) -> ResultadoLacre:
-    """Lacra, com commit, o arquivo do disco no processo, com a DEK dele ativa.
+    """Lacra, com commit, o arquivo do disco no processo.
 
     Args:
         engine: Engine do banco de teste.
-        storage: Storage (cifrado).
+        storage: Storage de objetos.
         processo: Processo dono.
         caminho: Arquivo com os bytes.
         nome: Nome original.
@@ -144,12 +143,6 @@ def lacrar_bytes(
     tipo = detectar_tipo(dados) or TipoArquivo.DESCONHECIDO
     recebido = ArquivoRecebido(caminho, calcular_hash_bytes(dados), len(dados), tipo)
     with Session(engine) as session, session.begin():
-        chave = session.scalar(
-            select(VisaoProcesso.chave_dados_cifrada).where(
-                VisaoProcesso.hk_processo == processo.hk_processo
-            )
-        )
-        ativar_processo(processo.hk_processo, chave)
         return lacrar(
             session,
             storage,
@@ -167,9 +160,9 @@ def relogio() -> Relogio:
 
 
 @pytest.fixture
-def storage_memoria() -> StorageCifrado:
-    """Storage em memória embrulhado na cifra por processo, como o de produção."""
-    return StorageCifrado(ArmazenamentoMemoria())
+def storage_memoria() -> ArmazenamentoMemoria:
+    """Storage em memória, no lugar do MinIO."""
+    return ArmazenamentoMemoria()
 
 
 SemearArquivo = Callable[..., ArquivoSemeado]
@@ -177,7 +170,7 @@ SemearArquivo = Callable[..., ArquivoSemeado]
 
 @pytest.fixture
 def semear_arquivo(
-    engine_teste: Engine, storage_memoria: StorageCifrado, tmp_path: Path
+    engine_teste: Engine, storage_memoria: ObjectStorage, tmp_path: Path
 ) -> SemearArquivo:
     """Fábrica: processo novo e arquivo lacrado nele, em `recebido`."""
 

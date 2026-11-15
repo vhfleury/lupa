@@ -10,6 +10,6 @@ As ferramentas têm escopo de processo. A conferência da resposta verifica pág
 
 ## Limites e registro
 
-Os tetos incluem tamanho da pergunta, turnos, páginas originais consultadas e tokens por chamada, conversa e processo. Os padrões constam em [config.py](../../pipeline/src/lupa_pipeline/config.py). As mensagens têm armazenamento cifrado por processo. O registro de chamada guarda versão do modelo e do prompt, hashes, ferramentas, tokens, latência e resultado. A auditoria e os logs operacionais evitam reproduzir o conteúdo consultado.
+Os tetos incluem tamanho da pergunta, turnos, páginas originais consultadas e tokens por chamada, conversa e processo. Os padrões constam em [config.py](../../pipeline/src/lupa_pipeline/config.py). As mensagens ficam no banco, vinculadas à conversa do processo. O registro de chamada guarda versão do modelo e do prompt, hashes, ferramentas, tokens, latência e resultado. A auditoria e os logs operacionais evitam reproduzir o conteúdo consultado.
 
 A API pode enviar ao fornecedor externo trechos dos autos com nomes e outros dados que constem da página. Condições para uso de autos sigilosos e comunicação ao tribunal estão na [minuta de conformidade](../conformidade/CONFORMIDADE.md).

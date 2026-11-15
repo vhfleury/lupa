@@ -413,7 +413,7 @@ def processar_arquivo(
     hk_arquivo: bytes,
     parar: Event,
 ) -> None:
-    """Valida, extrai e indexa o arquivo com a DEK ativada pelo worker."""
+    """Valida, extrai e indexa o arquivo."""
     with fabrica() as session:
         assumir_papel_aplicacao(session)
         arquivo = session.get_one(VisaoArquivo, hk_arquivo)

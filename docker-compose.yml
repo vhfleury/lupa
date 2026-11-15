@@ -11,7 +11,6 @@ services:
     environment:
       LUPA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       LUPA_MINIO_ENDPOINT: minio:9000
-      LUPA_VAULT_ENDERECO: http://vault:8200
       # Etapa 6.8: `falso` usa o modelo roteirizado (so desenvolvimento/teste; o E2E liga).
       LUPA_AGENTE_CLIENTE: ${LUPA_AGENTE_CLIENTE:-sdk}
     # Etapa 6: o acesso normal e pelo proxy (https://localhost:${PROXY_PORTA_HOST}/api). A porta
@@ -39,8 +38,6 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
-      vault:
-        condition: service_healthy
     # Processos sinteticos de referencia (4B.9), so leitura, para as medicoes da Etapa 4C.
     volumes:
       - ./.sinteticos:/app/.sinteticos:ro
@@ -122,7 +119,6 @@ services:
     environment:
       LUPA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       LUPA_MINIO_ENDPOINT: minio:9000
-      LUPA_VAULT_ENDERECO: http://vault:8200
     # Processos sinteticos de referencia (4B.9), so leitura, para a regressao de injecao.
     volumes:
       - ./.sinteticos:/app/.sinteticos:ro
@@ -136,34 +132,7 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
-      vault:
-        condition: service_healthy
     networks: [ingestao]
-    security_opt: ["no-new-privileges:true"]
-
-  # Cofre de chaves (Etapa 7.2): HashiCorp Vault em modo servidor (storage em arquivo, sem modo
-  # dev), so nas redes internas. Depois da primeira subida (e a cada reinicio, que sela o cofre),
-  # rode scripts/vault_inicializar.sh: init, unseal, Transit, politica e AppRole.
-  # Etapa 8.1: o healthcheck exige o cofre DESTRAVADO (`vault status` sai com 2 se selado, 1 se
-  # fora do ar). Numa instalacao nova ou depois de reiniciar, o vault fica `unhealthy` (e a api e o
-  # worker esperam) ate o unseal: suba primeiro `docker compose up -d vault`, rode o
-  # vault_inicializar e so entao `docker compose up -d --wait`.
-  vault:
-    image: hashicorp/vault:1.21.3@sha256:5f244d447c6f90107149c9565da5ffedf847cec673ba0062a82fc3dd83c89e65
-    # O entrypoint da imagem le todos os .hcl de /vault/config (so lupa.hcl; politicas/ fica fora).
-    command: ["server"]
-    environment:
-      SKIP_SETCAP: "true"
-      VAULT_ADDR: http://127.0.0.1:8200
-    volumes:
-      - ./vault:/vault/config:ro
-      - vault-dados:/vault/file
-    healthcheck:
-      test: ["CMD", "vault", "status"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    networks: [interna, ingestao]
     security_opt: ["no-new-privileges:true"]
 
   db:
@@ -238,4 +207,3 @@ networks:
 volumes:
   db-dados:
   minio-dados:
-  vault-dados:

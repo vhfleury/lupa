@@ -2,7 +2,7 @@
 
 | Status | Data | Responsável |
 | --- | --- | --- |
-| Aceito | 2026-11-06 | Victor Hugo Fleury Barreto |
+| Substituído por [ADR 0018](0018-remocao-do-cofre-e-da-cifra.md) | 2026-11-06 | Victor Hugo Fleury Barreto |
 
 ## Contexto
 

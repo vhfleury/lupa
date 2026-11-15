@@ -1,4 +1,4 @@
-"""Descarte dos satélites e limpeza dos objetos cifrados do processo (A13)."""
+"""Descarte dos satélites e limpeza dos objetos do processo (A13; RF-SEG-01)."""
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -11,15 +11,12 @@ from lupa_pipeline.ingestao.storage import ObjectStorage, prefixo_processo
 PREFIXO_RENDERIZACAO = "renderizacao/"
 
 
-def descartar(session: Session, hk_processo: bytes) -> str | None:
-    """Apaga satélites e DEK do processo travado e grava o estado na transação da auditoria.
+def descartar(session: Session, hk_processo: bytes) -> None:
+    """Apaga os satélites de conteúdo do processo travado e grava o estado descartado.
 
-    Returns:
-        SHA-256 da DEK cifrada, calculado pelo banco antes da exclusão.
+    Roda na transação de quem chama, a mesma do evento de auditoria.
     """
-    chave: str | None = session.scalar(
-        text("SELECT lupa_descartar_processo(:hk)"), {"hk": hk_processo}
-    )
+    session.execute(text("SELECT lupa_descartar_processo(:hk)"), {"hk": hk_processo})
     gravar_satelite(
         session,
         sat_processo_estado,
@@ -27,7 +24,6 @@ def descartar(session: Session, hk_processo: bytes) -> str | None:
         {"status": StatusProcesso.DESCARTADO.value},
         "pipeline.descarte",
     )
-    return chave
 
 
 def apagar_objetos(storage: ObjectStorage, hk_processo: bytes) -> int:

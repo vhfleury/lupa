@@ -36,7 +36,7 @@ Python 3.12, pytest 8 com `pytest-asyncio` em modo automático, `ruff` e `mypy -
 - Todos os dados são sintéticos. Nunca use número de processo, nome ou trecho de autos reais em teste ou fixture, nem leia `.env`, `.segredos/`, `.vault-dev/`, `.backups/` ou `.backup-chaves/`.
 - Reaproveite as fixtures e os auxiliares antes de criar novos. Os comuns aos dois pacotes ficam em `pipeline/tests/apoio/` (no `pythonpath` do pytest de ambos; importe com `from apoio_comum import ...`): `fabrica_fato`, `fabrica_processo`, `sessao` (transação desfeita ao final), `gerar_numero_cnj`, `criar_pagina`, `criar_processo_teste`, `eventos_do_banco` em `apoio_comum.py`, os da ingestão em `apoio_ingestao.py` e os arquivos sintéticos em `apoio_arquivos.py`. Os da intranet (`cliente`/`app_teste`, `logar`, `criar_usuario_teste`, `relogio_fixo`, `ResolvedorFalso`) ficam em `intranet/api/tests/conftest.py`. Depois vem o `conftest.py` da área.
 - Tempo é injetado, não esperado: use `relogio_fixo` e datas fixas em vez de `sleep` ou do relógio real.
-- Dependências externas entram por dublês que já existem (cofre em memória, `ResolvedorFalso`, cliente roteirizado do agente). O modelo real só é chamado em testes marcados `llm`, que não fazem parte do ciclo.
+- Dependências externas entram por dublês que já existem (`ResolvedorFalso`, cliente roteirizado do agente). O modelo real só é chamado em testes marcados `llm`, que não fazem parte do ciclo.
 - Marcadores: `integracao` (exige PostgreSQL e MinIO), `injecao`, `agente`, `carga`, `llm`. A configuração padrão exclui `carga` e `llm`.
 - As regras jurídicas estão descritas em `docs/especificacao/catalogo-validacoes.md` e `docs/sistema/validacoes.md`. São a fonte para saber o resultado esperado de uma validação.
 

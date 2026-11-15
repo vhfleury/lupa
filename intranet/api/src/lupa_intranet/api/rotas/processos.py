@@ -44,8 +44,6 @@ from lupa_pipeline.dominio.visoes import (
     atual,
 )
 from lupa_pipeline.ingestao.eventos.etapa import atualizar_achados
-from lupa_pipeline.seguranca.chaves import criar_chave_processo
-from lupa_pipeline.seguranca.contexto import ativar_processo, obter_cofre
 
 router = APIRouter()
 
@@ -214,13 +212,12 @@ def _ligar_responsavel(
 def gravar_processo(
     sessao: Session, numero_cnj: str, classe: ClasseProcessual, ator: Ator, *, origem: str = ORIGEM
 ) -> bytes:
-    """Cadastra o processo, abre a DEK e atribui o assessor que o cadastrou."""
+    """Cadastra o processo e atribui o assessor que o cadastrou."""
     hk = gravar_hub(sessao, hub_processo, {"numero_cnj": numero_cnj}, origem)
     dados = {"classe": classe.value, "hk_usuario": ator.hk_usuario}
     gravar_satelite(sessao, sat_processo_dados, hk, dados, origem)
     estado = {"status": StatusProcesso.CRIADO.value}
     gravar_satelite(sessao, sat_processo_estado, hk, estado, origem)
-    criar_chave_processo(sessao, obter_cofre(), hk, origem)
     if ator.papel is PapelUsuario.ASSESSOR:
         _ligar_responsavel(sessao, hk, ator.hk_usuario, vigente=True)
     return hk
@@ -259,7 +256,6 @@ def corrigir_classe(
         return _serializar(atual)
     dados = {"classe": corpo.classe.value, "hk_usuario": ator.hk_usuario}
     gravar_satelite(sessao, sat_processo_dados, hk, dados, ORIGEM)
-    ativar_processo(hk, atual.chave_dados_cifrada)
     atualizar_achados(sessao, hk, ctx.agora.date())
     for acao in (AcaoAuditoria.CLASSE_CORRIGIDA, AcaoAuditoria.VALIDACAO_EXECUTADA):
         auditar(

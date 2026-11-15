@@ -7,9 +7,8 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from lupa_pipeline.dominio.tabelas import sat_achado_resultado, sat_fato_valor
-from lupa_pipeline.dominio.visoes import VisaoAchado, VisaoFato, VisaoParte, VisaoProcesso
+from lupa_pipeline.dominio.visoes import VisaoAchado, VisaoFato, VisaoParte
 from lupa_pipeline.ingestao.eventos.etapa import processar_eventos
-from lupa_pipeline.seguranca.contexto import ativar_processo
 from tests.ingestao.conftest import Autos
 
 
@@ -18,7 +17,6 @@ def test_eventos_e_reprocessamento_idempotente(autos_civeis: Autos, engine_teste
     """RF-FAT-01, RF-FAT-04, RF-ING-08: o replay mantém as provas e as versões."""
     hk = autos_civeis.processo
     with Session(engine_teste) as s, s.begin():
-        ativar_processo(hk, s.get_one(VisaoProcesso, hk).chave_dados_cifrada)
         partes = s.scalars(select(VisaoParte).where(VisaoParte.hk_processo == hk))
         assert {(p.nome, p.polo) for p in partes} == {
             ("Marina do Lago", "ativo"),

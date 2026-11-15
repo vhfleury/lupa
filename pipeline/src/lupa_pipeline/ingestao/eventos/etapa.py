@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from lupa_pipeline.config import get_settings
-from lupa_pipeline.dominio.chaves import hmac_processo
+from lupa_pipeline.dominio.chaves import hash_nome
 from lupa_pipeline.dominio.enums import StatusFato, TipoPeca
 from lupa_pipeline.dominio.esquemas import Achado
 from lupa_pipeline.dominio.gravacao import chave_do_hub, gravar_hub, gravar_link, gravar_satelite
@@ -30,7 +30,6 @@ from lupa_pipeline.ingestao.eventos.fatos import ORIGEM, VERSAO, candidatos_da_p
 from lupa_pipeline.ingestao.eventos.modelo import PaginaTexto, PecaTexto, evidencia_de
 from lupa_pipeline.ingestao.eventos.partes import chave_nome, extrair_partes
 from lupa_pipeline.ingestao.repositorio_eventos import gravar_achados
-from lupa_pipeline.seguranca.contexto import dek_para_gravar
 from lupa_pipeline.validacoes.adaptador import para_dominio, para_modelo
 from lupa_pipeline.validacoes.motor import executar_catalogo
 
@@ -96,7 +95,7 @@ def _gravar_partes(
             referencia = evidencia_da_pagina(session, processo.hk_processo, evidencia)
             chave = {
                 "numero_cnj": processo.numero_cnj,
-                "chave_nome": hmac_processo(dek_para_gravar()[1], nome),
+                "chave_nome": hash_nome(nome),
             }
             hk = gravar_hub(session, hub_parte, chave, ORIGEM)
             gravar_link(

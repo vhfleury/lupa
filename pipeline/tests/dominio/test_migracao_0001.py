@@ -54,8 +54,8 @@ def test_migracao_coincide_com_tabelas(engine_teste: Engine) -> None:
 
 
 def test_modelo_tem_os_hubs_links_e_satelites_do_plano() -> None:
-    """RES-03: 13 hubs, 15 links e 28 satélites, com os prefixos de RES-13."""
-    assert (len(HUBS), len(LINKS), len(SATELITES)) == (13, 15, 28)
+    """RES-03: 13 hubs, 15 links e 27 satélites, com os prefixos de RES-13."""
+    assert (len(HUBS), len(LINKS), len(SATELITES)) == (13, 15, 27)
     assert all(t.name.startswith("hub_") for t in HUBS)
     assert all(t.name.startswith("link_") for t in LINKS)
     assert all(t.name.startswith("sat_") for t in SATELITES)
@@ -186,7 +186,7 @@ def test_fato_com_evidencia_passa_no_commit(sessao: Session) -> None:
 
 
 def test_nome_de_pessoa_so_fica_em_coluna_autorizada() -> None:
-    """RF-FAT-04, RF-SEG-01: nome de parte só em `sat_parte_identidade`, cifrado."""
+    """RF-FAT-04, RF-SEG-01: nome de parte só em `sat_parte_identidade`, em texto."""
     colunas = {
         f"{tabela.name}.{coluna.name}"
         for tabela in metadata.tables.values()
@@ -198,4 +198,4 @@ def test_nome_de_pessoa_so_fica_em_coluna_autorizada() -> None:
         "sat_parte_identidade.nome",
         "sat_arquivo_dados.nome_original",
     }
-    assert type(metadata.tables["sat_parte_identidade"].c.nome.type).__name__ == "TextoCifrado"
+    assert type(metadata.tables["sat_parte_identidade"].c.nome.type).__name__ == "Text"

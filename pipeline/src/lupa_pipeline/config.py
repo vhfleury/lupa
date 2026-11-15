@@ -55,12 +55,6 @@ class Settings(BaseSettings):
     agente_max_tokens_processo: int = Field(default=5_000_000, ge=1)
     agente_max_turnos: int = Field(default=12, ge=1)
     agente_max_resumos_dossie: int = Field(default=10, ge=0)
-    cofre_backend: Literal["vault", "memoria"] = "vault"
-    vault_endereco: str = "http://vault:8200"
-    vault_role_id: SecretStr | None = None
-    vault_secret_id: SecretStr | None = None
-    vault_transit_montagem: str = "transit"
-    vault_timeout_segundos: float = Field(default=5.0, gt=0)
     busca_max_paginas: int = Field(default=5000, ge=1)
 
     def url_banco_aplicacao(self) -> str:

@@ -27,7 +27,6 @@ from lupa_pipeline.ingestao.eventos.etapa import processar_eventos
 from lupa_pipeline.ingestao.processamento import processar_arquivo
 from lupa_pipeline.ingestao.storage import ObjectStorage, criar_storage, prefixo_processo
 from lupa_pipeline.ingestao.worker import executar_worker
-from lupa_pipeline.seguranca.contexto import ativar_processo
 from lupa_pipeline.sinteticos import identidades
 from lupa_pipeline.sinteticos.empacotamento import exportar
 from lupa_pipeline.sinteticos.gabarito import Cenario, Composicao, Gabarito
@@ -46,7 +45,6 @@ def _valor(valor: Any, nomes: dict[str, str]) -> str:
 
 def _conferir(sessao: Session, hk: bytes, arquivo: bytes, gab: Gabarito) -> None:
     processo = sessao.get_one(VisaoProcesso, hk)
-    ativar_processo(hk, processo.chave_dados_cifrada)
     trabalho = sessao.get_one(VisaoArquivo, arquivo)
     assert (trabalho.estado, processo.status) == ("concluido", "pronto")
     paginas = {
@@ -124,7 +122,6 @@ def _conferir_ficha_e_reprocessamento(
     )
     assert correcao.status_code == 201, correcao.text
     with Session(engine) as sessao, sessao.begin():
-        ativar_processo(hk, sessao.get_one(VisaoProcesso, hk).chave_dados_cifrada)
         processar_eventos(sessao, hk, gab.processo.data_referencia)
     ficha = cliente.get(base + "/dossie").json()["ficha"]
     assert [d["valor"] for d in ficha["dados_capa"] if d["tipo"] == "relator"] == [novo]

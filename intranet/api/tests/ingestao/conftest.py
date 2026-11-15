@@ -14,15 +14,13 @@ from apoio_arquivos import pdf_texto, zip_de
 from apoio_comum import criar_processo_teste
 from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.enums import PapelUsuario
-from lupa_pipeline.dominio.visoes import VisaoProcesso
 from lupa_pipeline.ingestao.processamento import processar_arquivo
-from lupa_pipeline.seguranca.contexto import ativar_processo
 from tests.conftest import criar_usuario_teste, logar
 
 
 @dataclass
 class Autos:
-    """Arquivo no storage cifrado, com páginas e fatos extraídos na versão corrente."""
+    """Arquivo no storage, com páginas e fatos extraídos na versão corrente."""
 
     cliente: TestClient
     processo: bytes
@@ -65,8 +63,6 @@ def autos_civeis(
         )
         assert r.status_code == 201, r.text
         arquivo = bytes.fromhex(r.json()["arquivo_id"])
-        with fabrica_sessao() as s:
-            ativar_processo(processo, s.get_one(VisaoProcesso, processo).chave_dados_cifrada)
         processar_arquivo(
             fabrica_sessao, settings_ficticias, app_teste.state.storage, arquivo, Event()
         )

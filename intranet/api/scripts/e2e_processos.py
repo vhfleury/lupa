@@ -19,20 +19,17 @@ from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao
 from lupa_pipeline.dominio.visoes import VisaoUsuario
 from lupa_pipeline.ingestao.recepcao import ArquivoRecebido, TipoArquivo
 from lupa_pipeline.ingestao.storage import criar_storage
-from lupa_pipeline.seguranca.cofre import criar_cofre
-from lupa_pipeline.seguranca.contexto import contexto_cifra, definir_cofre
 
 
 @contextmanager
 def sessao_e2e() -> Iterator[Session]:
-    """Abre uma transação com o papel da aplicação e o cofre real da stack sintética."""
+    """Abre uma transação com o papel da aplicação na stack sintética."""
     settings = get_settings()
     if settings.ambiente not in {"teste", "desenvolvimento"}:
         raise SystemExit("E2E exige ambiente de teste ou desenvolvimento")
     engine = create_engine(settings.url_banco_aplicacao())
-    definir_cofre(criar_cofre(settings))
     try:
-        with Session(engine) as sessao, sessao.begin(), contexto_cifra():
+        with Session(engine) as sessao, sessao.begin():
             assumir_papel_aplicacao(sessao)
             yield sessao
     finally:

@@ -20,7 +20,6 @@ from lupa_pipeline.dominio.gravacao import travar_processo
 from lupa_pipeline.dominio.tabelas import hub_processo
 from lupa_pipeline.dominio.visoes import VisaoProcesso
 from lupa_pipeline.ingestao.storage import ObjectStorage, criar_storage
-from lupa_pipeline.seguranca.contexto import esquecer_processo
 from lupa_pipeline.seguranca.descarte import apagar_objetos, descartar
 
 ORIGENS = ("scripts.calibrar", "scripts.ponta_a_ponta", "scripts.e2e")
@@ -59,17 +58,16 @@ def limpar(engine: Engine, *, executar: bool, ambiente: str, storage: ObjectStor
         with Session(engine) as session, session.begin():
             processo = travar_processo(session, hk)
             if processo and processo.status != "descartado":
-                hash_dek = descartar(session, hk)
+                descartar(session, hk)
                 registrar(
                     session,
                     NovoEvento(
                         acao=AcaoAuditoria.PROCESSO_DESCARTADO,
                         hk_processo=hk,
-                        objeto_tipo="dek_sha256",
-                        objeto_id=hash_dek,
+                        objeto_tipo="processo",
+                        objeto_id=hk.hex(),
                     ),
                 )
-        esquecer_processo(hk)
         try:
             objetos += apagar_objetos(storage, hk)
         except Exception:

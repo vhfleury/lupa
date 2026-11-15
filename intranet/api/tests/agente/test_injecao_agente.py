@@ -29,7 +29,6 @@ from lupa_pipeline.dominio.esquemas import calcular_hash
 from lupa_pipeline.dominio.visoes import VisaoAchado, VisaoPagina, VisaoParte, VisaoProcesso
 from lupa_pipeline.ingestao.calibracao import enviar_e_processar
 from lupa_pipeline.ingestao.storage import criar_storage
-from lupa_pipeline.seguranca.contexto import ativar_processo
 from lupa_pipeline.seguranca.descarte import apagar_objetos
 from lupa_pipeline.sinteticos.gabarito import TODOS_VETORES, Cenario, Composicao, Gabarito
 from lupa_pipeline.sinteticos.referencia import gerar_processo
@@ -85,7 +84,6 @@ def _carregar(
 ) -> Processado:
     with Session(engine) as session:
         dados = session.get_one(VisaoProcesso, processo)
-        ativar_processo(processo, dados.chave_dados_cifrada)
         partes = session.scalars(select(VisaoParte.nome).where(VisaoParte.hk_processo == processo))
         nomes = {p for p in partes if p}
         paginas = session.execute(

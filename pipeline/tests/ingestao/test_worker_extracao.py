@@ -13,7 +13,7 @@ from lupa_pipeline.dominio.visoes import VisaoArquivo
 from lupa_pipeline.ingestao import processamento
 from lupa_pipeline.ingestao.extracao import ResultadoTarefa, Tarefa, executar_tarefa
 from lupa_pipeline.ingestao.sandbox import LimitesSandbox
-from lupa_pipeline.ingestao.storage import StorageCifrado
+from lupa_pipeline.ingestao.storage import ObjectStorage
 
 pytestmark = pytest.mark.integracao
 
@@ -30,7 +30,7 @@ pytestmark = pytest.mark.integracao
 def test_retentativas_e_paginas_faltantes(
     fabrica_sessao: sessionmaker[Session],
     settings_ficticias: Settings,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
     semear_arquivo: SemearArquivo,
     monkeypatch: pytest.MonkeyPatch,
     motivo: MotivoFalha,
