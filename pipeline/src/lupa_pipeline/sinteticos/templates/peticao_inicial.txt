@@ -1,0 +1,9 @@
+PETIÇÃO INICIAL
+
+{{parte_autora:Autor: $autor}}
+
+{{parte_re:Réu: $reu}}
+
+{{data_ajuizamento:Ajuizamento em $data}}.
+
+Por seu advogado, a parte autora pede a citação da parte ré para responder à ação de reparação por defeitos no imóvel. Apresenta o contrato e o orçamento de reparo da cobertura.

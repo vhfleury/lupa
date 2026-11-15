@@ -1,0 +1,7 @@
+PROCURAÇÃO
+
+Outorgante: $autor
+
+{{procuracao:Outorgado: $advogado, OAB/GO $oab}}.
+
+A parte outorgante nomeia e constitui o advogado acima para representá-la no processo.

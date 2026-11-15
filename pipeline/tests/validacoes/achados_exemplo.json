@@ -1,0 +1,249 @@
+[
+  {
+    "validacao": "tempestividade_recurso",
+    "sujeito": "000000000000000000000000000000000000000000000000000000000000002a",
+    "versao_catalogo": "0.2.0",
+    "resultado": "atencao",
+    "fatos_usados": [
+      "0000000000000000000000000000000000000000000000000000000000000001",
+      "0000000000000000000000000000000000000000000000000000000000000002",
+      "0000000000000000000000000000000000000000000000000000000000000003",
+      "0000000000000000000000000000000000000000000000000000000000000004"
+    ],
+    "valores": {
+      "data_intimacao": "2026-08-03",
+      "data_interposicao": "2026-08-25",
+      "prazo_dias": 15,
+      "prazo_em_dobro": false,
+      "vencimento": "2026-08-24",
+      "atraso_dias_uteis": 1,
+      "dias_nao_contados": [
+        {
+          "data": "2026-08-08",
+          "motivo": "sábado",
+          "fonte": "art. 216 do CPC"
+        },
+        {
+          "data": "2026-08-09",
+          "motivo": "domingo",
+          "fonte": "art. 216 do CPC"
+        },
+        {
+          "data": "2026-08-15",
+          "motivo": "sábado",
+          "fonte": "art. 216 do CPC"
+        },
+        {
+          "data": "2026-08-16",
+          "motivo": "domingo",
+          "fonte": "art. 216 do CPC"
+        },
+        {
+          "data": "2026-08-22",
+          "motivo": "sábado",
+          "fonte": "art. 216 do CPC"
+        },
+        {
+          "data": "2026-08-23",
+          "motivo": "domingo",
+          "fonte": "art. 216 do CPC"
+        }
+      ],
+      "versoes_dados": {
+        "feriados/nacionais.yaml": "2026.11.0",
+        "feriados/tjgo.yaml": "2026.11.0",
+        "suspensoes_prazo.yaml": "0.2.1",
+        "prazos_recursos.yaml": "0.2.0"
+      },
+      "base_legal": "art. 1.003, § 5º, do CPC, arts. 219, 220 e 224 do CPC",
+      "motivo": "Apelação cível com prazo de 15 dias úteis. O prazo venceu em 24/08/2026 e a interposição ocorreu em 25/08/2026. O atraso foi de 1 dia útil.",
+      "fatos": [
+        {
+          "tipo": "tipo_recurso",
+          "valor": "apelacao_civel",
+          "fato_id": "0000000000000000000000000000000000000000000000000000000000000001",
+          "evidencia_ids": [
+            "0000000000000000000000000000000000000000000000000000000000000033"
+          ],
+          "pagina_ids": [
+            "000000000000000000000000000000000000000000000000000000000000004c"
+          ]
+        },
+        {
+          "tipo": "data_intimacao",
+          "valor": "2026-08-03",
+          "fato_id": "0000000000000000000000000000000000000000000000000000000000000002",
+          "evidencia_ids": [
+            "0000000000000000000000000000000000000000000000000000000000000034"
+          ],
+          "pagina_ids": [
+            "000000000000000000000000000000000000000000000000000000000000004d"
+          ]
+        },
+        {
+          "tipo": "data_interposicao",
+          "valor": "2026-08-25",
+          "fato_id": "0000000000000000000000000000000000000000000000000000000000000003",
+          "evidencia_ids": [
+            "0000000000000000000000000000000000000000000000000000000000000035"
+          ],
+          "pagina_ids": [
+            "000000000000000000000000000000000000000000000000000000000000004e"
+          ]
+        },
+        {
+          "tipo": "qualidade_recorrente",
+          "valor": "particular",
+          "fato_id": "0000000000000000000000000000000000000000000000000000000000000004",
+          "evidencia_ids": [
+            "0000000000000000000000000000000000000000000000000000000000000036"
+          ],
+          "pagina_ids": [
+            "000000000000000000000000000000000000000000000000000000000000004f"
+          ]
+        }
+      ],
+      "faltantes": [],
+      "pecas_procuradas": {},
+      "conflitos": []
+    },
+    "explicacao": "O recurso foi interposto depois do vencimento. Apelação cível com prazo de 15 dias úteis. O prazo venceu em 24/08/2026 e a interposição ocorreu em 25/08/2026. O atraso foi de 1 dia útil. A conferência observa os dispositivos do CPC indicados em art. 1.003, § 5º, do CPC, arts. 219, 220 e 224 do CPC."
+  },
+  {
+    "validacao": "preparo_recurso",
+    "sujeito": "000000000000000000000000000000000000000000000000000000000000002a",
+    "versao_catalogo": "0.2.0",
+    "resultado": "conforme",
+    "fatos_usados": [
+      "0000000000000000000000000000000000000000000000000000000000000001",
+      "0000000000000000000000000000000000000000000000000000000000000003",
+      "0000000000000000000000000000000000000000000000000000000000000004",
+      "0000000000000000000000000000000000000000000000000000000000000005"
+    ],
+    "valores": {
+      "data_comprovante": "2026-08-25",
+      "data_interposicao": "2026-08-25",
+      "base_legal": "arts. 98, 99 § 7º e 1.007 do CPC",
+      "motivo": "Comprovante de 25/08/2026 e interposição em 25/08/2026.",
+      "fatos": [
+        {
+          "tipo": "tipo_recurso",
+          "valor": "apelacao_civel",
+          "fato_id": "0000000000000000000000000000000000000000000000000000000000000001",
+          "evidencia_ids": [
+            "0000000000000000000000000000000000000000000000000000000000000033"
+          ],
+          "pagina_ids": [
+            "000000000000000000000000000000000000000000000000000000000000004c"
+          ]
+        },
+        {
+          "tipo": "data_interposicao",
+          "valor": "2026-08-25",
+          "fato_id": "0000000000000000000000000000000000000000000000000000000000000003",
+          "evidencia_ids": [
+            "0000000000000000000000000000000000000000000000000000000000000035"
+          ],
+          "pagina_ids": [
+            "000000000000000000000000000000000000000000000000000000000000004e"
+          ]
+        },
+        {
+          "tipo": "qualidade_recorrente",
+          "valor": "particular",
+          "fato_id": "0000000000000000000000000000000000000000000000000000000000000004",
+          "evidencia_ids": [
+            "0000000000000000000000000000000000000000000000000000000000000036"
+          ],
+          "pagina_ids": [
+            "000000000000000000000000000000000000000000000000000000000000004f"
+          ]
+        },
+        {
+          "tipo": "comprovante_preparo",
+          "valor": "2026-08-25",
+          "fato_id": "0000000000000000000000000000000000000000000000000000000000000005",
+          "evidencia_ids": [
+            "0000000000000000000000000000000000000000000000000000000000000037"
+          ],
+          "pagina_ids": [
+            "0000000000000000000000000000000000000000000000000000000000000050"
+          ]
+        }
+      ],
+      "faltantes": [],
+      "pecas_procuradas": {},
+      "conflitos": []
+    },
+    "explicacao": "O preparo está regular. Comprovante de 25/08/2026 e interposição em 25/08/2026. A conferência observa os dispositivos do CPC indicados em arts. 98, 99 § 7º e 1.007 do CPC."
+  },
+  {
+    "validacao": "representacao_recurso",
+    "sujeito": "000000000000000000000000000000000000000000000000000000000000002a",
+    "versao_catalogo": "0.2.0",
+    "resultado": "conforme",
+    "fatos_usados": [
+      "0000000000000000000000000000000000000000000000000000000000000004",
+      "0000000000000000000000000000000000000000000000000000000000000006",
+      "0000000000000000000000000000000000000000000000000000000000000007"
+    ],
+    "valores": {
+      "paginas_mandato": [
+        "0000000000000000000000000000000000000000000000000000000000000052"
+      ],
+      "cadeia": [
+        "0000000000000000000000000000000000000000000000000000000000000007"
+      ],
+      "base_legal": "arts. 75, 103 e 104 do CPC",
+      "motivo": "Mandato do recorrente ao subscritor localizado.",
+      "fatos": [
+        {
+          "tipo": "qualidade_recorrente",
+          "valor": "particular",
+          "fato_id": "0000000000000000000000000000000000000000000000000000000000000004",
+          "evidencia_ids": [
+            "0000000000000000000000000000000000000000000000000000000000000036"
+          ],
+          "pagina_ids": [
+            "000000000000000000000000000000000000000000000000000000000000004f"
+          ]
+        },
+        {
+          "tipo": "advogado_subscritor",
+          "valor": {
+            "nome": "Ada Sintética",
+            "oab": "GO 111"
+          },
+          "fato_id": "0000000000000000000000000000000000000000000000000000000000000006",
+          "evidencia_ids": [
+            "0000000000000000000000000000000000000000000000000000000000000038"
+          ],
+          "pagina_ids": [
+            "0000000000000000000000000000000000000000000000000000000000000051"
+          ]
+        },
+        {
+          "tipo": "procuracao",
+          "valor": {
+            "outorgante": "000000000000000000000000000000000000000000000000000000000000002a",
+            "advogado": {
+              "nome": "Ada Sintética",
+              "oab": "GO 111"
+            }
+          },
+          "fato_id": "0000000000000000000000000000000000000000000000000000000000000007",
+          "evidencia_ids": [
+            "0000000000000000000000000000000000000000000000000000000000000039"
+          ],
+          "pagina_ids": [
+            "0000000000000000000000000000000000000000000000000000000000000052"
+          ]
+        }
+      ],
+      "faltantes": [],
+      "pecas_procuradas": {},
+      "conflitos": []
+    },
+    "explicacao": "A representação está regular. Mandato do recorrente ao subscritor localizado. A conferência observa os dispositivos do CPC indicados em arts. 75, 103 e 104 do CPC."
+  }
+]

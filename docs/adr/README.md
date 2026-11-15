@@ -8,8 +8,8 @@ crie um ADR novo e ligue os dois.
 
 | ADR | Decisão | Status |
 | --- | --- | --- |
-| [0001](0001-isolamento-por-gabinete-com-rls.md) | Isolamento por gabinete com RLS e `gabinete_id` desnormalizado | Aceito |
-| [0002](0002-fila-rq-com-banco-como-fonte-da-verdade.md) | Fila RQ com o banco como fonte da verdade | Aceito |
+| [0001](0001-isolamento-por-gabinete-com-rls.md) | Isolamento por gabinete com RLS | Substituído por 0013 |
+| [0002](0002-fila-rq-com-banco-como-fonte-da-verdade.md) | Fila RQ | Substituído por 0014 |
 | [0003](0003-sandbox-de-parsing-por-subprocesso.md) | Sandbox de parsing por subprocesso com limites | Aceito |
 | [0004](0004-autenticacao-local-com-totp.md) | Autenticação local com senha e TOTP | Aceito |
 | [0005](0005-agente-com-claude-agent-sdk.md) | Agente com o Claude Agent SDK e modelo externo | Aceito |
@@ -20,6 +20,10 @@ crie um ADR novo e ligue os dois.
 | [0010](0010-dependencias-no-pyproject-com-uv.md) | Dependências só no `pyproject.toml`, travadas com `uv` | Aceito |
 | [0011](0011-leitura-de-legado-em-claro.md) | Leitura de dado legado em claro | Substituído por 0012 |
 | [0012](0012-recusa-de-dado-em-claro.md) | Dado em claro é recusado na leitura | Aceito |
+| [0013](0013-data-vault.md) | Data Vault e histórico de leitura | Aceito |
+| [0014](0014-fila-no-banco.md) | Fila de arquivos no PostgreSQL | Aceito |
+| [0015](0015-gabinete-unico-sem-pseudonimizacao.md) | Gabinete único e nomes das partes | Aceito |
+| [0016](0016-dois-pacotes.md) | Pacotes de pipeline e intranet | Aceito |
 
 ## Modelo
 

@@ -1,0 +1,7 @@
+CERTIDÃO DE INTIMAÇÃO
+
+Recorrente: $autor
+
+{{data_intimacao:Intimação do recorrente em $data}}.
+
+Certifico o recebimento da comunicação no endereço informado nos autos. Dou fé.

@@ -2,7 +2,7 @@
 
 | Status | Data | Responsável |
 | --- | --- | --- |
-| Aceito | `{{data exata da decisão}}` (até 2026-10-22, data do primeiro commit) | Executor da Etapa 1; endossada na revisão 1 |
+| Substituído pelo [ADR 0013](0013-data-vault.md) | Até 2026-10-22 | Executor da Etapa 1, endossada na revisão 1 |
 
 ## Contexto
 

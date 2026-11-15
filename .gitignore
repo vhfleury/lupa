@@ -19,19 +19,19 @@ htmlcov/
 # Autos sinteticos (Etapa 4B), grandes e fora do repositorio
 .sinteticos/
 # Front (Etapa 6)
-front/node_modules/
-front/build/
-front/.svelte-kit/
-front/e2e/node_modules/
-front/e2e/test-results/
-front/e2e/playwright-report/
-# Backups cifrados e chaves do periodo (Etapa 7.8), nunca no repositorio
+intranet/web/node_modules/
+intranet/web/build/
+intranet/web/.svelte-kit/
+intranet/web/e2e/node_modules/
+intranet/web/e2e/test-results/
+intranet/web/e2e/playwright-report/
+# Backups cifrados e chaves da 0.1 (backup removido na 0.2), nunca no repositorio
 .backups/
 .backup-chaves/
 # Vault de desenvolvimento (Etapa 7.2): chave de unseal e token raiz, nunca no repositorio
 .vault-dev/
-# Segredos em arquivo para Prometheus e Grafana (Etapa 8.1), nunca no repositorio
+# Segredos em arquivo da 0.1 (Prometheus e Grafana, removidos na 0.2), nunca no repositorio
 .segredos/
-dados/
+/dados/
 # Claude Code: permissoes locais de cada maquina
 .claude/settings.local.json

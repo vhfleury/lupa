@@ -4,6 +4,7 @@ services:
   api:
     build:
       context: .
+      dockerfile: intranet/api/Dockerfile
       args:
         INSTALAR_DEV: "true"
     env_file: .env
@@ -22,7 +23,7 @@ services:
     # (sub-rede fixa abaixo), para o rate limit por IP e a auditoria.
     command:
       - uvicorn
-      - lupa.api.app:create_app
+      - lupa_intranet.api.app:create_app
       - --factory
       - --host
       - 0.0.0.0
@@ -38,8 +39,6 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
       vault:
         condition: service_healthy
     # Processos sinteticos de referencia (4B.9), so leitura, para as medicoes da Etapa 4C.
@@ -52,7 +51,7 @@ services:
   # rede `borda`. A imagem so e gerada se lint, typecheck e testes unitarios passarem.
   front:
     build:
-      context: ./front
+      context: ./intranet/web
     read_only: true
     tmpfs: [/tmp]
     networks: [borda]
@@ -68,8 +67,8 @@ services:
       XDG_CONFIG_HOME: /tmp/config
       XDG_DATA_HOME: /tmp/data
     volumes:
-      # Etapa 8.1: a pasta inteira (Caddyfile + modos/ de certificado, LUPA_TLS_MODO).
-      - ./proxy:/etc/caddy:ro
+      # A pasta inteira: Caddyfile e modos/interno.caddy (certificado da CA interna do Caddy).
+      - ./intranet/proxy:/etc/caddy:ro
     read_only: true
     tmpfs: [/tmp]
     ports:
@@ -88,20 +87,18 @@ services:
     security_opt: ["no-new-privileges:true"]
 
   # Testes ponta a ponta (Playwright) contra a stack real, pelo proxy. So sobe sob demanda:
-  # `docker compose run --rm e2e` (ver docs/sistema/front.md e front/scripts/e2e.sh).
+  # `docker compose run --rm e2e` (ver docs/sistema/front.md e intranet/web/scripts/e2e.sh).
   e2e:
     build:
-      context: ./front/e2e
+      context: ./intranet/web/e2e
     profiles: [e2e]
     environment:
       LUPA_E2E_URL: https://proxy:8443
-      LUPA_E2E_ADMIN_USUARIO: ${LUPA_E2E_ADMIN_USUARIO:-}
-      LUPA_E2E_ADMIN_SENHA: ${LUPA_E2E_ADMIN_SENHA:-}
+      LUPA_E2E_DES_USUARIO: ${LUPA_E2E_DES_USUARIO:-}
+      LUPA_E2E_DES_SENHA: ${LUPA_E2E_DES_SENHA:-}
       LUPA_E2E_PROC_USUARIO: ${LUPA_E2E_PROC_USUARIO:-}
       LUPA_E2E_PROC_SENHA: ${LUPA_E2E_PROC_SENHA:-}
       LUPA_E2E_PROC_ID: ${LUPA_E2E_PROC_ID:-}
-      LUPA_E2E_CHAT_USUARIO: ${LUPA_E2E_CHAT_USUARIO:-}
-      LUPA_E2E_CHAT_SENHA: ${LUPA_E2E_CHAT_SENHA:-}
       LUPA_E2E_CHAT_PROCESSO: ${LUPA_E2E_CHAT_PROCESSO:-}
       LUPA_E2E_HOSTIL_PROCESSO: ${LUPA_E2E_HOSTIL_PROCESSO:-}
     shm_size: 1gb
@@ -113,18 +110,24 @@ services:
 
   # Worker da ingestao (Etapa 4A): so na rede interna `ingestao`, sem saida para fora e sem porta
   # publicada. Os parsers rodam em subprocesso com limites e sem variaveis LUPA_* (sandbox.py).
+  # Versao 0.2 (D21): a imagem do worker tambem roda a suite da pipeline (dependencias de dev).
   worker:
     build:
       context: .
-    command: ["python", "-m", "lupa.ingestao.worker"]
+      dockerfile: pipeline/Dockerfile
+      args:
+        INSTALAR_DEV: "true"
+    command: ["python", "-m", "lupa_pipeline.ingestao.worker"]
     env_file: .env
     environment:
       LUPA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       LUPA_MINIO_ENDPOINT: minio:9000
-      LUPA_REDIS_URL: redis://redis:6379/0
       LUPA_VAULT_ENDERECO: http://vault:8200
+    # Processos sinteticos de referencia (4B.9), so leitura, para a regressao de injecao.
+    volumes:
+      - ./.sinteticos:/app/.sinteticos:ro
     healthcheck:
-      test: ["CMD", "python", "-c", "import os,redis; redis.Redis.from_url(os.environ['LUPA_REDIS_URL']).ping()"]
+      test: ["CMD", "python", "-m", "lupa_pipeline.ingestao.worker", "--saude"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -133,24 +136,9 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
       vault:
         condition: service_healthy
     networks: [ingestao]
-    security_opt: ["no-new-privileges:true"]
-
-  # Fila da ingestao. Sem persistencia: o banco e a fonte da verdade e o varredor do worker
-  # reenfileira jobs parados. Sem porta publicada no host.
-  redis:
-    image: redis:7.4-alpine
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    networks: [interna, ingestao]
     security_opt: ["no-new-privileges:true"]
 
   # Cofre de chaves (Etapa 7.2): HashiCorp Vault em modo servidor (storage em arquivo, sem modo
@@ -231,162 +219,6 @@ services:
       - mc alias set lupa http://minio:9000 "$$MINIO_ACCESS_KEY" "$$MINIO_SECRET_KEY" && mc mb --ignore-existing "lupa/$$BUCKET"
     networks: [interna]
 
-  # Backup cifrado (Etapa 7.8), so sob demanda: `docker compose --profile backup run --rm backup
-  # /scripts/backup_conteiner.sh fazer` (use scripts/backup.sh, restaurar.sh, expurgar_backups.sh;
-  # ver docs/operacao/backup.md). pg_dump 16 da mesma imagem do banco, `mc` copiado da imagem fixada do
-  # MinIO e `age` (cifra) do Alpine. Backups (.age) e chaves por mes ficam em pastas separadas do
-  # host, por bind mount (LUPA_BACKUP_DIR, padrao .backups/; LUPA_BACKUP_CHAVES_DIR, padrao
-  # .backup-chaves/). Raiz do conteiner so leitura: nenhum dado de backup vai a camada gravavel; a
-  # area de trabalho temporaria fica em /backups/.trabalho-* e e apagada ao fim.
-  backup:
-    profiles: [backup]
-    build:
-      context: ./scripts
-      dockerfile_inline: |
-        FROM pgsty/minio@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372 AS mc
-        FROM postgres:16-alpine
-        RUN apk add --no-cache age && mkdir -p /trabalho && chmod 700 /trabalho
-        COPY --from=mc /usr/bin/mc /usr/bin/mc
-    image: lupa-backup:local
-    entrypoint: ["/bin/sh"]
-    read_only: true
-    tmpfs:
-      - /tmp:size=16m,mode=1777
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      LUPA_MINIO_ACCESS_KEY: ${LUPA_MINIO_ACCESS_KEY}
-      LUPA_MINIO_SECRET_KEY: ${LUPA_MINIO_SECRET_KEY}
-      LUPA_MINIO_BUCKET: ${LUPA_MINIO_BUCKET}
-      LUPA_BACKUP_RETENCAO_DIAS: ${LUPA_BACKUP_RETENCAO_DIAS:-30}
-    volumes:
-      - ./scripts:/scripts:ro
-      - ${LUPA_BACKUP_DIR:-./.backups}:/backups
-      - ${LUPA_BACKUP_CHAVES_DIR:-./.backup-chaves}:/chaves
-      # Etapa 8.1: armazenamento do Vault (ja cifrado pela barreira), so leitura, entra no .age.
-      - vault-dados:/vault-dados:ro
-    depends_on:
-      db:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    networks: [interna]
-    security_opt: ["no-new-privileges:true"]
-
-  # Backup agendado (Etapa 8.1): crond do BusyBox na propria imagem do backup (bases fixadas),
-  # diario as 02:00 (backup_conteiner.sh fazer) e semanal aos domingos 03:30 (expurgar). Perfil
-  # `agendamento` aqui; o docker-compose.prod.yml o liga sempre. Log em LUPA_BACKUP_DIR/cron.log.
-  backup-agendado:
-    profiles: [agendamento]
-    image: lupa-backup:local
-    build:
-      context: ./scripts
-      dockerfile_inline: |
-        FROM pgsty/minio@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372 AS mc
-        FROM postgres:16-alpine
-        RUN apk add --no-cache age && mkdir -p /trabalho && chmod 700 /trabalho
-        COPY --from=mc /usr/bin/mc /usr/bin/mc
-    entrypoint: ["/bin/sh", "/scripts/cron_backup.sh"]
-    read_only: true
-    tmpfs:
-      - /tmp:size=16m,mode=1777
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      LUPA_MINIO_ACCESS_KEY: ${LUPA_MINIO_ACCESS_KEY}
-      LUPA_MINIO_SECRET_KEY: ${LUPA_MINIO_SECRET_KEY}
-      LUPA_MINIO_BUCKET: ${LUPA_MINIO_BUCKET}
-      LUPA_BACKUP_RETENCAO_DIAS: ${LUPA_BACKUP_RETENCAO_DIAS:-30}
-      LUPA_BACKUP_CRON_DIARIO: ${LUPA_BACKUP_CRON_DIARIO:-0 2 * * *}
-      LUPA_BACKUP_CRON_EXPURGO: ${LUPA_BACKUP_CRON_EXPURGO:-30 3 * * 0}
-    volumes:
-      - ./scripts:/scripts:ro
-      - ${LUPA_BACKUP_DIR:-./.backups}:/backups
-      - ${LUPA_BACKUP_CHAVES_DIR:-./.backup-chaves}:/chaves
-      - vault-dados:/vault-dados:ro
-    healthcheck:
-      test: ["CMD", "pgrep", "crond"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-    depends_on:
-      db:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    networks: [interna]
-    security_opt: ["no-new-privileges:true"]
-
-  # Monitoramento (Etapa 8.1, perfil `monitoramento`): o Prometheus raspa GET /metricas/servico da
-  # API com o token de servico lido de arquivo de segredo (LUPA_METRICAS_TOKEN_ARQUIVO, mesmo valor
-  # de LUPA_METRICAS_TOKEN no .env); Grafana com painel provisionado. Portas so em loopback.
-  prometheus:
-    profiles: [monitoramento]
-    image: prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time=${LUPA_PROMETHEUS_RETENCAO:-30d}
-    volumes:
-      - ./monitoramento/prometheus:/etc/prometheus:ro
-      - prometheus-dados:/prometheus
-    secrets:
-      - source: metricas_token
-        target: metricas_token
-    read_only: true
-    ports:
-      - "127.0.0.1:${PROMETHEUS_PORTA_HOST:-9090}:9090"
-    depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9090/-/ready"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-    networks: [interna]
-    security_opt: ["no-new-privileges:true"]
-
-  grafana:
-    profiles: [monitoramento]
-    image: grafana/grafana:12.1.1@sha256:a1701c2180249361737a99a01bc770db39381640e4d631825d38ff4535efa47d
-    environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USUARIO:-admin}
-      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_senha
-      GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_AUTH_ANONYMOUS_ENABLED: "false"
-      GF_ANALYTICS_REPORTING_ENABLED: "false"
-      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
-      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
-      GF_NEWS_NEWS_FEED_ENABLED: "false"
-    volumes:
-      - ./monitoramento/grafana/provisionamento:/etc/grafana/provisioning:ro
-      - ./monitoramento/grafana/paineis:/var/lib/grafana/dashboards:ro
-      - grafana-dados:/var/lib/grafana
-    secrets:
-      - source: grafana_senha
-        target: grafana_senha
-    ports:
-      - "127.0.0.1:${GRAFANA_PORTA_HOST:-3000}:3000"
-    depends_on:
-      prometheus:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-    networks: [interna]
-    security_opt: ["no-new-privileges:true"]
-
-secrets:
-  metricas_token:
-    file: ${LUPA_METRICAS_TOKEN_ARQUIVO:-./.segredos/metricas_token}
-  grafana_senha:
-    file: ${GRAFANA_SENHA_ARQUIVO:-./.segredos/grafana_senha}
-
 networks:
   interna:
     driver: bridge
@@ -407,5 +239,3 @@ volumes:
   db-dados:
   minio-dados:
   vault-dados:
-  prometheus-dados:
-  grafana-dados:

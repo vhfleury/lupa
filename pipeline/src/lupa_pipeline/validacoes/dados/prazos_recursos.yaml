@@ -1,0 +1,13 @@
+versao: "0.2.0"
+fonte: "https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2015/lei/l13105compilada.htm"
+contagem_base_legal: "arts. 219, 220 e 224 do CPC"
+multiplicador_dobro: 2
+dobra:
+  fazenda_publica: "art. 183 do CPC"
+  ministerio_publico: "art. 180 do CPC"
+  defensoria_publica: "art. 186 do CPC"
+recursos:
+  apelacao_civel: {nome: "Apelação cível", dias: 15, base_legal: "art. 1.003, § 5º, do CPC"}
+  agravo_instrumento: {nome: "Agravo de instrumento", dias: 15, base_legal: "art. 1.003, § 5º, do CPC"}
+  agravo_interno: {nome: "Agravo interno", dias: 15, base_legal: "art. 1.003, § 5º, do CPC"}
+  embargos_declaracao: {nome: "Embargos de declaração", dias: 5, base_legal: "art. 1.023 do CPC"}

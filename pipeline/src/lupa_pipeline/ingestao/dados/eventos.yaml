@@ -1,0 +1,10 @@
+versao: civel-0.2.0
+datas:
+  data_ajuizamento: 'ajuiz(?:amento|ad[ao])|distribui(?:cao|d[ao])'
+  data_intimacao: 'intim(?:acao|ad[ao])'
+  data_citacao: 'cit(?:acao|ad[ao])'
+  data_contestacao: 'contestacao(?: apresentada| protocolada)?'
+  data_decisao_recorrida: 'decisao (?:recorrida|agravada|interlocutoria)|sentenca proferida'
+  data_acordao: 'acordao'
+  comprovante_preparo: '(?:preparo|custas) (?:recolhid[oa]s?|pag[oa]s?)|data (?:do pagamento|de recolhimento)'
+  data_interposicao: 'interpo(?:sicao|sto|sta)|protocol(?:ado|ada|o do recurso)'

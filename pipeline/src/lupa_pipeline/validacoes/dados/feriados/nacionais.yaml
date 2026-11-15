@@ -1,0 +1,13 @@
+versao: "2026.11.0"
+fonte: "https://docs.tjgo.jus.br/institucional/feriados/DOC_feriados_2026_13012026.pdf"
+abrangencia: "nacional"
+feriados:
+  - {data: 2026-01-01, descricao: "Ano Novo"}
+  - {data: 2026-04-21, descricao: "Tiradentes"}
+  - {data: 2026-05-01, descricao: "Dia do Trabalho"}
+  - {data: 2026-09-07, descricao: "Independência do Brasil"}
+  - {data: 2026-10-12, descricao: "Nossa Senhora Aparecida"}
+  - {data: 2026-11-02, descricao: "Finados"}
+  - {data: 2026-11-15, descricao: "Proclamação da República"}
+  - {data: 2026-11-20, descricao: "Consciência Negra"}
+  - {data: 2026-12-25, descricao: "Natal"}
