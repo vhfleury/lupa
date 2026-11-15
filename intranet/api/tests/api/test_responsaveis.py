@@ -1,7 +1,5 @@
 """Responsáveis do processo: compartilhar, transferir e recusar atribuição inválida (RF-PRO-03)."""
 
-from uuid import uuid4
-
 import pytest
 from fastapi import FastAPI
 from sqlalchemy import Engine, select
@@ -12,7 +10,7 @@ from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.dominio.gravacao import gravar_satelite
 from lupa_pipeline.dominio.tabelas import sat_usuario_cadastro
 from lupa_pipeline.dominio.visoes import VisaoResponsavel
-from tests.api.test_processos_lista import _cliente, _corpo
+from tests.api.test_processos_lista import _cliente, processo_com_responsavel
 from tests.conftest import criar_usuario_teste
 
 pytestmark = pytest.mark.integracao
@@ -34,7 +32,7 @@ def test_desembargador_compartilha_e_transfere_e_assessor_nao_altera(
     b = criar_usuario_teste(engine_teste, PapelUsuario.ASSESSOR)
     desembargador = criar_usuario_teste(engine_teste, PapelUsuario.DESEMBARGADOR)
     ca, cb, gestor = (_cliente(app_teste, engine_teste, u) for u in (a, b, desembargador))
-    processo = ca.post("/processos", json=_corpo(uuid4().int % 9_000_000 + 1)).json()["id"]
+    processo = processo_com_responsavel(engine_teste, a)
     rota = f"/processos/{processo}/responsaveis"
     inicial = gestor.get(rota).json()
     assert [r["id"] for r in inicial["responsaveis"]] == [a.id]

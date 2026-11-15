@@ -8,21 +8,19 @@ from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from lupa_intranet.acesso.servico import Ator, Contexto, auditar, criar_usuario
-from lupa_intranet.api.rotas.processos import CorpoProcesso, gravar_processo
-from lupa_intranet.auditoria.eventos import AcaoAuditoria
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
+
+from lupa_intranet.acesso.servico import Ator, Contexto, criar_usuario
+from lupa_intranet.api.rotas.ingestao import cadastrar_por_arquivo
 from lupa_pipeline.config import get_settings
 from lupa_pipeline.dominio.enums import ClasseProcessual, PapelUsuario
 from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao
 from lupa_pipeline.dominio.visoes import VisaoUsuario
-from lupa_pipeline.ingestao.recepcao import ArquivoRecebido, TipoArquivo, lacrar
+from lupa_pipeline.ingestao.recepcao import ArquivoRecebido, TipoArquivo
 from lupa_pipeline.ingestao.storage import criar_storage
 from lupa_pipeline.seguranca.cofre import criar_cofre
 from lupa_pipeline.seguranca.contexto import contexto_cifra, definir_cofre
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session
-
-ORIGEM = "scripts.e2e"
 
 
 @contextmanager
@@ -56,38 +54,25 @@ def desembargador(sessao: Session) -> Ator:
     return ator(usuario)
 
 
-def enfileirar_pdf(sessao: Session, autor: Ator, numero: str, pdf: Path) -> str:
-    """Cadastra a apelação cível e lacra o arquivo usando a mesma DEK e fila da intranet."""
+def enfileirar_pdf(sessao: Session, autor: Ator, pdf: Path) -> str:
+    """Identifica os autos pela capa e os envia pelo serviço de cadastro da intranet."""
     ctx = Contexto(None, None, datetime.now(UTC))
-    corpo = CorpoProcesso(numero_cnj=numero, classe=ClasseProcessual.APELACAO_CIVEL)
-    processo = gravar_processo(sessao, corpo, autor, origem=ORIGEM)
-    auditar(
-        sessao,
-        ctx,
-        AcaoAuditoria.PROCESSO_CRIADO,
-        hk_usuario=autor.hk_usuario,
-        hk_processo=processo,
-        objeto_tipo="processo",
-        objeto_id=processo.hex(),
-    )
     with pdf.open("rb") as arquivo:
         sha = hashlib.file_digest(arquivo, "sha256").hexdigest()
     recebido = ArquivoRecebido(pdf, sha, pdf.stat().st_size, TipoArquivo.PDF)
-    lacrar(
-        sessao,
-        criar_storage(get_settings()),
-        recebido,
-        hk_processo=processo,
-        enviado_por=autor.hk_usuario,
-        nome_original=pdf.name,
+    settings = get_settings()
+    status, resposta = cadastrar_por_arquivo(
+        sessao, criar_storage(settings), recebido, pdf.name, autor, ctx, settings
     )
-    return processo.hex()
+    if status != 201 or not resposta["processo_criado"]:
+        raise RuntimeError(f"O cadastro do PDF sintético falhou (HTTP {status})")
+    return str(resposta["processo_id"])
 
 
 def preparar() -> tuple[str, str, str]:
     """Entrega credenciais do assessor e o id do processo sintético que ele cadastrou."""
     from lupa_pipeline.sinteticos.empacotamento import exportar
-    from lupa_pipeline.sinteticos.gabarito import Cenario, Composicao, Gabarito
+    from lupa_pipeline.sinteticos.gabarito import Cenario, Composicao
     from lupa_pipeline.sinteticos.gerador import gerar_conteudo
     from lupa_pipeline.sinteticos.roteiro import Configuracao
 
@@ -102,9 +87,12 @@ def preparar() -> tuple[str, str, str]:
             mistura={Composicao.NATIVA: 1.0},
             proporcao_vazias=0.0,
         )
-        gerado = exportar(gerar_conteudo(config), Path(diretorio), (Cenario.PDF_INDICE,))[0]
-        numero = Gabarito.model_validate_json(gerado.gabarito.read_bytes()).processo.numero_cnj
-        processo = enfileirar_pdf(sessao, ator(criado.usuario), numero, gerado.caminho)
+        conteudo = gerar_conteudo(config)
+        try:
+            (gerado,) = exportar(conteudo, Path(diretorio), (Cenario.PDF_INDICE,))
+        finally:
+            conteudo.documento.close()
+        processo = enfileirar_pdf(sessao, ator(criado.usuario), gerado.caminho)
         return nome, criado.senha_temporaria, processo
 
 

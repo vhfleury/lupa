@@ -1,20 +1,10 @@
-"""Rotas de processo: cadastro com classe, lista, leitura, arquivos e responsáveis.
-
-`GET /processos` lista todos os processos, igual para qualquer usuário (RF-PRO-02), com classe,
-resumo da ingestão (de `v_arquivo`) e responsáveis vigentes (de `v_responsavel`); é auditada
-como `busca`. `POST /processos` grava `hub_processo`, `sat_processo_dados`, `sat_processo_estado`
-e a DEK (RF-PRO-01); o assessor que cadastra vira o responsável inicial. Número repetido dá 409
-com o `processo_id` do existente. `GET /processos/{id}` e as rotas abaixo dele usam
-`exige_processo`: responsável não restringe acesso (RF-PRO-03) e não há sigilo (RF-PRO-04).
-Responsáveis mudam por linha nova de `sat_processo_responsavel_vigencia`, só pelo desembargador.
-"""
+"""Lista, leitura, gravação e gestão dos responsáveis do processo. (RF-PRO-01 a 04)."""
 
 from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
@@ -30,13 +20,9 @@ from lupa_intranet.acesso.papeis import Permissao, tem_permissao
 from lupa_intranet.acesso.servico import Ator, auditar
 from lupa_intranet.api.middleware import auditar_rota
 from lupa_intranet.auditoria.eventos import AcaoAuditoria
-from lupa_pipeline.dominio.cnj import (
-    NumeroCnjInvalidoError,
-    formatar_numero_cnj,
-    validar_numero_cnj,
-)
+from lupa_pipeline.dominio.cnj import formatar_numero_cnj
 from lupa_pipeline.dominio.enums import ClasseProcessual, EstadoJob, PapelUsuario, StatusProcesso
-from lupa_pipeline.dominio.gravacao import chave_do_hub, gravar_hub, gravar_link, gravar_satelite
+from lupa_pipeline.dominio.gravacao import gravar_hub, gravar_link, gravar_satelite
 from lupa_pipeline.dominio.tabelas import (
     hub_processo,
     link_processo_responsavel,
@@ -58,30 +44,11 @@ router = APIRouter()
 
 Processo = Annotated[VisaoProcesso, Depends(exige_processo)]
 Leitor = Annotated[Ator, Depends(exige_papel(Permissao.VER_PROCESSO))]
-Cadastrador = Annotated[Ator, Depends(exige_papel(Permissao.SUBIR_PROCESSO))]
 
 ORIGEM = "intranet.processos"
 ESTADOS_FINAIS = frozenset({EstadoJob.CONCLUIDO, EstadoJob.QUARENTENA, EstadoJob.FALHO})
 ESTADOS_COM_PENDENCIA = frozenset({EstadoJob.PARCIAL, EstadoJob.EM_REVISAO})
-MENSAGEM_DUPLICADO = "número CNJ já cadastrado"
 TRAVA_RESPONSAVEIS = 0x4C555041
-
-
-class CorpoProcesso(BaseModel):
-    """Dados do processo novo: número CNJ e classe da seção 3.1."""
-
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-
-    numero_cnj: str = Field(min_length=25, max_length=25)
-    classe: ClasseProcessual
-
-    @field_validator("numero_cnj")
-    @classmethod
-    def _cnj_valido(cls, valor: str) -> str:
-        try:
-            return validar_numero_cnj(valor)
-        except NumeroCnjInvalidoError as erro:
-            raise ValueError(str(erro)) from None
 
 
 class CorpoResponsaveis(BaseModel):
@@ -223,11 +190,11 @@ def _ligar_responsavel(
 
 
 def gravar_processo(
-    sessao: Session, corpo: CorpoProcesso, ator: Ator, *, origem: str = ORIGEM
+    sessao: Session, numero_cnj: str, classe: ClasseProcessual, ator: Ator, *, origem: str = ORIGEM
 ) -> bytes:
     """Cadastra o processo, abre a DEK e atribui o assessor que o cadastrou."""
-    hk = gravar_hub(sessao, hub_processo, {"numero_cnj": corpo.numero_cnj}, origem)
-    dados = {"classe": corpo.classe.value, "hk_usuario": ator.hk_usuario}
+    hk = gravar_hub(sessao, hub_processo, {"numero_cnj": numero_cnj}, origem)
+    dados = {"classe": classe.value, "hk_usuario": ator.hk_usuario}
     gravar_satelite(sessao, sat_processo_dados, hk, dados, origem)
     estado = {"status": StatusProcesso.CRIADO.value}
     gravar_satelite(sessao, sat_processo_estado, hk, estado, origem)
@@ -235,44 +202,6 @@ def gravar_processo(
     if ator.papel is PapelUsuario.ASSESSOR:
         _ligar_responsavel(sessao, hk, ator.hk_usuario, vigente=True)
     return hk
-
-
-def _consulta_processo(hk_processo: bytes) -> Select[tuple[VisaoProcesso]]:
-    return atual(select(VisaoProcesso).where(VisaoProcesso.hk_processo == hk_processo))
-
-
-@router.post("/processos", status_code=201, response_model=None)
-def criar_processo(
-    corpo: CorpoProcesso, ator: Cadastrador, sessao: SessaoBanco, ctx: ContextoReq
-) -> dict[str, Any] | JSONResponse:
-    """Cadastra o processo com número CNJ e classe (RF-PRO-01).
-
-    Args:
-        corpo: Número CNJ (dígito verificador conferido) e classe.
-        ator: Quem cadastra.
-        sessao: Sessão da requisição.
-        ctx: Contexto para a auditoria.
-
-    Returns:
-        Processo criado, ou 409 com o `processo_id` do existente.
-    """
-    hk = chave_do_hub(hub_processo, {"numero_cnj": corpo.numero_cnj})
-    if sessao.scalars(_consulta_processo(hk)).one_or_none() is not None:
-        return JSONResponse(
-            status_code=409, content={"detail": MENSAGEM_DUPLICADO, "processo_id": hk.hex()}
-        )
-    gravar_processo(sessao, corpo, ator)
-    processo = sessao.scalars(_consulta_processo(hk)).one()
-    auditar(
-        sessao,
-        ctx,
-        AcaoAuditoria.PROCESSO_CRIADO,
-        hk_usuario=ator.hk_usuario,
-        hk_processo=hk,
-        objeto_tipo="processo",
-        objeto_id=hk.hex(),
-    )
-    return _serializar(processo)
 
 
 @router.get("/processos/{processo_id}")
