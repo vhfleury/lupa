@@ -462,7 +462,8 @@ Execução do [plano de cadastro pelo arquivo](plano_cadastro_pelo_arquivo.md).
 
 - [x] **T8.1** Ampliar os tipos de fato e preservar o criador no histórico de classe. RF-PRO-06, RF-FAT-01.
   - `pytest pipeline/tests/dominio/test_migracao_0002.py --no-cov` no worker com PostgreSQL. A asserção dos seis novos tipos falhou antes da revisão. Com a migração, 1 teste passou, incluindo subida, duas correções, descida e nova subida.
-- [ ] **T8.2** Identificar número CNJ e classe no PDF ou ZIP em sandbox. RF-PRO-01, RF-ING-02, RF-ING-04.
+- [x] **T8.2** Identificar número CNJ e classe no PDF ou ZIP em sandbox. RF-PRO-01, RF-ING-02, RF-ING-04.
+  - `pytest pipeline/tests/ingestao/test_identificacao.py --no-cov` no worker. No vermelho, 18 falhas e 5 testes passaram. No verde, os 23 passaram, inclusive a sonda de rede e ambiente executada no subprocesso.
 - [ ] **T8.3** Criar ou localizar o processo pelo upload, tratar o complemento e retirar o cadastro manual. RF-PRO-01, RF-ING-01, RF-ING-02.
 - [ ] **T8.4** Extrair, medir e exibir os fatos da capa com evidência nos autos sintéticos. RF-FAT-01, RF-FAT-03, RF-ING-08, RNF-02.
 - [ ] **T8.5** Corrigir a classe, preservar a autoria e recalcular os achados. RF-PRO-06.
