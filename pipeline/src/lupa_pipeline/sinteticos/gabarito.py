@@ -280,7 +280,7 @@ class ParteGabarito(ComEvidencia):
 
 
 class EventoGabarito(ComEvidencia):
-    """Fato cível, com o nome do sujeito ou vazio para fato comum."""
+    """Fato com valor normalizado e evidência literal, de uma parte ou do processo."""
 
     tipo: TipoFato
     valor: Any

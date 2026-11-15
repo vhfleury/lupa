@@ -2,11 +2,13 @@
 
 from collections.abc import Iterator
 
+from lupa_pipeline.config import PAGINAS_IDENTIFICACAO_PADRAO
 from lupa_pipeline.dominio.chaves import chave_hash
 from lupa_pipeline.dominio.enums import TipoPeca
 from lupa_pipeline.dominio.esquemas import Fato
 from lupa_pipeline.ingestao.datas import dobrar
 from lupa_pipeline.ingestao.eventos import (
+    capa,
     certidao,
     decisao_agravada,
     marcos,
@@ -31,7 +33,12 @@ EXTRATORES = {
 }
 
 
-def candidatos_da_peca(peca: PecaTexto, sujeitos: dict[str, str]) -> Iterator[Candidato]:
+def candidatos_da_peca(
+    peca: PecaTexto,
+    sujeitos: dict[str, str],
+    *,
+    identificacao_paginas: int = PAGINAS_IDENTIFICACAO_PADRAO,
+) -> Iterator[Candidato]:
     """Aplica as regras da espécie da peça ao sujeito expressamente identificado."""
     nomes = {
         chave_nome(m[1])
@@ -43,6 +50,8 @@ def candidatos_da_peca(peca: PecaTexto, sujeitos: dict[str, str]) -> Iterator[Ca
     explicita = any(recurso.QUALIDADE.search(dobrar(p.normalizado)) for p in peca.paginas)
     for pagina in peca.paginas:
         fonte = Fonte(pagina, sujeito)
+        if pagina.numero <= identificacao_paginas:
+            yield from capa.extrair(fonte)
         if tipo in recurso.RECURSOS:
             yield from recurso.extrair(fonte, tipo, explicita)
         if tipo in marcos.MARCOS:

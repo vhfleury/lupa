@@ -387,7 +387,12 @@ def _processar(
         if etapa == "catalogo":
             relatorio["eventos"] |= atualizar_achados(session, arquivo.hk_processo, referencia)
         else:
-            relatorio["eventos"] = processar_eventos(session, arquivo.hk_processo, referencia)
+            relatorio["eventos"] = processar_eventos(
+                session,
+                arquivo.hk_processo,
+                referencia,
+                identificacao_paginas=settings.identificacao_paginas,
+            )
         relatorio["versoes_processamento"] = trabalho.versoes
         estado = EstadoJob.PARCIAL if relatorio["paginas_faltando"] else EstadoJob.CONCLUIDO
         mudar_estado(

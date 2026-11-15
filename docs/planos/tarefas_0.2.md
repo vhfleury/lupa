@@ -466,7 +466,9 @@ Execução do [plano de cadastro pelo arquivo](plano_cadastro_pelo_arquivo.md).
   - `pytest pipeline/tests/ingestao/test_identificacao.py --no-cov` no worker. No vermelho, 18 falhas e 5 testes passaram. No verde, os 23 passaram, inclusive a sonda de rede e ambiente executada no subprocesso.
 - [x] **T8.3** Criar ou localizar o processo pelo upload, tratar o complemento e retirar o cadastro manual. RF-PRO-01, RF-ING-01, RF-ING-02.
   - O primeiro teste de envio falhou com 405 em vez de 201. Na API, `pytest intranet/api/tests/api/test_cadastro_arquivo.py intranet/api/tests/auditoria/test_eventos_reais.py --no-cov` passou nos 15 casos com integração exigida. Dois envios simultâneos com o mesmo CNJ criaram um processo e dois arquivos.
-- [ ] **T8.4** Extrair, medir e exibir os fatos da capa com evidência nos autos sintéticos. RF-FAT-01, RF-FAT-03, RF-ING-08, RNF-02.
+- [x] **T8.4** Extrair, medir e exibir os fatos da capa com evidência nos autos sintéticos. RF-FAT-01, RF-FAT-03, RF-ING-08, RNF-02.
+  - O gabarito tinha zero fatos na capa e o dossiê não tinha o campo `dados_capa`. Com as marcas de evidência e o extrator, `pytest pipeline/tests/sinteticos --no-cov` passou nos 106 testes. `test_capa.py` e `test_reprocessamento.py` conferem os offsets, a janela de páginas, a coexistência de fontes e a preservação da revisão humana.
+  - `pytest pipeline/tests/ingestao/test_calibracao.py --no-cov` mediu o PDF liso, o PDF com índice e o ZIP. Com a semente 88, o recall dos eventos e das fronteiras foi de 100% nos três formatos e a precisão de datas atingiu a meta de 99%. Na API, `test_ponta_a_ponta.py` confronta as cinco classes com os gabaritos no PostgreSQL e no MinIO.
 - [ ] **T8.5** Corrigir a classe, preservar a autoria e recalcular os achados. RF-PRO-06.
 - [ ] **T8.6** Enviar os autos pela interface, completar a identificação e conferir a ficha no cabeçalho. RF-PRO-01, RF-PRO-06, RF-FAT-04.
 - [ ] **T8.7** Atualizar arquitetura, decisão, guia, capturas e documentação técnica. RF-DOC-01, RF-DOC-03.

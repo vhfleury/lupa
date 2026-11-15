@@ -10,7 +10,7 @@ from lupa_pipeline.dominio.enums import ClasseProcessual, OrigemPeca, QualidadeP
 from lupa_pipeline.sinteticos import identidades as ids
 from lupa_pipeline.sinteticos.gabarito import Composicao, TipoData, VetorInjecao
 from lupa_pipeline.sinteticos.injecao import VISIVEIS, paragrafo_injecao
-from lupa_pipeline.sinteticos.textos import Paragrafo, enchimento, renderizar_peca
+from lupa_pipeline.sinteticos.textos import Marca, Paragrafo, enchimento, renderizar_peca
 
 PARAGRAFOS_POR_PAGINA = 13
 
@@ -196,12 +196,33 @@ class _Fabrica:
 
 
 def _capa(partes: Partes, linha: Linha, classe: ClasseProcessual) -> PecaPlano:
+    classe_na_capa = {
+        ClasseProcessual.APELACAO_CIVEL: "Apelação cível",
+        ClasseProcessual.AGRAVO_INSTRUMENTO: "Agravo de instrumento",
+        ClasseProcessual.AGRAVO_INTERNO: "Agravo interno",
+        ClasseProcessual.EMBARGOS_DECLARACAO: "Embargos de declaração",
+        ClasseProcessual.ACAO_ORIGINARIA: "Ação rescisória",
+    }
     texto = [
         Paragrafo("AUTUAÇÃO", papel="titulo"),
         Paragrafo(f"Processo nº {partes.numero}"),
-        Paragrafo(f"Classe processual: {classe.value.replace('_', ' ')}"),
+        Paragrafo(f"Classe processual: {classe_na_capa[classe]}"),
         Paragrafo(f"Autuado em {linha.ajuizamento:%d/%m/%Y}."),
     ]
+    distribuicao = linha.ajuizamento + timedelta(days=1)
+    campos = {
+        "relator": ("Relator", partes.variaveis["juiz"]),
+        "orgao_julgador": ("Órgão julgador", "Terceira Câmara Cível"),
+        "assunto": ("Assunto", "Reparação por defeitos no imóvel"),
+        "valor_causa": ("Valor da causa", "R$ 1.234,56"),
+        "juizo_origem": ("Juízo de origem", f"Vara Cível da {ids.COMARCA}"),
+        "data_distribuicao": ("Distribuição", distribuicao.strftime("%d/%m/%Y")),
+    }
+    for tipo, (rotulo, literal) in campos.items():
+        linha_capa = f"{rotulo}: {literal}"
+        texto.append(Paragrafo(linha_capa, [Marca(tipo, len(rotulo) + 2, len(linha_capa))]))
+    valores = {tipo: literal for tipo, (_, literal) in campos.items()}
+    valores.update(valor_causa="1234.56", data_distribuicao=distribuicao.isoformat())
     return PecaPlano(
         TipoPeca.OUTROS,
         OrigemPeca.JUIZO,
@@ -209,6 +230,7 @@ def _capa(partes: Partes, linha: Linha, classe: ClasseProcessual) -> PecaPlano:
         linha.ajuizamento,
         TipoData.JUNTADA,
         texto,
+        valores,
         capa=True,
     )
 
