@@ -1,5 +1,7 @@
 # Lupa — Requisitos da primeira versão
 
+> Substituído, para a versão 0.2, pela [especificação da 0.2](0.2/especificacao.md). Vale para a 0.1.0.
+
 20 de outubro de 2026 · Victor Hugo
 
 Este documento consolida as decisões tomadas na discussão de projeto. Ele substitui, para a primeira versão, as partes do `arquitetura.md` que foram tratadas como sugestão. O `catalogo-validacoes.md` e o `prompt-injection.md` continuam como referência.

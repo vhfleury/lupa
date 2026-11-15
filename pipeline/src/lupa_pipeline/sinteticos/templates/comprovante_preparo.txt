@@ -1,0 +1,7 @@
+COMPROVANTE DE PREPARO
+
+Recorrente: $autor
+
+{{comprovante_preparo:Preparo recolhido em $data}}.
+
+A guia de preparo recursal identifica os autos e confirma o recolhimento das custas.

@@ -1,5 +1,7 @@
 # Catálogo de validações — processo criminal em 2º grau
 
+> Substituído, para a versão 0.2, pela [especificação da 0.2](0.2/especificacao.md), que só tem validações cíveis. Vale para a 0.1.0.
+
 Oct 16, 2026 · @Victor Hugo
 
 Lista das conferências que um gabinete de desembargador criminal faz antes de minutar, agrupadas por fase. A coluna Classe diz como o sistema decide: D = determinística (datas e aritmética), E = estrutural (presença de peça ou elemento), S = semântica (LLM compara trechos; sempre marcada como "verificar"). Dispositivos citados de memória; o gabinete deve confirmar cada um antes de o catálogo entrar em produção.

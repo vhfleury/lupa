@@ -1,0 +1,1 @@
+A regra {validacao} não conseguiu concluir a conferência dos valores. Confira os autos.

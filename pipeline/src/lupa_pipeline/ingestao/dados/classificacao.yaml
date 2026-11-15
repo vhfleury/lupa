@@ -1,0 +1,80 @@
+versao: "2"
+linhas_inicio: 18
+peso_titulo: 3.0
+peso_titulo_indefinido: 1.0
+peso_formula: 1.0
+pontuacao_minima: 2.0
+margem_minima: 1.0
+confianca_ambiguo: 0.3
+tipos:
+  peticao_inicial:
+    titulos: ["PETICAO INICIAL"]
+    formulas: ["ajuizo a presente","pede a citacao"]
+  contestacao:
+    titulos: ["CONTESTACAO"]
+    formulas: ["apresenta contestacao","impugna especificamente"]
+  replica:
+    titulos: ["REPLICA"]
+    formulas: ["em replica","impugna a contestacao"]
+  decisao_interlocutoria:
+    titulos: ["DECISAO INTERLOCUTORIA"]
+    formulas: ["defiro a tutela","decido a questao incidental"]
+  sentenca:
+    titulos: ["SENTENCA"]
+    formulas: ["julgo (im)?procedente","resolvo o merito"]
+  embargos_declaracao:
+    titulos: ["EMBARGOS DE DECLARACAO"]
+    formulas: ["opoe embargos de declaracao","sanar a omissao"]
+  apelacao:
+    titulos: ["APELACAO","RAZOES DE APELACAO"]
+    formulas: ["interpoe apelacao","reforma da sentenca"]
+  agravo_instrumento:
+    titulos: ["AGRAVO DE INSTRUMENTO"]
+    formulas: ["interpoe agravo de instrumento","decisao agravada"]
+  agravo_interno:
+    titulos: ["AGRAVO INTERNO"]
+    formulas: ["interpoe agravo interno","decisao monocratica"]
+  contrarrazoes:
+    titulos: ["CONTRARRAZOES"]
+    formulas: ["oferece contrarrazoes","desprovimento do recurso"]
+  acordao:
+    titulos: ["ACORDAO"]
+    formulas: ["acordam","camara civel"]
+  certidao:
+    titulos: ["CERTIDAO"]
+    formulas: ["^certifico","dou fe"]
+  procuracao:
+    titulos: ["PROCURACAO"]
+    formulas: ["nomeia e constitui","outorgante"]
+  comprovante_preparo:
+    titulos: ["COMPROVANTE DE PREPARO"]
+    formulas: ["preparo recursal","recolhimento das custas"]
+  laudo_pericial:
+    titulos: ["LAUDO PERICIAL"]
+    formulas: ["o perito","quesitos da pericia"]
+  parecer_mp:
+    titulos: ["PARECER DO MINISTERIO PUBLICO"]
+    formulas: ["o ministerio publico opina","parecer ministerial"]
+  outros:
+    titulos: ["TERMO DE JUNTADA"]
+    formulas: ["junto a estes autos","documento anexo"]
+origem:
+  confianca_assinatura: 0.95
+  confianca_vocabulario: 0.7
+  confianca_cargo_aproximado: 0.8
+  semelhanca_cargo: 0.72
+  cargos_canonicos:
+    juizo: [juiz de direito, desembargador, analista judiciario]
+    mp: [promotor de justica, procurador de justica]
+    parte: [advogado, advogada, defensor publico, procurador do estado]
+    terceiro: [perito judicial, perito]
+  cargos:
+    juizo: ['juiz[a]? de direito', 'desembargador[a]?', 'analista judiciari[oa]', 'relator[a]?']
+    mp: ['promotor[a]? de justica', 'procurador[a]? de justica']
+    parte: ['advogad[oa]', 'oab', 'defensor[a]? public[oa]', 'procurador[a]? do estado']
+    terceiro: ['perit[oa]', 'oficial de justica']
+  vocabulario:
+    juizo: ['^vistos', '^certifico', '^acordam', '^autuacao']
+    mp: ['o ministerio publico', 'parecer ministerial']
+    parte: ['por seu advogado', 'por sua advogada', 'interpoe', 'opoe embargos']
+    terceiro: ['pericia realizada', 'respondendo aos quesitos']

@@ -1,0 +1,15 @@
+{{tipo_recurso:AGRAVO DE INSTRUMENTO}}
+
+Recorrente: $autor
+
+Recorrido: $reu
+
+{{qualidade_recorrente:Qualidade do recorrente: $qualidade}}
+
+{{data_interposicao:Recurso interposto em $data}}.
+
+Interpõe agravo de instrumento contra a decisão agravada que deferiu a tutela.
+
+$pedido
+
+{{advogado_subscritor:Advogado subscritor: $advogado, OAB/GO $oab}}

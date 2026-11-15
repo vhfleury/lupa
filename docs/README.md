@@ -1,63 +1,35 @@
 # Documentação do Lupa
 
-Índice da pasta `docs/`. As convenções de código estão no [`CLAUDE.md`](../CLAUDE.md) e a instalação de desenvolvimento no [README da raiz](../README.md).
+## Usar e operar
 
-## Visão geral
+- [Guia do assessor](guias/guia-assessor.md) e [guia do desembargador](guias/guia-desembargador.md).
+- [Operação do ambiente de desenvolvimento](operacao/operacao.md) e [procedimentos operacionais](runbooks/README.md).
+- [Termos, aviso de tratamento, resposta a incidentes e relatório ao tribunal](conformidade/CONFORMIDADE.md).
 
-- [arquitetura.md](arquitetura.md): limite do sistema, componentes, uma execução de ponta a ponta e o estado das mudanças.
-- [adr/](adr/README.md): registros de decisão de arquitetura, um arquivo por decisão.
-- [runbooks/](runbooks/README.md): procedimentos operacionais com resultado observável.
-- Na raiz: [CONTRIBUTING.md](../CONTRIBUTING.md), [CHANGELOG.md](../CHANGELOG.md) e [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md).
+## Como funciona
 
-## Especificação
-
-- [especificacao/requisitos-v1.md](especificacao/requisitos-v1.md): decisões de produto da primeira versão.
-- [especificacao/arquitetura.md](especificacao/arquitetura.md): desenho original do sistema e princípios.
-- [especificacao/catalogo-validacoes.md](especificacao/catalogo-validacoes.md): regras jurídicas das validações.
-- [especificacao/prompt-injection.md](especificacao/prompt-injection.md): controles contra injeção de instruções nos autos.
-
-## Como o sistema funciona
-
-| Documento | Assunto |
+| Documento | Abrangência |
 | --- | --- |
-| [sistema/modelo-de-dados.md](sistema/modelo-de-dados.md) | diagrama, regras impostas pelo banco, RLS por gabinete |
-| [sistema/ingestao.md](sistema/ingestao.md) | pipeline de ingestão: fila, sandbox, OCR, saneamento, fronteiras, eventos |
-| [sistema/validacoes.md](sistema/validacoes.md) | as três validações do piloto e o que o gabinete precisa confirmar |
-| [sistema/agente.md](sistema/agente.md) | contrato do agente e do chat |
-| [sistema/auditoria.md](sistema/auditoria.md) | o que a auditoria registra e como verificar a cadeia |
-| [sistema/criptografia.md](sistema/criptografia.md) | cifra em repouso e Vault |
-| [sistema/front.md](sistema/front.md) | interface web, proxy e testes E2E |
-| [sistema/sinteticos.md](sistema/sinteticos.md) | gerador de autos sintéticos e medição |
+| [Arquitetura](arquitetura.md) | Componentes e percurso dos autos até a página de evidência |
+| [Modelo de dados](sistema/modelo-de-dados.md) | Hubs, links, satélites, views e responsabilidades |
+| [Ingestão](sistema/ingestao.md) | Recepção, fila no PostgreSQL, extração, classificação e rastreabilidade |
+| [Validações](sistema/validacoes.md) | Regras por classe e reprodução da conta |
+| [Agente](sistema/agente.md) | Dossiê, escopo, fontes, tetos e revisão |
+| [Auditoria](sistema/auditoria.md) | Cadeia única e relatórios de uso |
+| [Criptografia](sistema/criptografia.md) | Cifra por processo e descarte |
+| [Interface](sistema/front.md) | Telas por papel, sessão e proxy |
+| [Sintéticos](sistema/sinteticos.md) | Gerador de cinco classes, evidências conhecidas e medição |
 
-## Operação
+## Especificação, plano e decisões
 
-- [operacao/operacao.md](operacao/operacao.md): manual do responsável técnico (instalação, atualização, Vault, certificado, monitoramento, incidentes).
-- [operacao/backup.md](operacao/backup.md): backup cifrado, restauração e expurgo.
+- [Especificação da 0.2](especificacao/0.2/especificacao.md).
+- [Plano da 0.2](planos/plano_0.2.md), [algoritmos e checklist](planos/plano_0.2_execucao.md) e [tarefas com evidências](planos/tarefas_0.2.md).
+- [Plano do cadastro pelo arquivo](planos/plano_cadastro_pelo_arquivo.md), aguardando aprovação.
+- [ADRs](adr/README.md) e [registro das decisões](decisoes/registro.md).
+- [Defesas contra instruções presentes nos autos](especificacao/prompt-injection.md) e [decisão sobre o object storage](decisoes/object-storage.md).
 
-## Guias dos usuários
+## Histórico da 0.1
 
-- [guias/guia-assessor.md](guias/guia-assessor.md)
-- [guias/guia-desembargador.md](guias/guia-desembargador.md)
+O [histórico das etapas](etapas/ETAPAS.md), os [requisitos anteriores](especificacao/requisitos-v1.md), o [desenho inicial](especificacao/arquitetura.md) e o [catálogo criminal anterior](especificacao/catalogo-validacoes.md) documentam a versão de origem. A decisão de preservar as duas falhas históricas de T1.7 e a verificação dos responsáveis na 0.2 estão no [quadro de tarefas](planos/tarefas_0.2.md).
 
-As capturas de tela ficam em `imagens/`, gravadas por `front/scripts/capturas.sh`.
-
-## Conformidade (LGPD e Res. CNJ 615/2025)
-
-As minutas para revisão de advogado estão em [Conformidade do Lupa](conformidade/CONFORMIDADE.md).
-
-- [Termos de uso do Lupa](conformidade/CONFORMIDADE.md#termos-de-uso) e [aceite pelo gabinete](conformidade/CONFORMIDADE.md#aceite-dos-termos)
-- [Aviso de tratamento de dados pessoais](conformidade/CONFORMIDADE.md#aviso-de-tratamento) e [registro das operações de tratamento](conformidade/CONFORMIDADE.md#registro-de-operacoes)
-- [Plano de resposta a incidentes](conformidade/CONFORMIDADE.md#plano-de-incidentes)
-- [Modelo de relatório de uso ao tribunal](conformidade/CONFORMIDADE.md#relatorio-uso-tribunal)
-- [Checklist antes do primeiro processo real](conformidade/CONFORMIDADE.md#checklist-piloto)
-
-## Histórico da construção
-
-- [Relatórios, limitações e pendências por etapa](etapas/ETAPAS.md#etapas-e-pendencias). Os demais relatórios de execução estão no histórico do Git.
-- [Conformidade geral](etapas/ETAPAS.md#conformidade-geral) reúne o estado e as métricas até a 8.2.
-- [decisoes/registro.md](decisoes/registro.md): decisões tomadas em cada etapa e resultado das revisões. As que definem a arquitetura têm registro próprio em [adr/](adr/README.md).
-- [decisoes/object-storage.md](decisoes/object-storage.md): decisão do object storage.
-
-## Outros
-
-- `contexto/`: relatórios de pesquisa usados no desenho (gabinete do TJGO, dados judiciais, prompt injection).
+Na raiz estão o [README](../README.md), o [guia de contribuição](../CONTRIBUTING.md) e o [changelog](../CHANGELOG.md).
