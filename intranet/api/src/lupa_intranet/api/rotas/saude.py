@@ -14,7 +14,7 @@ router = APIRouter()
 def obter_saude(
     response: Response, settings: Annotated[Settings, Depends(get_settings)]
 ) -> dict[str, str]:
-    """Informa o estado da API, do banco, do MinIO e do cofre (Vault destravado e decifrando).
+    """Informa o estado da API, do banco e do MinIO (RF-SEG-02 removido).
 
     Args:
         response: Resposta HTTP, para ajustar o status.
@@ -27,7 +27,6 @@ def obter_saude(
         "api": "ok",
         "db": "ok" if saude.verificar_db(settings) else "falha",
         "minio": "ok" if saude.verificar_minio(settings) else "falha",
-        "cofre": "ok" if saude.verificar_cofre(settings) else "falha",
     }
     if "falha" in corpo.values():
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE

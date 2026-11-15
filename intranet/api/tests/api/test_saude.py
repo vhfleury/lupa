@@ -12,8 +12,6 @@ from lupa_intranet.api import saude
 from lupa_intranet.api.app import create_app
 from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.logging import get_logger
-from lupa_pipeline.seguranca.cofre import CHAVE_SAUDE, CofreError, CofreMemoria
-from lupa_pipeline.seguranca.contexto import definir_cofre, obter_cofre
 
 CREDENCIAL_FICTICIA = "valor-ficticio-de-metricas"
 
@@ -28,10 +26,9 @@ def test_saude_responde_ok_quando_dependencias_respondem(
     """Com banco e MinIO saudáveis, responde 200 e tudo ok."""
     monkeypatch.setattr(saude, "verificar_db", lambda _s: True)
     monkeypatch.setattr(saude, "verificar_minio", lambda _s: True)
-    monkeypatch.setattr(saude, "verificar_cofre", lambda _s: True)
     resposta = _cliente(settings_ficticias).get("/saude")
     assert resposta.status_code == 200
-    assert resposta.json() == {"api": "ok", "db": "ok", "minio": "ok", "cofre": "ok"}
+    assert resposta.json() == {"api": "ok", "db": "ok", "minio": "ok"}
 
 
 def test_saude_responde_503_quando_banco_falha(
@@ -40,10 +37,20 @@ def test_saude_responde_503_quando_banco_falha(
     """Com banco fora, responde 503 indicando a falha."""
     monkeypatch.setattr(saude, "verificar_db", lambda _s: False)
     monkeypatch.setattr(saude, "verificar_minio", lambda _s: True)
-    monkeypatch.setattr(saude, "verificar_cofre", lambda _s: True)
     resposta = _cliente(settings_ficticias).get("/saude")
     assert resposta.status_code == 503
     assert resposta.json()["db"] == "falha"
+
+
+def test_saude_responde_503_quando_minio_falha(
+    settings_ficticias: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """RNF-06 (D4): com o MinIO fora, responde 503 indicando a falha."""
+    monkeypatch.setattr(saude, "verificar_db", lambda _s: True)
+    monkeypatch.setattr(saude, "verificar_minio", lambda _s: False)
+    resposta = _cliente(settings_ficticias).get("/saude")
+    assert resposta.status_code == 503
+    assert resposta.json() == {"api": "ok", "db": "ok", "minio": "falha"}
 
 
 def test_verificacoes_retornam_falso_sem_servicos(settings_ficticias: Settings) -> None:
@@ -84,7 +91,6 @@ def test_cada_requisicao_recebe_request_id_unico(
     """O middleware gera request_id distinto por requisição e o injeta no log."""
     monkeypatch.setattr(saude, "verificar_db", lambda _s: True)
     monkeypatch.setattr(saude, "verificar_minio", lambda _s: True)
-    monkeypatch.setattr(saude, "verificar_cofre", lambda _s: True)
     cliente = _cliente(settings_ficticias)
     primeiro = cliente.get("/saude").headers["X-Request-ID"]
     segundo = cliente.get("/saude").headers["X-Request-ID"]
@@ -106,7 +112,6 @@ def test_log_dentro_da_requisicao_carrega_request_id(
 
     monkeypatch.setattr(saude, "verificar_db", _db)
     monkeypatch.setattr(saude, "verificar_minio", lambda _s: True)
-    monkeypatch.setattr(saude, "verificar_cofre", lambda _s: True)
     cliente = _cliente(settings_ficticias)
     capsys.readouterr()
     request_id = cliente.get("/saude").headers["X-Request-ID"]
@@ -117,65 +122,11 @@ def test_log_dentro_da_requisicao_carrega_request_id(
 @pytest.mark.integracao
 @pytest.mark.usefixtures("ambiente_ficticio")
 def test_saude_integracao_com_servicos_reais() -> None:
-    """RNF-06. A rota verifica o PostgreSQL, o MinIO e o Vault reais da implantação."""
-    settings = get_settings().model_copy(update={"cofre_backend": "vault"})
-    cofre_anterior = obter_cofre()
-    try:
-        with TestClient(create_app(settings)) as cliente:
-            resposta = cliente.get("/saude")
-    finally:
-        definir_cofre(cofre_anterior)
+    """RNF-06. A rota verifica o PostgreSQL e o MinIO reais da implantação."""
+    with TestClient(create_app(get_settings())) as cliente:
+        resposta = cliente.get("/saude")
     if resposta.status_code == 503:
         falhas = [servico for servico, estado in resposta.json().items() if estado == "falha"]
         integracao_indisponivel("Serviços indisponíveis na rota /saude: " + ", ".join(falhas))
     assert resposta.status_code == 200
-    assert resposta.json() == {"api": "ok", "db": "ok", "minio": "ok", "cofre": "ok"}
-
-
-def test_saude_responde_503_com_cofre_selado(
-    settings_ficticias: Settings, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Cofre selado ou fora: 503 com `cofre: falha` (achado da 7.10)."""
-    monkeypatch.setattr(saude, "verificar_db", lambda _s: True)
-    monkeypatch.setattr(saude, "verificar_minio", lambda _s: True)
-    monkeypatch.setattr(saude, "verificar_cofre", lambda _s: False)
-    resposta = _cliente(settings_ficticias).get("/saude")
-    assert resposta.status_code == 503
-    assert resposta.json()["cofre"] == "falha"
-
-
-def test_verificar_cofre_memoria_cifra_e_decifra(settings_ficticias: Settings) -> None:
-    """Com o cofre em memória, cria a chave de verificação e confere a ida e volta."""
-    cofre = CofreMemoria()
-    assert saude.verificar_cofre(settings_ficticias, cofre) is True
-    assert cofre.existe_chave(CHAVE_SAUDE)
-
-
-class _CofreSelado(CofreMemoria):
-    def cifrar(self, nome: str, dados: bytes) -> str:
-        raise CofreError("vault respondeu 503")
-
-
-class _CofreTrocado(CofreMemoria):
-    def decifrar(self, nome: str, token: str) -> bytes:
-        return b"outro"
-
-
-def test_verificar_cofre_falso_quando_selado_ou_inconsistente(
-    settings_ficticias: Settings,
-) -> None:
-    """Erro do cofre (selado) ou valor decifrado diferente resultam em falso, sem exceção."""
-    assert saude.verificar_cofre(settings_ficticias, _CofreSelado()) is False
-    assert saude.verificar_cofre(settings_ficticias, _CofreTrocado()) is False
-
-
-def test_verificar_cofre_vault_inalcancavel(settings_ficticias: Settings) -> None:
-    """Vault inalcançável (configuração padrão) resulta em falso."""
-    inalcancavel = settings_ficticias.model_copy(
-        update={
-            "cofre_backend": "vault",
-            "vault_endereco": "http://127.0.0.1:1",
-            "vault_timeout_segundos": 0.2,
-        }
-    )
-    assert saude.verificar_cofre(inalcancavel) is False
+    assert resposta.json() == {"api": "ok", "db": "ok", "minio": "ok"}

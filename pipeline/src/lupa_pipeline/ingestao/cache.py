@@ -3,6 +3,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from lupa_pipeline.dominio.enums import StatusProcesso
 from lupa_pipeline.dominio.tabelas import (
     atributos_do_satelite,
     sat_pagina_extracao,
@@ -10,13 +11,12 @@ from lupa_pipeline.dominio.tabelas import (
 )
 from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoPagina, VisaoProcesso
 from lupa_pipeline.ingestao.paginas import gravar_pagina
-from lupa_pipeline.seguranca.contexto import abrir_dek, obter_cofre, registrar_dek
 
 
 def copiar_do_cache(
     session: Session, destino: VisaoArquivo, versao: str, total: int, pendentes: set[int]
 ) -> set[int]:
-    """Copia apenas páginas pendentes, decifrando na origem e cifrando com a DEK de destino."""
+    """Copia apenas as páginas pendentes de um arquivo idêntico de processo não descartado."""
     if not pendentes:
         return set()
     consulta = (
@@ -27,7 +27,7 @@ def copiar_do_cache(
             VisaoArquivo.sha256 == destino.sha256,
             VisaoArquivo.hk_arquivo != destino.hk_arquivo,
             VisaoArquivo.estado == "concluido",
-            VisaoProcesso.chave_dados_cifrada.is_not(None),
+            VisaoProcesso.status.is_distinct_from(StatusProcesso.DESCARTADO.value),
             VisaoPagina.versao_extrator == versao,
         )
         .group_by(VisaoPagina.hk_arquivo)
@@ -38,16 +38,6 @@ def copiar_do_cache(
     fonte = session.scalar(consulta)
     if fonte is None:
         return set()
-    chave = session.execute(
-        select(VisaoProcesso.hk_processo, VisaoProcesso.chave_dados_cifrada)
-        .join(VisaoArquivo, VisaoArquivo.hk_processo == VisaoProcesso.hk_processo)
-        .where(VisaoArquivo.hk_arquivo == fonte)
-    ).one()
-    if chave.chave_dados_cifrada is None:
-        return set()
-    registrar_dek(
-        chave.hk_processo, abrir_dek(obter_cofre(), chave.chave_dados_cifrada), atual=False
-    )
     campos = [
         *atributos_do_satelite(sat_pagina_extracao),
         *atributos_do_satelite(sat_pagina_saneamento),

@@ -19,9 +19,8 @@ from lupa_pipeline.dominio.chaves import (
     normalizar_cnj,
     normalizar_hash,
 )
-from lupa_pipeline.dominio.tabelas import atributos_do_satelite, satelite_cifrado
+from lupa_pipeline.dominio.tabelas import atributos_do_satelite
 from lupa_pipeline.dominio.visoes import VisaoProcesso
-from lupa_pipeline.seguranca.contexto import dek_para_gravar
 
 COLUNAS_OPCIONAIS = frozenset({"sujeito"})
 NORMALIZADORES: Mapping[str, Callable[[str], str]] = {
@@ -134,12 +133,6 @@ def gravar_link(
     return hk
 
 
-def _dek(tabela: Table) -> bytes | None:
-    if not satelite_cifrado(tabela):
-        return None
-    return dek_para_gravar()[1]
-
-
 def _hash_diff_corrente(
     session: Session, tabela: Table, hk_pai: bytes, atributos: Mapping[str, object]
 ) -> bytes | None:
@@ -159,8 +152,8 @@ def gravar_satelite(
 ) -> bool:
     """Grava uma linha nova do satélite se o conteúdo mudou (A2, passos 3 a 6).
 
-    No satélite cifrado o `hash_diff` é HMAC com a DEK do processo ativo do contexto de cifra
-    (D5), a mesma que cifra as colunas. Anotação e falha de login sempre inserem.
+    O `hash_diff` é o SHA-256 do JSON canônico dos atributos. Anotação e falha de login sempre
+    inserem.
 
     Args:
         session: Sessão com transação aberta.
@@ -177,7 +170,7 @@ def gravar_satelite(
     """
     _exigir_tipo(tabela, "satelite")
     _exigir_colunas(tabela, atributos, atributos_do_satelite(tabela))
-    novo = hash_diff(atributos, dek=_dek(tabela))
+    novo = hash_diff(atributos)
     sempre = tabela.info["sempre_insere"]
     if not sempre and _hash_diff_corrente(session, tabela, hk_pai, atributos) == novo:
         return False

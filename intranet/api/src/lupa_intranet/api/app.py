@@ -8,7 +8,6 @@ from lupa_intranet.acesso import rotas as rotas_acesso
 from lupa_intranet.acesso.erros import RecusaAcessoError, tratar_erro_acesso
 from lupa_intranet.agente.cliente_roteirizado import criar_cliente
 from lupa_intranet.api.banco import configurar_banco
-from lupa_intranet.api.cifra import cifra_middleware, configurar_cifra
 from lupa_intranet.api.middleware import auditoria_middleware, request_id_middleware
 from lupa_intranet.api.rotas import (
     achados,
@@ -58,12 +57,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.dependency_overrides[get_settings] = lambda: configuracao
     configurar_banco(app, configuracao)
     app.state.resolvedor = criar_resolvedor(configuracao)
-    configurar_cifra(app, configuracao)
     app.state.storage = criar_storage(configuracao)
     app.state.cliente_agente = criar_cliente(configuracao)
     app.add_exception_handler(RecusaAcessoError, tratar_erro_acesso)
     app.middleware("http")(auditoria_middleware)
-    app.middleware("http")(cifra_middleware)
     app.middleware("http")(request_id_middleware)
     for modulo in (
         saude,

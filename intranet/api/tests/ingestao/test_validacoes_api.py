@@ -7,9 +7,8 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from apoio_comum import eventos_do_banco
-from lupa_pipeline.dominio.visoes import VisaoPagina, VisaoProcesso
+from lupa_pipeline.dominio.visoes import VisaoPagina
 from lupa_pipeline.ingestao.eventos.etapa import processar_eventos
-from lupa_pipeline.seguranca.contexto import ativar_processo
 from tests.ingestao.conftest import Autos
 
 pytestmark = pytest.mark.integracao
@@ -36,7 +35,6 @@ def test_correcao_e_historico_com_evidencia_atualizada(
     assert c.post(rota, json=pedido).status_code == 422
     with Session(engine_teste) as s:
         hk = autos_civeis.processo
-        ativar_processo(hk, s.get_one(VisaoProcesso, hk).chave_dados_cifrada)
         pagina = s.get_one(VisaoPagina, bytes.fromhex(e["pagina_id"]))
         assert pagina.texto
         inicio = pagina.texto.index("06/03/2025")
@@ -55,7 +53,6 @@ def test_correcao_e_historico_com_evidencia_atualizada(
     assert len(tempestividade) >= 2 and sum(a["vigente"] for a in tempestividade) == 1
     assert len({a["id"] for a in tempestividade}) == 1
     with Session(engine_teste) as s, s.begin():
-        ativar_processo(hk, s.get_one(VisaoProcesso, hk).chave_dados_cifrada)
         assert processar_eventos(s, hk, date(2025, 4, 30))["achados_gravados"] == 0
     atual = next(f for f in c.get(base + "/fatos").json()["fatos"] if f["id"] == fato["id"])
     assert atual["valor"] == "2025-03-06" and atual["evidencias"][0]["trecho"] == "06/03/2025"

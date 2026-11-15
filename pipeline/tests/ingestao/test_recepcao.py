@@ -30,11 +30,10 @@ from lupa_pipeline.ingestao.recepcao import (
 )
 from lupa_pipeline.ingestao.storage import (
     ArmazenamentoMemoria,
-    StorageCifrado,
+    ArmazenamentoS3,
     chave_objeto,
     criar_storage,
 )
-from lupa_pipeline.seguranca.contexto import contexto_cifra
 
 
 async def _blocos(dados: bytes, tamanho: int = 7) -> AsyncIterator[bytes]:
@@ -94,22 +93,20 @@ async def test_tipo_invalido_preserva_bytes_para_quarentena(tmp_path: Path, dado
 
 @pytest.mark.integracao
 async def test_mesmo_arquivo_duas_vezes_nao_duplica(engine_teste: Engine, tmp_path: Path) -> None:
-    """RF-ING-01 e RF-SEG-01: o segundo lacre não altera o original cifrado no MinIO."""
+    """RF-ING-01 e RF-SEG-01: o segundo lacre não altera o original no MinIO."""
     processo = semear_processo(engine_teste)
     dados = pdf_minimo()
     recebido = await receber(_blocos(dados), "autos.pdf", 10_000_000, tmp_path)
     chave = chave_objeto(processo.hk_processo, recebido.sha256)
     storage = criar_storage(get_settings().model_copy(update={"storage_backend": "s3"}))
-    assert isinstance(storage, StorageCifrado)
+    assert isinstance(storage, ArmazenamentoS3)
     try:
         primeiro = lacrar_bytes(engine_teste, storage, processo, recebido.caminho)
-        objeto = storage.interno.ler(chave)
-        assert objeto.startswith(b"LUPAOBJ")
         assert storage.ler(chave) == dados
         segundo = lacrar_bytes(engine_teste, storage, processo, recebido.caminho, "copia.pdf")
         assert (primeiro.duplicado, segundo.duplicado) == (False, True)
         assert primeiro.hk_arquivo == segundo.hk_arquivo
-        assert storage.interno.ler(chave) == objeto
+        assert storage.ler(chave) == dados
     finally:
         storage.apagar(chave)
     with Session(engine_teste) as sessao:
@@ -135,13 +132,12 @@ def test_corrida_no_lacre_devolve_o_arquivo_do_concorrente(
     processo = semear_processo(engine_teste)
     caminho = tmp_path / "autos.pdf"
     caminho.write_bytes(pdf_minimo())
-    storage = StorageCifrado(ArmazenamentoMemoria())
+    storage = ArmazenamentoMemoria()
     inicio = Barrier(2)
 
     def enviar() -> ResultadoLacre:
-        with contexto_cifra():
-            inicio.wait(timeout=15)
-            return lacrar_bytes(engine_teste, storage, processo, caminho)
+        inicio.wait(timeout=15)
+        return lacrar_bytes(engine_teste, storage, processo, caminho)
 
     with ThreadPoolExecutor(max_workers=2) as grupo:
         envios = [grupo.submit(enviar) for _ in range(2)]
@@ -159,7 +155,7 @@ async def test_rollback_sobrescreve_objeto_orfao_no_proximo_envio(
     processo = semear_processo(engine_teste)
     dados = pdf_minimo()
     recebido = await receber(_blocos(dados), "autos.pdf", 10_000_000, tmp_path)
-    storage = StorageCifrado(ArmazenamentoMemoria())
+    storage = ArmazenamentoMemoria()
     chave = chave_objeto(processo.hk_processo, recebido.sha256)
     with Session(engine_teste) as sessao:
         lacrar(
@@ -171,7 +167,7 @@ async def test_rollback_sobrescreve_objeto_orfao_no_proximo_envio(
             nome_original="autos.pdf",
         )
         sessao.rollback()
-    primeiro = storage.interno.ler(chave)
+    assert storage.ler(chave) == dados
     with Session(engine_teste) as sessao:
         assert (
             sessao.scalar(
@@ -181,23 +177,18 @@ async def test_rollback_sobrescreve_objeto_orfao_no_proximo_envio(
         )
     resultado = lacrar_bytes(engine_teste, storage, processo, recebido.caminho)
     assert not resultado.duplicado
-    assert storage.interno.ler(chave) != primeiro
     assert storage.ler(chave) == dados
 
 
 @pytest.mark.integracao
-def test_estado_muda_sem_dek_e_sem_duplicar_a_linha_corrente(
-    engine_teste: Engine, tmp_path: Path
-) -> None:
+def test_estado_muda_sem_duplicar_a_linha_corrente(engine_teste: Engine, tmp_path: Path) -> None:
     """RF-ING-06, RF-ING-07: o worker conta tentativas sem precisar abrir o nome original."""
     processo = semear_processo(engine_teste)
     caminho = tmp_path / "autos.pdf"
     caminho.write_bytes(pdf_minimo())
-    resultado = lacrar_bytes(
-        engine_teste, StorageCifrado(ArmazenamentoMemoria()), processo, caminho
-    )
+    resultado = lacrar_bytes(engine_teste, ArmazenamentoMemoria(), processo, caminho)
     hk = resultado.hk_arquivo
-    with contexto_cifra(), Session(engine_teste) as sessao, sessao.begin():
+    with Session(engine_teste) as sessao, sessao.begin():
         for _ in range(2):
             arquivo = repositorio.mudar_estado(sessao, hk, EstadoJob.RECEBIDO, tentativas=1)
             assert (arquivo.estado, arquivo.tentativas) == ("recebido", 1)

@@ -1,13 +1,11 @@
-"""Chave por hash, `hash_diff` e HMAC por processo do Data Vault (A1; D4, D5).
+"""Chave por hash, `hash_diff` e hash do nome da parte no Data Vault (A1; D4, D5).
 
 O `hk` de um hub é o SHA-256 das partes da chave de negócio, normalizadas e unidas por `|`; o de
 um link, o SHA-256 dos hex dos `hk` dos hubs ligados, na ordem das colunas. O `hash_diff` de um
-satélite é o SHA-256 do JSON canônico dos atributos ou, quando o satélite tem coluna cifrada, o
-HMAC-SHA-256 com a DEK do processo, para que o hash não revele o texto por dicionário.
+satélite é o SHA-256 do JSON canônico dos atributos.
 """
 
 import hashlib
-import hmac
 import json
 import re
 import unicodedata
@@ -17,7 +15,6 @@ from uuid import UUID
 
 SEPARADOR = "|"
 TAMANHO_HK = 32
-TAMANHO_DEK = 32
 NAO_DIGITO = re.compile(r"\D")
 
 
@@ -133,43 +130,28 @@ def json_canonico(atributos: Mapping[str, object]) -> bytes:
     return texto.encode()
 
 
-def hmac_processo(dek: bytes, texto: str) -> bytes:
-    """HMAC-SHA-256 de um texto com a DEK do processo (`hub_parte.chave_nome`, D5).
+def hash_nome(texto: str) -> bytes:
+    """SHA-256 de um nome já normalizado (`hub_parte.chave_nome`; RF-SEG-01).
 
     Args:
-        dek: DEK do processo (32 bytes).
-        texto: Texto já normalizado por quem chama.
+        texto: Nome já normalizado por quem chama.
 
     Returns:
-        HMAC (32 bytes).
-
-    Raises:
-        ValueError: DEK sem 32 bytes.
+        SHA-256 (32 bytes).
     """
-    return _hmac(dek, texto.encode())
+    return hashlib.sha256(texto.encode()).digest()
 
 
-def _hmac(dek: bytes, dados: bytes) -> bytes:
-    if len(dek) != TAMANHO_DEK:
-        raise ValueError("DEK sem 32 bytes")
-    return hmac.new(dek, dados, hashlib.sha256).digest()
-
-
-def hash_diff(atributos: Mapping[str, object], dek: bytes | None = None) -> bytes:
+def hash_diff(atributos: Mapping[str, object]) -> bytes:
     """Calcula o `hash_diff` dos atributos de um satélite (A1, passo 5).
 
     Args:
         atributos: Atributos de negócio (sem `hk`, `load_dts`, `record_source`).
-        dek: DEK do processo, quando o satélite tem coluna cifrada.
 
     Returns:
-        SHA-256 do JSON canônico, ou HMAC-SHA-256 com a DEK (32 bytes).
+        SHA-256 do JSON canônico (32 bytes).
 
     Raises:
         TypeError: Valor sem forma canônica.
-        ValueError: DEK sem 32 bytes.
     """
-    conteudo = json_canonico(atributos)
-    if dek is None:
-        return hashlib.sha256(conteudo).digest()
-    return _hmac(dek, conteudo)
+    return hashlib.sha256(json_canonico(atributos)).digest()

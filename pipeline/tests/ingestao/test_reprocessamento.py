@@ -23,7 +23,7 @@ from lupa_pipeline.ingestao import indice, processamento
 from lupa_pipeline.ingestao.classificacao import classificar_tipo
 from lupa_pipeline.ingestao.eventos import capa, fatos, recurso
 from lupa_pipeline.ingestao.extracao import executar_tarefa
-from lupa_pipeline.ingestao.storage import StorageCifrado
+from lupa_pipeline.ingestao.storage import ObjectStorage
 from lupa_pipeline.ingestao.worker import executar_worker
 from lupa_pipeline.validacoes import motor
 from lupa_pipeline.validacoes.catalogo import validacoes_de
@@ -42,7 +42,7 @@ def banco_reprocessamento() -> Iterator[Engine]:
 def test_nova_versao_extrai_capas_existentes_e_preserva_correcao(
     banco_reprocessamento: Engine,
     settings_ficticias: Settings,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -99,7 +99,7 @@ def test_nova_versao_extrai_capas_existentes_e_preserva_correcao(
 def test_reinicio_executa_so_as_etapas_afetadas_e_preserva_a_revisao(
     banco_reprocessamento: Engine,
     settings_ficticias: Settings,
-    storage_memoria: StorageCifrado,
+    storage_memoria: ObjectStorage,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:

@@ -42,7 +42,6 @@ from lupa_pipeline.ingestao.recepcao import (
     receber,
 )
 from lupa_pipeline.ingestao.storage import ObjectStorage
-from lupa_pipeline.seguranca.contexto import ativar_processo
 
 router = APIRouter()
 RECUSAS = {
@@ -99,7 +98,6 @@ def _lacrar_envio(
 ) -> tuple[int, dict[str, Any]]:
     if processo.status == StatusProcesso.DESCARTADO.value:
         raise ConflitoError("processo descartado")
-    ativar_processo(processo.hk_processo, processo.chave_dados_cifrada)
     try:
         lacre = lacrar(
             sessao,
