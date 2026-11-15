@@ -455,3 +455,16 @@ a saída resumida (vermelho inicial e verde final).
     API publicada por `app.openapi()` informou 0.2.0. Os quatro locks Python foram regenerados
     pelos comandos do alvo `make lock`, preservando os pins e hashes. A varredura conferiu
     108 referências locais em 23 documentos. Doze testes de saúde da API passaram.
+
+## Fase 8 — Cadastro pelo arquivo
+
+Execução do [plano de cadastro pelo arquivo](plano_cadastro_pelo_arquivo.md).
+
+- [x] **T8.1** Ampliar os tipos de fato e preservar o criador no histórico de classe. RF-PRO-06, RF-FAT-01.
+  - `pytest pipeline/tests/dominio/test_migracao_0002.py --no-cov` no worker com PostgreSQL. A asserção dos seis novos tipos falhou antes da revisão. Com a migração, 1 teste passou, incluindo subida, duas correções, descida e nova subida.
+- [ ] **T8.2** Identificar número CNJ e classe no PDF ou ZIP em sandbox. RF-PRO-01, RF-ING-02, RF-ING-04.
+- [ ] **T8.3** Criar ou localizar o processo pelo upload, tratar o complemento e retirar o cadastro manual. RF-PRO-01, RF-ING-01, RF-ING-02.
+- [ ] **T8.4** Extrair, medir e exibir os fatos da capa com evidência nos autos sintéticos. RF-FAT-01, RF-FAT-03, RF-ING-08, RNF-02.
+- [ ] **T8.5** Corrigir a classe, preservar a autoria e recalcular os achados. RF-PRO-06.
+- [ ] **T8.6** Enviar os autos pela interface, completar a identificação e conferir a ficha no cabeçalho. RF-PRO-01, RF-PRO-06, RF-FAT-04.
+- [ ] **T8.7** Atualizar arquitetura, decisão, guia, capturas e documentação técnica. RF-DOC-01, RF-DOC-03.

@@ -30,13 +30,29 @@ from lupa_pipeline.dominio.enums import (
     StatusFato,
     StatusMensagem,
     StatusProcesso,
-    TipoFato,
     TipoPagina,
     TipoPeca,
 )
 from lupa_pipeline.dominio.tabelas import checar_enum, checar_valores
 
 PAPEL_APLICACAO = "lupa_app"
+TIPOS_FATO_0001 = (
+    "data_decisao_recorrida",
+    "data_intimacao",
+    "tipo_recurso",
+    "data_interposicao",
+    "qualidade_recorrente",
+    "comprovante_preparo",
+    "gratuidade_pedido",
+    "gratuidade_decisao",
+    "advogado_subscritor",
+    "procuracao",
+    "hipotese_decisao_agravada",
+    "data_ajuizamento",
+    "data_citacao",
+    "data_contestacao",
+    "data_acordao",
+)
 TABELAS: list[str] = []
 
 
@@ -198,7 +214,7 @@ def _criar_hubs() -> None:
         _texto("tipo"),
         _texto("sujeito"),
         _hk("hk_evidencia_origem", "hub_evidencia.hk_evidencia"),
-        checar_enum("tipo", TipoFato),
+        checar_valores("tipo", TIPOS_FATO_0001),
     )
     _hub("achado", _texto("numero_cnj"), _texto("validacao"), _texto("sujeito"))
     _hub("parte", _texto("numero_cnj"), _hk("chave_nome"))
