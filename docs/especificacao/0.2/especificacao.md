@@ -106,12 +106,24 @@ técnico.
 
 ### 4.2 Processos (PRO)
 
-**RF-PRO-01 — Cadastro.** O usuário cria um processo informando o número CNJ e a classe (3.1).
+**RF-PRO-01 — Cadastro pelo arquivo.** O usuário cria um processo enviando o PDF ou ZIP dos autos.
+O sistema lê o número CNJ e a classe (3.1) nas primeiras páginas e cria o processo sem outro
+passo. Não há cadastro sem arquivo.
 
-- Dado um número com dígito verificador inválido, quando o usuário cria o processo, então é
-  recusado com a razão.
-- Dado um número já cadastrado, quando o usuário cria o processo, então é recusado e a resposta
-  aponta o existente.
+- Dado um arquivo cuja capa traz um número CNJ com dígito verificador válido e uma classe da seção
+  3.1, quando é enviado, então o processo é criado com esse número e essa classe, o arquivo fica
+  recebido e quem enviou é o criador.
+- Dado um arquivo sem número CNJ válido, com números válidos diferentes sem rótulo que indique o
+  do processo, ou sem classe reconhecida, quando é enviado, então nada é gravado e a resposta traz
+  o que foi lido e o que falta; quando o usuário reenvia o mesmo arquivo informando o que faltava,
+  então o processo é criado.
+- Dado um número informado pelo usuário com dígito verificador inválido, então é recusado com a
+  razão.
+- Dado um arquivo cujo número já está cadastrado, quando é enviado, então entra como arquivo do
+  processo existente, a classe do processo não muda e a resposta aponta o processo.
+- Dado um arquivo cujo número é de processo descartado, quando é enviado, então é recusado.
+- Dado um arquivo que não abre (senha, corrompido, truncado, tipo não aceito ou ZIP malicioso),
+  quando é enviado para criar processo, então é recusado com o motivo e nada é gravado.
 
 **RF-PRO-02 — Lista.** O usuário vê todos os processos, com número, classe, estado da ingestão e
 responsáveis.
@@ -137,17 +149,28 @@ irrecuperável o conteúdo dos autos desse processo e preserva a auditoria.
 - Dado um processo descartado, quando o desembargador consulta a auditoria, então os eventos
   dele continuam lá.
 
+**RF-PRO-06 — Correção da classe.** O usuário pode corrigir a classe de um processo. A classe
+anterior fica guardada, com quem mudou e quando, e as validações são refeitas para a nova classe.
+
+- Dado um processo cuja classe foi corrigida, quando o processo é aberto, então mostra a nova
+  classe e permite ver a anterior, quem corrigiu e quando.
+- Dado um processo cuja classe foi corrigida, quando os achados são consultados, então são os das
+  validações da nova classe (3.1).
+- Dado um processo descartado, quando a classe é corrigida, então é recusado.
+
 ### 4.3 Ingestão (ING)
 
-**RF-ING-01 — Recepção e lacre.** O usuário envia PDF ou ZIP a um processo. Cada arquivo recebe
-SHA-256 no recebimento; o original nunca é alterado.
+**RF-ING-01 — Recepção e lacre.** O usuário envia PDF ou ZIP para criar um processo (RF-PRO-01)
+ou a um processo existente. Cada arquivo recebe SHA-256 no recebimento; o original nunca é
+alterado.
 
 - Dado um arquivo enviado, quando o original é lido de volta, então seu SHA-256 é o registrado.
 - Dado o mesmo arquivo enviado de novo ao mesmo processo, então a resposta informa duplicidade e
   nada novo é gravado.
 
 **RF-ING-02 — Arquivo inválido.** Arquivo corrompido, truncado, com senha, de tipo não aceito ou
-ZIP malicioso vai para quarentena com o motivo.
+ZIP malicioso enviado a um processo existente vai para quarentena com o motivo. No envio que cria
+o processo, o arquivo é recusado (RF-PRO-01).
 
 - Dado um PDF com senha, quando é enviado, então o estado final é quarentena com motivo `senha` e
   nenhuma página é gravada.
@@ -159,7 +182,12 @@ nas páginas sem texto nativo utilizável.
   gravada por página do PDF, cada uma com o tipo correto.
 
 **RF-ING-04 — Parsing isolado.** A abertura de PDF e o OCR rodam isolados, sem rede e sem acesso
-ao banco, com limite de memória, CPU e tempo.
+ao banco, com limite de memória, CPU e tempo. A leitura das primeiras páginas no envio que cria o
+processo (RF-PRO-01) roda no serviço da API, em subprocesso sem credenciais, com a rede bloqueada
+no próprio subprocesso e com os mesmos limites (risco 4 da seção 10).
+
+- Dado o subprocesso de leitura do envio, quando tenta abrir uma conexão de rede ou ler uma
+  variável de ambiente com credencial, então falha.
 
 - Dado um PDF que estoura o limite de memória, quando é processado, então o estado final é falho
   com o motivo e o serviço continua atendendo outros arquivos.
@@ -228,7 +256,13 @@ evidência não é gravado.
 | Procuração ou substabelecimento: outorgante e advogado | representação |
 | Hipótese da decisão agravada | cabimento |
 | Datas de ajuizamento, citação, contestação e acórdão | linha do tempo |
+| Relator e órgão julgador | cabeçalho do processo, dossiê |
+| Assunto e valor da causa | cabeçalho do processo, dossiê |
+| Juízo de origem e data de distribuição | cabeçalho do processo, dossiê |
 
+- Dado o processo sintético de referência, quando a ingestão termina, então relator, órgão
+  julgador, assunto, valor da causa, juízo de origem e data de distribuição coincidem com o
+  gabarito, cada um com a página de origem.
 - Dado qualquer fato gravado, quando sua evidência é conferida contra o texto da página, então o
   trecho está na posição registrada e o hash confere.
 - Dado um trecho candidato a fato cuja evidência não confere, então o fato não é gravado.
@@ -250,6 +284,8 @@ nos autos, sem pseudonimização.
 
 - Dado o processo sintético de referência, quando a ingestão termina, então a ficha lista as
   partes do gabarito com o polo correto e a página de origem.
+- Dado um processo com partes extraídas, quando o usuário o abre, então o cabeçalho mostra as
+  partes com o polo; a lista de processos não mostra partes.
 
 ### 4.6 Validações (VAL)
 
@@ -466,6 +502,24 @@ backup.
 **RF-DOC-03 — Documentos de sistema.** `docs/arquitetura.md` e `docs/sistema/` descrevem a 0.2
 como construída.
 
+**RF-DOC-04 — Estrutura da documentação.** A raiz de `docs/` contém só `README.md`,
+`arquitetura.md` e oito pastas: `especificacao/` (apenas `0.2/`), `sistema/`, `decisoes/` (ADRs em
+`decisoes/adr/`), `operacao/` (runbooks em `operacao/runbooks/`), `planos/`, `relatorios/`,
+`guias/` (capturas de tela, quando geradas, em `guias/imagens/`) e `conformidade/`. Análise,
+dívida técnica, incidente e pesquisa de contexto ficam em `relatorios/`, sem subpasta, com o nome
+`AAAA-MM-DD-<tipo>-<tema>` e tipo `analise`, `divida`, `incidente` ou `contexto`. Documentos da
+0.1 não ficam no repositório.
+
+- Dada a raiz de `docs/`, quando se listam suas entradas, então são exatamente os dois arquivos e
+  as oito pastas acima.
+- Dado um arquivo em `docs/relatorios/`, quando se lê o nome, então ele segue
+  `AAAA-MM-DD-<tipo>-<tema>` com um dos quatro tipos.
+- Dado um link relativo em qualquer arquivo `.md` versionado, quando o caminho é resolvido, então
+  o arquivo existe.
+- Dado qualquer arquivo versionado, quando se procuram os caminhos `docs/adr/`, `docs/runbooks/`,
+  `docs/etapas/`, `docs/contexto/`, `docs/imagens/`, `docs/dividas/`, `docs/analises/` e
+  `docs/incidentes/`, então nenhum é citado.
+
 ## 5. Requisitos não funcionais
 
 | Id | Requisito | Critério |
@@ -533,6 +587,22 @@ Respostas do usuário em 13/11/2026 às decisões levantadas antes desta especif
 | 27 | Reingestão | upload manual pela interface |
 | 28 | Itens mantidos da 0.1 | localização por IP, custo estimado, processo em revisão, testes ponta a ponta e capturas |
 
+Respostas do usuário em 15/11/2026 sobre o cadastro pelo arquivo (RF-PRO-01, RF-PRO-06).
+
+| Nº | Decisão | Resposta |
+| --- | --- | --- |
+| 29 | Dados lidos do arquivo | número CNJ e classe no envio; partes, relator, órgão julgador, assunto, valor da causa, juízo de origem e data de distribuição na ingestão |
+| 30 | Momento da identificação | no próprio envio, pela API |
+| 31 | Conferência antes de criar | não há; o processo é criado direto |
+| 32 | Número ou classe não lidos | o usuário completa o que faltou e o mesmo arquivo é aproveitado |
+| 33 | Número já cadastrado | o arquivo é anexado ao processo existente |
+| 34 | Cadastro manual sem arquivo | removido |
+| 35 | Dados da capa | fatos, com evidência e correção |
+| 36 | Classe errada | corrigível pela tela, com histórico |
+| 37 | Partes | no cabeçalho do processo e no dossiê; fora da lista |
+| 38 | Arquivo que não abre no envio que cria processo | recusado com o motivo |
+| 39 | Isolamento da leitura no envio | aceito o subprocesso na API, sem o isolamento de rede do worker |
+
 ## 8. Removido em relação à 0.1.0
 
 - Vários gabinetes: tabela `gabinete`, `gabinete_id`, RLS por gabinete, tela de gabinetes, papel
@@ -572,6 +642,11 @@ Consequências das decisões 2, 5 e 16 que o usuário deve ter à vista ao aprov
    sistema; correções, anotações, conversas e auditoria não têm cópia.
 3. **Sem monitoramento, falha é percebida pelo usuário.** Não há alerta de fila parada, cofre
    selado ou disco cheio.
+4. **A leitura no envio tem isolamento menor que o do worker.** Para criar o processo a partir do
+   arquivo (decisões 30 e 39), a API abre as primeiras páginas em subprocesso sem credenciais, com
+   rede bloqueada no próprio subprocesso e limites de memória, CPU e tempo. O contêiner da API
+   tem saída de rede; o do worker não. Um PDF que explore falha do parser nesse subprocesso não
+   encontra a barreira de rede do contêiner.
 
 ## 11. Regras jurídicas a confirmar pelo gabinete
 
