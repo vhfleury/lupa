@@ -5,10 +5,12 @@ O Lupa organiza os autos cíveis do gabinete e mostra de onde saiu cada informa�
 ## Entrar e localizar o processo
 
 1. Use a credencial entregue pelo desembargador. No primeiro acesso, configure o autenticador com o código mostrado e confirme o TOTP. Troque a senha temporária quando solicitado. Se perder o autenticador, peça a redefinição ao desembargador.
-2. Abra **Processos**. Pesquise o número CNJ. Para cadastrar, informe um número válido e escolha apelação cível, agravo de instrumento, embargos de declaração, agravo interno ou ação originária. Se o número já existir, abra o cadastro indicado.
-3. Envie PDF ou ZIP na tela do processo e acompanhe o arquivo. A quarentena informa o motivo. Em processamento parcial, consulte o relatório para saber quais páginas faltaram antes de usar o resultado.
+2. Abra **Processos**. Para consultar, pesquise o número CNJ. Para cadastrar, selecione **Novo processo**, escolha o PDF ou ZIP dos autos e clique em **Enviar**. O Lupa lê o número e a classe na capa. Se pedir um complemento, confira o que foi lido, preencha o campo solicitado e confirme o reenvio. O arquivo continua selecionado. Se o número já existir, o Lupa abre esse processo e informa se o arquivo foi anexado ou já tinha sido enviado.
+3. Na tela do processo, acompanhe a ingestão. Depois do processamento, confira as partes, os polos e os dados da capa pelas evidências. Use **Corrigir classe** se necessário. A alteração registra a classe anterior, o autor e a data, e atualiza as validações. Para juntar mais autos, use **Enviar autos**. Em caso de quarentena, leia o motivo. Em processamento parcial, consulte o relatório para saber quais páginas faltaram.
 
 ![Cadastro e consulta de processos sintéticos](../imagens/processos.png)
+
+![Cabeçalho do processo sintético com partes e dados da capa](../imagens/processo.png)
 
 ## Encontrar a prova na página
 

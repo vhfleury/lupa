@@ -16,7 +16,8 @@ O formato segue o [Keep a Changelog 1.1.0](https://keepachangelog.com/pt-BR/1.1.
 
 ## [Não publicado]
 
-Nada ainda.
+- **Cadastro de processos.** Envie o PDF ou ZIP dos autos para identificar número CNJ e classe. Se faltar informação, complete o campo pedido e reenvie. Um novo arquivo de um número já cadastrado entra no mesmo processo. A rota de cadastro manual foi substituída por `POST /api/processos/arquivos`.
+- **Ficha do processo.** Partes, polos, relator, órgão julgador, assunto, valor da causa, juízo de origem e distribuição aparecem com suas fontes. É possível corrigir a classe, consultar a alteração e conferir os achados recalculados.
 
 ## [0.2.0] - 2026-11-14
 

@@ -801,6 +801,27 @@ para a 0.2, mantém a consulta das versões anteriores pela interface. A execuç
 o resultado histórico de T1.7 na suíte da 0.1. A distribuição de responsáveis passa a ser
 verificada na 0.2 pelo vínculo, pela view e pelas rotas atuais. [Tarefas e testes](../planos/tarefas_0.2.md).
 
+### Cadastro pelo arquivo — 15/11/2026
+
+| Decisão | Regra que passa a valer |
+| --- | --- |
+| D1 | A inspeção e a leitura inicial ocorrem no temporário da API, antes do lacre por processo. |
+| D2 | O CNJ rotulado da página inicial tem precedência. Sem ele, a identificação exige um único número válido distinto nas páginas lidas. |
+| D3 | A classe vem do campo rotulado e da tabela de variantes cíveis. |
+| D4 | O envio incompleto devolve o que falta. O navegador reenvia o mesmo arquivo e os valores informados prevalecem. |
+| D5 | O cadastro recusa arquivo inválido antes da gravação dos autos, inclusive com complemento. |
+| D6 | Número já cadastrado recebe o arquivo e conserva a classe corrente. Descarte impede o envio. |
+| D7 | Uma trava transacional específica serializa a criação pelo número. |
+| D8 | O envio dos autos substitui o cadastro manual sem arquivo. |
+| D9 | Os seis valores da capa são fatos com sujeito vazio e evidência literal. A data e a moeda têm valores normalizados. |
+| D10 | A extração de capa respeita a janela de páginas e as regras de ajuizamento continuam restritas às peças de marco. |
+| D11 | A correção de classe grava nova linha, mantém o criador e recalcula os achados sob trava. |
+| D12 | Rótulos e classes aceitos ficam no catálogo versionado de eventos. |
+| D13 | O cabeçalho usa a ficha do dossiê para exibir partes e dados da capa. |
+| D14 | A versão do catálogo aciona o reprocessamento dos arquivos já ingeridos. |
+
+[Plano com regras e algoritmos](../planos/plano_cadastro_pelo_arquivo.md) · [ADR 0017](../adr/0017-cadastro-pelo-arquivo.md).
+
 ## Resultado das revisões
 
 | Revisão | Resultado |

@@ -24,7 +24,7 @@
 
 - [Especificação da 0.2](especificacao/0.2/especificacao.md).
 - [Plano da 0.2](planos/plano_0.2.md), [algoritmos e checklist](planos/plano_0.2_execucao.md) e [tarefas com evidências](planos/tarefas_0.2.md).
-- [Plano do cadastro pelo arquivo](planos/plano_cadastro_pelo_arquivo.md), aguardando aprovação.
+- [Plano do cadastro pelo arquivo](planos/plano_cadastro_pelo_arquivo.md) e [ADR 0017 sobre identificação no envio](adr/0017-cadastro-pelo-arquivo.md).
 - [ADRs](adr/README.md) e [registro das decisões](decisoes/registro.md).
 - [Defesas contra instruções presentes nos autos](especificacao/prompt-injection.md) e [decisão sobre o object storage](decisoes/object-storage.md).
 
