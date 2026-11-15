@@ -30,7 +30,7 @@ A minuta anterior identificou o fornecedor como controlador. A qualificação de
 | --- | --- | --- |
 | Usuários, nomes de acesso, papel, credenciais protegidas, sessão e metadados de acesso | Autenticação, segurança, atribuição de trabalho, auditoria e prestação de informações | A aplicação mantém dados de conta e histórico mínimo de atos. Prazos de retenção e canais de atendimento são definidos pelo controlador. |
 | Partes, procuradores e demais pessoas citadas em autos, inclusive menores e titulares de dados sensíveis | Organizar documentos, localizar evidências e apoiar a conferência do caso pelo gabinete | Usuários autorizados do gabinete consultam páginas e nomes. O modelo pode receber o contexto necessário à consulta. |
-| Perguntas, respostas, fatos corrigidos, anotações e evidências | Instruir a análise e permitir revisão humana | Conteúdo cifrado por processo. O descarte elimina a chave e o conteúdo do banco e remove os objetos. |
+| Perguntas, respostas, fatos corrigidos, anotações e evidências | Instruir a análise e permitir revisão humana | Conteúdo guardado sem cifra da aplicação no banco e no armazenamento de objetos; a proteção em repouso é a do host. O descarte elimina o conteúdo do banco e remove os objetos. |
 | Eventos e metadados do modelo | Verificar integridade, rastrear atos e produzir relatório de uso | Consulta e exportação pelo desembargador. Hubs, vínculos e cadeia de auditoria sobrevivem ao descarte. |
 
 <a id="pessoas-citadas-nos-autos"></a>
@@ -43,7 +43,7 @@ O aviso aos titulares deve identificar finalidades, agentes, canal de atendiment
 
 Preencher para cada fluxo da tabela anterior: processo de trabalho e finalidade específica, categorias de titulares e dados, responsável pela decisão de tratamento, operadores e destinatários, fundamento jurídico, prazo de retenção, localização e transferência, medidas de segurança e data da revisão. Para o fornecedor do modelo, anexar o contrato e a versão efetiva da política de retenção. Vincular cada decisão à avaliação institucional correspondente.
 
-A instalação em desenvolvimento usa TLS no navegador, controle por papel, trilha encadeada, envelope por processo, armazenamento cifrado e worker em rede interna. Não existe pseudonimização de nomes nem cópia de segurança do acervo de trabalho na implantação 0.2. A perda do host pode atingir correções, anotações, conversas e a própria auditoria. Preservar os documentos originais no repositório institucional definido pelo gabinete.
+A instalação em desenvolvimento usa TLS no navegador, controle por papel, trilha encadeada e worker em rede interna. Não há cifra da aplicação em repouso: os autos ficam em claro nos volumes do banco e do armazenamento de objetos. Não existe pseudonimização de nomes nem cópia de segurança do acervo de trabalho na implantação 0.2. A perda do host pode atingir correções, anotações, conversas e a própria auditoria. Preservar os documentos originais no repositório institucional definido pelo gabinete.
 
 <a id="plano-de-incidentes"></a>
 <a id="fundamentos-incidentes"></a>

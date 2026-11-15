@@ -22,4 +22,4 @@ O desembargador administra os assessores. A marca de responsável distribui trab
 
 ## Referências
 
-[Conformidade](../conformidade/CONFORMIDADE.md) e [criptografia](../sistema/criptografia.md). [Plano 0.2](../planos/plano_0.2.md).
+[Conformidade](../conformidade/CONFORMIDADE.md) e [modelo de dados](../sistema/modelo-de-dados.md). [Plano 0.2](../planos/plano_0.2.md).
