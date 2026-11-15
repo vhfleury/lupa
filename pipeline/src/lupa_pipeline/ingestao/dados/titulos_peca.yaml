@@ -1,0 +1,57 @@
+versao: "2"
+titulos:
+  - titulo: PETICAO INICIAL
+    tipo: peticao_inicial
+    variacoes: ["PETICAO INICIAL","EXORDIAL","ACAO DE COBRANCA"]
+  - titulo: CONTESTACAO
+    tipo: contestacao
+    variacoes: ["CONTESTACAO"]
+  - titulo: REPLICA
+    tipo: replica
+    variacoes: ["REPLICA","IMPUGNACAO A CONTESTACAO"]
+  - titulo: DECISAO INTERLOCUTORIA
+    tipo: decisao_interlocutoria
+    variacoes: ["DECISAO INTERLOCUTORIA","DECISAO","DECISAO AGRAVADA"]
+  - titulo: SENTENCA
+    tipo: sentenca
+    variacoes: ["SENTENCA"]
+  - titulo: EMBARGOS DE DECLARACAO
+    tipo: embargos_declaracao
+    variacoes: ["EMBARGOS DE DECLARACAO","EMBARGOS DECLARATORIOS"]
+  - titulo: APELACAO
+    tipo: apelacao
+    variacoes: ["APELACAO","APELACAO CIVEL","RECURSO DE APELACAO"]
+  - titulo: AGRAVO DE INSTRUMENTO
+    tipo: agravo_instrumento
+    variacoes: ["AGRAVO DE INSTRUMENTO"]
+  - titulo: AGRAVO INTERNO
+    tipo: agravo_interno
+    variacoes: ["AGRAVO INTERNO","AGRAVO REGIMENTAL"]
+  - titulo: CONTRARRAZOES
+    tipo: contrarrazoes
+    variacoes: ["CONTRARRAZOES","CONTRARRAZOES DE APELACAO"]
+  - titulo: ACORDAO
+    tipo: acordao
+    variacoes: ["ACORDAO"]
+  - titulo: CERTIDAO
+    tipo: certidao
+    variacoes: ["CERTIDAO","CERTIDAO DE INTIMACAO","CERTIDAO DE PUBLICACAO"]
+  - titulo: PROCURACAO
+    tipo: procuracao
+    variacoes: ["PROCURACAO","INSTRUMENTO DE MANDATO","SUBSTABELECIMENTO"]
+  - titulo: COMPROVANTE DE PREPARO
+    tipo: comprovante_preparo
+    variacoes: ["COMPROVANTE DE PREPARO","COMPROVANTE DE RECOLHIMENTO DO PREPARO","GUIA DE PREPARO"]
+  - titulo: LAUDO PERICIAL
+    tipo: laudo_pericial
+    variacoes: ["LAUDO PERICIAL","LAUDO TECNICO"]
+  - titulo: PARECER DO MINISTERIO PUBLICO
+    tipo: parecer_mp
+    variacoes: ["PARECER DO MINISTERIO PUBLICO","PARECER MINISTERIAL"]
+  - titulo: TERMO DE JUNTADA
+    tipo: outros
+    variacoes: ["TERMO DE JUNTADA","AUTUACAO","JUNTADA"]
+  - titulo: RAZOES DE APELACAO
+    tipo: apelacao
+    secao: true
+    variacoes: [RAZOES DE APELACAO, RAZOES RECURSAIS]

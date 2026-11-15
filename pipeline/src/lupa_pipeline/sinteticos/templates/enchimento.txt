@@ -1,0 +1,9 @@
+Os documentos do contrato detalham a área da cobertura, as condições de acesso e os materiais utilizados. A planilha apresenta as quantidades medidas durante a vistoria.
+
+No ofício nº $numero_oficio, recebido em $data_distracao, a secretaria solicitou cópia dos comprovantes apresentados à administração do condomínio.
+
+A inspeção registrada em $data_distracao descreve o estado da pintura e das estruturas de apoio. O relatório tem fotografias com referência ao pavimento e à fachada examinada.
+
+As partes consultaram os anexos e pediram cópia dos quadros de medição. O levantamento discrimina as horas de mão de obra e os materiais necessários ao reparo.
+
+[[A planilha de custos foi juntada aos autos.||A secretaria certificou o recebimento da planilha de custos.]] As notas fiscais permitem conferir os preços unitários e a extensão do serviço.

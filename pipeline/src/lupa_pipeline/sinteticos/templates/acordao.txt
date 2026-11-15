@@ -1,0 +1,5 @@
+ACÓRDÃO
+
+Acordam os integrantes da Câmara Cível em acolher parcialmente o pedido para ajustar o valor devido pelas obras.
+
+{{data_acordao:Acórdão proferido em $data}}.

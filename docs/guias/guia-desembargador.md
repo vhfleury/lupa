@@ -1,103 +1,31 @@
 # Guia do desembargador
 
-Tudo do [guia do assessor](guia-assessor.md) vale também para o senhor: o desembargador vê e
-faz tudo o que o assessor faz. Este guia trata só do que é **exclusivo** do desembargador. As
-telas usam dados **fictícios** de teste.
+O desembargador pode consultar processos, conferir fatos e citações, corrigir evidências e usar o chat pelos mesmos passos do [guia do assessor](guia-assessor.md). Também administra assessores, distribui responsáveis, examina a auditoria, libera o chat em revisão e decide sobre descarte.
 
-## 1. Gestão de assessores
+## Dar acesso e distribuir processos
 
-![Tela de usuários](../imagens/usuarios.png)
+Na tela **Usuários**, crie o assessor e entregue a credencial temporária por canal combinado. A pessoa registra o próprio autenticador no primeiro acesso. Use **Desativar** para encerrar o acesso e **Reativar** para restabelecê-lo. Em caso de perda de credencial, redefina a senha ou o MFA conforme o caso. As sessões anteriores são revogadas. O responsável técnico cria a primeira conta de desembargador fora da interface.
 
-Menu **Usuários**. A tabela mostra cada pessoa do gabinete com **Papel**, **Situação** (ativo ou
-desativado) e **Autenticador** (cadastrado ou pendente).
+Na tela do processo, escolha os responsáveis entre os assessores ativos e salve a distribuição. Todos os usuários ativos do gabinete consultam o acervo cível, inclusive quando os autos contêm dados sigilosos. Confira quem mantém acesso antes de admitir material sujeito a sigilo. [Gestão das contas](../operacao/operacao.md).
 
-**Adicionar um assessor**
+![Gestão de assessores na implantação de teste](../imagens/usuarios.png)
 
-1. Em **Novo assessor**, digite o **Nome de usuário** (3 a 64 caracteres: letras minúsculas,
-   números, ponto, hífen ou sublinhado) e clique **Criar assessor**.
-2. O sistema mostra uma **senha temporária**, que **não será exibida de novo**. Anote e entregue
-   pessoalmente ao assessor (nunca por e-mail ou mensagem junto com o nome de usuário). Clique
-   **Já anotei, fechar**.
-3. No primeiro acesso o assessor cadastra o autenticador e troca a senha (guia do assessor,
-   seção 2).
+## Examinar uma resposta bloqueada
 
-**Desativar** (quando o assessor sai do gabinete): botão **Desativar** na linha; confirme na
-janela que abre (Esc ou **Cancelar** desistem). A pessoa perde o acesso na hora. O histórico dela
-na auditoria **não é apagado**. **Reativar** devolve o acesso.
+Abra o processo em revisão e consulte o motivo e as informações do evento. Confira a página de origem de qualquer trecho suspeito. Enquanto a revisão estiver ativa, uma nova pergunta exibe o aviso e o sistema preserva os limites da conversa. Ao concluir a apuração, use **Liberar revisão**. A autorização fica no histórico de auditoria.
 
-## 2. Reset de senha e do autenticador
+Ao avaliar um achado, refaça a conta a partir das evidências e do calendário da classe. O chat oferece consulta documental. A conclusão de admissibilidade, a valoração da prova e a redação da decisão são atos do gabinete. [Como refazer tempestividade, preparo e representação](guia-assessor.md#conferir-uma-validação).
 
-- **Resetar senha**: gera nova senha temporária (mostrada uma única vez, como na criação). O
-  assessor entra com ela e é obrigado a trocar.
-- **Resetar autenticador**: apaga o cadastro do autenticador. No próximo acesso o assessor lê um
-  QR code novo (use quando trocar ou perder o celular).
-- Antes de resetar, confirme por um canal seguro (pessoalmente ou por telefone conhecido) que o
-  pedido é mesmo do assessor. Todo reset fica registrado na auditoria com o seu usuário.
-- A sua própria senha ou autenticador: peça ao administrador do sistema.
+## Auditoria e relatório ao tribunal
 
-## 3. Liberar processo em revisão
+Em **Auditoria**, filtre por período, usuário, processo ou ação. Consulte a localização registrada quando o evento apontar uma página ou trecho. Use **Verificar integridade** para conferir a cadeia cronológica. Se surgir posição inconsistente, preserve a exportação e encaminhe a ocorrência ao responsável técnico.
 
-Quando o chat detecta algo suspeito numa resposta (por exemplo, texto nos autos que parece uma
-instrução escondida para a IA, ou menção a outro processo), ele descarta a resposta e coloca o
-processo **em revisão**: o chat daquele processo fica suspenso para todos ("Processo em revisão.").
-Dossiê e validações continuam funcionando.
+![Auditoria dos atos sintéticos](../imagens/auditoria.png)
 
-1. Abra o **Chat** do processo. Aparece o aviso e o botão **Liberar revisão**.
-2. Antes de liberar, veja na **Auditoria** o evento `processo_em_revisao` (escolha esse valor na lista **Ação** e clique **Consultar**; a linha mostra
-   quando, quem perguntou e o processo) e
-   olhe no dossiê os **Alertas de saneamento** das páginas do processo: há texto estranho? O
-   arquivo é mesmo o exportado do Projudi?
-3. Se estiver tudo em ordem, clique **Liberar revisão** e confirme em **Liberar**. Fica
-   registrado o evento `revisao_liberada` com seu usuário. Se não estiver, mantenha suspenso e
-   avise o administrador.
+No relatório de uso, escolha o usuário ou processo e confira contagens, tokens e custo estimado. Para prestação de informações, exporte o período em CSV e registre a versão da ferramenta e do modelo. Use o [modelo de relatório](../conformidade/CONFORMIDADE.md#relatorio-uso-tribunal) para identificar o período, a finalidade e as medidas de supervisão humana.
 
-## 4. Auditoria do gabinete
+![Relatório por processo com contagens, tokens e custo estimado](../imagens/relatorio-uso.png)
 
-![Auditoria](../imagens/auditoria.png)
+## Descartar um processo
 
-Menu **Auditoria**. O senhor vê só o próprio gabinete.
-
-- **Filtros**: **Usuário (id)**, **Processo (id)**, **Ação** (ex.: `login_falha`,
-  `processo_aberto`, `pergunta_chat`, `fato_corrigido`, `admin_acesso_conteudo`), período (**De**,
-  **Até**) e **IP**. Clique **Consultar**; **Carregar mais** traz eventos mais antigos.
-- Cada linha: quando, ação, resultado (`ok`, `falha`, `negado`, `bloqueado`), usuário, processo,
-  objeto, IP e local aproximado. Clicar no usuário ou no processo abre o relatório de uso dele.
-- **O que nunca aparece**: texto dos autos, das perguntas, das respostas e das anotações; senhas.
-- **Acesso do administrador** a conteúdo de autos aparece como `admin_acesso_conteudo`: filtre
-  por essa ação para ver quando e o quê.
-- **Exportar o filtro aplicado**: **CSV** ou **JSON**. A exportação também vira um registro.
-- **Integridade da cadeia**: o botão **Verificar integridade** recalcula o lacre de cada evento.
-  "Íntegra" quer dizer que ninguém alterou nem apagou registro. Se acusar problema, ele mostra o
-  primeiro evento afetado: avise o administrador imediatamente e guarde uma exportação.
-
-## 5. Relatório de uso
-
-![Relatório de uso](../imagens/relatorio-uso.png)
-
-Na mesma tela, seção **Relatório de uso**: escolha **Por** (processo ou usuário), cole o
-**Identificador** (ou clique num id na tabela) e gere. Mostra quantas vezes cada ação ocorreu,
-primeiro e último acesso, quais versões do modelo de IA e das instruções foram usadas, e um
-**custo estimado** (estimativa pela tabela de preços do sistema; o valor real está na fatura do
-fornecedor). Exporte em CSV/JSON pelo filtro da auditoria se precisar anexar.
-
-## 6. Dever de informar o tribunal
-
-O Lupa é uma ferramenta **privada** de inteligência artificial generativa, fornecida por terceiro
-(não é do tribunal). As normas do CNJ sobre uso de IA pelo Judiciário (Resolução CNJ 615/2025,
-art. 19, conforme o documento de requisitos do sistema; confira o texto vigente) permitem esse
-uso pelo magistrado e servidores para tarefas de apoio, desde que:
-
-- o uso fique nas finalidades de apoio (localizar, organizar, resumir), sem decisão automática;
-- a supervisão e a conclusão sejam sempre humanas;
-- o magistrado **informe ao tribunal** o uso da ferramenta, na forma que o tribunal definir.
-
-O **relatório de uso** por processo e por usuário existe para isso: ele mostra o que foi usado,
-por quem, quando e com qual versão do modelo, sem expor o conteúdo dos autos. Combine com o
-tribunal a periodicidade e o formato da comunicação e guarde as exportações enviadas.
-
-Outros cuidados que dependem do senhor:
-
-- Não envie autos de processos em segredo de justiça (bloqueados nesta versão).
-- Garanta que os assessores leram o guia e sabem que **toda informação deve ser conferida na
-  página dos autos**.
-- Desative imediatamente o acesso de quem deixar o gabinete.
+Antes de acionar o descarte, confira o número CNJ e o processo selecionado. O descarte torna o conteúdo, as correções, as anotações e as conversas inacessíveis e elimina o envelope da chave. Os eventos e os vínculos técnicos permanecem para auditoria. Se houver aviso de limpeza pendente no storage, acione novamente a operação para concluir a remoção dos objetos. A implantação de desenvolvimento não dispõe de backup. [Procedimento operacional](../operacao/operacao.md#descarte).

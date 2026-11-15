@@ -7,8 +7,7 @@ O formato segue o [Keep a Changelog 1.1.0](https://keepachangelog.com/pt-BR/1.1.
 
 ## Como as versões funcionam
 
-- A versão é do monorepo inteiro: back, front, proxy e scripts sobem juntos. O `pyproject.toml` e o
-  `front/package.json` (e o `front/package-lock.json`) declaram a mesma versão, `0.1.0`.
+- A versão é do monorepo inteiro: back, front, proxy e scripts sobem juntos. Os manifestos de `pipeline/`, `intranet/api/` e `intranet/web/` declaram a mesma versão, `0.2.0`.
 - Esquema de numeração: [SemVer 2.0](https://semver.org/lang/pt-BR/). Enquanto a versão for `0.x`,
   uma versão menor pode quebrar compatibilidade.
 - Ao publicar: num PR para o `develop`, mova as entradas de `Não publicado` para uma seção
@@ -18,6 +17,23 @@ O formato segue o [Keep a Changelog 1.1.0](https://keepachangelog.com/pt-BR/1.1.
 ## [Não publicado]
 
 Nada ainda.
+
+## [0.2.0] - 2026-11-14
+
+### Adicionado
+
+- Dossiê cível com qualificação das partes, evidências de página, histórico de fatos e achados e conferência individual de cada recorrente.
+- Catálogo de tempestividade, preparo, representação e cabimento para apelações, agravos e embargos. As cinco classes, inclusive ação originária, têm autos sintéticos com gabarito.
+- Data Vault no PostgreSQL, chave de dados por processo, descarte com retomada de objetos pendentes e auditoria em cadeia única.
+
+### Alterado
+
+- A intranet e a pipeline têm pacotes e suítes próprios. O processamento usa uma fila no PostgreSQL e retoma páginas e lotes já concluídos.
+- Desembargador e assessores compartilham o acervo de um gabinete. Os nomes das partes permanecem nos trechos consultados. A aplicação aceita autos sigilosos e documenta o tratamento no serviço externo do modelo.
+
+### Removido
+
+- Módulos criminais do piloto, administrador e isolamento por gabinete, Redis/RQ, backup, monitoramento e configuração de produção da 0.1.
 
 ## [0.1.0] - 2026-11-13
 
@@ -74,5 +90,6 @@ Nada ainda.
   bucket de desenvolvimento, que guarda objetos antigos em claro
   ([ADR 0012](docs/adr/0012-recusa-de-dado-em-claro.md)).
 
-[Não publicado]: https://github.com/vhfleury/lupa/compare/v0.1.0...HEAD
+[Não publicado]: https://github.com/vhfleury/lupa/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/vhfleury/lupa/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/vhfleury/lupa/releases/tag/v0.1.0

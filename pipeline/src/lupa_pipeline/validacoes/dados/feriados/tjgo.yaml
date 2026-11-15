@@ -1,0 +1,19 @@
+versao: "2026.11.0"
+fonte: "https://docs.tjgo.jus.br/institucional/feriados/DOC_feriados_2026_13012026.pdf"
+abrangencia: "Tribunal de Justiça de Goiás"
+feriados:
+  - {data: 2026-02-16, descricao: "Carnaval"}
+  - {data: 2026-02-17, descricao: "Carnaval"}
+  - {data: 2026-04-01, descricao: "Semana Santa"}
+  - {data: 2026-04-02, descricao: "Semana Santa"}
+  - {data: 2026-04-03, descricao: "Paixão de Cristo"}
+  - {data: 2026-04-20, descricao: "Ponto facultativo no Judiciário goiano"}
+  - {data: 2026-05-24, descricao: "Nossa Senhora Auxiliadora"}
+  - {data: 2026-06-04, descricao: "Corpus Christi"}
+  - {data: 2026-06-05, descricao: "Ponto facultativo no Judiciário goiano"}
+  - {data: 2026-07-26, descricao: "Fundação da Cidade de Goiás"}
+  - {data: 2026-10-24, descricao: "Aniversário de Goiânia"}
+  - data: 2026-10-30
+    descricao: "Dia do Servidor Público, transferido pelo Decreto Judiciário 5.123/2026"
+    fonte: "https://www.tjgo.jus.br/index.php/agencia-de-noticias/noticias-ccs/240-carrossel-tj/37449-tjgo-transfere-feriado-do-dia-do-servidor-publico-para-30-de-outubro"
+  - {data: 2026-12-08, descricao: "Dia da Justiça"}

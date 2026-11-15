@@ -1,0 +1,6 @@
+versao: "0.2.0"
+fonte: "Especificação 0.2, RF-VAL-03 e RF-VAL-04. CPC: https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2015/lei/l13105compilada.htm"
+dispensas:
+  fazenda_publica: "Fazenda Pública"
+  ministerio_publico: "Ministério Público"
+  defensoria_publica: "Defensoria Pública"

@@ -1,0 +1,5 @@
+CERTIDÃO
+
+Certifico o cumprimento do mandado. {{data_citacao:Citação em $data}}.
+
+A parte ré recebeu cópia da petição inicial e dos documentos que a instruem.
