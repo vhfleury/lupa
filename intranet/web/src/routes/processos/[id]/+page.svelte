@@ -5,6 +5,7 @@
   import { page } from '$app/state';
   import { chamar, mensagemErro } from '$lib/api';
   import Responsaveis from '$lib/processos/Responsaveis.svelte';
+  import CabecalhoProcesso from '$lib/processos/CabecalhoProcesso.svelte';
   import Aviso from '$lib/componentes/Aviso.svelte';
   import {
     enviarArquivo,
@@ -17,12 +18,11 @@
     ESTADO_JOB,
     ESTADOS_FINAIS,
     formatarData,
-    legivel,
     motivoFalha,
     motivoQuarentena,
     SITUACAO,
   } from '$lib/processos/rotulos';
-  import type { ArquivosDoProcesso, Processo } from '$lib/processos/tipos';
+  import type { ArquivosDoProcesso, Dossie, Processo } from '$lib/processos/tipos';
   import { repetirEnquanto } from '$lib/repeticao';
   import { sessao, tem } from '$lib/sessao.svelte';
 
@@ -31,8 +31,9 @@
   const id = $derived(page.params['id'] ?? '');
   let processo = $state<Processo | null>(null);
   let dados = $state<ArquivosDoProcesso | null>(null);
+  let ficha = $state<Dossie['ficha'] | null>(null);
   let erro = $state('');
-  let aviso = $state('');
+  let aviso = $state(page.state.avisoCadastro ?? '');
   let progresso = $state<Progresso | null>(null);
   let envio: EnvioEmCurso | null = null;
   let seletor = $state<HTMLInputElement | null>(null);
@@ -52,7 +53,24 @@
 
   async function carregarArquivos(): Promise<void> {
     try {
-      dados = await chamar<ArquivosDoProcesso>('GET', `/processos/${id}/arquivos`);
+      const novos = await chamar<ArquivosDoProcesso>('GET', `/processos/${id}/arquivos`);
+      const atualizarFicha =
+        !ficha ||
+        novos.arquivos.some(
+          (a) =>
+            (a.estado === 'concluido' || a.estado === 'em_revisao') &&
+            !dados?.arquivos.some(
+              (anterior) =>
+                anterior.arquivo_id === a.arquivo_id &&
+                anterior.estado_em === a.estado_em &&
+                anterior.estado === a.estado,
+            ),
+        );
+      dados = novos;
+      if (atualizarFicha && processo?.status !== 'descartado') {
+        const dossie = await chamar<Dossie>('GET', `/processos/${id}/dossie`);
+        ficha = dossie.ficha;
+      }
     } catch (e) {
       erro = mensagemErro(e);
     }
@@ -110,10 +128,7 @@
 
 <p><a href="/processos">← Processos</a></p>
 {#if processo}
-  <h1 class="mono">{processo.numero_cnj}</h1>
-  <p>
-    {legivel(processo.classe)} · {legivel(processo.status)}
-  </p>
+  <CabecalhoProcesso {processo} {ficha} aoCorrigir={(atualizado) => (processo = atualizado)} />
   <nav class="atalhos" aria-label="Telas do processo">
     <a href="/processos/{id}/dossie">Dossiê e linha do tempo</a>
     <a href="/processos/{id}/validacoes">Validações</a>

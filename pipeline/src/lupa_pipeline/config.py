@@ -8,6 +8,8 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
+PAGINAS_IDENTIFICACAO_PADRAO = 3
+
 
 class Settings(BaseSettings):
     """Configuração da aplicação; falha na criação se faltar variável obrigatória."""
@@ -34,6 +36,8 @@ class Settings(BaseSettings):
     sandbox_memoria_mb: int = Field(default=1024, ge=64)
     sandbox_cpu_segundos: int = Field(default=60, ge=1)
     sandbox_tempo_segundos: float = Field(default=120.0, gt=0)
+    identificacao_paginas: int = Field(default=PAGINAS_IDENTIFICACAO_PADRAO, ge=1)
+    identificacao_tempo_segundos: float = Field(default=30.0, gt=0, allow_inf_nan=False)
     zip_max_entradas: int = Field(default=2000, ge=1)
     zip_max_razao: float = Field(default=100.0, gt=1)
     zip_max_descomprimido_bytes: int = Field(default=4 * 1024 * 1024 * 1024, gt=0)

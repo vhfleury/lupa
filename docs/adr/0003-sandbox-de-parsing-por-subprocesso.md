@@ -33,6 +33,8 @@ PDF e OCR são a superfície de ataque mais antiga do sistema. Um arquivo malici
 
 ## Fontes
 
+- [ADR 0017, uso do sandbox pela API no cadastro pelo arquivo](0017-cadastro-pelo-arquivo.md)
+
 - [decisoes/registro.md](../decisoes/registro.md), 4A.4
 - [sistema/ingestao.md](../sistema/ingestao.md), "Sandbox de parsing"
 - `src/lupa/ingestao/sandbox.py`

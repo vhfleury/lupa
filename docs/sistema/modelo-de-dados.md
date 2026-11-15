@@ -11,6 +11,8 @@ A revisão Alembic `v0001_data_vault` instala o esquema da 0.2 em uma base nova.
 
 ## Vigência e histórico
 
+A revisão `0002` amplia o CHECK de `hub_fato.tipo` com os seis dados da capa. Em `sat_processo_dados`, cada linha guarda a classe e o usuário que a registrou. A view `v_processo` lê o criador da primeira linha e a classe da última. Quando há correção, expõe a classe penúltima, a chave e o identificador de quem corrigiu e o instante da alteração.
+
 O banco gera `load_dts` com seu relógio. Para o mesmo pai e subchave, o trigger garante a ordem crescente mesmo perante recuo do relógio. As views de leitura apresentam a versão atual. `v_fato_historico` e `v_achado_historico` sustentam a consulta de versões anteriores na interface. A correção preserva o identificador do fato e registra a evidência vigente. Um fato só pode ser criado com evidência de origem.
 
 O sujeito de fato ou achado é o hex da chave da parte. O valor vazio designa informação comum ao processo. O nome normalizado da parte identifica o hub por HMAC com a DEK do processo. A identidade e os dados sensíveis residem em satélites cifrados. O banco recusa alterações e remoções diretas nos registros protegidos. O descarte segue a função com privilégios específicos e elimina o conteúdo de um único processo.
@@ -20,5 +22,7 @@ O sujeito de fato ou achado é o hex da chave da parte. O valor vazio designa in
 `link_processo_responsavel` e sua vigência alimentam `v_responsavel`. O desembargador atribui ou remove assessores ativos. O cadastro do gabinete permite a ambas as funções consultar o acervo. A responsabilidade indica a distribuição de trabalho.
 
 ## Migração
+
+O downgrade para `0001` restaura a definição anterior da view e do CHECK. Se houver fatos de um dos seis tipos novos, o PostgreSQL recusa o CHECK anterior e desfaz a transação, preservando os dados.
 
 A partir da raiz, use `make migrate` contra o banco da 0.2. O piloto 0.1 tem esquema e cadeia de revisões próprios. O registro histórico de T1.7 conserva o resultado de seus testes de responsáveis, e T3.6 verifica o vínculo atual. [Histórico das tarefas](../planos/tarefas_0.2.md).

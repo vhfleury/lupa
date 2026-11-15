@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from lupa_pipeline.config import get_settings
 from lupa_pipeline.dominio.chaves import hmac_processo
 from lupa_pipeline.dominio.enums import StatusFato, TipoPeca
 from lupa_pipeline.dominio.esquemas import Achado
@@ -147,15 +148,26 @@ def atualizar_achados(session: Session, processo_id: bytes, referencia: date) ->
     }
 
 
-def processar_eventos(session: Session, processo_id: bytes, referencia: date) -> dict[str, Any]:
+def processar_eventos(
+    session: Session,
+    processo_id: bytes,
+    referencia: date,
+    *,
+    identificacao_paginas: int | None = None,
+) -> dict[str, Any]:
     """Recalcula o processo inteiro a partir das páginas e peças, respeitando revisões humanas."""
     processo = processo_para_gravar(session, processo_id)
     pecas = pecas_do_processo(session, processo_id)
     sujeitos = _gravar_partes(session, processo, pecas)
     gravados: set[bytes] = set()
     rejeitados = 0
+    limite = (
+        get_settings().identificacao_paginas
+        if identificacao_paginas is None
+        else identificacao_paginas
+    )
     for peca in pecas:
-        for candidato in candidatos_da_peca(peca, sujeitos):
+        for candidato in candidatos_da_peca(peca, sujeitos, identificacao_paginas=limite):
             fato = confirmar(candidato, processo.id)
             if fato is None:
                 rejeitados += 1

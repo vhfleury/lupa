@@ -21,7 +21,7 @@ from lupa_pipeline.dominio.tabelas import sat_fato_anotacao
 from lupa_pipeline.dominio.visoes import VisaoAnotacao, VisaoArquivo, VisaoPagina
 from lupa_pipeline.ingestao import indice, processamento
 from lupa_pipeline.ingestao.classificacao import classificar_tipo
-from lupa_pipeline.ingestao.eventos import recurso
+from lupa_pipeline.ingestao.eventos import capa, fatos, recurso
 from lupa_pipeline.ingestao.extracao import executar_tarefa
 from lupa_pipeline.ingestao.storage import StorageCifrado
 from lupa_pipeline.ingestao.worker import executar_worker
@@ -37,6 +37,63 @@ def banco_reprocessamento() -> Iterator[Engine]:
     with banco_vazio("reprocessamento") as engine:
         migrar(engine, "head")
         yield engine
+
+
+def test_nova_versao_extrai_capas_existentes_e_preserva_correcao(
+    banco_reprocessamento: Engine,
+    settings_ficticias: Settings,
+    storage_memoria: StorageCifrado,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """RF-FAT-01/02/03, RF-ING-08: arquivos discordantes e revisão sobrevivem ao reinício."""
+    engine = banco_reprocessamento
+    processo = semear_processo(engine)
+    for i, assunto in enumerate(("Assunto A", "Assunto B")):
+        caminho = tmp_path / f"volume-{i}.pdf"
+        caminho.write_bytes(pdf_texto([f"AUTUAÇÃO\nAssunto: {assunto}\nRetificação: Assunto C"]))
+        lacrar_bytes(engine, storage_memoria, processo, caminho)
+
+    def reiniciar() -> None:
+        assert (
+            executar_worker(
+                engine,
+                settings_ficticias,
+                storage_memoria,
+                PararAoEsvaziar(),
+                processamento.processar_arquivo,
+            )
+            == 0
+        )
+
+    with monkeypatch.context() as anterior:
+        anterior.setattr(fatos, "VERSAO", "civel-0.2.0")
+        anterior.setattr(capa, "extrair", lambda _fonte: ())
+        reiniciar()
+        with Session(engine) as session:
+            assert listar_fatos_por_processo(session, processo.hk_processo) == []
+    reiniciar()
+    with Session(engine) as session, session.begin():
+        assuntos = listar_fatos_por_processo(session, processo.hk_processo)
+        assert sorted(f.valor for f in assuntos) == ["Assunto A", "Assunto B"]
+        original = next(f for f in assuntos if f.valor == "Assunto A")
+        evidencia = original.evidencias[0]
+        pagina = session.get_one(VisaoPagina, bytes.fromhex(evidencia.pagina_id))
+        assert pagina.texto and pagina.texto[evidencia.inicio : evidencia.fim] == original.valor
+        valor = "Assunto C"
+        inicio = pagina.texto.index(valor)
+        nova = Evidencia(
+            id="0" * 64, pagina_id=pagina.id, trecho=valor, inicio=inicio, fim=inicio + len(valor)
+        )
+        corrigir_fato(session, original, StatusFato.CORRIGIDO, processo.hk_usuario, valor, nova)
+    monkeypatch.setattr(fatos, "VERSAO", "civel-teste")
+    reiniciar()
+    with Session(engine) as session:
+        atuais = listar_fatos_por_processo(session, processo.hk_processo)
+        assert {(f.valor, f.status) for f in atuais} == {
+            ("Assunto B", StatusFato.AUTOMATICO),
+            ("Assunto C", StatusFato.CORRIGIDO),
+        }
 
 
 def test_reinicio_executa_so_as_etapas_afetadas_e_preserva_a_revisao(

@@ -45,7 +45,7 @@ from lupa_pipeline.sinteticos.roteiro import Configuracao
 def test_gabarito_de_cada_classe(
     classe: str, peca_recurso: str | None, validacoes: set[str], tmp_path: Path
 ) -> None:
-    """Relê o arquivo exportado e confere as evidências contra o texto realmente emitido."""
+    """RF-FAT-01 e RNF-04. Confere evidências da capa e das peças em cada classe."""
     config = Configuracao(
         classe=ClasseProcessual(classe),
         semente=19,
@@ -61,6 +61,19 @@ def test_gabarito_de_cada_classe(
         conteudo.documento.close()
     gabarito = Gabarito.model_validate_json(arquivo.gabarito.read_bytes())
     assert gabarito.processo.classe == classe
+    capa = {e.tipo.value: e for e in gabarito.eventos if e.pagina == 1}
+    assert set(capa) == {
+        "relator",
+        "orgao_julgador",
+        "assunto",
+        "valor_causa",
+        "juizo_origem",
+        "data_distribuicao",
+    }
+    assert all(e.sujeito == "" for e in capa.values())
+    assert capa["valor_causa"].trecho == "R$ 1.234,56"
+    assert capa["valor_causa"].valor == "1234.56"
+    assert capa["data_distribuicao"].trecho != capa["data_distribuicao"].valor
     assert {p.polo for p in gabarito.partes} == {Polo.ATIVO, Polo.PASSIVO}
     assert len({p.nome for p in gabarito.partes}) == 2
     for registro in (*gabarito.partes, *gabarito.eventos):

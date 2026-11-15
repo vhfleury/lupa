@@ -1,4 +1,19 @@
-versao: civel-0.2.0
+versao: civel-0.3.0
+capa:
+  numero: ["Processo nº", "Processo no", "Processo n°", "Autos nº", "Autos no", "Autos n°", "Número do processo"]
+  classe: ["Classe processual", "Classe judicial", "Classe"]
+  classes:
+    apelacao_civel: ["Apelação cível"]
+    agravo_instrumento: ["Agravo de instrumento", "Agravo instrumento"]
+    embargos_declaracao: ["Embargos de declaração", "Embargos declaração"]
+    agravo_interno: ["Agravo interno"]
+    acao_originaria: ["Ação originária", "Ação rescisória", "Mandado de segurança", "Reclamação", "Conflito de competência"]
+  relator: ["Relator", "Relatora"]
+  orgao_julgador: ["Órgão julgador"]
+  assunto: ["Assunto"]
+  valor_causa: ["Valor da causa"]
+  juizo_origem: ["Juízo de origem", "Comarca"]
+  data_distribuicao: ["Data de distribuição", "Distribuição"]
 datas:
   data_ajuizamento: 'ajuiz(?:amento|ad[ao])|distribui(?:cao|d[ao])'
   data_intimacao: 'intim(?:acao|ad[ao])'

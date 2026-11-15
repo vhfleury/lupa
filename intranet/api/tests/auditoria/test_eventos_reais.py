@@ -144,13 +144,15 @@ def fluxo(
     with TestClient(OrigemTeste(app_teste), base_url="https://teste") as c:
         segredos = _autenticar(c, app_teste, engine_teste, magistrado) + _gerir_assessor(c)
         numero = gerar_numero_cnj(1 + uuid4().int % 9_999_998)
-        criado = c.post("/processos", json={"numero_cnj": numero, "classe": "apelacao_civel"})
-        assert criado.status_code == 201
-        processo = criado.json()["id"]
-        base = f"/processos/{processo}"
         pdf = pdf_texto([f"CERTIDÃO\nCertifico o seguinte. {TRECHO}"])
-        envio = c.post(base + "/arquivos", params={"nome": NOME_ARQUIVO}, content=pdf)
+        envio = c.post(
+            "/processos/arquivos",
+            params={"nome": NOME_ARQUIVO, "numero_cnj": numero, "classe": "apelacao_civel"},
+            content=pdf,
+        )
         assert envio.status_code == 201
+        processo = envio.json()["processo_id"]
+        base = f"/processos/{processo}"
         arquivo = envio.json()["arquivo_id"]
         with fabrica_sessao() as session:
             hk = bytes.fromhex(processo)

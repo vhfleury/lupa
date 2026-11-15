@@ -24,6 +24,7 @@ from lupa_pipeline.ingestao.calibracao import (
     para_markdown,
     semear_assessor,
 )
+from lupa_pipeline.ingestao.eventos.capa import TIPOS_CAPA
 from lupa_pipeline.ingestao.repositorio import mudar_estado
 from lupa_pipeline.ingestao.storage import ObjectStorage
 from lupa_pipeline.ingestao.worker import TRAVA_WORKER
@@ -46,7 +47,7 @@ def test_calibracao_de_processo_sintetico_gera_relatorio_para_conferencia(
     storage_memoria: ObjectStorage,
     autos_sinteticos: AutosSinteticos,
 ) -> None:
-    """Pipeline até achados e relatório com diagnóstico, peças, eventos com trecho e achados."""
+    """RF-FAT-01: o relatório traz os seis fatos da capa com os valores e trechos do gabarito."""
     dono = sessionmaker(engine_teste)
     with dono.begin() as session:
         usuario = semear_assessor(session, "scripts.calibrar")
@@ -67,6 +68,9 @@ def test_calibracao_de_processo_sintetico_gera_relatorio_para_conferencia(
     assert dados["diagnostico"]["cenario"] == "pdf_com_bookmarks_e_indice"
     assert {p["nome"] for p in dados["partes"]} == {p.nome for p in gabarito.partes}
     assert dados["fatos"] and all(f["trecho"] for f in dados["fatos"])
+    capa = {f["tipo"]: (f["valor"], f["trecho"]) for f in dados["fatos"] if f["tipo"] in TIPOS_CAPA}
+    assert set(capa) == set(TIPOS_CAPA)
+    assert capa == {e.tipo: (e.valor, e.trecho) for e in gabarito.eventos if e.tipo in TIPOS_CAPA}
     assert [(a["validacao"], a["resultado"]) for a in dados["achados"]] == sorted(
         (a.validacao, a.resultado.value) for a in gabarito.resultado_esperado
     )
@@ -164,7 +168,7 @@ def test_medicao_ponta_a_ponta_confronta_dados_do_banco_com_o_gabarito(
     tmp_path: Path,
     cenario: Cenario,
 ) -> None:
-    """O relatório confere valores, fontes e cadeia de representação de cada parte."""
+    """RNF-02, RF-FAT-01: mede as datas e confronta valores e evidências com o gabarito."""
     caminho = Path(__file__).resolve().parents[2] / "scripts" / "ponta_a_ponta.py"
     spec = importlib.util.spec_from_file_location("ponta_a_ponta", caminho)
     assert spec is not None and spec.loader is not None
@@ -192,4 +196,5 @@ def test_medicao_ponta_a_ponta_confronta_dados_do_banco_com_o_gabarito(
     )
     assert linha["estado"] == "concluido" and linha["evidencias_nao_literais"] == 0
     assert linha["fronteira"]["recall"] == 1.0 and linha["eventos"]["recall"] == 1.0, linha
+    assert linha["datas"]["precisao"] >= 0.99, linha["datas"]
     assert linha["achados_iguais"] == len(linha["achados"]) == 3, linha["achados"]

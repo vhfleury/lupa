@@ -394,10 +394,47 @@ def test_resposta_citada_legitima_permanece_disponivel_nos_autos_injetados(
     assert corpo["citacoes"][0]["pagina_id"] == pagina_id and corpo["citacoes"][0]["trecho"] == nome
 
 
+def _conferir_dados_capa(
+    cliente: TestClient, alvo: Processado, dados: list[dict[str, Any]], deslocamento: int
+) -> None:
+    """RF-FAT-01/04: cada valor da capa precisa do fato e da prova literal prevista no gabarito."""
+    tipos = {
+        "relator",
+        "orgao_julgador",
+        "assunto",
+        "valor_causa",
+        "juizo_origem",
+        "data_distribuicao",
+    }
+    previstos = {e.tipo.value: e for e in alvo.gabarito.eventos if e.tipo.value in tipos}
+    assert set(previstos) == tipos
+    assert len(dados) == len(tipos) and {d["tipo"] for d in dados} == tipos
+    resposta = cliente.get(f"/processos/{alvo.processo_id}/fatos")
+    assert resposta.status_code == 200, resposta.text
+    fatos = {f["id"]: f for f in resposta.json()["fatos"]}
+    paginas = {pid: (n, texto) for pid, n, texto in alvo.paginas}
+    for dado in dados:
+        esperado = previstos[dado["tipo"]]
+        fato = fatos[dado["fato_id"]]
+        assert (fato["tipo"], fato["valor"], fato["sujeito"]) == (esperado.tipo, esperado.valor, "")
+        (prova,) = fato["evidencias"]
+        numero, texto = paginas[prova["pagina_id"]]
+        assert numero == esperado.pagina + deslocamento
+        assert texto[prova["inicio"] : prova["fim"]] == prova["trecho"] == esperado.trecho
+        assert prova["hash_trecho"] == calcular_hash(esperado.trecho)
+        assert dado == {
+            "tipo": esperado.tipo.value,
+            "valor": esperado.valor,
+            "fato_id": fato["id"],
+            "evidencia_id": prova["id"],
+            "pagina_id": prova["pagina_id"],
+        }
+
+
 def test_dossie_do_processo_sintetico_bate_com_o_gabarito(
     app_teste: FastAPI, engine_teste: Engine, ingeridos: list[Processado]
 ) -> None:
-    """Dossie do processo sintetico bate com o gabarito."""
+    """RF-FAT-01/04, RF-DOS-01: dados e provas do dossiê conferem com os autos injetados."""
     alvo = ingeridos[0]
     app_teste.state.cliente_agente = ClienteFalso([Roteiro(resposta="nunca")])
     cliente = TestClient(app_teste, base_url="https://testserver")
@@ -426,4 +463,5 @@ def test_dossie_do_processo_sintetico_bate_com_o_gabarito(
         (a.validacao, a.resultado.value) for a in alvo.gabarito.resultado_esperado
     )
     assert {p["nome"] for p in dossie["ficha"]["partes"]} == {p.nome for p in alvo.gabarito.partes}
+    _conferir_dados_capa(cliente, alvo, dossie["ficha"].pop("dados_capa"), deslocamentos.pop())
     assert textos_livres_sem_rotulo(dossie) == []

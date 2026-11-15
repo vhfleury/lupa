@@ -2,8 +2,10 @@
 
 import json
 from pathlib import Path
+from random import SystemRandom
 from threading import Event
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI
@@ -11,7 +13,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from apoio_comum import criar_processo_teste
 from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.enums import ClasseProcessual, PapelUsuario
 from lupa_pipeline.dominio.repositorios import listar_achados, listar_fatos_por_processo
@@ -22,10 +23,12 @@ from lupa_pipeline.dominio.visoes import (
     VisaoPeca,
     VisaoProcesso,
 )
+from lupa_pipeline.ingestao.eventos.etapa import processar_eventos
 from lupa_pipeline.ingestao.processamento import processar_arquivo
 from lupa_pipeline.ingestao.storage import ObjectStorage, criar_storage, prefixo_processo
 from lupa_pipeline.ingestao.worker import executar_worker
 from lupa_pipeline.seguranca.contexto import ativar_processo
+from lupa_pipeline.sinteticos import identidades
 from lupa_pipeline.sinteticos.empacotamento import exportar
 from lupa_pipeline.sinteticos.gabarito import Cenario, Composicao, Gabarito
 from lupa_pipeline.sinteticos.gerador import gerar_conteudo
@@ -86,6 +89,47 @@ def _conferir(sessao: Session, hk: bytes, arquivo: bytes, gab: Gabarito) -> None
     }
 
 
+def _conferir_ficha_e_reprocessamento(
+    cliente: TestClient, engine: Engine, hk: bytes, gab: Gabarito
+) -> None:
+    """RF-FAT-01/03/04, RF-ING-08: confronta a capa com a prova e preserva a revisão humana."""
+    tipos = {
+        "relator",
+        "orgao_julgador",
+        "assunto",
+        "valor_causa",
+        "juizo_origem",
+        "data_distribuicao",
+    }
+    base = f"/processos/{hk.hex()}"
+    previstos = {e.tipo.value: e.valor for e in gab.eventos if e.tipo.value in tipos}
+    dossie = cliente.get(base + "/dossie").json()
+    dados = dossie["ficha"]["dados_capa"]
+    assert set(previstos) == tipos
+    assert {d["tipo"]: d["valor"] for d in dados} == previstos
+    fatos = {f["id"]: f for f in cliente.get(base + "/fatos").json()["fatos"]}
+    for d in dados:
+        prova = fatos[d["fato_id"]]["evidencias"][0]
+        assert (d["pagina_id"], d["evidencia_id"]) == (prova["pagina_id"], prova["id"])
+    assert [e["data"] for e in dossie["linha_do_tempo"] if e["tipo"] == "data_distribuicao"] == [
+        previstos["data_distribuicao"]
+    ]
+    relator = next(d for d in dados if d["tipo"] == "relator")
+    evidencia = fatos[relator["fato_id"]]["evidencias"][0]
+    pedido = {k: evidencia[k] for k in ("pagina_id", "inicio", "fim", "trecho")}
+    novo = relator["valor"].upper()
+    correcao = cliente.post(
+        f"{base}/fatos/{relator['fato_id']}/corrigir",
+        json=pedido | {"status": "corrigido", "valor": novo},
+    )
+    assert correcao.status_code == 201, correcao.text
+    with Session(engine) as sessao, sessao.begin():
+        ativar_processo(hk, sessao.get_one(VisaoProcesso, hk).chave_dados_cifrada)
+        processar_eventos(sessao, hk, gab.processo.data_referencia)
+    ficha = cliente.get(base + "/dossie").json()["ficha"]
+    assert [d["valor"] for d in ficha["dados_capa"] if d["tipo"] == "relator"] == [novo]
+
+
 @pytest.mark.parametrize(
     ("classe", "cenario"),
     [
@@ -101,7 +145,7 @@ def test_upload_fila_e_resultados_conferem_com_gabarito(
     engine_teste: Engine,
     settings_ficticias: Settings,
 ) -> None:
-    """RF-ING-03, RF-FAT-04, RNF-01/02. Cada peça, parte e fato deve remeter ao PDF."""
+    """RF-PRO-01, RF-ING-03/08, RF-FAT-01/03/04, RNF-01/02: do cadastro ao gabarito."""
     config = Configuracao(
         semente=19,
         classe=classe,
@@ -110,7 +154,11 @@ def test_upload_fila_e_resultados_conferem_com_gabarito(
         mistura={Composicao.NATIVA: 1.0},
         proporcao_vazias=0,
     )
-    conteudo = gerar_conteudo(config)
+    gerar_cnj = identidades.gerar_numero_cnj
+    with patch.object(
+        identidades, "gerar_numero_cnj", side_effect=lambda _, ano: gerar_cnj(SystemRandom(), ano)
+    ):
+        conteudo = gerar_conteudo(config)
     try:
         (arquivo,) = exportar(conteudo, tmp_path, (cenario,))
     finally:
@@ -121,16 +169,21 @@ def test_upload_fila_e_resultados_conferem_com_gabarito(
     app_teste.state.storage = storage
     with TestClient(app_teste, base_url="https://testserver") as cliente:
         logar(cliente, engine_teste, usuario)
-        # O banco de testes é compartilhado pelas parametrizações; cada cadastro exige CNJ novo.
-        hk = criar_processo_teste(engine_teste, usuario, classe=classe)
+        r = cliente.post(
+            "/processos/arquivos",
+            params={"nome": arquivo.caminho.name},
+            content=arquivo.caminho.read_bytes(),
+        )
+        assert r.status_code == 201, r.text
+        corpo = r.json()
+        assert corpo["processo_criado"] and corpo["numero_cnj"] == gab.processo.numero_cnj
+        assert corpo["classe"] == classe and corpo["origem"] == {
+            "numero_cnj": "lido",
+            "classe": "lido",
+        }
+        hk = bytes.fromhex(corpo["processo_id"])
         try:
-            r = cliente.post(
-                f"/processos/{hk.hex()}/arquivos",
-                params={"nome": arquivo.caminho.name},
-                content=arquivo.caminho.read_bytes(),
-            )
-            assert r.status_code == 201, r.text
-            esperado = bytes.fromhex(r.json()["arquivo_id"])
+            esperado = bytes.fromhex(corpo["arquivo_id"])
             parar = Event()
 
             def executar(
@@ -149,6 +202,8 @@ def test_upload_fila_e_resultados_conferem_com_gabarito(
             assert executar_worker(engine_teste, settings_ficticias, storage, parar, executar) == 0
             with Session(engine_teste) as sessao:
                 _conferir(sessao, hk, esperado, gab)
+            if cenario == Cenario.PDF_LISO:
+                _conferir_ficha_e_reprocessamento(cliente, engine_teste, hk, gab)
         finally:
             for chave in storage.listar(prefixo_processo(hk)):
                 storage.apagar(chave)

@@ -16,7 +16,7 @@ export type SituacaoIngestao =
   | 'pendencias'
   | 'concluido';
 
-export interface Processo {
+interface ResumoProcesso {
   id: string;
   numero_cnj: string;
   classe: ClasseProcessual;
@@ -25,7 +25,13 @@ export interface Processo {
   criado_em: string;
 }
 
-export interface ProcessoNaLista extends Processo {
+export interface Processo extends ResumoProcesso {
+  classe_anterior: ClasseProcessual | null;
+  classe_corrigida_por_id: string | null;
+  classe_corrigida_em: string | null;
+}
+
+export interface ProcessoNaLista extends ResumoProcesso {
   responsaveis?: { id: string; nome_usuario: string; ativo: boolean }[];
   ingestao: {
     situacao: SituacaoIngestao;
@@ -62,6 +68,26 @@ export interface RespostaEnvio {
   tamanho_bytes: number;
   mime: string;
   duplicado: boolean;
+}
+
+export interface Complemento {
+  numero_cnj?: string;
+  classe?: ClasseProcessual;
+}
+
+export interface IdentificacaoIncompleta {
+  motivo: 'identificacao_incompleta';
+  lido: { numero_cnj: string | null; classe: ClasseProcessual | null };
+  faltando: (keyof Complemento)[];
+  numeros_encontrados: string[];
+}
+
+export interface RespostaEnvioProcesso extends RespostaEnvio {
+  processo_id: string;
+  processo_criado: boolean;
+  numero_cnj: string;
+  classe: ClasseProcessual;
+  origem: { numero_cnj: 'lido' | 'informado'; classe: 'lido' | 'informado' | 'existente' };
 }
 
 export interface PecaIndice {
@@ -106,6 +132,13 @@ export interface Dossie {
       pagina_id: string;
     }[];
     responsaveis: { id: string; nome_usuario: string }[];
+    dados_capa: {
+      tipo: string;
+      valor: string;
+      fato_id: string;
+      pagina_id: string;
+      evidencia_id: string;
+    }[];
     ingestao: { situacao: SituacaoIngestao };
   };
   pecas: {

@@ -31,6 +31,7 @@ class AcaoAuditoria(StrEnum):
     USUARIO_DESATIVADO = "usuario_desativado"
     USUARIO_REATIVADO = "usuario_reativado"
     PROCESSO_CRIADO = "processo_criado"
+    CLASSE_CORRIGIDA = "classe_corrigida"
     RESPONSAVEL_ADICIONADO = "responsavel_adicionado"
     RESPONSAVEL_REMOVIDO = "responsavel_removido"
     UPLOAD = "upload"

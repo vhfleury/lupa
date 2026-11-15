@@ -4,6 +4,7 @@
   import { chamar, mensagemErro } from '$lib/api';
   import Aviso from '$lib/componentes/Aviso.svelte';
   import { mascararCnj } from '$lib/processos/cnj';
+  import DadosCapa from '$lib/processos/DadosCapa.svelte';
   import { formatarData, legivel, RESULTADO, SITUACAO } from '$lib/processos/rotulos';
   import type { Dossie, Indice } from '$lib/processos/tipos';
 
@@ -59,6 +60,7 @@
       <dd>{legivel(dossie.ficha.classe)}</dd>
       <dt>Status</dt>
       <dd>{legivel(dossie.ficha.status)}</dd>
+      <DadosCapa processoId={id} dados={dossie.ficha.dados_capa} />
       <dt>Partes</dt>
       <dd data-testid="partes">
         {#each dossie.ficha.partes as parte (parte.id)}

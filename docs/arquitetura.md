@@ -14,10 +14,10 @@ O Lupa atende um gabinete cível de segundo grau. O assessor e o desembargador c
 
 ## Percurso de um arquivo
 
-1. O usuário cadastra o número e a classe. A API valida o dígito CNJ e informa o processo existente se o número se repetir.
-2. Ao receber PDF ou ZIP, a API calcula o SHA-256, deduplica por processo e arquivo, cifra os bytes e registra a recepção. A view da fila passa a apresentar o arquivo.
+1. O usuário envia o PDF ou ZIP. Ainda no temporário, a API executa a inspeção e lê a capa em subprocessos com limites, ambiente filtrado e sockets bloqueados. Valida o dígito CNJ e identifica a classe pelo rótulo. Se faltar identificação, o navegador reenvia o mesmo arquivo com o complemento. Uma recusa estrutural encerra a tentativa.
+2. Sob trava transacional pelo número CNJ, a API localiza o processo ou o cria com sua chave de dados. Deduplica pelo SHA-256 dos bytes, cifra o arquivo com a chave do processo e registra a recepção e a auditoria. A view da fila passa a apresentar o arquivo.
 3. Um worker mantém o lock de sessão na conexão física e consome a fila em ordem de recebimento. O ambiente de parsing limita memória, CPU e tempo do subprocesso. A extração combina texto nativo e OCR conforme a página, guarda evidências e marca conteúdo suspeito.
-4. A classificação identifica as peças. Os extratores localizam partes e fatos e conferem os offsets contra o texto da página. O catálogo seleciona as regras pela classe e avalia os fatos de cada recorrente.
+4. A classificação identifica as peças. Os extratores localizam partes e fatos, inclusive os seis campos da capa, e conferem os offsets contra o texto da página. O catálogo seleciona as regras pela classe e avalia os fatos de cada recorrente. Uma correção de classe preserva o criador e recalcula os achados na mesma transação.
 5. No dossiê e no visualizador, a pessoa abre a evidência para conferir a página. Uma correção grava outra versão do fato e recalcula os achados. Uma reexecução respeita a classificação manual e os fatos confirmados ou corrigidos.
 6. O chat consulta o processo aberto e verifica as citações da resposta antes de mostrá-las. O registro de auditoria guarda atos, identificadores e metadados de uso. O texto dos autos e das conversas tem armazenamento cifrado próprio.
 

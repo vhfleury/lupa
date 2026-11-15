@@ -35,8 +35,9 @@ function numeroCnj(sequencial: number, valido: boolean): string {
 }
 
 /** PDF mínimo válido (uma página com texto), montado com os offsets corretos do xref. */
-function pdfMinimo(texto: string): Buffer {
-  const conteudo = `BT /F1 14 Tf 72 720 Td (${texto}) Tj ET`;
+function pdfMinimo(...linhas: string[]): Buffer {
+  const texto = linhas.map((linha) => `(${linha}) Tj`).join(' T* ');
+  const conteudo = `BT /F1 14 Tf 20 TL 72 720 Td ${texto} ET`;
   const objetos = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
@@ -114,19 +115,25 @@ test.describe.serial('Etapas 6.4 a 6.7', () => {
     });
   });
 
-  test('6.4 cria processo (CNJ validado), envia PDF e o status muda; quarentena legível', async () => {
+  test('RF-PRO-01 completa o CNJ da capa e acompanha arquivos do processo', async () => {
     test.setTimeout(240_000);
     await page.goto('/processos');
     const sequencial = 1_000_000 + Math.floor(Math.random() * 8_000_000);
     await page.getByRole('button', { name: /Novo processo/ }).click();
+    await page.getByLabel(/Arquivo PDF ou ZIP/).setInputFiles({
+      name: 'autos-sem-numero.pdf',
+      mimeType: 'application/pdf',
+      buffer: pdfMinimo('Classe: Apelacao civel'),
+    });
+    await page.getByRole('button', { name: 'Enviar' }).click();
+    await expect(page.getByLabel('Número CNJ')).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Classe', exact: true })).toHaveCount(0);
     await page.getByLabel('Número CNJ').fill(numeroCnj(sequencial, false));
-    await page.getByLabel('Classe').selectOption('apelacao_civel');
-    await page.getByRole('button', { name: 'Criar processo' }).click();
+    await expect(page.getByRole('button', { name: 'Confirmar e reenviar' })).toBeDisabled();
     await expect(page.getByText('Dígito verificador não confere.')).toBeVisible();
     await page.getByLabel('Número CNJ').fill(numeroCnj(sequencial, true));
-    await page.getByRole('button', { name: 'Criar processo' }).click();
-    await expect(page.getByText(/Processo .* criado\./)).toBeVisible();
-    await page.getByRole('link', { name: numeroCnj(sequencial, true) }).click();
+    await page.getByRole('button', { name: 'Confirmar e reenviar' }).click();
+    await expect(page.getByText('Processo criado e arquivo recebido.')).toBeVisible();
     await expect(page).toHaveURL(/\/processos\/[0-9a-f]{64}$/);
     processoNovo = page.url().split('/').at(-1) ?? '';
 
@@ -151,6 +158,35 @@ test.describe.serial('Etapas 6.4 a 6.7', () => {
     expect(await estadoFinal(page, 'truncado.pdf')).toContain('quarentena');
     const linha = page.getByTestId('lista-arquivos').locator('tr', { hasText: 'truncado.pdf' });
     await expect(linha.getByTestId('motivo-quarentena')).toHaveText(/incompleto/);
+  });
+
+  test('RF-PRO-01 reconhece a capa e distingue criação, anexo e duplicata', async () => {
+    const numero = numeroCnj(9018754, true);
+    const pdf = pdfMinimo(`Numero do processo: ${numero}`, 'Classe: Agravo interno');
+    const anexo = pdfMinimo(`Numero do processo: ${numero}`, 'Classe: Apelacao civel');
+    let destino = '';
+    for (const [buffer, aviso] of [
+      [pdf, 'Processo criado e arquivo recebido.'],
+      [anexo, 'Arquivo anexado ao processo existente.'],
+      [anexo, 'Este arquivo já foi enviado ao processo.'],
+    ] as const) {
+      await page.goto('/processos');
+      await page.getByRole('button', { name: /Novo processo/ }).click();
+      await page.getByLabel(/Arquivo PDF ou ZIP/).setInputFiles({
+        name: 'autos.pdf',
+        mimeType: 'application/pdf',
+        buffer,
+      });
+      await page.getByRole('button', { name: 'Enviar' }).click();
+      await expect(page.getByText(aviso)).toBeVisible();
+      await expect(page.getByRole('heading', { name: numero })).toBeVisible();
+      if (destino) expect(page.url()).toBe(destino);
+      destino = page.url();
+    }
+    await page.getByRole('button', { name: 'Corrigir classe' }).click();
+    await page.getByLabel('Nova classe').selectOption('agravo_instrumento');
+    await page.getByRole('button', { name: 'Salvar classe' }).click();
+    await expect(page.getByLabel('Última correção de classe')).toContainText('Agravo interno');
   });
 
   test(`6.4 upload de ${MEGABYTES_GRANDE} MB com progresso sem travar a interface`, async () => {
