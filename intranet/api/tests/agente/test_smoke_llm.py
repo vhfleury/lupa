@@ -15,13 +15,13 @@ from typing import Any
 
 import pytest
 
-from lupa_intranet.agente.cliente import (
+from lupa_api.agente.cliente import (
     ClienteAgenteError,
     ClienteSdk,
     FerramentaAgente,
     PedidoAgente,
 )
-from lupa_intranet.agente.contexto import prompt_sistema
+from lupa_api.agente.contexto import prompt_sistema
 
 pytestmark = pytest.mark.llm
 

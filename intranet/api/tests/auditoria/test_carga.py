@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import Engine, func, select, text
 from sqlalchemy.orm import Session
 
-from lupa_intranet.auditoria import consulta
+from lupa_api.auditoria import consulta
 from lupa_pipeline.dominio.chaves import chave_hash
 from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao
 from lupa_pipeline.dominio.visoes import VisaoAuditoria

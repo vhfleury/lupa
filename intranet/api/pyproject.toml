@@ -62,7 +62,7 @@ testpaths = ["tests"]
 pythonpath = ["src", "../../pipeline/src", "../../pipeline/tests/apoio"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-addopts = "--cov=lupa_intranet --cov-report=term-missing --cov-fail-under=90 -m 'not carga and not llm'"
+addopts = "--cov=lupa_api --cov-report=term-missing --cov-fail-under=90 -m 'not carga and not llm'"
 markers = [
     "integracao: exige PostgreSQL e MinIO acessíveis",
     "carga: teste de carga lento (1 milhão de eventos); rode com `pytest -m carga --no-cov`",

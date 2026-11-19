@@ -10,7 +10,7 @@ Sai com a contagem de desembargadores criados no log (0 ou 1), nunca com a senha
 import os
 import sys
 
-from lupa_intranet.acesso.instalacao import criar_desembargador_inicial
+from lupa_api.acesso.instalacao import criar_desembargador_inicial
 from lupa_pipeline.config import get_settings
 from lupa_pipeline.logging import configurar_logging
 

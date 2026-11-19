@@ -11,8 +11,8 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, sessionmaker
 
 from apoio_comum import eventos_do_banco
-from lupa_intranet.auditoria.eventos import AcaoAuditoria, NovoEvento
-from lupa_intranet.auditoria.registrador import registrar, verificar_cadeia
+from lupa_api.auditoria.eventos import AcaoAuditoria, NovoEvento
+from lupa_api.auditoria.registrador import registrar, verificar_cadeia
 from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao
 
 pytestmark = pytest.mark.integracao

@@ -9,9 +9,9 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from apoio_comum import UsuarioTeste, criar_pagina, criar_processo_teste
-from lupa_intranet.agente.contexto import Delimitador
-from lupa_intranet.agente.ferramentas.sessao import SessaoAgente
-from lupa_intranet.auditoria.eventos import AcaoAuditoria
+from lupa_api.agente.contexto import Delimitador
+from lupa_api.agente.ferramentas.sessao import SessaoAgente
+from lupa_api.auditoria.eventos import AcaoAuditoria
 from lupa_pipeline.dominio import tabelas as t
 from lupa_pipeline.dominio.chaves import chave_hash
 from lupa_pipeline.dominio.enums import PapelUsuario

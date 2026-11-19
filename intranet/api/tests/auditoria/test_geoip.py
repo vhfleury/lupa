@@ -8,7 +8,7 @@ import geoip2.database
 import geoip2.errors
 import pytest
 
-from lupa_intranet.auditoria import geoip
+from lupa_api.auditoria import geoip
 from lupa_pipeline.config import Settings
 
 

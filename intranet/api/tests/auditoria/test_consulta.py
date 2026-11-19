@@ -12,8 +12,8 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from apoio_comum import UsuarioTeste, criar_processo_teste, eventos_do_banco
-from lupa_intranet.auditoria.eventos import AcaoAuditoria, NovoEvento
-from lupa_intranet.auditoria.registrador import registrar
+from lupa_api.auditoria.eventos import AcaoAuditoria, NovoEvento
+from lupa_api.auditoria.registrador import registrar
 from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.logging import CAMPOS_PROIBIDOS
 from tests.auditoria.conftest import ChamadaTeste

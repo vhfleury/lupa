@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 
-from lupa_intranet.agente.recusa import classificar, politica_padrao
+from lupa_api.agente.recusa import classificar, politica_padrao
 
 CORPUS = Path(__file__).parent / "dados" / "perguntas.yaml"
 META_RECALL = 1.0

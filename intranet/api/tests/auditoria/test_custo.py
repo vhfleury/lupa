@@ -9,8 +9,8 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from apoio_comum import criar_processo_teste
-from lupa_intranet.agente.precos import CAMINHO_PRECOS, Preco, custo, ler_tabela, tabela_padrao
-from lupa_intranet.auditoria.consulta import FiltroAuditoria, custo_estimado
+from lupa_api.agente.precos import CAMINHO_PRECOS, Preco, custo, ler_tabela, tabela_padrao
+from lupa_api.auditoria.consulta import FiltroAuditoria, custo_estimado
 from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.dominio.gravacao import gravar_hub
 from lupa_pipeline.dominio.tabelas import hub_conversa

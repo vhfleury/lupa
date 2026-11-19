@@ -507,10 +507,16 @@ Execução do [plano do front em Django](plano_front_django.md). Um único PR pa
 depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos; mudança em
 `lupa_api` roda também a suíte da pipeline e a de `lupa_web`.
 
-- [ ] **T10.1** Renomear `lupa_intranet` para `lupa_api` e mover `limpar_dev.py`. RES-12. Fase 1; P1.
+- [x] **T10.1** Renomear `lupa_intranet` para `lupa_api` e mover `limpar_dev.py`. RES-12. Fase 1; P1.
   - Vermelho: `pipeline/tests/unit/test_dependencias.py::test_pipeline_nao_importa_lupa_api_nem_lupa_web` falha (pacote ainda se chama `lupa_intranet` e `pipeline/scripts/limpar_dev.py` importa a API).
   - Verde: `git mv` do pacote, imports, `resources.files`, `pyproject.toml`, Dockerfile, scripts; `limpar_dev.py` e seu teste para `intranet/api/`.
   - Limpeza: nenhuma.
+  - Comando: `docker compose exec worker python -m pytest -c pipeline/pyproject.toml
+    pipeline/tests/unit/test_dependencias.py --no-cov -q`. Vermelho (pacote renomeado, com
+    `pipeline/scripts/limpar_dev.py` importando `lupa_api`): `1 failed, 1 passed`. Verde (script
+    em `intranet/api/scripts/`, teste em `intranet/api/tests/unit/test_limpar_dev.py`): `2 passed`.
+  - Suítes com `LUPA_EXIGIR_INTEGRACAO=1`: pipeline `702 passed`, cobertura 95,25%; intranet/api
+    `262 passed, 3 deselected`, cobertura 98,23%.
 - [ ] **T10.2** Gravar `record_source` `api.*` nas linhas novas e listar os dois prefixos na auditoria. RES-12. Fase 1; D9.
   - Vermelho: `intranet/api/tests/auditoria/test_registrador.py::test_evento_novo_grava_record_source_api` e `intranet/api/tests/auditoria/test_consulta.py::test_auditoria_lista_eventos_com_record_source_antigo_e_novo`.
   - Verde: constantes `ORIGEM` e filtros por `record_source`.

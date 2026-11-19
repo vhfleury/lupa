@@ -251,8 +251,8 @@ def test_nenhuma_validacao_importa_camadas_proibidas() -> None:
     proibidos = (
         "lupa_pipeline.dominio",
         "lupa_pipeline.ingestao",
-        "lupa_intranet.agente",
-        "lupa_intranet.api",
+        "lupa_api.agente",
+        "lupa_api.api",
     )
     permitidos = {"lupa_pipeline.dominio.esquemas", "lupa_pipeline.dominio.enums"}
     for arquivo in _arquivos_py():

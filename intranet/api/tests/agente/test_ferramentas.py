@@ -6,20 +6,20 @@ from typing import Any
 
 import pytest
 
-from lupa_intranet.agente.cliente import ClienteFalso, PassoFerramenta, PedidoAgente, Roteiro
-from lupa_intranet.agente.ferramentas import leitura
-from lupa_intranet.agente.ferramentas.calculo import executar_validacao
-from lupa_intranet.agente.ferramentas.leitura import (
+from lupa_api.agente.cliente import ClienteFalso, PassoFerramenta, PedidoAgente, Roteiro
+from lupa_api.agente.ferramentas import leitura
+from lupa_api.agente.ferramentas.calculo import executar_validacao
+from lupa_api.agente.ferramentas.leitura import (
     buscar_texto,
     ler_pagina_estruturada,
     listar_achados,
     listar_fatos,
     listar_pecas,
 )
-from lupa_intranet.agente.ferramentas.original import OBJETO_PAGINA_ORIGINAL, ler_pagina_original
-from lupa_intranet.agente.ferramentas.registro import criar_ferramentas
-from lupa_intranet.agente.ferramentas.sessao import SessaoAgente, flags_ligadas
-from lupa_intranet.auditoria.eventos import AcaoAuditoria
+from lupa_api.agente.ferramentas.original import OBJETO_PAGINA_ORIGINAL, ler_pagina_original
+from lupa_api.agente.ferramentas.registro import criar_ferramentas
+from lupa_api.agente.ferramentas.sessao import SessaoAgente, flags_ligadas
+from lupa_api.auditoria.eventos import AcaoAuditoria
 from lupa_pipeline.dominio.visoes import VisaoPagina
 from tests.agente.conftest import (
     NOME_PARTE,

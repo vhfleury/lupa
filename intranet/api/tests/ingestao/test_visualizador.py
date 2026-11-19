@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from sqlalchemy import Engine
 
 from apoio_comum import criar_processo_teste, eventos_do_banco
-from lupa_intranet.api.rotas.visualizador import caixas_da_evidencia, fracao
+from lupa_api.api.rotas.visualizador import caixas_da_evidencia, fracao
 from lupa_pipeline.ingestao import renderizacao
 from lupa_pipeline.ingestao.sandbox import LimitesSandbox
 from lupa_pipeline.ingestao.storage import ArmazenamentoMemoria

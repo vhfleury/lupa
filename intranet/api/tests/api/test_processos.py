@@ -6,8 +6,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
 from apoio_comum import UsuarioTeste, criar_processo_teste, eventos_do_banco
-from lupa_intranet.api.middleware import auditar_rota
-from lupa_intranet.auditoria.eventos import AcaoAuditoria
+from lupa_api.api.middleware import auditar_rota
+from lupa_api.auditoria.eventos import AcaoAuditoria
 from lupa_pipeline.dominio.enums import PapelUsuario
 from tests.conftest import criar_usuario_teste, logar
 
@@ -59,7 +59,7 @@ def test_processo_inexistente_responde_404_e_a_tentativa_e_registrada(
 
 def test_middleware_registra_busca_sem_processo(app_teste: FastAPI, engine_teste: Engine) -> None:
     """RF-AUD-01: rota marcada sem processo grava o evento do usuário com o caminho."""
-    from lupa_intranet.acesso.autorizacao import AtorAutenticado
+    from lupa_api.acesso.autorizacao import AtorAutenticado
 
     @app_teste.get("/busca-teste")
     @auditar_rota(AcaoAuditoria.BUSCA, conteudo=False)

@@ -9,7 +9,7 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from apoio_comum import criar_processo, eventos_do_banco
-from lupa_intranet.acesso.autorizacao import exige_processo
+from lupa_api.acesso.autorizacao import exige_processo
 from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.dominio.gravacao import gravar_satelite
 from lupa_pipeline.dominio.tabelas import sat_processo_estado

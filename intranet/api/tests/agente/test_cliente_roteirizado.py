@@ -6,15 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from lupa_intranet.agente.cliente import ClienteFalso, ClienteSdk, FerramentaAgente, PedidoAgente
-from lupa_intranet.agente.cliente_roteirizado import (
+from lupa_api.agente.cliente import ClienteFalso, ClienteSdk, FerramentaAgente, PedidoAgente
+from lupa_api.agente.cliente_roteirizado import (
     ROTEIRO_PADRAO,
     ConfiguracaoAgenteError,
     carregar_roteiro,
     criar_cliente,
     segmentos_do_resultado,
 )
-from lupa_intranet.agente.contexto import Delimitador, formatar_segmentos, segmentos
+from lupa_api.agente.contexto import Delimitador, formatar_segmentos, segmentos
 from lupa_pipeline.config import Settings
 
 PAGINA = "11111111-2222-3333-4444-555555555555"

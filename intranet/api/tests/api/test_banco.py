@@ -7,8 +7,8 @@ from fastapi import HTTPException
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from lupa_intranet.acesso.erros import NaoEncontradoError
-from lupa_intranet.api.banco import sessao_aplicacao
+from lupa_api.acesso.erros import NaoEncontradoError
+from lupa_api.api.banco import sessao_aplicacao
 from lupa_pipeline.dominio.gravacao import gravar_hub
 from lupa_pipeline.dominio.tabelas import hub_usuario
 from lupa_pipeline.dominio.visoes import VisaoUsuario

@@ -13,9 +13,9 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from apoio_comum import UsuarioTeste, semear_usuario
-from lupa_intranet.acesso import senhas
-from lupa_intranet.acesso.autorizacao import relogio
-from lupa_intranet.api.app import create_app
+from lupa_api.acesso import senhas
+from lupa_api.acesso.autorizacao import relogio
+from lupa_api.api.app import create_app
 from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.dominio.visoes import VisaoUsuario

@@ -6,8 +6,8 @@ import pyotp
 import pytest
 from argon2 import PasswordHasher
 
-from lupa_intranet.acesso import mfa, senhas
-from lupa_intranet.acesso.papeis import MATRIZ, Permissao, tem_permissao
+from lupa_api.acesso import mfa, senhas
+from lupa_api.acesso.papeis import MATRIZ, Permissao, tem_permissao
 from lupa_pipeline.dominio.enums import PapelUsuario
 
 AGORA = datetime(2026, 10, 20, 12, 0, 0, tzinfo=UTC)
