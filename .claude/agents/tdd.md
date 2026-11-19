@@ -2,6 +2,7 @@
 name: tdd
 description: Especialista em TDD do Lupa. Use para implementar uma funcionalidade, regra de validação ou correção de bug escrevendo o teste antes do código (vermelho, verde, refatorar), no back (Python/pytest) ou no front (SvelteKit/Vitest). Passe o comportamento esperado e, se souber, o módulo afetado. Devolve os testes criados, a evidência de que falharam antes e passam depois, e o que ficou sem verificar. Não serve para tarefas sem mudança de comportamento (documentação, infraestrutura, renomeações).
 tools: Read, Edit, Write, Glob, Grep, Bash
+model: opus
 ---
 
 Você implementa mudanças de comportamento no Lupa por TDD: primeiro um teste que falha, depois o mínimo de código que o faz passar, depois a limpeza com os testes verdes.
@@ -38,7 +39,7 @@ Python 3.12, pytest 8 com `pytest-asyncio` em modo automático, `ruff` e `mypy -
 - Tempo é injetado, não esperado: use `relogio_fixo` e datas fixas em vez de `sleep` ou do relógio real.
 - Dependências externas entram por dublês que já existem (`ResolvedorFalso`, cliente roteirizado do agente). O modelo real só é chamado em testes marcados `llm`, que não fazem parte do ciclo.
 - Marcadores: `integracao` (exige PostgreSQL e MinIO), `injecao`, `agente`, `carga`, `llm`. A configuração padrão exclui `carga` e `llm`.
-- As regras jurídicas estão descritas em `docs/especificacao/catalogo-validacoes.md` e `docs/sistema/validacoes.md`. São a fonte para saber o resultado esperado de uma validação.
+- As regras jurídicas estão descritas em `docs/especificacao/0.2/especificacao.md` (requisitos e critérios de aceite) e `docs/sistema/validacoes.md`. São a fonte para saber o resultado esperado de uma validação.
 
 ## Convenções do front (`intranet/web/`)
 

@@ -837,6 +837,22 @@ Substituem a decisão 8 da especificação da 0.2 (cofre com chave única e chav
 
 [Plano](../planos/plano_remocao_vault.md) · [ADR 0018](../adr/0018-remocao-do-cofre-e-da-cifra.md).
 
+### Front em Django — 19/11/2026
+
+Substituem a decisão 17 da especificação da 0.2 (front reaproveita o SvelteKit) e a restrição
+RES-06 na redação anterior.
+
+| Decisão | Tema | Resposta |
+| --- | --- | --- |
+| 46 | Front (RES-06, RF-INT-01 a RF-INT-05) | front Django com templates, em `intranet/web/`, consumindo a API FastAPI sem alterá-la |
+| 47 | Interatividade (Q1, Q2) | HTMX no chat, no progresso do envio e no visualizador |
+| 48 | Sessão (Q3) | o Django repassa o cookie de sessão da API; sem sessão própria |
+| 49 | Pacotes (Q4, RES-12) | `lupa_web` novo em `intranet/web/`; `lupa_intranet` renomeado para `lupa_api` |
+| 50 | Banco do Django (Q5) | nenhum: sem models, migrations nem acesso ao PostgreSQL |
+| 51 | Transição (Q6) | troca de uma vez; o SvelteKit sai no mesmo plano |
+| 52 | Testes de navegador (Q7, RNF-09) | `pytest-playwright` em `lupa_web`; capturas dos guias refeitas pela suíte |
+| 53 | Visual (Q8) | reproduz o layout atual |
+
 ## Resultado das revisões
 
 | Revisão | Resultado |

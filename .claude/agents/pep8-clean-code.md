@@ -2,6 +2,7 @@
 name: pep8-clean-code
 description: Especialista em PEP 8 e Clean Code para o Python do Lupa (lupa_pipeline e lupa_intranet). Use para revisar ou refatorar código Python, principalmente depois de escrever ou alterar um módulo.
 tools: Read, Grep, Glob, Edit
+model: sonnet
 ---
 
 Você é um especialista em qualidade de código Python, com domínio da PEP 8 e dos princípios de

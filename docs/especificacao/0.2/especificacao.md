@@ -1,6 +1,6 @@
 # Lupa 0.2 — Especificação
 
-13 de novembro de 2026 · Estado: **aprovada** (alterada e aprovada em 15 de novembro de 2026: decisões 40 a 45)
+13 de novembro de 2026 · Estado: **aprovada** (alterada e aprovada em 15 de novembro de 2026: decisões 40 a 45; em 19 de novembro de 2026: decisões 46 a 53)
 
 Fonte da verdade da versão 0.2. Diz o que o sistema faz e para quem, com requisitos e critérios
 de aceite verificáveis. Não decide implementação: isso é do plano, que só começa depois desta
@@ -520,6 +520,81 @@ dívida técnica, incidente e pesquisa de contexto ficam em `relatorios/`, sem s
   `docs/etapas/`, `docs/contexto/`, `docs/imagens/`, `docs/dividas/`, `docs/analises/` e
   `docs/incidentes/`, então nenhum é citado.
 
+### 4.12 Interface (INT)
+
+Aprovada em 19/11/2026 (decisões 46 a 53): o front SvelteKit de `intranet/web/` é substituído por um front Django
+com templates renderizados no servidor, que consome a API FastAPI de `intranet/api/` sem
+alterá-la. Altera RES-06, RES-12, RNF-08, RNF-09 e a decisão 17.
+
+**RF-INT-01 — Front renderizado no servidor.** Toda tela da intranet é uma página
+HTML gerada pelo Django, que obtém os dados chamando a API existente; o navegador não chama
+`/api` diretamente.
+
+- Dado um usuário com sessão válida, quando abre a lista de processos, então recebe a página já
+  com os processos sintéticos, e a API registra a chamada feita pelo front.
+- Dado o tráfego do navegador nessa tela, quando se listam as requisições, então nenhuma vai para
+  `/api`.
+
+**RF-INT-02 — Paridade de telas.** O front Django oferece as mesmas telas e ações da
+0.2: login com TOTP, troca de senha, lista e cadastro de processo, processo, dossiê, validações,
+visualizador, chat, auditoria e gestão de assessores.
+
+- Dada cada tela listada, quando o usuário do papel permitido a abre, então vê o mesmo conteúdo
+  que a API devolve para ele.
+- Dado um assessor, quando abre auditoria ou gestão de assessores, então recebe a página de
+  acesso negado, refletindo o 403 da API.
+
+**RF-INT-03 — Sessão e permissões só na API.** O Django não tem usuários, senhas nem
+papéis próprios: repassa a sessão da API e mostra o que ela permite.
+
+- Dada uma sessão expirada na API, quando o usuário navega, então é levado ao login.
+- Dado um formulário enviado sem token CSRF válido, quando chega ao Django, então é recusado sem
+  chamar a API.
+
+**RF-INT-04 — Envio e progresso de ingestão.** O cadastro por PDF ou ZIP e o
+acompanhamento do estado (RF-PRO-01, RF-ING-06) funcionam no front Django.
+
+- Dado um PDF sintético sem classe legível, quando é enviado, então a página pede a classe e o
+  reenvio reaproveita o mesmo arquivo.
+
+**RF-INT-05 — Rótulos e citações.** O chat e o dossiê no front Django mantêm o
+rótulo de IA (RF-CHA-04), "sem evidência" (RF-CHA-03) e o link da evidência para a página do
+arquivo.
+
+- Dada uma resposta com citação conferida, quando aparece, então está em bloco rotulado como
+  gerado por IA e o link abre a página citada.
+
+Alterações aprovadas em requisitos e restrições existentes (já aplicadas nas seções 5 e 6):
+
+- RES-06 passa a ser: "A interface é um front Django com templates, em `intranet/web/`, que
+  consome a API de `intranet/api/`."
+- RES-12 passa a ser: "Três pacotes Python: `lupa_pipeline` em `pipeline/`; `lupa_api` em
+  `intranet/api/`, que depende do primeiro (antes `lupa_intranet`); e `lupa_web` em
+  `intranet/web/`, o front Django, que só fala com `lupa_api` por HTTP e não importa nenhum dos
+  outros dois."
+- RNF-08: o trecho do front passa a valer para o Python do front Django (ruff, mypy, cobertura
+  de 90%) e para os templates.
+- RNF-09: a suíte de navegador, em `pytest-playwright`, roda contra o front Django e gera as
+  capturas dos guias.
+
+Perguntas e respostas:
+
+- Q1. Renderização do chat — respondida em 19/11/2026: HTMX troca só o bloco da resposta,
+  devolvido pelo Django como fragmento de template.
+- Q2. Interatividade das demais telas (progresso do envio, visualizador de página) — respondida
+  em 19/11/2026: HTMX, como no chat.
+- Q3. Onde fica a sessão — respondida em 19/11/2026: o Django repassa o cookie de sessão da API,
+  que fica no navegador, em cada chamada e devolve ao navegador o que a API renovar ou apagar;
+  o Django não guarda sessão própria.
+- Q4. Pacote Python — respondida em 19/11/2026: novo pacote `lupa_web` em `intranet/web/`, e
+  `lupa_intranet` passa a se chamar `lupa_api` (RES-12).
+- Q5. Banco do Django — respondida em 19/11/2026: nenhum; `lupa_web` não tem models, migrations
+  nem acesso ao PostgreSQL.
+- Q6. Transição — respondida em 19/11/2026: troca de uma vez; o SvelteKit sai no mesmo plano.
+- Q7. Testes de navegador — respondida em 19/11/2026: a suíte é mantida, reescrita em
+  `pytest-playwright` dentro de `lupa_web`, e as capturas dos guias são refeitas a partir dela.
+- Q8. Visual — respondida em 19/11/2026: o front Django reproduz o layout atual.
+
 ## 5. Requisitos não funcionais
 
 | Id | Requisito | Critério |
@@ -531,8 +606,8 @@ dívida técnica, incidente e pesquisa de contexto ficam em `relatorios/`, sem s
 | RNF-05 | Dados de teste | todo teste usa dado sintético; nenhum teste lê `dados/` |
 | RNF-06 | Execução | tudo roda em contêineres, num único host, sem dependência instalada na máquina do desenvolvedor |
 | RNF-07 | Segredos | só em arquivo ignorado pelo git; nunca em código ou imagem |
-| RNF-08 | Qualidade | lint, formatação, tipagem estrita e cobertura mínima de 90% no código Python; lint, formatação e checagem de tipos sem aviso no front |
-| RNF-09 | Ponta a ponta | suíte de navegador cobre login, processos, dossiê, chat, auditoria e gestão de assessores sobre dados sintéticos; as capturas de tela dos guias saem dela |
+| RNF-08 | Qualidade | lint, formatação, tipagem estrita e cobertura mínima de 90% no código Python, inclusive no front Django (`lupa_web`) |
+| RNF-09 | Ponta a ponta | suíte de navegador em `pytest-playwright`, contra o front Django, cobre login, processos, dossiê, chat, auditoria e gestão de assessores sobre dados sintéticos; as capturas de tela dos guias saem dela |
 
 ## 6. Restrições
 
@@ -545,12 +620,12 @@ Vêm do escopo definido pelo usuário; o detalhe é do plano.
 | RES-03 | Ponto de partida do modelo. Hubs: processo, arquivo, página, peça, evidência, fato, achado, parte, usuário, conversa. Links: processo–arquivo, arquivo–página, arquivo–peça, página–evidência, fato–evidência, processo–fato, processo–achado, achado–fato, processo–parte, processo–usuário responsável, processo–conversa. Satélites: um ou mais por hub, separando descrição de estado; anotação e mensagem como satélites. |
 | RES-04 | Tudo do frontend e do back que o atende (API, acesso, auditoria, agente) fica em `intranet/`. "Intranet" é só o nome do diretório; o acesso continua por usuário, senha e TOTP. |
 | RES-05 | Tudo da pipeline de dados (worker, ingestão, fatos, validações, modelo e migrations do Data Vault, sintéticos) fica em `pipeline/`. |
-| RES-06 | A interface reaproveita o front SvelteKit da 0.1. |
+| RES-06 | A interface é um front Django com templates, em `intranet/web/`, que consome a API de `intranet/api/` (decisão 46). |
 | RES-07 | Um único worker de ingestão, que lê a fila do próprio banco. Sem Redis. |
 | RES-08 | Sem cofre de chaves e sem cifra na aplicação; a proteção em repouso é a do host (decisões 40 e 42). |
 | RES-09 | O banco da 0.2 nasce vazio, com migration inicial nova. Os processos de `dados/` são enviados de novo, à mão, pela interface da 0.2; correções, anotações, conversas e auditoria da 0.1 não são migradas. |
 | RES-11 | A 0.2 é instalada só na máquina de desenvolvimento. Não há servidor do piloto nem perfil de produção. |
-| RES-12 | Dois pacotes Python: `lupa_pipeline` em `pipeline/` e `lupa_intranet` em `intranet/api/`, que depende do primeiro. O front fica em `intranet/web/`. |
+| RES-12 | Três pacotes Python: `lupa_pipeline` em `pipeline/`; `lupa_api` em `intranet/api/`, que depende do primeiro (antes `lupa_intranet`); e `lupa_web` em `intranet/web/`, o front Django, que só fala com `lupa_api` por HTTP e não importa nenhum dos outros dois (decisão 49). |
 | RES-13 | Tabelas com prefixo `hub_`, `link_` e `sat_`; colunas técnicas `hk_<entidade>`, `load_dts`, `record_source` e `hash_diff`; atributos de negócio em português; hash SHA-256. Toda mudança de estado é linha nova; `UPDATE` e `DELETE` são bloqueados no banco. Única exceção: o descarte apaga as linhas de satélite do processo e a chave, mantendo hubs e links. |
 | RES-10 | A 0.2 vive neste repositório, na branch `feat/versao-0.2`, substituindo a estrutura atual. A 0.1 fica preservada na tag `v0.1.0`. |
 
@@ -576,7 +651,7 @@ Respostas do usuário em 13/11/2026 às decisões levantadas antes desta especif
 | 14 | API, acesso, auditoria e agente | em `intranet/` |
 | 15 | Fila | worker único lendo o banco, sem Redis |
 | 16 | Monitoramento e backup | removidos: Prometheus, Grafana, métricas de serviço, backup, restauração e expurgo |
-| 17 | Front | reaproveita o SvelteKit |
+| 17 | Front | reaproveita o SvelteKit (substituída pelas decisões 46 a 53) |
 | 18 | "Intranet" | só o nome do diretório |
 | 19 a 21 | Specs | este arquivo; seção de restrições; specs da v1 mantidas e marcadas como substituídas |
 | 22 | Repositório | o mesmo, em branch nova |
@@ -614,6 +689,19 @@ decisão 8.
 | 43 | Rotação de chave | removida |
 | 44 | Identificação interna do nome da parte | SHA-256 do nome normalizado, sem chave |
 | 45 | Objeto do evento de descarte | id do processo |
+
+Respostas do usuário em 19/11/2026 sobre o front em Django (seção 4.12). Substituem a decisão 17.
+
+| Nº | Decisão | Resposta |
+| --- | --- | --- |
+| 46 | Front (RES-06, RF-INT-01 a RF-INT-05) | front Django com templates, em `intranet/web/`, consumindo a API FastAPI sem alterá-la |
+| 47 | Interatividade (Q1, Q2) | HTMX no chat, no progresso do envio e no visualizador |
+| 48 | Sessão (Q3) | o Django repassa o cookie de sessão da API; sem sessão própria |
+| 49 | Pacotes (Q4, RES-12) | `lupa_web` novo em `intranet/web/`; `lupa_intranet` renomeado para `lupa_api` |
+| 50 | Banco do Django (Q5) | nenhum: sem models, migrations nem acesso ao PostgreSQL |
+| 51 | Transição (Q6) | troca de uma vez; o SvelteKit sai no mesmo plano |
+| 52 | Testes de navegador (Q7, RNF-09) | `pytest-playwright` em `lupa_web`; capturas dos guias refeitas pela suíte |
+| 53 | Visual (Q8) | reproduz o layout atual |
 
 ## 8. Removido em relação à 0.1.0
 

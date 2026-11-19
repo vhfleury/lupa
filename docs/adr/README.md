@@ -26,6 +26,7 @@ crie um ADR novo e ligue os dois.
 | [0016](0016-dois-pacotes.md) | Pacotes de pipeline e intranet | Aceito |
 | [0017](0017-cadastro-pelo-arquivo.md) | Cadastro pela leitura da capa no sandbox da API | Aceito |
 | [0018](0018-remocao-do-cofre-e-da-cifra.md) | Remoção do cofre e da cifra da aplicação | Aceito |
+| [0019](0019-front-django-renderizado-no-servidor.md) | Front Django renderizado no servidor | Proposto |
 
 ## Modelo
 
