@@ -65,7 +65,7 @@ services:
     networks: [borda]
     security_opt: ["no-new-privileges:true"]
 
-  # Proxy reverso (Etapa 6): mesmo origin para front (/) e API (/api, prefixo removido), HTTPS
+  # Proxy reverso (Etapa 6; 0.2 D2): tudo vai ao front; a API nao e alcancavel pelo proxy. HTTPS
   # com certificado autoassinado do proprio Caddy (`tls internal`). CA em tmpfs: um certificado
   # novo a cada subida, aceitavel no piloto local.
   proxy:

@@ -12,8 +12,7 @@ import pytest
 CAMINHO = Path(__file__).resolve().parents[2] / "scripts" / "verificar_cabecalhos.py"
 CSP = (
     "default-src 'none'; script-src 'self'; "
-    "style-src 'self' 'unsafe-hashes' 'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo='; "
-    "img-src 'self'; font-src 'self'; "
+    "style-src 'self'; img-src 'self'; font-src 'self'; "
     "connect-src 'self'; manifest-src 'self'; form-action 'self'; frame-ancestors 'none'; "
     "base-uri 'none'; object-src 'none'"
 )
@@ -68,7 +67,6 @@ def test_cabecalhos_do_proxy_passam(modulo: ModuleType) -> None:
             _csp("style-src 'self'", "style-src 'self' 'unsafe-inline'"),
             "style-src tem 'unsafe-inline'",
         ),
-        (_csp("S8qMpvofolR8", "outroHash000"), "style-src deve ser"),
         (
             _csp("img-src 'self'", "img-src *"),
             "img-src tem *",
@@ -98,6 +96,18 @@ def test_falha_se_faltar_ou_afrouxar(
     cabecalhos = {**BONS, **alteracao}
     filtrados = {k: v for k, v in cabecalhos.items() if v is not None}
     assert any(esperado in p for p in modulo.problemas(filtrados)), modulo.problemas(filtrados)
+
+
+def test_csp_sem_unsafe_hashes(modulo: ModuleType) -> None:
+    """RF-INT-01 (D10): `style-src 'self'` passa; `unsafe-hashes` com hash volta a ser problema."""
+    assert modulo.problemas_csp(CSP) == []
+    antiga = CSP.replace(
+        "style-src 'self'",
+        "style-src 'self' 'unsafe-hashes' 'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo='",
+    )
+    erros = modulo.problemas_csp(antiga)
+    assert "CSP style-src tem 'unsafe-hashes'" in erros
+    assert "CSP style-src deve ser 'self'" in erros
 
 
 def test_main_com_proxy_fora_do_ar(modulo: ModuleType, capsys: pytest.CaptureFixture[str]) -> None:

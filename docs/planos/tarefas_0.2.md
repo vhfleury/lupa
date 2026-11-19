@@ -571,11 +571,26 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
     import name 'cliente_api' from 'lupa_web'`. Verde: `13 passed` (os três da tarefa: `4 passed`,
     com o 502 parametrizado em conexão recusada e prazo esgotado); suíte de `lupa_web`
     `22 passed`, cobertura 100%.
-- [ ] **T10.5** Proxy sem `/api` e CSP nova. RF-INT-01. Fase 3; D2, D10.
+- [x] **T10.5** Proxy sem `/api` e CSP nova. RF-INT-01. Fase 3; D2, D10.
   - Vermelho: `intranet/web/tests/integracao/test_proxy.py::test_proxy_responde_404_para_api` e `intranet/api/tests/unit/test_verificar_cabecalhos.py::test_csp_sem_unsafe_hashes`.
   - Verde: `intranet/proxy/Caddyfile`, `verificar_cabecalhos.py`.
   - Limpeza: nenhuma.
   - Pronto quando: também `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde.
+  - Caddyfile: um só `reverse_proxy front:8000`; CSP com `style-src 'self'`.
+    `verificar_cabecalhos.py`: `style-src` exato `'self'`, `unsafe-hashes` proibido em toda
+    diretiva, rotas `/`, `/login`, `/saude`, `/api/saude` (`/inicio.js` era do SvelteKit). No
+    teste, a constante `CSP` passa à nova e sai o caso do hash do anunciador (regra mudada por
+    D10). Extra: `test_proxy.py::test_proxy_entrega_o_front`. `validar_caddyfile.sh`: ok.
+  - Comando: `docker compose exec -T -e LUPA_EXIGIR_INTEGRACAO=1 front python -m pytest -c
+    intranet/web/pyproject.toml intranet/web/tests/integracao/test_proxy.py --no-cov -q` e
+    `docker compose exec api python -m pytest -c intranet/api/pyproject.toml
+    intranet/api/tests/unit/test_verificar_cabecalhos.py --no-cov -q`. Vermelho: `1 failed`
+    (`assert 200 == 404`) e `3 failed` (`test_csp_sem_unsafe_hashes`,
+    `test_cabecalhos_do_proxy_passam`, `test_main_confere_cada_rota`). Verde: `2 passed` e
+    `18 passed`.
+  - `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh`: pipeline `702 passed` (95,25%), api
+    `265 passed, 3 deselected` (98,23%), ponta a ponta `6 passed`, injeção `2 passed`, web
+    `24 passed` (100%), cabeçalhos ok em 4 rotas, agente `11 passed`; E2E não rodou.
 - [ ] **T10.6** Login com TOTP, MFA com QR, troca de senha, logout e redirecionamento por sessão. RF-INT-02, RF-INT-03. Fase 4; A2, A3, D11.
   - Vermelho: `intranet/web/tests/telas/test_acesso.py::test_login_com_codigo_errado_mostra_recusa_generica`, `::test_configuracao_de_mfa_mostra_qr_em_svg`, `::test_sessao_expirada_redireciona_para_login`, `::test_pedido_htmx_com_sessao_expirada_recebe_hx_redirect`; `intranet/web/tests/telas/test_csrf.py::test_post_sem_csrf_e_recusado_sem_chamar_api`.
   - Verde: `telas/acesso.py`, `templates/base.html`, `templates/acesso/`, `componentes/`.
