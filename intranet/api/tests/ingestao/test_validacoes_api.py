@@ -3,10 +3,11 @@
 from datetime import date
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from apoio_comum import eventos_do_banco
+from lupa_pipeline.dominio.tabelas import sat_fato_anotacao
 from lupa_pipeline.dominio.visoes import VisaoPagina
 from lupa_pipeline.ingestao.eventos.etapa import processar_eventos
 from tests.ingestao.conftest import Autos
@@ -65,3 +66,17 @@ def test_correcao_e_historico_com_evidencia_atualizada(
     assert {"fato_corrigido", "validacao_executada", "anotacao"} <= {
         ev.acao for ev in eventos_do_banco(engine_teste, hk_processo=autos_civeis.processo)
     }
+
+
+def test_anotacao_nova_grava_record_source_api(autos_civeis: Autos, engine_teste: Engine) -> None:
+    """RES-12 (D9): a anotação nova de fato grava `record_source` `api.anotacao`."""
+    c, base = autos_civeis.cliente, autos_civeis.url
+    fato = c.get(base + "/fatos").json()["fatos"][0]
+    texto = "Anotação sintética de origem."
+    nota = c.post(base + "/anotacoes", json={"fato_id": fato["id"], "texto": texto})
+    assert nota.status_code == 201, nota.text
+    with Session(engine_teste) as s:
+        origens = s.scalars(
+            select(sat_fato_anotacao.c.record_source).where(sat_fato_anotacao.c.texto == texto)
+        ).all()
+    assert origens == ["api.anotacao"]

@@ -523,14 +523,18 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
   - Limpeza: nenhuma.
   - Nenhuma consulta da API filtra por `record_source`; o segundo teste fixa que eventos
     `intranet.auditoria` e `api.auditoria` aparecem juntos na lista. `intranet.anotacao`
-    (`api/rotas/achados.py`) fica como está: fora das quatro constantes de D9.
+    (`api/rotas/achados.py`) também passa a `api.anotacao` (D9 cobre todo prefixo `intranet.*`):
+    `intranet/api/tests/ingestao/test_validacoes_api.py::test_anotacao_nova_grava_record_source_api`,
+    vermelho `1 failed` (`['intranet.anotacao'] == ['api.anotacao']`), verde `1 passed`.
+  - Imports de `intranet/api/scripts/limpar_dev.py` e `e2e_preparar.py` reordenados (I001
+    consequência do rename: `lupa_api` passou a primeiro partido).
   - Comando: `docker compose exec api python -m pytest -c intranet/api/pyproject.toml
     intranet/api/tests/auditoria/test_registrador.py::test_evento_novo_grava_record_source_api
     intranet/api/tests/auditoria/test_consulta.py::test_auditoria_lista_eventos_com_record_source_antigo_e_novo
     --no-cov -q`. Vermelho: `2 failed` (`'intranet.auditoria' != 'api.auditoria'`). Verde:
     `2 passed`.
   - Suítes com `LUPA_EXIGIR_INTEGRACAO=1`: pipeline `702 passed`, cobertura 95,25%; intranet/api
-    `264 passed, 3 deselected`, cobertura 98,23%.
+    `265 passed, 3 deselected`, cobertura 98,23%.
 - [ ] **T10.3** Criar o pacote `lupa_web` sem banco, a imagem e o serviço `front` Python. RES-12, RNF-08. Fase 2; D1, D4, D6, D12.
   - Vermelho: `intranet/web/tests/unit/test_configuracao.py::test_lupa_web_nao_configura_banco` e `intranet/web/tests/unit/test_dependencias.py::test_lupa_web_nao_importa_lupa_api_nem_lupa_pipeline`.
   - Verde: `pyproject.toml`, requirements por `make lock`, `configuracao.py`, `asgi.py`, `urls.py`, Dockerfile, serviço `front` no compose, etapa `web` em `scripts/verificar.sh`. O SvelteKit fica no repositório até T10.16, fora do compose.

@@ -10,11 +10,11 @@ import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from lupa_api.auditoria.eventos import AcaoAuditoria, NovoEvento, ResultadoEvento
-from lupa_api.auditoria.registrador import registrar
 from sqlalchemy import Engine, create_engine, select
 from sqlalchemy.orm import Session
 
+from lupa_api.auditoria.eventos import AcaoAuditoria, NovoEvento, ResultadoEvento
+from lupa_api.auditoria.registrador import registrar
 from lupa_pipeline.config import get_settings
 from lupa_pipeline.dominio.gravacao import travar_processo
 from lupa_pipeline.dominio.tabelas import hub_processo

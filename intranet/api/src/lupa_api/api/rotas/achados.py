@@ -326,7 +326,7 @@ def anotar(
         tabela,
         hk,
         {"texto": corpo.texto, "hk_usuario": ator.hk_usuario},
-        "intranet.anotacao",
+        "api.anotacao",
     )
     nota = sessao.scalars(
         select(VisaoAnotacao)
