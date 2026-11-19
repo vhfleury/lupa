@@ -1,6 +1,6 @@
 # Proxy reverso do Lupa (Etapa 6). Um unico origin HTTPS:
 #   /api/*  -> api:8000 (prefixo /api removido; a API nao sabe do prefixo)
-#   /*      -> front:8080 (SPA estatica)
+#   /*      -> front:8000 (Django)
 # Assim nao ha CORS e o cookie de sessao (Secure, SameSite=Strict, Path=/) funciona.
 # O Caddy substitui o X-Forwarded-For recebido pelo IP real do cliente (nao confia em cabecalho
 # vindo de fora); a API confia nesse cabecalho so quando vem da rede `borda`.
@@ -42,7 +42,7 @@
 		reverse_proxy api:8000
 	}
 	handle {
-		reverse_proxy front:8080
+		reverse_proxy front:8000
 	}
 }
 

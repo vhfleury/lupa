@@ -535,10 +535,24 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
     `2 passed`.
   - Suítes com `LUPA_EXIGIR_INTEGRACAO=1`: pipeline `702 passed`, cobertura 95,25%; intranet/api
     `265 passed, 3 deselected`, cobertura 98,23%.
-- [ ] **T10.3** Criar o pacote `lupa_web` sem banco, a imagem e o serviço `front` Python. RES-12, RNF-08. Fase 2; D1, D4, D6, D12.
+- [x] **T10.3** Criar o pacote `lupa_web` sem banco, a imagem e o serviço `front` Python. RES-12, RNF-08. Fase 2; D1, D4, D6, D12.
   - Vermelho: `intranet/web/tests/unit/test_configuracao.py::test_lupa_web_nao_configura_banco` e `intranet/web/tests/unit/test_dependencias.py::test_lupa_web_nao_importa_lupa_api_nem_lupa_pipeline`.
   - Verde: `pyproject.toml`, requirements por `make lock`, `configuracao.py`, `asgi.py`, `urls.py`, Dockerfile, serviço `front` no compose, etapa `web` em `scripts/verificar.sh`. O SvelteKit fica no repositório até T10.16, fora do compose.
   - Limpeza: nenhuma.
+  - O Dockerfile Python substitui `intranet/web/Dockerfile` (contexto na raiz, como `api`); o
+    serviço `front` passa a ser o Django na porta 8000, e o `reverse_proxy` do Caddyfile vai a
+    `front:8000`. O SvelteKit (`src/`, `e2e/`, `package*.json`, `Caddyfile`) fica só como código
+    a remover na T10.16; `intranet/web/scripts/e2e.sh` deixa de funcionar até a T10.15.
+  - Django 5.2.1, httpx 0.28.1, WhiteNoise 6.8.2, segno 1.6.1, uvicorn 0.34.0; alvo `lock` do
+    `Makefile` com as duas linhas de `intranet/web`. Com `DATABASES = {}` o Django põe o motor
+    `django.db.backends.dummy` em `default`; o teste confere isso. `/saude` e uma página inicial
+    mínima até a T10.6. Imagem `read_only`: caches de pytest, coverage, mypy e ruff em `/tmp`.
+    `SECRET_KEY` de `LUPA_WEB_CHAVE_SECRETA`, aleatória por processo quando ausente.
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/unit/test_configuracao.py::test_lupa_web_nao_configura_banco
+    intranet/web/tests/unit/test_dependencias.py::test_lupa_web_nao_importa_lupa_api_nem_lupa_pipeline
+    --no-cov -q`. Vermelho: `ImportError: No module named 'lupa_web.configuracao'`. Verde:
+    `2 passed`; suíte de `lupa_web` `9 passed`, cobertura 100%.
 - [ ] **T10.4** Cliente da API com repasse de cookie, IP e desvios 401/403/falha. RF-INT-03. Fase 2; A1, D3, D13.
   - Vermelho: `intranet/web/tests/unit/test_cliente_api.py::test_cookie_da_api_e_repassado_e_set_cookie_volta`, `::test_x_forwarded_for_e_repassado`, `::test_api_fora_do_ar_mostra_servico_indisponivel`.
   - Verde: `cliente_api.py`.

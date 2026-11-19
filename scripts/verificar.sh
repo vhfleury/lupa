@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Roda lint, tipagem e testes dos dois pacotes em sequencia; falha no primeiro erro.
+# Roda lint, tipagem e testes dos tres pacotes em sequencia; falha no primeiro erro.
 # Roda no host, com a stack de pe (`docker compose up -d --build --wait`): a pipeline e verificada
-# na imagem do `worker` e a intranet na da `api` (D21), ambas com /app como diretorio de trabalho.
+# na imagem do `worker`, a API na da `api` (D21) e o front na do `front`, todas com /app como diretorio de trabalho.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PIPELINE=(docker compose exec -T -e LUPA_EXIGIR_INTEGRACAO=1 worker python)
 INTRANET=(docker compose exec -T -e LUPA_EXIGIR_INTEGRACAO=1 api python)
+WEB=(docker compose exec -T -e LUPA_EXIGIR_INTEGRACAO=1 front python)
 echo "== pipeline: ruff check ==";          "${PIPELINE[@]}" -m ruff check pipeline/src pipeline/tests
 echo "== pipeline: ruff format --check =="; "${PIPELINE[@]}" -m ruff format --check pipeline/src pipeline/tests
 echo "== pipeline: mypy --strict ==";       "${PIPELINE[@]}" -m mypy --config-file pipeline/pyproject.toml pipeline/src pipeline/tests
@@ -22,11 +23,11 @@ METRICAS_INJECAO=/tmp/metricas_injecao.json
 MSYS_NO_PATHCONV=1 docker compose exec -T -e LUPA_EXIGIR_INTEGRACAO=1 -e LUPA_METRICAS_INJECAO="$METRICAS_INJECAO" worker \
   python -m pytest -c pipeline/pyproject.toml -m injecao pipeline/tests/ingestao/test_injecao_corpus.py --no-cov -q
 MSYS_NO_PATHCONV=1 "${PIPELINE[@]}" -c "import json,sys; m=json.load(open(sys.argv[1])); print({k: m[k] for k in ('versoes','recall','falso_positivo','injecoes_textuais','injecoes_detectadas','paginas_semente_01')})" "$METRICAS_INJECAO"
-# Etapa 6: lint, typecheck e testes unitarios do front, sempre em conteiner: reconstroi o estagio
-# `verificacao` da imagem do front.
-echo "== front =="
-docker build --target verificacao -q intranet/web >/dev/null
-echo "front: lint, typecheck e testes ok (build da imagem)"
+# 0.2 (plano_front_django, RNF-08): lint, tipagem e testes de lupa_web na imagem do `front`.
+echo "== web: ruff check ==";               "${WEB[@]}" -m ruff check intranet/web/src intranet/web/tests
+echo "== web: ruff format --check ==";      "${WEB[@]}" -m ruff format --check intranet/web/src intranet/web/tests
+echo "== web: mypy --strict ==";            "${WEB[@]}" -m mypy --config-file intranet/web/pyproject.toml intranet/web/src intranet/web/tests
+echo "== web: pytest ==";                   "${WEB[@]}" -m pytest -c intranet/web/pyproject.toml intranet/web/tests
 # Etapa 6.10: cabecalhos de seguranca do proxy (CSP, HSTS, Permissions-Policy, COOP...). Falha se
 # faltar algum ou se a CSP afrouxar; com o proxy fora do ar so avisa (LUPA_EXIGIR_CABECALHOS=1 exige).
 echo "== cabecalhos de seguranca =="

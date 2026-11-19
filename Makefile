@@ -41,3 +41,6 @@ lock:
 		-o intranet/api/requirements.txt
 	$(UV_COMPILE) pipeline/pyproject.toml intranet/api/pyproject.toml --extra dev \
 		-c intranet/api/requirements.txt -o intranet/api/requirements-dev.txt
+	$(UV_COMPILE) intranet/web/pyproject.toml -o intranet/web/requirements.txt
+	$(UV_COMPILE) intranet/web/pyproject.toml --extra dev -c intranet/web/requirements.txt \
+		-o intranet/web/requirements-dev.txt

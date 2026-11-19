@@ -44,11 +44,22 @@ services:
     networks: [interna, borda]
     security_opt: ["no-new-privileges:true"]
 
-  # Front (Etapa 6): SPA SvelteKit estatica servida por Caddy sem TLS, usuario nao root, so na
-  # rede `borda`. A imagem so e gerada se lint, typecheck e testes unitarios passarem.
+  # Front (0.2, plano_front_django D1, D6): Django sob uvicorn, usuario nao root, so na rede
+  # `borda`; chama a API em LUPA_WEB_API_URL. A imagem tambem roda os testes de lupa_web.
   front:
     build:
-      context: ./intranet/web
+      context: .
+      dockerfile: intranet/web/Dockerfile
+      args:
+        INSTALAR_DEV: "true"
+    environment:
+      LUPA_WEB_API_URL: http://api:8000
+      LUPA_WEB_CHAVE_SECRETA: ${LUPA_WEB_CHAVE_SECRETA:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/saude', timeout=2).status == 200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     read_only: true
     tmpfs: [/tmp]
     networks: [borda]

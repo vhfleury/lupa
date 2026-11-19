@@ -1,23 +1,30 @@
 # syntax=docker/dockerfile:1
-# Front do Lupa (SvelteKit, SPA estatica). O build so termina se lint, typecheck e testes passarem.
-FROM node:22.12.0-alpine3.20 AS deps
+# Front do Lupa em Django (D1, D6): uvicorn, usuario nao root; a imagem tambem roda os testes de
+# lupa_web (dependencias de dev com INSTALAR_DEV=true). Contexto: raiz do repositorio.
+FROM python:3.12-slim AS builder
+ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+WORKDIR /build
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+COPY intranet/web/requirements.txt intranet/web/requirements-dev.txt ./
+RUN pip install --require-hashes -r requirements.txt
+ARG INSTALAR_DEV=false
+RUN if [ "$INSTALAR_DEV" = "true" ]; then pip install --require-hashes -r requirements-dev.txt; fi
+
+FROM python:3.12-slim AS runtime
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH=/app/intranet/web/src DJANGO_SETTINGS_MODULE=lupa_web.configuracao \
+    LUPA_WEB_ESTATICOS=/app/estaticos COVERAGE_FILE=/tmp/.coverage MYPY_CACHE_DIR=/tmp/mypy \
+    RUFF_CACHE_DIR=/tmp/ruff PYTEST_ADDOPTS="-p no:cacheprovider"
+RUN groupadd --system --gid 10001 lupa && useradd --system --uid 10001 --gid lupa --no-create-home lupa
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
-
-FROM deps AS verificacao
-COPY . .
-RUN npm run verificar && node scripts/carimbo.mjs > /app/verificacao.json
-
-FROM verificacao AS build
-RUN npm run build && cp /app/verificacao.json /app/build/verificacao.json
-
-FROM caddy:2.8.4-alpine AS runtime
-ENV XDG_CONFIG_HOME=/tmp/config XDG_DATA_HOME=/tmp/data
-COPY Caddyfile /etc/caddy/Caddyfile
-COPY --from=build /app/build /srv
-USER 10001:10001
-EXPOSE 8080
+COPY --from=builder /opt/venv /opt/venv
+COPY --chown=lupa:lupa intranet/web/pyproject.toml ./intranet/web/pyproject.toml
+COPY --chown=lupa:lupa intranet/web/src ./intranet/web/src
+COPY --chown=lupa:lupa intranet/web/tests ./intranet/web/tests
+RUN LUPA_WEB_CHAVE_SECRETA=coleta python -m django collectstatic --noinput -v 0
+USER lupa
+EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \
-  CMD wget -qO- http://127.0.0.1:8080/verificacao.json >/dev/null || exit 1
-CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/saude', timeout=2).status == 200 else 1)"
+CMD ["uvicorn", "lupa_web.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--no-server-header"]
