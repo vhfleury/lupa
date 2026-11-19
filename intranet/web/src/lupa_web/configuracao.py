@@ -23,6 +23,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "lupa_web.cliente_api.DesviosDaApi",
 ]
 
 ROOT_URLCONF = "lupa_web.urls"

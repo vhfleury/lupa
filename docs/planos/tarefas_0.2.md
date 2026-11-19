@@ -553,10 +553,24 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
     intranet/web/tests/unit/test_dependencias.py::test_lupa_web_nao_importa_lupa_api_nem_lupa_pipeline
     --no-cov -q`. Vermelho: `ImportError: No module named 'lupa_web.configuracao'`. Verde:
     `2 passed`; suíte de `lupa_web` `9 passed`, cobertura 100%.
-- [ ] **T10.4** Cliente da API com repasse de cookie, IP e desvios 401/403/falha. RF-INT-03. Fase 2; A1, D3, D13.
+- [x] **T10.4** Cliente da API com repasse de cookie, IP e desvios 401/403/falha. RF-INT-03. Fase 2; A1, D3, D13.
   - Vermelho: `intranet/web/tests/unit/test_cliente_api.py::test_cookie_da_api_e_repassado_e_set_cookie_volta`, `::test_x_forwarded_for_e_repassado`, `::test_api_fora_do_ar_mostra_servico_indisponivel`.
   - Verde: `cliente_api.py`.
   - Limpeza: nenhuma.
+  - `chamar()` usa um `httpx.AsyncClient` único, criado na primeira chamada e fechado no
+    `lifespan.shutdown` do `asgi.py`, com pote de cookies que recusa tudo (o cookie de um usuário
+    não vai no pedido de outro). Sem `X-Forwarded-For` vai o `REMOTE_ADDR`. Os desvios são
+    exceções (`ApiIndisponivelError`, `SessaoExpiradaError`, `AcessoNegadoError`) tratadas pelo
+    middleware `DesviosDaApi`, que também copia todo `Set-Cookie` da API, inclusive no 401. HTMX
+    com 401: status 200 e `HX-Redirect: /login`. Páginas `erros/servico_indisponivel.html` e
+    `erros/acesso_negado.html` mínimas até a T10.6. O log da falha tem método, caminho sem
+    consulta e o tipo do erro. Testes extras: cookie não guardado entre pedidos, IP da conexão,
+    401, HTMX, 403, prazos de D13; tela de teste em `tests/unit/rotas_de_teste.py`.
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/unit/test_cliente_api.py --no-cov -q`. Vermelho: `ImportError: cannot
+    import name 'cliente_api' from 'lupa_web'`. Verde: `13 passed` (os três da tarefa: `4 passed`,
+    com o 502 parametrizado em conexão recusada e prazo esgotado); suíte de `lupa_web`
+    `22 passed`, cobertura 100%.
 - [ ] **T10.5** Proxy sem `/api` e CSP nova. RF-INT-01. Fase 3; D2, D10.
   - Vermelho: `intranet/web/tests/integracao/test_proxy.py::test_proxy_responde_404_para_api` e `intranet/api/tests/unit/test_verificar_cabecalhos.py::test_csp_sem_unsafe_hashes`.
   - Verde: `intranet/proxy/Caddyfile`, `verificar_cabecalhos.py`.

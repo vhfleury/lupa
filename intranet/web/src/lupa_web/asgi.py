@@ -1,7 +1,7 @@
 """Aplicação ASGI do front, servida pelo uvicorn (D1).
 
-O Django não trata o ciclo de vida do ASGI; este módulo responde a ele e repassa ao Django os
-pedidos HTTP.
+O Django não trata o ciclo de vida do ASGI; este módulo responde a ele, fecha no encerramento o
+cliente da API e repassa ao Django os pedidos HTTP.
 """
 
 import os
@@ -9,6 +9,8 @@ from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
 from django.core.asgi import get_asgi_application
+
+from lupa_web.cliente_api import encerrar_cliente
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "lupa_web.configuracao")
 
@@ -20,7 +22,7 @@ aplicacao_django = get_asgi_application()
 
 
 async def ciclo_de_vida(receive: Receber, send: Enviar) -> None:
-    """Atende `lifespan.startup` e `lifespan.shutdown` até o encerramento.
+    """Atende `lifespan.startup` e `lifespan.shutdown`; no encerramento fecha o cliente da API.
 
     Args:
         receive: Canal de entrada do servidor ASGI.
@@ -31,6 +33,7 @@ async def ciclo_de_vida(receive: Receber, send: Enviar) -> None:
         if mensagem["type"] == "lifespan.startup":
             await send({"type": "lifespan.startup.complete"})
         elif mensagem["type"] == "lifespan.shutdown":
+            await encerrar_cliente()
             await send({"type": "lifespan.shutdown.complete"})
             return
 
