@@ -1,6 +1,6 @@
 # Plano — front da intranet em Django
 
-19 de novembro de 2026 · Estado: **proposto** · Atende a
+19 de novembro de 2026 · Estado: **aprovado** · Atende a
 [especificação da 0.2](../especificacao/0.2/especificacao.md): RF-INT-01 a RF-INT-05, RES-06,
 RES-12, RNF-08, RNF-09; decisões 46 a 53. [ADR 0019](../adr/0019-front-django-renderizado-no-servidor.md).
 
@@ -22,7 +22,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 | `intranet/api/tests/**`, `intranet/api/scripts/*.py` | alterar: imports `lupa_api` |
 | `intranet/api/pyproject.toml`, `intranet/api/Dockerfile` | alterar: nome do pacote, `packages`, cobertura e caminhos |
 | `pipeline/tests/unit/test_dependencias.py`, `pipeline/tests/validacoes/test_motor_e_regras.py` | alterar: pacote proibido `lupa_api` (e `lupa_web`) |
-| `pipeline/scripts/limpar_dev.py` | alterar: imports `lupa_api` (P1) |
+| `pipeline/scripts/limpar_dev.py` | mover para `intranet/api/scripts/limpar_dev.py`, com imports `lupa_api`; teste para `intranet/api/tests/unit/` (P1) |
 | `intranet/web/` (SvelteKit: `src/`, `static/`, `e2e/`, `scripts/`, `package*.json`, `node_modules`, configs de Vite, Svelte, TS, ESLint, `Caddyfile`, `Dockerfile`) | remover (decisão 51) |
 | `intranet/web/pyproject.toml`, `requirements.txt`, `requirements-dev.txt` | criar: pacote `lupa_web`, Django, httpx, WhiteNoise, segno, uvicorn; dev com pytest, pytest-django, respx, pytest-playwright, django-stubs, ruff, mypy (via `make lock`) |
 | `intranet/web/Dockerfile` | criar: `python:3.12-slim`, usuário não root, `uvicorn lupa_web.asgi:application` (D1, D6) |
@@ -31,7 +31,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 | `intranet/web/src/lupa_web/telas/<tela>.py` | criar: uma view por tela da RF-INT-02 (acesso, processos, processo, dossiê, validações, visualizador, chat, auditoria, usuários) |
 | `intranet/web/src/lupa_web/templates/` | criar: `base.html`, parciais em `componentes/` (cabeçalho, menu, aviso, confirmação, senha temporária, QR) e uma pasta por tela; fragmentos HTMX em `fragmentos/` |
 | `intranet/web/src/lupa_web/static/css/` | criar: `base.css`, `componentes.css` e uma folha por tela, extraídas dos estilos Svelte (D7) |
-| `intranet/web/src/lupa_web/static/js/htmx.min.js`, `static/js/envio.js` | criar: HTMX versionado no repositório e o progresso do envio (D8) |
+| `intranet/web/src/lupa_web/static/js/htmx.min.js`, `static/js/envio.js`, `static/js/tema.js` | criar: HTMX versionado no repositório, o progresso do envio e a troca de tema (D8) |
 | `intranet/web/tests/unit/`, `tests/telas/`, `tests/integracao/`, `tests/e2e/` | criar: testes de `lupa_web` (D5) |
 | `intranet/web/e2e/Dockerfile` | criar: imagem Python com `pytest-playwright` e Chromium, perfil `e2e` (D6) |
 | `intranet/web/scripts/e2e.sh` | reescrever: sobe o projeto Compose temporário e roda `pytest -m e2e` na imagem `e2e` |
@@ -60,7 +60,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 ## Problemas
 
 - **P1.** `pipeline/scripts/limpar_dev.py` importa `lupa_intranet`, contra a regra de dependência
-  do `CLAUDE.md`; o rename só troca o nome, a violação fica registrada como dívida em `docs/dividas/`.
+  do `CLAUDE.md`; o script vai para `intranet/api/scripts/` na fase 1.
 - **P2.** A CSP atual depende do hash do anunciador de rota do SvelteKit (`unsafe-hashes`).
 - **P3.** O QR do MFA, o progresso do envio, o seletor de tema e o visualizador hoje dependem de
   JavaScript do SvelteKit.
@@ -88,7 +88,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
   classes, variáveis de tema e layout (decisão 53).
 - **D8.** HTMX 2 versionado em `static/js/`, com `htmx.config.allowEval = false`,
   `includeIndicatorStyles = false` e `selfRequestsOnly = true`. JavaScript próprio só em
-  `envio.js` (progresso do envio pelo evento `htmx:xhr:progress`) e na troca de tema; sem script
+  `envio.js` (progresso do envio pelo evento `htmx:xhr:progress`) e `tema.js` (troca de tema); sem script
   inline.
 - **D9.** `record_source` das linhas novas passa de `intranet.*` para `api.*`; linhas antigas não
   mudam (sem `UPDATE`, RES-13). Consultas que filtram por `record_source` aceitam os dois prefixos.

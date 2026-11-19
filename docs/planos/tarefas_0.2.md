@@ -499,3 +499,74 @@ Execução do [plano de remoção do Vault](plano_remocao_vault.md).
   - `bash scripts/verificar.sh` terminou com código 0, sem o serviço `vault`: ingestão ponta a ponta (6), regressão de injeção (16 de 16, zero falso positivo), front, cabeçalhos em 4 rotas, isolamento do worker e 16 cenários do agente sem vazamento. `bash intranet/web/scripts/e2e.sh` passou nos 36 testes em Chromium, numa stack sem Vault.
 - [x] **T9.5** Atualizar documentação, ADR 0018, registro de decisões, `CLAUDE.md` e `CHANGELOG.md`. RF-SEG-01, RES-08. D1 a D7.
   - A conferência de links locais nos 21 documentos alterados não achou link quebrado.
+
+## Fase 10 — Front em Django
+
+Execução do [plano do front em Django](plano_front_django.md). Um único PR para todas as tarefas
+(fases 1 a 11 do plano). "Pronto quando", salvo indicação: suíte do pacote verde no contêiner
+depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos; mudança em
+`lupa_api` roda também a suíte da pipeline e a de `lupa_web`.
+
+- [ ] **T10.1** Renomear `lupa_intranet` para `lupa_api` e mover `limpar_dev.py`. RES-12. Fase 1; P1.
+  - Vermelho: `pipeline/tests/unit/test_dependencias.py::test_pipeline_nao_importa_lupa_api_nem_lupa_web` falha (pacote ainda se chama `lupa_intranet` e `pipeline/scripts/limpar_dev.py` importa a API).
+  - Verde: `git mv` do pacote, imports, `resources.files`, `pyproject.toml`, Dockerfile, scripts; `limpar_dev.py` e seu teste para `intranet/api/`.
+  - Limpeza: nenhuma.
+- [ ] **T10.2** Gravar `record_source` `api.*` nas linhas novas e listar os dois prefixos na auditoria. RES-12. Fase 1; D9.
+  - Vermelho: `intranet/api/tests/auditoria/test_registrador.py::test_evento_novo_grava_record_source_api` e `intranet/api/tests/auditoria/test_consulta.py::test_auditoria_lista_eventos_com_record_source_antigo_e_novo`.
+  - Verde: constantes `ORIGEM` e filtros por `record_source`.
+  - Limpeza: nenhuma.
+- [ ] **T10.3** Criar o pacote `lupa_web` sem banco, a imagem e o serviço `front` Python. RES-12, RNF-08. Fase 2; D1, D4, D6, D12.
+  - Vermelho: `intranet/web/tests/unit/test_configuracao.py::test_lupa_web_nao_configura_banco` e `intranet/web/tests/unit/test_dependencias.py::test_lupa_web_nao_importa_lupa_api_nem_lupa_pipeline`.
+  - Verde: `pyproject.toml`, requirements por `make lock`, `configuracao.py`, `asgi.py`, `urls.py`, Dockerfile, serviço `front` no compose, etapa `web` em `scripts/verificar.sh`. O SvelteKit fica no repositório até T10.16, fora do compose.
+  - Limpeza: nenhuma.
+- [ ] **T10.4** Cliente da API com repasse de cookie, IP e desvios 401/403/falha. RF-INT-03. Fase 2; A1, D3, D13.
+  - Vermelho: `intranet/web/tests/unit/test_cliente_api.py::test_cookie_da_api_e_repassado_e_set_cookie_volta`, `::test_x_forwarded_for_e_repassado`, `::test_api_fora_do_ar_mostra_servico_indisponivel`.
+  - Verde: `cliente_api.py`.
+  - Limpeza: nenhuma.
+- [ ] **T10.5** Proxy sem `/api` e CSP nova. RF-INT-01. Fase 3; D2, D10.
+  - Vermelho: `intranet/web/tests/integracao/test_proxy.py::test_proxy_responde_404_para_api` e `intranet/api/tests/unit/test_verificar_cabecalhos.py::test_csp_sem_unsafe_hashes`.
+  - Verde: `intranet/proxy/Caddyfile`, `verificar_cabecalhos.py`.
+  - Limpeza: nenhuma.
+  - Pronto quando: também `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde.
+- [ ] **T10.6** Login com TOTP, MFA com QR, troca de senha, logout e redirecionamento por sessão. RF-INT-02, RF-INT-03. Fase 4; A2, A3, D11.
+  - Vermelho: `intranet/web/tests/telas/test_acesso.py::test_login_com_codigo_errado_mostra_recusa_generica`, `::test_configuracao_de_mfa_mostra_qr_em_svg`, `::test_sessao_expirada_redireciona_para_login`, `::test_pedido_htmx_com_sessao_expirada_recebe_hx_redirect`; `intranet/web/tests/telas/test_csrf.py::test_post_sem_csrf_e_recusado_sem_chamar_api`.
+  - Verde: `telas/acesso.py`, `templates/base.html`, `templates/acesso/`, `componentes/`.
+  - Limpeza: nenhuma.
+- [ ] **T10.7** Lista de processos renderizada a partir da API. RF-INT-01, RF-INT-02. Fase 5.
+  - Vermelho: `intranet/web/tests/telas/test_processos.py::test_lista_de_processos_vem_renderizada_da_api`.
+  - Verde: `telas/processos.py`, `templates/processos/lista.html`.
+  - Limpeza: nenhuma.
+- [ ] **T10.8** Cadastro por arquivo com progresso, complemento e estado da ingestão. RF-INT-04. Fase 5; A4, D8, D14.
+  - Vermelho: `intranet/web/tests/telas/test_envio.py::test_pdf_sem_classe_pede_a_classe_e_reenvio_usa_o_mesmo_arquivo`, `::test_arquivo_acima_do_limite_e_recusado_sem_chamar_api`; `intranet/web/tests/telas/test_processo.py::test_estado_do_arquivo_para_de_atualizar_no_estado_final`; `intranet/web/tests/integracao/test_envio_api_real.py::test_envio_de_pdf_sintetico_cria_processo_pela_api`.
+  - Verde: `telas/envio.py`, `telas/processo.py`, fragmentos, `static/js/htmx.min.js`, `static/js/envio.js`.
+  - Limpeza: nenhuma.
+- [ ] **T10.9** Processo: arquivos com diagnóstico e alertas, responsáveis, correção de classe e descarte. RF-INT-02. Fase 5.
+  - Vermelho: casos `processo` de `intranet/web/tests/telas/test_paridade.py::test_cada_tela_responde_ao_papel_permitido`.
+  - Verde: `telas/processo.py`, `templates/processos/processo.html`.
+  - Limpeza: nenhuma.
+- [ ] **T10.10** Dossiê, peças, fatos, achados, anotações e visualizador com imagem repassada. RF-INT-02, RF-INT-05. Fase 6; A6.
+  - Vermelho: `intranet/web/tests/telas/test_dossie.py::test_evidencia_do_dossie_abre_a_pagina_do_arquivo`; `intranet/web/tests/telas/test_visualizador.py::test_imagem_da_pagina_e_repassada_com_tipo_e_cache_da_api`; casos `dossie`, `validacoes` e `visualizador` de `test_paridade.py`.
+  - Verde: `telas/dossie.py`, `telas/validacoes.py`, `telas/visualizador.py` e templates.
+  - Limpeza: nenhuma.
+- [ ] **T10.11** Chat com HTMX, histórico, teto, revisão e liberação. RF-INT-02, RF-INT-05. Fase 7; A5, D13.
+  - Vermelho: `intranet/web/tests/telas/test_chat.py::test_resposta_conferida_aparece_em_bloco_rotulado_com_link_da_pagina`, `::test_resposta_sem_citacao_conferida_mostra_sem_evidencia`, `::test_aviso_de_teto_aparece_sem_bloco_de_ia`; caso `chat` de `test_paridade.py`.
+  - Verde: `telas/chat.py`, `templates/chat/`, fragmentos.
+  - Limpeza: nenhuma.
+- [ ] **T10.12** Auditoria (lista, exportação, verificação, relatório de uso) e gestão de assessores. RF-INT-02, RF-INT-03. Fase 8.
+  - Vermelho: `intranet/web/tests/telas/test_paridade.py::test_assessor_recebe_acesso_negado_em_auditoria_e_usuarios`; casos `auditoria` e `usuarios` de `test_paridade.py`.
+  - Verde: `telas/auditoria.py`, `telas/usuarios.py` e templates.
+  - Limpeza: nenhuma.
+- [ ] **T10.13** CSS e tema reproduzindo o layout atual. RF-INT-02. Fase 9; D7, D8.
+  - Revisão manual: componente de apresentação; conferência visual tela a tela contra o SvelteKit, nos dois temas.
+  - Verde: `static/css/`, `static/js/tema.js`.
+- [ ] **T10.14** Paridade de telas fechada. RF-INT-02. Fases 4 a 8.
+  - Vermelho: `intranet/web/tests/telas/test_paridade.py::test_cada_tela_responde_ao_papel_permitido` com as onze telas e todas as ações.
+  - Verde: o que faltar das tarefas anteriores.
+  - Limpeza: extrair o que se repetir entre views.
+- [ ] **T10.15** Suíte E2E em `pytest-playwright` e capturas dos guias. RF-INT-01, RNF-09. Fase 10; D5, D6.
+  - Revisão manual: E2E fora do ciclo. `intranet/web/tests/e2e/test_seguranca.py::test_navegador_nao_faz_requisicao_para_api`, `test_fluxos.py` (login, processos, dossiê, chat, auditoria, assessores) e `test_capturas.py::test_gera_capturas_dos_guias`.
+  - Verde: `intranet/web/e2e/Dockerfile`, serviço `e2e`, `intranet/web/scripts/e2e.sh`, `docs/guias/imagens/`.
+  - Pronto quando: `bash intranet/web/scripts/e2e.sh` verde e capturas conferidas.
+- [ ] **T10.16** Remover o SvelteKit e atualizar `verificar.sh`, `Makefile`, `CLAUDE.md`, documentação, ADRs 0006 e 0016 e `CHANGELOG.md`. RES-06, RNF-08. Fase 11.
+  - Revisão manual: remoção e documentação. Testes do Vitest e Playwright em TypeScript saem neste commit, citando a tarefa.
+  - Pronto quando: `bash scripts/verificar.sh` verde, sem referência a `lupa_intranet`, `npm` ou SvelteKit fora do histórico, e links locais conferidos.
