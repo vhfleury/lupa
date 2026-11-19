@@ -8,10 +8,11 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
 from apoio_comum import UsuarioTeste, criar_processo_teste, eventos_do_banco
+from lupa_api.auditoria import registrador
 from lupa_api.auditoria.eventos import AcaoAuditoria, NovoEvento
 from lupa_api.auditoria.registrador import registrar
 from lupa_pipeline.dominio.enums import PapelUsuario
@@ -199,3 +200,28 @@ def test_nenhum_evento_contem_campo_proibido_nem_segredo(
     assert all(s not in json.dumps(resposta, ensure_ascii=False) for s in segredos)
     with pytest.raises(ValueError, match="extra"):
         NovoEvento.model_validate({"acao": "busca", "texto": "conteúdo dos autos"})
+
+
+def test_auditoria_lista_eventos_com_record_source_antigo_e_novo(
+    cliente: TestClient,
+    engine_teste: Engine,
+    desembargador: UsuarioTeste,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """RES-12 (D9): eventos gravados com `intranet.*` e com `api.*` aparecem juntos na lista."""
+    ip = "203.0.113.77"
+    with Session(engine_teste) as sessao, sessao.begin():
+        with monkeypatch.context() as contexto:
+            contexto.setattr(registrador, "ORIGEM", "intranet.auditoria")
+            antigo = registrar(sessao, NovoEvento(acao=AcaoAuditoria.BUSCA, ip=ip))
+        novo = registrar(sessao, NovoEvento(acao=AcaoAuditoria.BUSCA, ip=ip))
+        origens = sessao.execute(
+            text(
+                "SELECT record_source FROM link_evento_auditoria"
+                " WHERE sequencia IN (:a, :n) ORDER BY sequencia"
+            ),
+            {"a": antigo["sequencia"], "n": novo["sequencia"]},
+        ).scalars()
+        assert list(origens) == ["intranet.auditoria", "api.auditoria"]
+    pagina = cliente.get("/auditoria", params={"ip": ip, "acao": "busca"}).json()["eventos"]
+    assert {x["id"] for x in pagina} == {antigo["hk_evento"].hex(), novo["hk_evento"].hex()}

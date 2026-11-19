@@ -50,7 +50,7 @@ router = APIRouter()
 Processo = Annotated[VisaoProcesso, Depends(exige_processo)]
 Leitor = Annotated[Ator, Depends(exige_papel(Permissao.VER_PROCESSO))]
 
-ORIGEM = "intranet.processos"
+ORIGEM = "api.processos"
 ESTADOS_FINAIS = frozenset({EstadoJob.CONCLUIDO, EstadoJob.QUARENTENA, EstadoJob.FALHO})
 ESTADOS_COM_PENDENCIA = frozenset({EstadoJob.PARCIAL, EstadoJob.EM_REVISAO})
 TRAVA_RESPONSAVEIS = 0x4C555041

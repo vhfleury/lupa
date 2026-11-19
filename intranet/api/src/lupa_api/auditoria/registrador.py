@@ -20,7 +20,7 @@ from lupa_pipeline.dominio.tabelas import link_evento_auditoria
 from lupa_pipeline.dominio.visoes import VisaoAuditoria
 
 TRAVA_CADEIA = 0x4C555041
-ORIGEM = "intranet.auditoria"
+ORIGEM = "api.auditoria"
 LOTE_VERIFICACAO = 2000
 
 

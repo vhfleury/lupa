@@ -45,3 +45,14 @@ def test_alteracao_direta_no_banco_e_apontada(sessao: Session) -> None:
         sequencias[1],
         "hash",
     )
+
+
+def test_evento_novo_grava_record_source_api(sessao: Session) -> None:
+    """RES-12 (D9): a linha nova de auditoria grava `record_source` `api.auditoria`."""
+    assumir_papel_aplicacao(sessao)
+    evento = registrar(sessao, NovoEvento(acao=AcaoAuditoria.LOGIN_OK))
+    origem = sessao.execute(
+        text("SELECT record_source FROM link_evento_auditoria WHERE sequencia = :s"),
+        {"s": evento["sequencia"]},
+    ).scalar_one()
+    assert origem == "api.auditoria"

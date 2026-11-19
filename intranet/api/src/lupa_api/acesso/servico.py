@@ -49,7 +49,7 @@ PADRAO_NOME_USUARIO = re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$")
 MENSAGEM_CREDENCIAIS = "usuário ou senha inválidos"
 MENSAGEM_CODIGO = "código inválido"
 MENSAGEM_BLOQUEIO = "muitas tentativas; tente novamente mais tarde"
-ORIGEM = "intranet.acesso"
+ORIGEM = "api.acesso"
 
 
 class CamposEvento(TypedDict, total=False):

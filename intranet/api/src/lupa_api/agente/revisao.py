@@ -12,7 +12,7 @@ from lupa_pipeline.dominio.gravacao import gravar_satelite, travar_processo
 from lupa_pipeline.dominio.tabelas import sat_processo_estado, sat_processo_revisao
 from lupa_pipeline.dominio.visoes import VisaoProcesso
 
-ORIGEM = "intranet.agente"
+ORIGEM = "api.agente"
 MSG_EM_REVISAO = (
     "Este processo está em revisão. O assistente bloqueou uma resposta por conter uma instrução "
     "dos autos ou identificador de outro processo. O desembargador pode liberar o chat e os "

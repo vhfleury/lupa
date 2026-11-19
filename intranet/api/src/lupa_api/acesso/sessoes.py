@@ -33,7 +33,7 @@ DURACAO_ABSOLUTA = timedelta(hours=8)
 INATIVIDADE_MAXIMA = timedelta(minutes=30)
 INTERVALO_ULTIMO_ACESSO = timedelta(seconds=60)
 DURACAO_DESAFIO = timedelta(minutes=5)
-ORIGEM = "intranet.acesso"
+ORIGEM = "api.acesso"
 
 
 def gerar_token() -> str:

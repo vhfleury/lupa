@@ -31,7 +31,7 @@ from lupa_pipeline.dominio.visoes import (
     VisaoPeca,
 )
 
-ORIGEM = "intranet.agente"
+ORIGEM = "api.agente"
 
 
 @dataclass
