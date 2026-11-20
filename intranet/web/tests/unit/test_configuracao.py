@@ -24,6 +24,11 @@ def test_csrf_por_cookie_seguro_e_estrito() -> None:
     assert settings.CSRF_COOKIE_SAMESITE == "Strict"
 
 
+def test_referrer_policy_same_origin_mantem_a_origem_nos_formularios() -> None:
+    """RF-INT-03 (D18): `same-origin`, para o POST de formulário levar a origem real ao CSRF."""
+    assert settings.SECURE_REFERRER_POLICY == "same-origin"
+
+
 def test_estaticos_pelo_whitenoise_com_hash_no_nome() -> None:
     """RNF-08 (D12): estáticos pelo WhiteNoise com `CompressedManifestStaticFilesStorage`."""
     assert "whitenoise.middleware.WhiteNoiseMiddleware" in settings.MIDDLEWARE

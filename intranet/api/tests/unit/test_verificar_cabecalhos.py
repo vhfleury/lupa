@@ -22,7 +22,7 @@ BONS = {
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     "Cross-Origin-Opener-Policy": "same-origin",
     "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "no-referrer",
+    "Referrer-Policy": "same-origin",
     "X-Frame-Options": "DENY",
 }
 
@@ -47,6 +47,7 @@ def test_cabecalhos_do_proxy_passam(modulo: ModuleType) -> None:
     caddy = Path(__file__).resolve().parents[3] / "proxy" / "Caddyfile"
     if caddy.exists():  # no contêiner da API o intranet/proxy/ não é copiado
         assert CSP in caddy.read_text("utf-8")
+        assert "Referrer-Policy same-origin" in caddy.read_text("utf-8")
 
 
 @pytest.mark.parametrize(
@@ -59,6 +60,7 @@ def test_cabecalhos_do_proxy_passam(modulo: ModuleType) -> None:
         ({"Strict-Transport-Security": "max-age=60"}, "max-age menor"),
         ({"Permissions-Policy": "camera=()"}, "não bloqueia microphone"),
         ({"Server": "Caddy"}, "server exposto"),
+        ({"Referrer-Policy": "no-referrer"}, "referrer-policy deve ser same-origin"),
         (
             _csp("script-src 'self'", "script-src 'self' 'unsafe-inline'"),
             "script-src deve ser",

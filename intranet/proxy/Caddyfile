@@ -24,7 +24,7 @@
 	# HSTS: fica em intranet/proxy/modos/interno.caddy.
 	header {
 		X-Content-Type-Options nosniff
-		Referrer-Policy no-referrer
+		Referrer-Policy same-origin
 		X-Frame-Options DENY
 		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
 		Permissions-Policy "accelerometer=(), autoplay=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), xr-spatial-tracking=()"

@@ -24,7 +24,7 @@ OBRIGATORIOS: dict[str, str | None] = {
     "permissions-policy": None,
     "cross-origin-opener-policy": "same-origin",
     "x-content-type-options": "nosniff",
-    "referrer-policy": "no-referrer",
+    "referrer-policy": "same-origin",
     "x-frame-options": "DENY",
 }
 PROIBIDOS_SEMPRE = ("'unsafe-inline'", "'unsafe-eval'", "'unsafe-hashes'", "*", "data:", "http:")
