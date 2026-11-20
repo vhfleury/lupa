@@ -20,7 +20,7 @@ Regras que valem para todo código do repositório. As seções de "Linguagem e 
 
 ## Testes
 
-- `pytest` com cobertura mínima de 90% em cada pacote (`lupa_pipeline` e `lupa_intranet`), medida
+- `pytest` com cobertura mínima de 90% em cada pacote (`lupa_pipeline`, `lupa_api` e `lupa_web`), medida
   por `pytest-cov`.
 - Testes nomeados pelo comportamento: `test_apelacao_interposta_no_sexto_dia_e_intempestiva`.
 - `scripts/verificar.sh` roda no host lint, formatação, tipagem e testes dos dois pacotes nos
@@ -148,7 +148,7 @@ docs/
   código.
 - Não remova código aparentemente não utilizado sem verificar suas dependências.
 - Não modifique configurações globais do projeto (`pyproject.toml`, `docker-compose*.yml`,
-  `Dockerfile`, `Caddyfile`, `eslint.config.js`) sem necessidade; a reestruturação prevista no
+  `Dockerfile`, `Caddyfile`) sem necessidade; a reestruturação prevista no
   plano da 0.2 é necessidade, limitada ao que o plano lista. Nunca baixe o mínimo de
   cobertura nem use `# type: ignore`, `# noqa` ou exclusão de cobertura para silenciar um erro que
   o código deveria resolver.
@@ -158,8 +158,7 @@ docs/
 - Código: conforme "Linguagem e estilo" (português para conceitos jurídicos, inglês para
   infraestrutura).
 - Documentação em português: todos os arquivos `.md`.
-- Mensagens de log, de erro e textos da interface em português. No front, `describe` e `it` em
-  português.
+- Mensagens de log, de erro e textos da interface em português.
 
 #### PEP 8
 
@@ -182,10 +181,11 @@ docs/
 
 #### Front
 
-- SvelteKit 2 com Svelte 5 e TypeScript. Prettier e ESLint sem avisos, `svelte-check` com
-  `--fail-on-warnings`.
-- Lógica reaproveitada fica em `intranet/web/src/lib/`, por assunto; componente usado por mais de
-  uma tela, em `intranet/web/src/lib/componentes/`. Tela só em `intranet/web/src/routes/`.
+- Django 5.2 com templates e HTMX, pacote `lupa_web` em `intranet/web/src/lupa_web/`; as mesmas
+  regras de Python (ruff, mypy, docstring) valem para ele. O front fala com a API só por HTTP
+  (`cliente_api.py`).
+- Tela em `telas/` e `templates/`; CSS por assunto em `static/css/`. JavaScript próprio só em
+  `static/js/envio.js`, `tema.js` e `visualizador.js`; sem script inline.
 
 ### Padrão de script
 
@@ -204,7 +204,7 @@ docs/
 - Ciclo TDD: teste falhando, código mínimo para passar, limpeza; o relatório final mostra o
   vermelho inicial e o verde final.
 - Correção de bug começa por um teste que reproduz o bug.
-- Toda lógica nova ou alterada tem teste. Exceções admitidas: componente Svelte só de
+- Toda lógica nova ou alterada tem teste. Exceções admitidas: template só de
   apresentação, chamada real ao modelo (marcador `llm`), teste de carga (marcador `carga`) e fluxo
   E2E do Playwright; cada uma entra em "revisão manual" do relatório final.
 - Teste unitário valida o comportamento de função pura, sem rede, banco, MinIO nem
@@ -220,15 +220,17 @@ docs/
 #### Onde ficam
 
 - Os testes espelham o pacote: `pipeline/tests/<subpacote>/test_<modulo>.py` para
-  `lupa_pipeline` e `intranet/api/tests/<subpacote>/test_<modulo>.py` para `lupa_intranet`. Teste
+  `lupa_pipeline` e `intranet/api/tests/<subpacote>/test_<modulo>.py` para `lupa_api`. Teste
   que exercita rota da API ou login fica em `intranet/api/tests/`, mesmo quando o assunto é da
   pipeline. O `tests/unit/` de cada pacote guarda os testes de `config.py`, `logging.py` e dos
   scripts.
-- `lupa_intranet` importa `lupa_pipeline`; o contrário é proibido e
-  `pipeline/tests/unit/test_dependencias.py` falha se acontecer.
+- `lupa_api` importa `lupa_pipeline`; o contrário é proibido e
+  `pipeline/tests/unit/test_dependencias.py` falha se acontecer. `lupa_web` não importa nenhum
+  dos dois.
 - Teste de migration fica na área do assunto, como `test_migracao_NNNN.py`.
-- Front: unitários ao lado do módulo, `intranet/web/src/lib/**/<nome>.test.ts`; ponta a ponta em
-  `intranet/web/e2e/testes/`, fora do ciclo.
+- Front: `intranet/web/tests/` (pytest, `respx`, `pytest-django`); ponta a ponta em
+  `intranet/web/tests/e2e/` (pytest-playwright, via `bash intranet/web/scripts/e2e.sh`), fora do
+  ciclo.
 - Fixtures e auxiliares comuns aos dois pacotes ficam em `pipeline/tests/apoio/` (no `pythonpath`
   do pytest de ambos: `apoio_comum`, `apoio_ingestao`, `apoio_arquivos`); os da intranet, em
   `intranet/api/tests/conftest.py`; depois vem o `conftest.py` da área (`fabrica_fato`,
@@ -271,9 +273,10 @@ Antes de concluir uma tarefa:
    Mudança na pipeline também roda a suíte da intranet, que a importa. `bash scripts/verificar.sh`
    (ou `make verificar`: integração, injeção, front e cabeçalhos) é obrigatório quando a mudança
    toca ingestão, agente, segurança, migrations ou proxy.
-5. Quando alterar `intranet/web/`, rode `docker build --target verificacao intranet/web` (ou `npm
-   run verificar` em `intranet/web/`); quando alterar uma tela, reinicie o preview e confira no
-   navegador; quando alterar fluxo coberto pelo E2E, `bash intranet/web/scripts/e2e.sh` (cria um projeto Compose temporário com contas e processos sintéticos).
+5. Quando alterar `intranet/web/`, rode depois do rebuild, no contêiner `front`: `ruff check`,
+   `ruff format --check` e `mypy --config-file intranet/web/pyproject.toml` sobre `src` e `tests`,
+   e `python -m pytest -c intranet/web/pyproject.toml intranet/web/tests`; quando alterar uma
+   tela, confira no navegador; quando alterar fluxo coberto pelo E2E, `bash intranet/web/scripts/e2e.sh` (cria um projeto Compose temporário com contas e processos sintéticos).
 6. Quando alterar Python e a suíte não puder rodar, execute ao menos
    `python -m compileall -q pipeline intranet/api`.
 7. Informe claramente qualquer validação que não pôde ser executada.

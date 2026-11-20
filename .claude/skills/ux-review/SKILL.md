@@ -59,7 +59,7 @@ informação e não confundir apoio com decisão.
 | Medida | 1 | 2 | 3 |
 |---|---|---|---|
 | Impacto | cosmético | atrasa a leitura | induz leitura errada ou esconde dado |
-| Esforço | só componente Svelte | tela + `src/lib` | rota da API ou view `v_*` |
+| Esforço | só template ou CSS | tela + `cliente_api.py` | rota da API ou view `v_*` |
 
 ## Relatório
 

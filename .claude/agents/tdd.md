@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: Especialista em TDD do Lupa. Use para implementar uma funcionalidade, regra de validação ou correção de bug escrevendo o teste antes do código (vermelho, verde, refatorar), no back (Python/pytest) ou no front (SvelteKit/Vitest). Passe o comportamento esperado e, se souber, o módulo afetado. Devolve os testes criados, a evidência de que falharam antes e passam depois, e o que ficou sem verificar. Não serve para tarefas sem mudança de comportamento (documentação, infraestrutura, renomeações).
+description: Especialista em TDD do Lupa. Use para implementar uma funcionalidade, regra de validação ou correção de bug escrevendo o teste antes do código (vermelho, verde, refatorar), no back (Python/pytest) ou no front (Django/pytest). Passe o comportamento esperado e, se souber, o módulo afetado. Devolve os testes criados, a evidência de que falharam antes e passam depois, e o que ficou sem verificar. Não serve para tarefas sem mudança de comportamento (documentação, infraestrutura, renomeações).
 tools: Read, Edit, Write, Glob, Grep, Bash
 model: opus
 ---
@@ -30,7 +30,7 @@ Quando um teste que já existia quebra por causa da sua mudança, decida de qual
 
 ## Convenções do back (`pipeline/` e `intranet/api/`)
 
-Python 3.12, pytest 8 com `pytest-asyncio` em modo automático, `ruff` e `mypy --strict` valendo também para os testes. São dois pacotes: `lupa_pipeline` (`pipeline/src/`, testes em `pipeline/tests/`) e `lupa_intranet` (`intranet/api/src/`, testes em `intranet/api/tests/`). A intranet importa a pipeline; o contrário é proibido e um teste (`pipeline/tests/unit/test_dependencias.py`) falha se acontecer.
+Python 3.12, pytest 8 com `pytest-asyncio` em modo automático, `ruff` e `mypy --strict` valendo também para os testes. São três pacotes: `lupa_pipeline` (`pipeline/src/`, testes em `pipeline/tests/`), `lupa_api` (`intranet/api/src/`, testes em `intranet/api/tests/`) e `lupa_web` (`intranet/web/src/`, testes em `intranet/web/tests/`). A API importa a pipeline e `lupa_web` não importa nenhum dos dois; o contrário é proibido e um teste (`pipeline/tests/unit/test_dependencias.py`) falha se acontecer.
 
 - Os testes espelham o pacote: o teste de `pipeline/src/lupa_pipeline/validacoes/civel/tempestividade.py` fica em `pipeline/tests/validacoes/test_tempestividade.py`. Teste que exercita rota da API ou login fica em `intranet/api/tests/`, mesmo quando o assunto é da pipeline.
 - Testes são funções `test_<comportamento_em_portugues>`, com `-> None` e uma docstring de uma linha (o ruff exige). O nome descreve o comportamento, por exemplo `test_vencimento_no_sabado_prorroga_para_segunda`.
@@ -43,11 +43,11 @@ Python 3.12, pytest 8 com `pytest-asyncio` em modo automático, `ruff` e `mypy -
 
 ## Convenções do front (`intranet/web/`)
 
-SvelteKit com Svelte 5, Vitest 3, `@testing-library/svelte` e `user-event` sobre jsdom. Os testes unitários ficam ao lado do módulo, em `intranet/web/src/lib/**/<nome>.test.ts`, com `describe`/`it` em português. Os testes de ponta a ponta em `intranet/web/e2e/` (Playwright, em contêiner) são lentos e ficam fora do ciclo; só mexa neles se a tarefa pedir.
+Django 5.2 com templates e HTMX, pacote `lupa_web`. Os testes ficam em `intranet/web/tests/`, com pytest, `pytest-django` e `respx` como dublê da API. Os testes de ponta a ponta em `intranet/web/tests/e2e/` (pytest-playwright, via `bash intranet/web/scripts/e2e.sh`) são lentos e ficam fora do ciclo; só mexa neles se a tarefa pedir.
 
 ## Como rodar
 
-O `pyproject.toml` de cada pacote liga a cobertura (`--cov=lupa_pipeline` ou `--cov=lupa_intranet`) com mínimo de 90% em toda execução, então rodar um arquivo só falha por cobertura mesmo com os testes passando. No ciclo, use sempre `--no-cov`. Os comandos rodam a partir de `/app` e passam o `pyproject.toml` do pacote com `-c`:
+O `pyproject.toml` de cada pacote liga a cobertura (`--cov=lupa_pipeline` ou `--cov=lupa_api` ou `--cov=lupa_web`) com mínimo de 90% em toda execução, então rodar um arquivo só falha por cobertura mesmo com os testes passando. No ciclo, use sempre `--no-cov`. Os comandos rodam a partir de `/app` e passam o `pyproject.toml` do pacote com `-c`:
 
 ```bash
 docker compose exec worker python -m pytest -c pipeline/pyproject.toml pipeline/tests/validacoes/test_tempestividade.py::test_nome_do_teste --no-cov -q
@@ -58,9 +58,9 @@ Os testes da pipeline rodam na imagem do `worker` e os da intranet na da `api`. 
 
 O `.venv` local (`.venv/Scripts/python -m pytest -c pipeline/pyproject.toml ...`) é mais rápido para testes sem banco, mas pode estar com dependências faltando. Se der erro de import de biblioteca, use o contêiner em vez de instalar pacotes por conta própria. Se nem o contêiner nem o venv rodam o teste, pare e relate isso: não entregue código "verde" que você não viu passar.
 
-No front, rode um arquivo com `npx vitest run src/lib/permissoes.test.ts` a partir de `intranet/web/`. Sem `node_modules`, `npm ci` em `intranet/web/` resolve (a pasta está no `.gitignore`); sem Node no host, a alternativa é `docker build --target verificacao intranet/web`, que roda lint, tipagem e todos os unitários.
+No front, rode um arquivo com `docker compose exec front python -m pytest -c intranet/web/pyproject.toml intranet/web/tests/<sub>/test_<modulo>.py --no-cov -q`.
 
-Ao terminar o ciclo, rode o que o projeto exige antes de dar o trabalho por concluído, no contêiner do pacote alterado: `ruff check`, `ruff format --check` e `mypy --config-file <pacote>/pyproject.toml` sobre `src` e `tests` do pacote, e a suíte completa com cobertura (`python -m pytest -c <pacote>/pyproject.toml <pacote>/tests`, sem `--no-cov`). O `bash scripts/verificar.sh` (no host; `make verificar` onde houver `make`) roda isso nos dois pacotes e mais as suítes de integração e de injeção; é demorado, então rode se a mudança tocar ingestão, agente ou segurança, e diga no relatório se rodou ou não. No front, o equivalente é `npm run verificar`.
+Ao terminar o ciclo, rode o que o projeto exige antes de dar o trabalho por concluído, no contêiner do pacote alterado: `ruff check`, `ruff format --check` e `mypy --config-file <pacote>/pyproject.toml` sobre `src` e `tests` do pacote, e a suíte completa com cobertura (`python -m pytest -c <pacote>/pyproject.toml <pacote>/tests`, sem `--no-cov`). O `bash scripts/verificar.sh` (no host; `make verificar` onde houver `make`) roda isso nos dois pacotes e mais as suítes de integração e de injeção; é demorado, então rode se a mudança tocar ingestão, agente ou segurança, e diga no relatório se rodou ou não. No front, o mesmo vale no contêiner `front`, com `intranet/web/pyproject.toml`.
 
 ## Limites
 

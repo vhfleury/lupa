@@ -41,7 +41,7 @@ Arquivo fora dos esperados é desvio de Escopo, nunca "alteração antiga".
 | Plano | algoritmo mudou sem atualizar "Passo a passo do algoritmo" |
 | Entrega | tarefa não marcada em `tarefas_0.2.md` com requisito, comando e saída |
 | Docs | `.md` fora de `docs/<tipo>/` ou ausente de `docs/README.md`; análise ou incidente sem data no nome; mudança percebida sem `CHANGELOG.md`; mudança de componente sem `docs/arquitetura.md` |
-| Config | `pyproject.toml`, `docker-compose*.yml`, `Dockerfile`, `Caddyfile`, `eslint.config.js` alterados sem necessidade; `requirements*.txt` fora de `make lock` |
+| Config | `pyproject.toml`, `docker-compose*.yml`, `Dockerfile`, `Caddyfile` alterados sem necessidade; `requirements*.txt` fora de `make lock` |
 
 ## Encaminhamentos
 

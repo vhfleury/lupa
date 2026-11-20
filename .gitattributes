@@ -8,7 +8,6 @@
 *.hcl text eol=lf
 *.md text eol=lf
 *.ts text eol=lf
-*.svelte text eol=lf
 *.js text eol=lf
 *.mjs text eol=lf
 *.css text eol=lf

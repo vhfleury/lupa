@@ -1,6 +1,6 @@
 ---
 name: tela-intranet
-description: Conduz a criação ou a atualização de uma tela da intranet do Lupa (SvelteKit em intranet/web) de ponta a ponta — escopo, mapeamento, inventário de dados com fonte real nas views v_* e rotas da API, mock renderizado no próprio front com dado sintético, iteração com o usuário, requisito/plano/tarefas, implementação em TDD e validação. Use sempre que o pedido for criar tela, redesenhar, reorganizar, "melhorar o layout", adicionar colunas, ações ou painéis, ou mudar o que uma tela mostra.
+description: Conduz a criação ou a atualização de uma tela da intranet do Lupa (Django com templates e HTMX em intranet/web) de ponta a ponta — escopo, mapeamento, inventário de dados com fonte real nas views v_* e rotas da API, mock renderizado no próprio front com dado sintético, iteração com o usuário, requisito/plano/tarefas, implementação em TDD e validação. Use sempre que o pedido for criar tela, redesenhar, reorganizar, "melhorar o layout", adicionar colunas, ações ou painéis, ou mudar o que uma tela mostra.
 argument-hint: "[tela e o que mudar, ex.: /processos — mostrar o estado da ingestão sem abrir o processo]"
 ---
 
@@ -36,9 +36,9 @@ aprovado). Ajuste pontual: 0, 1 e 3 enxutos, depois 7 e 8, fazendo ao pé da let
   `docs/sistema/front.md` e `git status` para trabalho em andamento nos mesmos arquivos (não
   sobrescrever).
 - Depois, com caminho real: tela em `intranet/web/src/routes/`, lógica em
-  `intranet/web/src/lib/<assunto>/`, tipos em `src/lib/tipos.ts`, chamada em `src/lib/api.ts`,
-  permissões em `src/lib/permissoes.ts`, rota em `intranet/api/src/lupa_intranet/`, view `v_*`,
-  componentes de `src/lib/componentes/`, testes `*.test.ts` e `intranet/api/tests/`, outras telas
+  `intranet/web/src/lupa_web/telas/` e `templates/`, chamada em `cliente_api.py`, CSS em
+  `static/css/`, rota em `intranet/api/src/lupa_api/`, view `v_*`,
+  parciais compartilhados, testes em `intranet/web/tests/` e `intranet/api/tests/`, outras telas
   que usam as mesmas peças.
 
 ## 3. Inventário de dados
@@ -53,7 +53,7 @@ aprovado). Ajuste pontual: 0, 1 e 3 enxutos, depois 7 e 8, fazendo ao pé da let
 
 ## 4–5. Mock e iteração
 
-- Mock renderizado no próprio front (componente Svelte com dado sintético), aberto em
+- Mock renderizado no próprio front (template com dado sintético), aberto em
   `https://localhost:8443`, e aprovado pelo usuário antes do commit.
 - Marcar no mock a origem de cada dado (campo existente × dado novo).
 - Respeitar o tema (`tema.ts`, claro e escuro), componentes existentes e textos em português.
@@ -61,7 +61,7 @@ aprovado). Ajuste pontual: 0, 1 e 3 enxutos, depois 7 e 8, fazendo ao pé da let
 
 ## 7–8. Implementação e validação
 
-- Agente `tdd` com testes em `src/lib/**/<nome>.test.ts` e, para a rota, em `intranet/api/tests/`.
+- Agente `tdd` com testes em `intranet/web/tests/` e, para a rota, em `intranet/api/tests/`.
 - `especialista-intranet` em modo `revisao` antes do PR.
 - `/valida-intranet`, rebuild e conferência no navegador; fluxo coberto pelo E2E roda
   `bash intranet/web/scripts/e2e.sh`.
