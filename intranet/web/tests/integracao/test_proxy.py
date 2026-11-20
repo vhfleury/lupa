@@ -28,7 +28,7 @@ def test_proxy_responde_404_para_api() -> None:
 
 
 def test_proxy_entrega_o_front() -> None:
-    """RF-INT-01 (D2): a raiz pelo proxy vem do front Django."""
-    resposta = _pedir("/")
+    """RF-INT-01 (D2): a página de login pelo proxy vem do front Django."""
+    resposta = _pedir("/login")
     assert resposta.status_code == 200
-    assert "<title>Lupa</title>" in resposta.text
+    assert "<title>Entrar · Lupa</title>" in resposta.text

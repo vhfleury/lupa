@@ -171,3 +171,18 @@ def test_excecao_que_nao_e_da_api_segue_adiante() -> None:
     """RF-INT-03 (A1): o middleware só trata os desvios da API; o resto chega ao Django."""
     middleware = cliente_api.DesviosDaApi(lambda pedido: HttpResponse())
     assert middleware.process_exception(RequestFactory().get("/"), ValueError()) is None
+
+
+@pytest.mark.parametrize(
+    ("resposta", "esperado"),
+    [
+        (httpx.Response(422, json={"detail": "senha muito comum"}), "Senha muito comum."),
+        (httpx.Response(409, json={"detail": "Recarregue a lista."}), "Recarregue a lista."),
+        (httpx.Response(422, json={"detail": [{"msg": "x"}]}), cliente_api.MENSAGEM_GENERICA),
+        (httpx.Response(500, text="sem json"), cliente_api.MENSAGEM_GENERICA),
+        (httpx.Response(400, json=["lista"]), cliente_api.MENSAGEM_GENERICA),
+    ],
+)
+def test_detalhe_do_erro_vira_frase_da_tela(resposta: httpx.Response, esperado: str) -> None:
+    """RF-INT-03 (A1.8): o `detail` em texto da API vira frase; o resto, mensagem genérica."""
+    assert cliente_api.detalhe_do_erro(resposta) == esperado

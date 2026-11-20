@@ -591,10 +591,25 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
   - `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh`: pipeline `702 passed` (95,25%), api
     `265 passed, 3 deselected` (98,23%), ponta a ponta `6 passed`, injeção `2 passed`, web
     `24 passed` (100%), cabeçalhos ok em 4 rotas, agente `11 passed`; E2E não rodou.
-- [ ] **T10.6** Login com TOTP, MFA com QR, troca de senha, logout e redirecionamento por sessão. RF-INT-02, RF-INT-03. Fase 4; A2, A3, D11.
+- [x] **T10.6** Login com TOTP, MFA com QR, troca de senha, logout e redirecionamento por sessão. RF-INT-02, RF-INT-03. Fase 4; A2, A3, D11.
   - Vermelho: `intranet/web/tests/telas/test_acesso.py::test_login_com_codigo_errado_mostra_recusa_generica`, `::test_configuracao_de_mfa_mostra_qr_em_svg`, `::test_sessao_expirada_redireciona_para_login`, `::test_pedido_htmx_com_sessao_expirada_recebe_hx_redirect`; `intranet/web/tests/telas/test_csrf.py::test_post_sem_csrf_e_recusado_sem_chamar_api`.
   - Verde: `telas/acesso.py`, `templates/base.html`, `templates/acesso/`, `componentes/`.
   - Limpeza: nenhuma.
+  - `telas/sessao.py`: `tela_autenticada` consulta `GET /auth/sessao` antes da view e manda a
+    `/trocar-senha` quando a troca está pendente (A1.7); `contexto_da_moldura` monta cabeçalho e
+    menu por permissão. `/login` e `/login/codigo` (desafio, segredo e URI em campos ocultos; QR
+    do `segno` em SVG inline sem `style`); recusa de senha ou código com uma só mensagem, 429 com o
+    aviso de tentativas. `cliente_api`: `SessaoExpiradaError` guarda a resposta (o 401 do login e
+    da senha atual não é sessão expirada), `detalhe_do_erro` (A1.8) e `redirecionar`. `/` com
+    sessão vai a `/processos` (A3.2); a página inicial mínima sai, e `test_urls.py` e
+    `test_proxy.py::test_proxy_entrega_o_front` passam a conferir `/login`. Confirmação sem
+    JavaScript: `componentes/confirmacao.html` é uma página com formulário POST e "Cancelar".
+    Logos e favicon copiados para `lupa_web/static/`. O painel "Início" do SvelteKit não foi
+    reproduzido (fica para a paridade, T10.14).
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas --no-cov -q`. Vermelho: `22 failed` (rotas inexistentes, 404).
+    Verde: `22 passed`; suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1` `51 passed`,
+    cobertura 100%; ruff, format e mypy `--strict` limpos.
 - [ ] **T10.7** Lista de processos renderizada a partir da API. RF-INT-01, RF-INT-02. Fase 5.
   - Vermelho: `intranet/web/tests/telas/test_processos.py::test_lista_de_processos_vem_renderizada_da_api`.
   - Verde: `telas/processos.py`, `templates/processos/lista.html`.

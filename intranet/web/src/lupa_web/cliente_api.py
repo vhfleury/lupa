@@ -21,6 +21,7 @@ PRAZO_API_PADRAO = "30"
 PRAZO_CHAT_PADRAO = "180"
 CHAVE_SET_COOKIE = "lupa_web.set_cookie"
 CAMINHO_LOGIN = "/login"
+MENSAGEM_GENERICA = "Algo deu errado. Tente novamente."
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,16 @@ class ApiIndisponivelError(DesvioDaApiError):
 
 
 class SessaoExpiradaError(DesvioDaApiError):
-    """A API respondeu 401."""
+    """A API respondeu 401; `resposta` guarda a resposta para a tela que distingue a recusa."""
+
+    def __init__(self, resposta: httpx.Response) -> None:
+        """Cria o erro.
+
+        Args:
+            resposta: Resposta 401 da API.
+        """
+        super().__init__(resposta.status_code)
+        self.resposta = resposta
 
 
 class AcessoNegadoError(DesvioDaApiError):
@@ -140,14 +150,53 @@ async def chamar(
         raise ApiIndisponivelError from erro
     request.META.setdefault(CHAVE_SET_COOKIE, []).extend(resposta.headers.get_list("set-cookie"))
     if resposta.status_code == httpx.codes.UNAUTHORIZED:
-        raise SessaoExpiradaError
+        raise SessaoExpiradaError(resposta)
     if resposta.status_code == httpx.codes.FORBIDDEN:
         raise AcessoNegadoError
     return resposta
 
 
+def detalhe_do_erro(resposta: httpx.Response) -> str:
+    """Texto do `detail` de uma resposta de erro da API, pronto para a tela (A1, passo 8).
+
+    Args:
+        resposta: Resposta de erro da API.
+
+    Returns:
+        O `detail` com inicial maiúscula e ponto final; texto genérico sem `detail` em texto.
+    """
+    try:
+        corpo = resposta.json()
+    except ValueError:
+        corpo = None
+    detalhe = corpo.get("detail") if isinstance(corpo, dict) else None
+    if not isinstance(detalhe, str) or not detalhe:
+        return MENSAGEM_GENERICA
+    texto = detalhe[0].upper() + detalhe[1:]
+    return texto if texto.endswith(".") else f"{texto}."
+
+
+def redirecionar(request: HttpRequest, caminho: str) -> HttpResponse:
+    """Manda o navegador para `caminho`: 303 ou, em pedido HTMX, `HX-Redirect`.
+
+    Args:
+        request: Pedido do navegador.
+        caminho: Destino.
+
+    Returns:
+        Resposta de redirecionamento.
+    """
+    if request.headers.get("HX-Request") == "true":
+        resposta = HttpResponse()
+        resposta["HX-Redirect"] = caminho
+        return resposta
+    resposta = HttpResponseRedirect(caminho)
+    resposta.status_code = 303
+    return resposta
+
+
 def redirecionar_para_login(request: HttpRequest) -> HttpResponse:
-    """Manda o navegador para `/login`: 303 ou, em pedido HTMX, `HX-Redirect` (A1, passo 5).
+    """Manda o navegador para `/login` (A1, passo 5).
 
     Args:
         request: Pedido do navegador.
@@ -155,13 +204,7 @@ def redirecionar_para_login(request: HttpRequest) -> HttpResponse:
     Returns:
         Resposta de redirecionamento.
     """
-    if request.headers.get("HX-Request") == "true":
-        resposta = HttpResponse()
-        resposta["HX-Redirect"] = CAMINHO_LOGIN
-        return resposta
-    resposta = HttpResponseRedirect(CAMINHO_LOGIN)
-    resposta.status_code = 303
-    return resposta
+    return redirecionar(request, CAMINHO_LOGIN)
 
 
 class DesviosDaApi(MiddlewareMixin):

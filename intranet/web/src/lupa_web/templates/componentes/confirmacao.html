@@ -1,0 +1,11 @@
+<section class="confirmacao" aria-labelledby="confirmacao-titulo" data-testid="confirmacao">
+  <h2 id="confirmacao-titulo">{{ titulo }}</h2>
+  <p id="confirmacao-mensagem">{{ mensagem }}</p>
+  <form method="post" action="{{ acao }}">
+    {% csrf_token %}
+    <div class="acoes">
+      <button type="submit"{% if perigo %} class="perigo"{% endif %}>{{ rotulo_confirmar }}</button>
+      <a class="botao secundario" href="{{ voltar }}">Cancelar</a>
+    </div>
+  </form>
+</section>

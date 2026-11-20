@@ -1,0 +1,11 @@
+<header class="cabecalho">
+  <a class="marca" href="/">Lupa</a>
+  <div class="usuario">
+    <span data-testid="usuario-nome">{{ sessao.nome_usuario }}</span>
+    <span class="papel" data-testid="usuario-papel">{{ rotulo_papel }}</span>
+    <form method="post" action="/sair">
+      {% csrf_token %}
+      <button type="submit" class="secundario">Sair</button>
+    </form>
+  </div>
+</header>
