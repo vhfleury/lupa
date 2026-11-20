@@ -146,3 +146,16 @@ def test_anotacao_vazia_nao_chama_a_api(logado: respx.MockRouter, navegador: Cli
     resposta = navegador.post(f"{BASE}/anotacoes", {"achado_id": "x", "texto": "  "})
     assert resposta["Location"] == f"{BASE}/validacoes"
     assert not rota.called
+
+
+def test_ficha_mostra_o_numero_com_mascara_e_rotulos_da_capa(
+    logado: respx.MockRouter, navegador: Client
+) -> None:
+    """RF-INT-02: número só com dígitos sai com a máscara CNJ; dados da capa com rótulo."""
+    ficha = DOSSIE["ficha"] | {"numero_cnj": "00000036720268070001"}
+    logado.get(f"{BASE}/dossie").respond(200, json=DOSSIE | {"ficha": ficha})
+    logado.get(f"{BASE}/indice").respond(200, json=INDICE)
+
+    html = navegador.get(f"{BASE}/dossie").content.decode()
+
+    assert '<dd class="mono">0000003-67.2026.8.07.0001</dd>' in html

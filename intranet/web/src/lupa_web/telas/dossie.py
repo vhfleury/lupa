@@ -187,6 +187,7 @@ def contexto_do_dossie(
     return {
         "processo_id": processo_id,
         "ficha": ficha,
+        "numero_cnj": rotulos.mascarar_cnj(ficha["numero_cnj"]),
         "capa": capa(processo_id, ficha),
         "classe_rotulo": rotulos.legivel(ficha["classe"]),
         "status_rotulo": rotulos.legivel(ficha["status"]),

@@ -38,7 +38,7 @@ LINK = f"/processos/{PROCESSO}/visualizador?evidencia={EVIDENCIA}"
         (
             "x",
             {"prazo_dias": 15},
-            {"tipo": "mapa", "campos": [("Prazo dias", {"tipo": "texto", "texto": "15"})]},
+            {"tipo": "mapa", "campos": [("Prazo em dias úteis", {"tipo": "texto", "texto": "15"})]},
         ),
     ],
 )

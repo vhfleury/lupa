@@ -26,6 +26,15 @@ def test_legivel_usa_rotulo_conhecido_ou_a_chave_com_espacos() -> None:
     assert rotulos.legivel("apelacao_civel") == "Apelação cível"
     assert rotulos.legivel("sem_arquivos") == "Sem arquivos"
     assert rotulos.legivel("pagina_em_branco") == "Pagina em branco"
+    assert rotulos.legivel("juizo_origem") == "Juízo de origem"
+    assert rotulos.legivel("orgao_julgador") == "Órgão julgador"
+    assert rotulos.legivel("peticao_inicial") == "Petição inicial"
+
+
+def test_mascarar_cnj_formata_os_vinte_digitos() -> None:
+    """RF-INT-02: como o `mascararCnj` do SvelteKit, só dígitos ganham a máscara CNJ."""
+    assert rotulos.mascarar_cnj("00000036720268070001") == "0000003-67.2026.8.07.0001"
+    assert rotulos.mascarar_cnj("0000003-67.2026.8.07.0001") == "0000003-67.2026.8.07.0001"
 
 
 def test_motivos_de_quarentena_e_falha_tem_frase_para_o_usuario() -> None:
