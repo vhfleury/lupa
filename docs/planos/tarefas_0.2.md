@@ -951,10 +951,18 @@ Execução do [plano do padrão visual](plano_padrao_visual.md). Um único PR da
     intranet/web/tests/telas/test_padrao.py`. Vermelho: 4 failed (sem sessão, catálogo, selo,
     badge); os 4 casos de 404 já passavam por falta da rota. Verde: 8 passed; unit e telas 410
     passed, cobertura 100%.
-- [ ] **T11.4** Teste de conformidade com lista de telas pendentes. RF-VIS-01, RF-VIS-04. Fase 1; D5.
+- [x] **T11.4** Teste de conformidade com lista de telas pendentes. RF-VIS-01, RF-VIS-04. Fase 1; D5.
   - Vermelho: `intranet/web/tests/unit/test_conformidade_templates.py::test_css_de_tela_nao_tem_cor_nem_fonte_literal` e `::test_templates_de_tela_usam_componentes` falham para `base.css` e `componentes.css`, que não estão na lista de pendentes.
   - Verde: os dois CSS só com `var(--…)`; a lista de pendentes começa com os grupos das fases 2 a 6.
   - Limpeza: nenhuma.
+  - Entregue: `PENDENTES` com os grupos `acesso`, `processos`, `dossie`, `chat` e `gestao`
+    (templates e CSS de cada fase); caso extra `test_pendentes_citam_arquivos_que_existem`.
+    Testes: `docker compose exec -T front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/unit/test_conformidade_templates.py`. Vermelho: como a T11.1 já tirou os
+    tokens de `base.css` e a T11.3 deixou `componentes.css` só com tokens, o vermelho foi tirado
+    rodando o teste sobre a árvore de `ee33894` (antes da fase 11): CSS 1 failed, 42 ocorrências
+    em `base.css`; o de templates já passava (`base.html` sem marcação própria). Verde: 3 passed;
+    unit e telas 413 passed, cobertura 100%.
 - [ ] **T11.5** Telas de acesso no padrão (login, TOTP, troca de senha, erros, acesso negado). RF-VIS-04. Fase 2; P3.
   - Vermelho: grupo "acesso" sai da lista de pendentes e `test_conformidade_templates.py` falha.
   - Verde: templates de `acesso/`, `erros/` e `login.css` com componentes e tokens; testes de tela existentes continuam verdes.
