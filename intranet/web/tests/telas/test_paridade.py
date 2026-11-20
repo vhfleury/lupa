@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 import respx
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 
 from tests.telas.conftest import sessao_da_api
@@ -19,6 +20,8 @@ ARQUIVO = "d4" * 32
 ASSESSOR = "11" * 32
 OUTRO_ASSESSOR = "22" * 32
 BASE = f"/processos/{PROCESSO}"
+ANONIMO = "anonimo"
+PDF = b"%PDF-1.4\n% sintetico\n" + b"0" * 64
 
 DADOS_PROCESSO = {
     "id": PROCESSO,
@@ -343,6 +346,10 @@ USUARIO_INATIVO = USUARIO_ASSESSOR | {
 }
 USUARIOS = [USUARIO_DESEMBARGADOR, USUARIO_ASSESSOR, USUARIO_INATIVO]
 SENHA_TEMPORARIA = "senha-temporaria-sintetica"
+LISTA_ITEM = DADOS_PROCESSO | {
+    "responsaveis": [{"id": ASSESSOR, "nome_usuario": "assessora.sintetica", "ativo": True}],
+    "ingestao": {"situacao": "concluido", "por_estado": {}, "ultimo_envio": None},
+}
 ASSESSORA = {"id": ASSESSOR, "nome_usuario": "assessora.sintetica", "ativo": True}
 OUTRA = {"id": OUTRO_ASSESSOR, "nome_usuario": "outra.sintetica", "ativo": True}
 
@@ -401,8 +408,15 @@ def _simular_gestao(api: respx.MockRouter) -> None:
     api.get("/usuarios").respond(200, json=USUARIOS)
 
 
+def _simular_lista(api: respx.MockRouter) -> None:
+    api.get("/processos").respond(200, json=[LISTA_ITEM])
+
+
 def _simular_arquivo(api: respx.MockRouter, papel: str) -> None:
     base = f"{BASE}/arquivos/{ARQUIVO}"
+    api.get(f"{base}/paginas/2/imagem").respond(
+        200, content=b"PNG-sintetico", headers={"Content-Type": "image/png"}
+    )
     api.get(f"{base}/relatorio").respond(
         200,
         json={
@@ -860,6 +874,136 @@ CASOS = [
         corpo_api={},
         destino=f"{BASE}/chat?aviso=liberado",
     ),
+    Caso(
+        "login", ANONIMO, "GET", "/login", 200, trechos=("Bem-vindo ao Lupa", "csrfmiddlewaretoken")
+    ),
+    Caso(
+        "login",
+        ANONIMO,
+        "POST",
+        "/login",
+        200,
+        trechos=("Verificação em duas etapas", 'value="desafio-sintetico"'),
+        ausentes=("senha-sintetica",),
+        dados={"nome_usuario": " assessora.sintetica ", "senha": "senha-sintetica"},
+        rota_api="/auth/login",
+        corpo_api={"nome_usuario": "assessora.sintetica", "senha": "senha-sintetica"},
+        resposta_api={"etapa": "mfa", "desafio": "desafio-sintetico"},
+    ),
+    Caso(
+        "login_codigo",
+        ANONIMO,
+        "POST",
+        "/login/codigo",
+        303,
+        dados={"etapa": "mfa", "desafio": "desafio-sintetico", "codigo": " 123456 "},
+        rota_api="/auth/mfa",
+        corpo_api={"desafio": "desafio-sintetico", "codigo": "123456"},
+        resposta_api={"troca_senha_obrigatoria": False},
+        destino="/processos",
+    ),
+    Caso(
+        "trocar_senha",
+        "assessor",
+        "GET",
+        "/trocar-senha",
+        200,
+        trechos=("Trocar senha", 'name="nova_senha"', 'action="/trocar-senha"'),
+    ),
+    Caso(
+        "trocar_senha",
+        "assessor",
+        "POST",
+        "/trocar-senha",
+        303,
+        dados={
+            "senha_atual": "a",
+            "nova_senha": "frase-longa-sintetica",
+            "confirmacao": "frase-longa-sintetica",
+        },
+        rota_api="/auth/trocar-senha",
+        corpo_api={"senha_atual": "a", "nova_senha": "frase-longa-sintetica"},
+        destino="/processos",
+    ),
+    Caso(
+        "sair",
+        "assessor",
+        "POST",
+        "/sair",
+        303,
+        rota_api="/auth/logout",
+        destino="/login",
+    ),
+    Caso(
+        "processos",
+        "assessor",
+        "GET",
+        "/processos",
+        200,
+        trechos=(
+            "0000003-67.2026.8.07.0001",
+            f'href="{BASE}"',
+            "Agravo de instrumento",
+            "assessora.sintetica",
+            "Concluído",
+            "+ Novo processo",
+            'hx-post="/processos/envio"',
+        ),
+    ),
+    Caso(
+        "processos",
+        "desembargador",
+        "GET",
+        "/processos?situacao=quarentena",
+        200,
+        trechos=("Nenhum processo encontrado.", "Limpar filtros"),
+    ),
+    Caso(
+        "envio",
+        "assessor",
+        "POST",
+        "/processos/envio",
+        303,
+        dados={"arquivo": SimpleUploadedFile("autos.pdf", PDF, content_type="application/pdf")},
+        rota_api="/processos/arquivos",
+        resposta_api={"arquivo_id": ARQUIVO, "processo_id": PROCESSO, "duplicado": False},
+        destino=BASE,
+    ),
+    Caso(
+        "envio_anexo",
+        "assessor",
+        "POST",
+        f"{BASE}/envio",
+        303,
+        dados={"arquivo": SimpleUploadedFile("anexo.pdf", PDF, content_type="application/pdf")},
+        rota_api=f"{BASE}/arquivos",
+        resposta_api={"arquivo_id": ARQUIVO, "processo_id": PROCESSO, "duplicado": False},
+        destino=BASE,
+    ),
+    Caso(
+        "processo_estado",
+        "assessor",
+        "GET",
+        f"{BASE}/estado",
+        200,
+        trechos=('id="estado-arquivos"', "autos-sinteticos.pdf", "Em quarentena"),
+    ),
+    Caso(
+        "visualizador_imagem",
+        "assessor",
+        "GET",
+        f"{BASE}/arquivos/{ARQUIVO}/paginas/2/imagem",
+        200,
+        trechos=("PNG-sintetico",),
+    ),
+    Caso(
+        "dossie_resumos",
+        "assessor",
+        "GET",
+        f"{BASE}/dossie?resumos=1",
+        200,
+        trechos=("Ficha", "Gerar resumos das peças (modelo)"),
+    ),
 ]
 
 
@@ -868,7 +1012,9 @@ def test_cada_tela_responde_ao_papel_permitido(
     api_simulada: respx.MockRouter, navegador: Client, caso: Caso
 ) -> None:
     """RF-INT-02: a tela ou ação responde ao papel que a tem, com o conteúdo vindo da API."""
-    api_simulada.get("/auth/sessao").respond(200, json=sessao_da_api(caso.papel))
+    if caso.papel != ANONIMO:
+        api_simulada.get("/auth/sessao").respond(200, json=sessao_da_api(caso.papel))
+    _simular_lista(api_simulada)
     _simular_processo(api_simulada, caso.papel)
     _simular_arquivo(api_simulada, caso.papel)
     _simular_analise(api_simulada)
@@ -893,7 +1039,7 @@ def test_cada_tela_responde_ao_papel_permitido(
         assert trecho in html
     for trecho in caso.ausentes:
         assert trecho not in html
-    if rota is not None:
+    if rota is not None and caso.corpo_api is not None:
         assert json.loads(rota.calls.last.request.content) == caso.corpo_api
     if caso.destino:
         assert resposta["Location"] == caso.destino

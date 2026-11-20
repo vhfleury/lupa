@@ -799,10 +799,29 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
   - Conferência visual pendente do usuário: o painel do navegador recusou o certificado
     autoassinado de `https://localhost:8443`; a comparação foi por leitura, classe a classe e
     variável a variável, contra os `<style>` dos `.svelte`, `app.css` e `login.css`.
-- [ ] **T10.14** Paridade de telas fechada. RF-INT-02. Fases 4 a 8.
+- [x] **T10.14** Paridade de telas fechada. RF-INT-02. Fases 4 a 8.
   - Vermelho: `intranet/web/tests/telas/test_paridade.py::test_cada_tela_responde_ao_papel_permitido` com as onze telas e todas as ações.
   - Verde: o que faltar das tarefas anteriores.
   - Limpeza: extrair o que se repetir entre views.
+  - Casos novos: login (GET e senha aceita, anônimo), código TOTP, troca de senha (GET e POST),
+    sair, lista de processos (assessor; desembargador com filtro sem resultado), cadastro por
+    arquivo e anexo (303 para o processo), estado dos arquivos, imagem da página e resumos do
+    dossiê. Papel `anonimo` sem `GET /auth/sessao`; `corpo_api=None` dispensa a conferência do
+    corpo (envio em `application/octet-stream`). O complemento do cadastro fica em
+    `test_envio.py` (precisa de pendente no volume). Comparação rota a rota com
+    `src/routes` e `src/lib`: as onze telas e as ações das fases 4 a 8 já existiam; nenhum código
+    de view mudou, e a limpeza não achou repetição nova entre views.
+  - Sem reprodução, por exigir decisão nova (a especificação não os lista em RF-INT-02 e o
+    plano manda `/` a `/processos`, A3.2): o painel "Início" (`/`, com `GET /processos?meus=true`,
+    indicadores e atalhos) e o "Visualizar como assessor" do desembargador (cabeçalho com
+    `fieldset` desabilitado). Diferença menor: o "+ Novo processo" da lista é âncora para o
+    cadastro sempre visível, não botão que abre e fecha.
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas/test_paridade.py --no-cov -q`. Vermelho: `10 failed, 35 passed`
+    (API sem `/processos` nem imagem simuladas, papel anônimo inexistente, corpo binário).
+    Verde: `45 passed` no arquivo; suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1`
+    `321 passed` (com o envio real), cobertura 100%; ruff, format e mypy `--strict` limpos;
+    `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde (pipeline 702, intranet 265, web 321; e2e fora).
 - [ ] **T10.15** Suíte E2E em `pytest-playwright` e capturas dos guias. RF-INT-01, RNF-09. Fase 10; D5, D6.
   - Revisão manual: E2E fora do ciclo. `intranet/web/tests/e2e/test_seguranca.py::test_navegador_nao_faz_requisicao_para_api`, `test_fluxos.py` (login, processos, dossiê, chat, auditoria, assessores) e `test_capturas.py::test_gera_capturas_dos_guias`.
   - Verde: `intranet/web/e2e/Dockerfile`, serviço `e2e`, `intranet/web/scripts/e2e.sh`, `docs/guias/imagens/`.
