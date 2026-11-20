@@ -123,6 +123,10 @@
   margin-bottom: 1.5rem;
 }
 
+.cartao h3 {
+  margin: 0 0 0.5rem;
+}
+
 .cartao.destaque .senha {
   font-size: 1.25rem;
   padding: 0.5rem;
@@ -154,6 +158,7 @@
   flex: 1;
   min-width: 12rem;
   height: 1.1rem;
+  accent-color: var(--primaria);
 }
 
 .complemento {
