@@ -46,7 +46,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 | `docs/arquitetura.md` | alterar: componente `front`, proxy sem `/api` |
 | `docs/adr/0019-front-django-renderizado-no-servidor.md` | criar |
 | `docs/adr/0006-front-sveltekit-spa-atras-de-proxy.md`, `docs/adr/0016-dois-pacotes.md` | alterar: status "Substituído por 0019" |
-| `docs/guias/imagens/` | substituir: capturas geradas pela suíte E2E nova |
+| `docs/imagens/` | substituir: capturas geradas pela suíte E2E nova |
 | `CHANGELOG.md` | alterar: seção `Não publicado` |
 | `docs/README.md` | alterar: inclui este plano e o ADR 0019 |
 
@@ -89,7 +89,8 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
   classes, variáveis de tema e layout (decisão 53).
 - **D8.** HTMX 2 versionado em `static/js/`, com `htmx.config.allowEval = false`,
   `includeIndicatorStyles = false` e `selfRequestsOnly = true`. JavaScript próprio só em
-  `envio.js` (progresso do envio pelo evento `htmx:xhr:progress`) e `tema.js` (troca de tema); sem script
+  `envio.js` (progresso do envio pelo evento `htmx:xhr:progress`), `tema.js` (troca de tema) e
+  `visualizador.js` (atalhos de teclado do visualizador, decisão do usuário em 20/11/2026); sem script
   inline.
 - **D9.** `record_source` das linhas novas passa de `intranet.*` para `api.*`; linhas antigas não
   mudam (sem `UPDATE`, RES-13). Consultas que filtram por `record_source` aceitam os dois prefixos.
@@ -114,6 +115,10 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
   T10.14): o painel "Início" em `/` é reproduzido com os mesmos dados da API; a opção "Visualizar
   como assessor" do desembargador é removida; o "+ Novo processo" abre e fecha o cadastro com
   `<details>`, sem JavaScript novo.
+- **D18.** `Referrer-Policy: same-origin` no proxy e no Django, no lugar de `no-referrer`: com
+  `no-referrer` o navegador manda `Origin: null` no POST de formulário e o CSRF do Django recusa
+  todos (bug achado pelo E2E na T10.15; decisão do usuário em 20/11/2026). Não se aceita `null`
+  em `CSRF_TRUSTED_ORIGINS`.
 
 ## Fases
 
@@ -248,7 +253,7 @@ Arquivos de `lupa_web` em `intranet/web/tests/`; os de `lupa_api` seguem em `int
 - RNF-08: `scripts/verificar.sh` — ruff, format, mypy `--strict` e pytest com cobertura de 90% em `lupa_web` no contêiner `front`.
 - RNF-09: `intranet/web/tests/e2e/test_fluxos.py` (login, processos, dossiê, chat, auditoria, gestão de assessores) e `intranet/web/tests/e2e/test_capturas.py::test_gera_capturas_dos_guias` — marcador `e2e`, fora do ciclo; revisão manual das capturas.
 
-Revisão manual: conferência visual do layout contra o atual (D7) e as capturas de `docs/guias/imagens/`.
+Revisão manual: conferência visual do layout contra o atual (D7) e as capturas de `docs/imagens/`.
 
 ## Execução
 
