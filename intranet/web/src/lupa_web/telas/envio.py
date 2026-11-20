@@ -136,11 +136,13 @@ def _concluir(
     nome: str,
     pendente: envios_pendentes.Pendente | None = None,
     codigo: str = "",
+    processo_id: str = "",
 ) -> HttpResponse:
     corpo = _corpo(resposta)
     if not resposta.is_error:
         envios_pendentes.apagar(codigo)
-        destino = f"/processos/{corpo['processo_id']}?aviso={aviso_do_envio(corpo)}"
+        destino = f"/processos/{corpo.get('processo_id') or processo_id}"
+        destino += f"?aviso={aviso_do_envio(corpo)}"
         return cliente_api.redirecionar(request, destino)
     if corpo.get("motivo") == MOTIVO_INCOMPLETA:
         if not codigo:
@@ -154,7 +156,7 @@ def _concluir(
     return _fragmento(request, {"erro": erro})
 
 
-async def _enviar_arquivo(request: HttpRequest, rota: str) -> HttpResponse:
+async def _enviar_arquivo(request: HttpRequest, rota: str, processo_id: str = "") -> HttpResponse:
     arquivo = request.FILES.get("arquivo")
     problema = problema_do_arquivo(arquivo)
     if problema or not isinstance(arquivo, TemporaryUploadedFile):
@@ -163,7 +165,7 @@ async def _enviar_arquivo(request: HttpRequest, rota: str) -> HttpResponse:
     caminho = Path(arquivo.temporary_file_path())
     nome = str(arquivo.name)
     resposta = await _repassar(request, rota, caminho, {"nome": nome})
-    return _concluir(request, resposta, caminho, nome)
+    return _concluir(request, resposta, caminho, nome, processo_id=processo_id)
 
 
 @require_POST
@@ -194,7 +196,7 @@ async def anexo(request: HttpRequest, sessao: Sessao, processo_id: str) -> HttpR
     Returns:
         `HX-Redirect` para o processo ou o motivo da recusa.
     """
-    return await _enviar_arquivo(request, f"/processos/{processo_id}/arquivos")
+    return await _enviar_arquivo(request, f"/processos/{processo_id}/arquivos", processo_id)
 
 
 @require_POST

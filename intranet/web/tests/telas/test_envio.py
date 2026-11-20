@@ -187,3 +187,15 @@ def test_falha_da_api_sem_json_mostra_mensagem_generica(
     logado.post("/processos/arquivos").respond(500, text="falha")
     assert "Algo deu errado. Tente novamente." in _enviar(navegador, arquivo=_arquivo())
     assert list(pasta.iterdir()) == []
+
+
+def test_anexo_volta_ao_processo_da_rota_sem_processo_id_na_resposta(
+    logado: respx.MockRouter, navegador: Client, pasta: Path
+) -> None:
+    """RF-INT-04 (A4.8): a API do anexo não devolve `processo_id`; o destino vem da rota."""
+    resposta_api = {"arquivo_id": "f6" * 32, "duplicado": False}
+    logado.post(f"/processos/{PROCESSO}/arquivos").respond(201, json=resposta_api)
+    resposta = navegador.post(
+        f"/processos/{PROCESSO}/envio", {"arquivo": _arquivo()}, HTTP_HX_REQUEST="true"
+    )
+    assert resposta["HX-Redirect"] == f"/processos/{PROCESSO}?aviso=recebido"
