@@ -3,9 +3,8 @@
   width: 100%;
   max-width: 26rem;
   padding: 1.5rem 2rem;
-  border-radius: 20px;
-  border-top: 4px solid #008e87;
-  box-shadow: 0 20px 64px rgb(3 30 63 / 9%);
+  border-radius: var(--raio);
+  border-top: var(--tarja) solid var(--primaria);
 }
 .login-marca {
   width: min(100%, 12rem);
@@ -49,7 +48,7 @@
 .login-etapa {
   color: var(--texto-suave);
   font-size: 0.65rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.12em;
 }
 .login-introducao h1 {
@@ -88,18 +87,11 @@
   width: 100%;
   min-height: 50px;
   border-radius: 9px;
-  background: #063453;
-  border-color: #063453;
-  color: #fff;
   font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.85rem;
-}
-.login-cartao button[type='submit']:hover:not(:disabled) {
-  background: #09516b;
-  border-color: #09516b;
 }
 .login-cartao .acoes {
   gap: 0.75rem;

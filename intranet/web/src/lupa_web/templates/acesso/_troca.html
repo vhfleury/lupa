@@ -18,8 +18,8 @@
       <input id="confirmacao" name="confirmacao" type="password" autocomplete="new-password" minlength="12" required>
     </div>
     <div class="acoes">
-      <button type="submit">Salvar nova senha</button>
-      <button type="submit" class="secundario" form="form-sair">Sair</button>
+      {% include "componentes/botao.html" with rotulo="Salvar nova senha" variante="" href="" %}
+      {% include "componentes/botao.html" with rotulo="Sair" variante="secundario" href="" formulario="form-sair" %}
     </div>
   </form>
   <form id="form-sair" method="post" action="/sair">{% csrf_token %}</form>

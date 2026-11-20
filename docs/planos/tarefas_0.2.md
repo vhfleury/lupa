@@ -963,10 +963,17 @@ Execução do [plano do padrão visual](plano_padrao_visual.md). Um único PR da
     rodando o teste sobre a árvore de `ee33894` (antes da fase 11): CSS 1 failed, 42 ocorrências
     em `base.css`; o de templates já passava (`base.html` sem marcação própria). Verde: 3 passed;
     unit e telas 413 passed, cobertura 100%.
-- [ ] **T11.5** Telas de acesso no padrão (login, TOTP, troca de senha, erros, acesso negado). RF-VIS-04. Fase 2; P3.
+- [x] **T11.5** Telas de acesso no padrão (login, TOTP, troca de senha, erros, acesso negado). RF-VIS-04. Fase 2; P3.
   - Vermelho: grupo "acesso" sai da lista de pendentes e `test_conformidade_templates.py` falha.
   - Verde: templates de `acesso/`, `erros/` e `login.css` com componentes e tokens; testes de tela existentes continuam verdes.
   - Limpeza: nenhuma.
+  - Entregue: login, código e troca de senha com `componentes/botao.html` (o botão ganha o
+    parâmetro `formulario`, para o "Sair" da troca); `login.css` sem cor literal nem sombra, tarja
+    superior em `--tarja` e `--primaria`, botão no verde primário, peso 700 virou 600. As
+    páginas de erro já não tinham marcação própria. Testes: `docker compose exec -T front python
+    -m pytest -c intranet/web/pyproject.toml intranet/web/tests/unit/test_conformidade_templates.py`.
+    Vermelho: 2 failed (`acesso/_troca.html`, `login.css`). Verde: unit e telas 413 passed,
+    cobertura 100%.
 - [ ] **T11.6** Início, processos, processo e envio no padrão; estado de ingestão no badge. RF-VIS-04. Fase 3; P3, D7.
   - Vermelho: `intranet/web/tests/telas/test_processos.py::test_estado_de_ingestao_aparece_no_badge`; grupo "processos" sai da lista de pendentes.
   - Verde: `inicio.html`, `processos/`, `componentes/envio.html`, `inicio.css`, `processos.css`, `processo.css`.

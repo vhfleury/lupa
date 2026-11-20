@@ -15,7 +15,6 @@ COR_OU_FONTE_LITERAL = re.compile(
 )
 MARCACAO_PROPRIA = re.compile(r"<button|<table|<progress|class=\"aviso", re.I)
 PENDENTES = {
-    "acesso": ("acesso/", "erros/", "login.css"),
     "processos": (
         "inicio.html",
         "processos/lista.html",
