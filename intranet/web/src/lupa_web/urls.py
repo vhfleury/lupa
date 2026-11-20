@@ -3,7 +3,7 @@
 from django.http import HttpRequest, HttpResponse
 from django.urls import path
 
-from lupa_web.telas import acesso
+from lupa_web.telas import acesso, processos
 
 
 async def saude(request: HttpRequest) -> HttpResponse:
@@ -24,5 +24,6 @@ urlpatterns = [
     path("login/codigo", acesso.login_codigo, name="login_codigo"),
     path("trocar-senha", acesso.trocar_senha, name="trocar_senha"),
     path("sair", acesso.sair, name="sair"),
+    path("processos", processos.lista, name="processos"),
     path("", acesso.inicio, name="inicio"),
 ]

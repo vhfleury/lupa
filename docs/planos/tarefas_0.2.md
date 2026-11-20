@@ -610,10 +610,20 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
     intranet/web/tests/telas --no-cov -q`. Vermelho: `22 failed` (rotas inexistentes, 404).
     Verde: `22 passed`; suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1` `51 passed`,
     cobertura 100%; ruff, format e mypy `--strict` limpos.
-- [ ] **T10.7** Lista de processos renderizada a partir da API. RF-INT-01, RF-INT-02. Fase 5.
+- [x] **T10.7** Lista de processos renderizada a partir da API. RF-INT-01, RF-INT-02. Fase 5.
   - Vermelho: `intranet/web/tests/telas/test_processos.py::test_lista_de_processos_vem_renderizada_da_api`.
   - Verde: `telas/processos.py`, `templates/processos/lista.html`.
   - Limpeza: nenhuma.
+  - Filtros (busca, situação, responsável) num formulário GET, aplicados no servidor sobre a
+    resposta de `GET /processos`; sem atualização automática (o SvelteKit repetia a cada 4 s com
+    arquivo em processamento; a lista avisa para recarregar). `lupa_web/rotulos.py` com classes,
+    situações, estados e motivos do SvelteKit (`lib/processos/rotulos.ts`) e datas no fuso de
+    Brasília; teste em `tests/unit/test_rotulos.py`. Extras: filtros, lista vazia e filtro sem
+    resultado.
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas/test_processos.py --no-cov -q`. Vermelho: `5 failed` (rota
+    inexistente). Verde: `5 passed`; suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1`
+    `64 passed`, cobertura 100%.
 - [ ] **T10.8** Cadastro por arquivo com progresso, complemento e estado da ingestão. RF-INT-04. Fase 5; A4, D8, D14.
   - Vermelho: `intranet/web/tests/telas/test_envio.py::test_pdf_sem_classe_pede_a_classe_e_reenvio_usa_o_mesmo_arquivo`, `::test_arquivo_acima_do_limite_e_recusado_sem_chamar_api`; `intranet/web/tests/telas/test_processo.py::test_estado_do_arquivo_para_de_atualizar_no_estado_final`; `intranet/web/tests/integracao/test_envio_api_real.py::test_envio_de_pdf_sintetico_cria_processo_pela_api`.
   - Verde: `telas/envio.py`, `telas/processo.py`, fragmentos, `static/js/htmx.min.js`, `static/js/envio.js`.

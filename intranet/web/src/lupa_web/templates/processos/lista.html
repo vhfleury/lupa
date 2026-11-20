@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block titulo %}Processos · Lupa{% endblock %}
+{% block conteudo %}
+<div class="pagina-processos">
+  <header class="topo">
+    <div>
+      <span class="sobretitulo">ACERVO / PROCESSOS</span>
+      <h1>Processos</h1>
+      <p>Consulte os autos, acompanhe o processamento e veja quem está responsável.</p>
+    </div>
+  </header>
+  <section class="acervo" aria-labelledby="titulo-acervo">
+    <div class="cabecalho-lista">
+      <div><h2 id="titulo-acervo">Lista de processos</h2></div>
+      <span class="contagem">{{ processos|length }} de {{ total }}</span>
+    </div>
+    <form class="filtros" method="get" action="/processos">
+      <div>
+        <label for="buscar-processo">Buscar processo ou assessor</label>
+        <input id="buscar-processo" name="busca" type="search" value="{{ filtros.busca }}" placeholder="Número CNJ, classe ou nome do assessor">
+      </div>
+      <div>
+        <label for="filtro-situacao">Processamento</label>
+        <select id="filtro-situacao" name="situacao">
+          <option value="">Todas as situações</option>
+          {% for valor, rotulo in situacoes %}<option value="{{ valor }}"{% if filtros.situacao == valor %} selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="filtro-responsavel">Responsável</label>
+        <select id="filtro-responsavel" name="responsavel">
+          <option value="">Todos os responsáveis</option>
+          <option value="sem"{% if filtros.responsavel == "sem" %} selected{% endif %}>Sem responsável</option>
+          {% for assessor in assessores %}<option value="{{ assessor.id }}"{% if filtros.responsavel == assessor.id %} selected{% endif %}>{{ assessor.nome_usuario }}{% if not assessor.ativo %} (desativado){% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      <div><button type="submit" class="secundario">Filtrar</button></div>
+    </form>
+    {% if total == 0 %}
+    <div class="vazio">
+      <strong>Nenhum processo cadastrado.</strong>
+      <p>Os processos e seus responsáveis aparecerão aqui.</p>
+    </div>
+    {% elif not processos %}
+    <div class="vazio">
+      <strong>Nenhum processo encontrado.</strong>
+      <p>Experimente outros termos ou remova os filtros.</p>
+      <a class="botao secundario" href="/processos">Limpar filtros</a>
+    </div>
+    {% else %}
+    <div class="tabela-container">
+      <table data-testid="lista-processos">
+        <thead><tr><th scope="col">Processo</th><th scope="col">Assessores responsáveis</th><th scope="col">Processamento</th><th scope="col">Criado em</th></tr></thead>
+        <tbody>
+          {% for p in processos %}
+          <tr data-processo="{{ p.id }}">
+            <td data-rotulo="Processo"><a class="numero-processo" href="/processos/{{ p.id }}">{{ p.numero_cnj }}</a><span class="descricao">{{ p.classe_rotulo }}</span></td>
+            <td data-rotulo="Assessores responsáveis"><div class="responsaveis">
+              {% for assessor in p.responsaveis %}<span class="responsavel">{{ assessor.nome_usuario }}{% if not assessor.ativo %}<small> · desativado</small>{% endif %}</span>{% empty %}<span class="sem-responsavel">Sem responsável atribuído</span>{% endfor %}
+            </div></td>
+            <td data-rotulo="Processamento"><span class="selo {{ p.situacao }}" data-testid="situacao">{{ p.situacao_rotulo }}</span></td>
+            <td data-rotulo="Criado em" class="data">{{ p.criado_em_texto }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+    <footer class="rodape-lista">
+      <span>Abra um processo para consultar os detalhes e os responsáveis.</span>
+      {% if processando %}<span>Há arquivos em processamento; recarregue a página para ver o estado atual.</span>{% endif %}
+    </footer>
+  </section>
+</div>
+{% endblock %}
