@@ -12,7 +12,7 @@
 <article class="cartao achado {{ achado.resultado }}" data-testid="achado" data-validacao="{{ achado.validacao }}">
   <header>
     <h2>{{ achado.validacao_rotulo }}</h2>
-    <span class="resultado {{ achado.resultado }}" data-testid="resultado">{{ achado.resultado_rotulo }}</span>
+    {% include "componentes/selo.html" with tom=achado.resultado_tom texto=achado.resultado_rotulo testid="resultado" detalhe="" %}
   </header>
   <p>{{ achado.explicacao }}</p>
   <h3>Valores</h3>
@@ -26,14 +26,14 @@
     {% if fato %}
     <li data-testid="fato" data-fato="{{ fato.id }}">
       <span>{{ fato.tipo_rotulo }}: <strong>{{ fato.valor_texto }}</strong></span>
-      <span class="selo" data-testid="status-fato">{{ fato.status_rotulo }}</span>
-      {% if not fato.vigente %}<span class="selo antigo">substituído</span>{% endif %}
+      {% include "componentes/badge.html" with texto=fato.status_rotulo testid="status-fato" estado="" %}
+      {% if not fato.vigente %}{% include "componentes/badge.html" with texto="substituído" testid="" estado="" %}{% endif %}
       {% for evidencia in fato.links %}<a href="{{ evidencia.link }}" data-testid="link-evidencia">fl. {{ evidencia.pagina }}</a> {% endfor %}
       {% if fato.vigente and pode_anotar %}
       <form method="post" action="/processos/{{ processo_id }}/fatos/{{ fato.id }}/corrigir" class="confirmar">
         {% csrf_token %}
         <input type="hidden" name="status" value="confirmado">
-        <button type="submit" class="secundario">Confirmar</button>
+        {% include "componentes/botao.html" with rotulo="Confirmar" variante="secundario" href="" %}
       </form>
       <details class="correcao">
         <summary>Corrigir</summary>
@@ -58,7 +58,7 @@
             <label for="trecho-{{ fato.chave }}">Trecho literal dos autos</label>
             <textarea id="trecho-{{ fato.chave }}" name="trecho" rows="2"></textarea>
           </fieldset>
-          <button type="submit">Salvar correção</button>
+          {% include "componentes/botao.html" with rotulo="Salvar correção" variante="" href="" %}
         </form>
       </details>
       {% endif %}
@@ -81,12 +81,7 @@
 {% if antigos or substituidos %}
 {% if antigos %}
 <h3>Achados anteriores</h3>
-<table data-testid="historico-achados">
-  <thead><tr><th scope="col">Validação</th><th scope="col">Resultado</th><th scope="col">Explicação</th><th scope="col">Gravado em</th></tr></thead>
-  <tbody>
-    {% for achado in antigos %}<tr><td>{{ achado.validacao }}</td><td>{{ achado.resultado }}</td><td>{{ achado.explicacao }}</td><td>{{ achado.quando }}</td></tr>{% endfor %}
-  </tbody>
-</table>
+{% include "componentes/tabela.html" with legenda="Achados anteriores" colunas=colunas_historico testid="historico-achados" corpo="processos/_linhas_historico.html" %}
 {% endif %}
 {% if substituidos %}
 <h3>Fatos substituídos</h3>

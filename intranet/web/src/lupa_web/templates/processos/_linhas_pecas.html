@@ -1,0 +1,31 @@
+    {% for peca in pecas %}
+    <tr>
+      <td>{{ peca.ordem }}</td>
+      <td>
+        {{ peca.tipo_rotulo }}
+        {% if peca.resumo %}<div class="gerado" data-testid="gerado"><span class="rotulo-gerado">gerado</span> {{ peca.resumo }}</div>{% endif %}
+        {% if pode_reclassificar %}
+        <details class="reclassificar">
+          <summary>Reclassificar</summary>
+          <form method="post" action="/processos/{{ processo_id }}/pecas/{{ peca.id }}/reclassificar">
+            {% csrf_token %}
+            <label for="tipo-{{ peca.id }}">Tipo da peça</label>
+            <select id="tipo-{{ peca.id }}" name="tipo">
+              {% for valor, rotulo in tipos_peca %}<option value="{{ valor }}"{% if valor == peca.tipo %} selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+            </select>
+            {% include "componentes/botao.html" with rotulo="Salvar tipo" variante="" href="" %}
+          </form>
+        </details>
+        {% endif %}
+      </td>
+      <td>{{ peca.origem_rotulo }}</td>
+      <td><a href="{{ peca.link }}">{{ peca.paginas }}</a></td>
+      <td>{{ peca.data_texto }}</td>
+      <td>{{ peca.confianca_texto }} <span class="dica">({{ peca.metodo_rotulo }})</span></td>
+      <td>
+        {% for sinal in peca.sinais %}{% include "componentes/badge.html" with texto=sinal testid="" estado="" %}{% endfor %}
+        {% if peca.total_saneamento %}{% include "componentes/badge.html" with texto=peca.total_saneamento|stringformat:"s"|add:" alerta(s) de saneamento" testid="" estado="" %}{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  

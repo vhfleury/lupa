@@ -27,7 +27,7 @@
   {% for evento in linha_do_tempo %}
   <li>
     <a href="{{ evento.link }}" data-testid="evento"><strong>{{ evento.data_texto }}</strong> — {{ evento.tipo_rotulo }}{% if evento.pagina is not None %} <span class="dica">(fl. {{ evento.pagina }})</span>{% endif %}</a>
-    {% if evento.status != "automatico" %}<span class="selo">{{ evento.status_rotulo }}</span>{% endif %}
+    {% if evento.status != "automatico" %}{% include "componentes/badge.html" with texto=evento.status_rotulo testid="" estado="" %}{% endif %}
     <q>{{ evento.trecho }}</q>
   </li>
   {% endfor %}
@@ -38,54 +38,10 @@
 
 <h2>Índice de peças</h2>
 {% if pecas %}
-<table data-testid="indice-pecas">
-  <thead>
-    <tr>
-      <th scope="col">#</th>
-      <th scope="col">Tipo</th>
-      <th scope="col">Origem</th>
-      <th scope="col">Páginas</th>
-      <th scope="col">Data</th>
-      <th scope="col">Confiança</th>
-      <th scope="col">Flags</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for peca in pecas %}
-    <tr>
-      <td>{{ peca.ordem }}</td>
-      <td>
-        {{ peca.tipo_rotulo }}
-        {% if peca.resumo %}<div class="gerado" data-testid="gerado"><span class="rotulo-gerado">gerado</span> {{ peca.resumo }}</div>{% endif %}
-        {% if pode_reclassificar %}
-        <details class="reclassificar">
-          <summary>Reclassificar</summary>
-          <form method="post" action="/processos/{{ processo_id }}/pecas/{{ peca.id }}/reclassificar">
-            {% csrf_token %}
-            <label for="tipo-{{ peca.id }}">Tipo da peça</label>
-            <select id="tipo-{{ peca.id }}" name="tipo">
-              {% for valor, rotulo in tipos_peca %}<option value="{{ valor }}"{% if valor == peca.tipo %} selected{% endif %}>{{ rotulo }}</option>{% endfor %}
-            </select>
-            <button type="submit">Salvar tipo</button>
-          </form>
-        </details>
-        {% endif %}
-      </td>
-      <td>{{ peca.origem_rotulo }}</td>
-      <td><a href="{{ peca.link }}">{{ peca.paginas }}</a></td>
-      <td>{{ peca.data_texto }}</td>
-      <td>{{ peca.confianca_texto }} <span class="dica">({{ peca.metodo_rotulo }})</span></td>
-      <td>
-        {% for sinal in peca.sinais %}<span class="selo">{{ sinal }}</span>{% endfor %}
-        {% if peca.total_saneamento %}<span class="selo alerta">{{ peca.total_saneamento }} alerta(s) de saneamento</span>{% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+{% include "componentes/tabela.html" with legenda="Índice de peças" colunas=colunas_pecas testid="indice-pecas" corpo="processos/_linhas_pecas.html" %}
 <form method="get" action="/processos/{{ processo_id }}/dossie">
   <input type="hidden" name="resumos" value="1">
-  <button type="submit" class="secundario">Gerar resumos das peças (modelo)</button>
+  {% include "componentes/botao.html" with rotulo="Gerar resumos das peças (modelo)" variante="secundario" href="" %}
   <span class="dica">Texto gerado pelo modelo aparece marcado como <span class="rotulo-gerado">gerado</span>.</span>
 </form>
 {% else %}
@@ -106,7 +62,7 @@
 <ul>
   {% for achado in achados %}
   <li>
-    <strong>{{ achado.validacao_rotulo }}</strong>: {{ achado.resultado_rotulo }} — {{ achado.explicacao }}
+    <strong>{{ achado.validacao_rotulo }}</strong>: {% include "componentes/selo.html" with tom=achado.resultado_tom texto=achado.resultado_rotulo testid="" detalhe="" %} {{ achado.explicacao }}
     {% for link in achado.links %}<a href="{{ link }}">Fonte {{ forloop.counter }}</a> {% endfor %}
   </li>
   {% endfor %}

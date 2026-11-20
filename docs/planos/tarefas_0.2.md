@@ -988,10 +988,22 @@ Execução do [plano do padrão visual](plano_padrao_visual.md). Um único PR da
     intranet/web/pyproject.toml intranet/web/tests/unit/test_conformidade_templates.py
     intranet/web/tests/telas/test_processos.py`. Vermelho: 3 failed (CSS, templates, badge).
     Verde: unit e telas 420 passed, cobertura 100%; ruff e mypy limpos.
-- [ ] **T11.7** Dossiê, validações e visualizador no padrão; resultados no selo. RF-VIS-03, RF-VIS-04. Fase 4; P2, P3, D7.
+- [x] **T11.7** Dossiê, validações e visualizador no padrão; resultados no selo. RF-VIS-03, RF-VIS-04. Fase 4; P2, P3, D7.
   - Vermelho: `intranet/web/tests/telas/test_validacoes.py::test_resultado_tempestivo_aparece_no_selo_de_sucesso` e `::test_atencao_e_falha_usam_selo_do_seu_tom`; grupo "dossiê" sai da lista de pendentes.
   - Verde: templates de dossiê, validações e visualizador; `dossie.css`, `validacoes.css`, `visualizador.css`.
   - Limpeza: nenhuma.
+  - Entregue: resultado do achado no `selo.html` (novo parâmetro `testid`) nas validações e no
+    dossiê, pelo `rotulos.TOM_DO_RESULTADO`: `conforme` em sucesso, `verificar` em atenção,
+    `atencao` em falha (mantém os tons que cada resultado já tinha: verde, âmbar e vermelho);
+    status de fato, "substituído", sinais da peça e status do evento no badge; índice de peças e
+    histórico de achados pelo `tabela.html` com `corpo` (`_linhas_pecas.html`,
+    `_linhas_historico.html`); botões pelo `botao.html`; `.selo`/`.resultado` próprios saíram de
+    `dossie.css` e `validacoes.css`; `visualizador.css` com `--superficie-suave`, `--fundo` e
+    `--atencao` (preenchimento com `fill-opacity`) no lugar das cores literais; peso 700 virou 600.
+    Testes: `docker compose exec -T front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/unit/test_conformidade_templates.py intranet/web/tests/telas/test_validacoes.py`.
+    Vermelho: 4 failed (CSS, templates e os dois do selo). Verde: unit e telas 426 passed,
+    cobertura 100%; ruff e mypy limpos.
 - [ ] **T11.8** Chat no padrão. RF-VIS-04. Fase 5; P3.
   - Vermelho: grupo "chat" sai da lista de pendentes e o teste de conformidade falha.
   - Verde: templates de `chat/` e `chat.css`; rótulo de IA e citações (RF-INT-05) intactos nos testes existentes.

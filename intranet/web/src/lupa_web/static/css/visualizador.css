@@ -28,7 +28,7 @@
   overflow: auto;
   max-height: 80vh;
   border: 1px solid var(--borda);
-  background: #8a8f98;
+  background: var(--superficie-suave);
   padding: 1rem;
 }
 
@@ -36,14 +36,14 @@
   position: relative;
   margin: 0 auto;
   min-width: 10rem;
-  box-shadow: 0 1px 6px rgb(0 0 0 / 35%);
+  border: 1px solid var(--borda);
 }
 
 .folha img {
   display: block;
   width: 100%;
   height: auto;
-  background: #fff;
+  background: var(--fundo);
   user-select: none;
 }
 
@@ -56,8 +56,9 @@
 }
 
 .folha .destaque {
-  fill: rgb(255 214 0 / 35%);
-  stroke: #c77c00;
+  fill: var(--atencao);
+  fill-opacity: 0.35;
+  stroke: var(--atencao);
   stroke-width: 0.002;
 }
 
