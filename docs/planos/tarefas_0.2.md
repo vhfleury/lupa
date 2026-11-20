@@ -1048,6 +1048,13 @@ Execução do [plano do padrão visual](plano_padrao_visual.md). Um único PR da
     (modo estrito do `get_by_label("Por")`). Verde: E2E 37 passed em 85 s; `capturas.sh` 3
     passed; unit e telas 433 passed, cobertura 100%. Pendente: conferência das capturas pelo
     usuário.
-- [ ] **T11.11** Documentação. RF-VIS-04. Fase 8.
+- [x] **T11.11** Documentação. RF-VIS-04. Fase 8.
   - Revisão manual: `docs/sistema/padrao-visual.md` (tokens, componentes com exemplo de `include`, SHA-256 das fontes), `docs/sistema/front.md`, `docs/README.md`, `CHANGELOG.md` em "Não publicado".
   - Pronto quando: `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde.
+  - Entregue: `docs/sistema/padrao-visual.md` (tokens, componentes e parâmetros com exemplo de
+    `include`, badge e selo, `/padrao`, axe e capturas, SHA-256 das fontes), parágrafo em
+    `docs/sistema/front.md`, linha em `docs/README.md` e entrada em `CHANGELOG.md` ("Não
+    publicado"). Comando: `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` e `bash
+    intranet/web/scripts/e2e.sh`. Verde: pipeline 702 passed (95,25%), intranet 266 passed
+    (98,23%), integração 6, injeção 2, web 436 passed (100%), cabeçalhos ok em 4 rotas, agente
+    11; E2E 37 passed em 85 s.

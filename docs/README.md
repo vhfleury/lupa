@@ -17,6 +17,7 @@
 | [Agente](sistema/agente.md) | Dossiê, escopo, fontes, tetos e revisão |
 | [Auditoria](sistema/auditoria.md) | Cadeia única e relatórios de uso |
 | [Interface](sistema/front.md) | Telas por papel, sessão e proxy |
+| [Padrão visual](sistema/padrao-visual.md) | Tokens, fontes, componentes da intranet e página `/padrao` |
 | [Sintéticos](sistema/sinteticos.md) | Gerador de cinco classes, evidências conhecidas e medição |
 
 ## Especificação, plano e decisões
