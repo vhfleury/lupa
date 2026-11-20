@@ -1030,9 +1030,24 @@ Execução do [plano do padrão visual](plano_padrao_visual.md). Um único PR da
     intranet/web/pyproject.toml intranet/web/tests/unit/test_conformidade_templates.py`.
     Vermelho: 1 failed (templates de `auditoria/` e `usuarios/`). Verde: unit e telas 433
     passed, cobertura 100%; ruff e mypy limpos.
-- [ ] **T11.10** Axe com todas as regras, tabela a 375 px e capturas da `/padrao`; guias regerados. RF-VIS-04, RF-VIS-06, RNF-09. Fase 7; P4, D10.
+- [x] **T11.10** Axe com todas as regras, tabela a 375 px e capturas da `/padrao`; guias regerados. RF-VIS-04, RF-VIS-06, RNF-09. Fase 7; P4, D10.
   - Revisão manual (E2E): `intranet/web/tests/e2e/test_acessibilidade.py::test_axe_sem_violacoes_em_toda_tela` (sem filtro de tags, dois temas, inclui `/padrao`), `::test_tabela_larga_rola_sozinha_em_375px`, `test_capturas.py::test_capturas_do_padrao_nos_tres_formatos`; violações achadas corrigidas em commit próprio; `docs/imagens/` regerado por `capturas.sh`.
   - Pronto quando: `bash intranet/web/scripts/e2e.sh` verde e capturas conferidas pelo usuário.
+  - Entregue: `varrer` sem `runOnly` e o teste renomeado para `test_axe_sem_violacoes_em_toda_tela`,
+    que falha em qualquer violação (antes só sérias e críticas das tags WCAG A/AA) e inclui a
+    `/padrao`; `test_tabela_larga_rola_sozinha_em_375px` (auditoria a 375 px: a página não rola de
+    lado e a `.tabela-rolavel` rola); `test_capturas_do_padrao_nos_tres_formatos`. A `/padrao`
+    roda no E2E pela D11 (`LUPA_AMBIENTE=desenvolvimento` só no `front`). Correções achadas: a
+    regra `.cartao h3` da T11.3 vazava para o `h3` das telas (agora
+    `.cartao[data-componente="cartao"] h3`); as legendas das tabelas do relatório de uso
+    ("... por ação/versão") colidiam com `get_by_label("Por")` e viraram "Contagem de eventos" e
+    "Chamadas ao modelo em cada versão". `docs/imagens/` regerado por `capturas.sh`; capturas de
+    toda tela (claro/escuro, 1200 e 375 px) e da `/padrao` geradas fora do repositório. Testes:
+    `bash intranet/web/scripts/e2e.sh`. Vermelho: a varredura nova já veio sem violação do axe;
+    o vermelho foi 1 failed em `test_chat_auditoria.py::test_relatorio_por_usuario_traz_o_custo_estimado`
+    (modo estrito do `get_by_label("Por")`). Verde: E2E 37 passed em 85 s; `capturas.sh` 3
+    passed; unit e telas 433 passed, cobertura 100%. Pendente: conferência das capturas pelo
+    usuário.
 - [ ] **T11.11** Documentação. RF-VIS-04. Fase 8.
   - Revisão manual: `docs/sistema/padrao-visual.md` (tokens, componentes com exemplo de `include`, SHA-256 das fontes), `docs/sistema/front.md`, `docs/README.md`, `CHANGELOG.md` em "Não publicado".
   - Pronto quando: `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde.

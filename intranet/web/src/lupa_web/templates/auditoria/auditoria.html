@@ -66,9 +66,9 @@
   {% if relatorio %}
   <div data-testid="relatorio-uso">
     <p>Primeiro acesso: {{ relatorio.primeiro }} · Último acesso: {{ relatorio.ultimo }}</p>
-    {% include "componentes/tabela.html" with legenda="Eventos por ação" colunas=colunas_contagem testid="" corpo="auditoria/_linhas_contagem.html" %}
+    {% include "componentes/tabela.html" with legenda="Contagem de eventos" colunas=colunas_contagem testid="" corpo="auditoria/_linhas_contagem.html" %}
     {% if relatorio.chamadas_modelo %}
-    {% include "componentes/tabela.html" with legenda="Chamadas ao modelo por versão" colunas=colunas_chamadas testid="" corpo="auditoria/_linhas_chamadas.html" %}
+    {% include "componentes/tabela.html" with legenda="Chamadas ao modelo em cada versão" colunas=colunas_chamadas testid="" corpo="auditoria/_linhas_chamadas.html" %}
     {% endif %}
     <div class="custo" data-testid="custo-estimado">
       <strong>Custo estimado: {{ relatorio.custo_total }}</strong> — {{ relatorio.custo_estimado.observacao }}

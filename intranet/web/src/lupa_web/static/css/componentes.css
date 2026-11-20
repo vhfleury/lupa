@@ -123,7 +123,7 @@
   margin-bottom: 1.5rem;
 }
 
-.cartao h3 {
+.cartao[data-componente="cartao"] h3 {
   margin: 0 0 0.5rem;
 }
 

@@ -1,7 +1,7 @@
 """E2E de acessibilidade: axe-core nos dois temas, teclado com foco visível e tema manual (RNF-09).
 
-Reutiliza as contas criadas pelos fluxos; a varredura não aceita violação séria ou crítica das
-regras WCAG 2.1 A e AA, contraste incluído.
+Reutiliza as contas criadas pelos fluxos; a varredura roda todas as regras do axe, boas práticas
+incluídas, em toda tela e na `/padrao`, e não aceita nenhuma violação (RF-VIS-06).
 """
 
 import re
@@ -19,8 +19,7 @@ pytestmark = pytest.mark.e2e
 
 TEMAS = ("claro", "escuro")
 AXE = files("axe_playwright_python").joinpath("axe.min.js").read_text(encoding="utf-8")
-GRAVES = {"serious", "critical"}
-REGRAS_WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]
+LARGURA_DO_CELULAR = 375
 TABS_NO_CABECALHO = 12
 TABS_ATE_A_PERGUNTA = 6
 FOCO_VISIVEL = """() => {
@@ -70,7 +69,16 @@ TELAS = (
     ),
     Tela("desembargador", lambda: "/usuarios", re.compile("Usuários")),
     Tela("desembargador", lambda: "/auditoria", re.compile("Auditoria")),
+    Tela("desembargador", lambda: "/padrao", re.compile(r"^Padrão visual$")),
 )
+ROLAGEM = """() => {
+  const raiz = document.documentElement;
+  const regioes = Array.from(document.querySelectorAll('.tabela-rolavel'));
+  return {
+    pagina: raiz.scrollWidth - raiz.clientWidth,
+    tabela: Math.max(...regioes.map((r) => r.scrollWidth - r.clientWidth)),
+  };
+}"""
 
 
 def foco_visivel(page: Page) -> bool:
@@ -108,7 +116,7 @@ def abrir(
 
 
 def varrer(page: Page) -> list[dict[str, Any]]:
-    """Violações do axe-core (WCAG 2.1 A e AA) na página atual.
+    """Violações do axe-core, com todas as regras, na página atual.
 
     Args:
         page: Página carregada.
@@ -117,17 +125,17 @@ def varrer(page: Page) -> list[dict[str, Any]]:
         Violações como o `axe.run` devolve.
     """
     page.evaluate(AXE)
-    opcoes = {"runOnly": {"type": "tag", "values": REGRAS_WCAG}, "resultTypes": ["violations"]}
+    opcoes = {"resultTypes": ["violations"]}
     resultado = page.evaluate("(opcoes) => axe.run(document, opcoes)", opcoes)
     violacoes: list[dict[str, Any]] = resultado["violations"]
     return violacoes
 
 
 @pytest.mark.parametrize("tema", TEMAS)
-def test_axe_sem_violacao_grave_em_todas_as_telas(
+def test_axe_sem_violacoes_em_toda_tela(
     browser: Browser, assessor_processos: Conta, desembargador: Conta, tema: str
 ) -> None:
-    """RNF-09: nenhuma violação séria ou crítica do axe em nenhuma tela, nos dois temas."""
+    """RF-VIS-06, RNF-09: nenhuma violação do axe, sem filtro de tags, em toda tela e na /padrao."""
     contas = {"assessor": assessor_processos, "desembargador": desembargador}
     achados: list[str] = []
     for tela in TELAS:
@@ -139,11 +147,21 @@ def test_axe_sem_violacao_grave_em_todas_as_telas(
             page.locator("summary", has_text="Novo processo").click()
         expect(page.locator("html")).to_have_attribute("data-tema", tema)
         for violacao in varrer(page):
-            if violacao["impact"] in GRAVES:
-                alvos = " | ".join(" ".join(n["target"]) for n in violacao["nodes"][:5])
-                achados.append(f"{caminho} [{tema}] {violacao['id']}: {alvos}")
+            alvos = " | ".join(" ".join(n["target"]) for n in violacao["nodes"][:5])
+            achados.append(f"{caminho} [{tema}] {violacao['id']}: {alvos}")
         contexto.close()
     assert achados == [], "\n".join(achados)
+
+
+def test_tabela_larga_rola_sozinha_em_375px(browser: Browser, desembargador: Conta) -> None:
+    """RF-VIS-04: a 375 px a tabela da auditoria rola na sua região e a página não rola de lado."""
+    contexto, page = contexto_como(browser, desembargador, largura=LARGURA_DO_CELULAR)
+    page.goto("/auditoria")
+    expect(page.get_by_test_id("evento").first).to_be_visible()
+    rolagem = page.evaluate(ROLAGEM)
+    assert rolagem["pagina"] <= 0, rolagem
+    assert rolagem["tabela"] > 0, rolagem
+    contexto.close()
 
 
 def test_login_inteiro_pelo_teclado_com_foco_visivel(page: Page) -> None:

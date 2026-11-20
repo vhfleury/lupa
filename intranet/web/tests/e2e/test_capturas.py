@@ -2,8 +2,9 @@
 
 `test_gera_capturas_dos_guias` grava em `LUPA_CAPTURAS_DIR` os PNGs que `docs/guias/*.md`
 referenciam; `test_retrata_as_telas_nos_temas_e_no_celular` grava cada tela nos temas claro e
-escuro e na largura de celular em `LUPA_CAPTURAS_VISUAL`. Rodam pelo `capturas.sh`, numa stack
-nova (RNF-09); não conferem regra, só navegam e fotografam.
+escuro e na largura de celular em `LUPA_CAPTURAS_VISUAL`, onde
+`test_capturas_do_padrao_nos_tres_formatos` grava também a `/padrao`. Rodam pelo `capturas.sh`,
+numa stack nova (RNF-09); não conferem regra, só navegam e fotografam.
 """
 
 import os
@@ -179,3 +180,21 @@ def test_retrata_as_telas_nos_temas_e_no_celular(
                 contexto, page = contexto_como(browser, conta, tema, largura)
                 _retratar(page, pasta, sufixo, telas)
                 contexto.close()
+
+
+def test_capturas_do_padrao_nos_tres_formatos(browser: Browser, desembargador: Conta) -> None:
+    """RF-VIS-06: a `/padrao` em claro e escuro a 1200 px e em claro a 375 px."""
+    pasta = _pasta("LUPA_CAPTURAS_VISUAL", "lupa-visual")
+    formatos = (
+        ("claro", LARGURA_DA_MESA),
+        ("escuro", LARGURA_DA_MESA),
+        ("claro", LARGURA_DO_CELULAR),
+    )
+    for tema, largura in formatos:
+        contexto, page = contexto_como(browser, desembargador, tema, largura)
+        page.goto("/padrao")
+        expect(page.get_by_role("heading", level=1)).to_have_text("Padrão visual")
+        foto(page, pasta, f"padrao-{tema}-{largura}", inteira=True)
+        contexto.close()
+    for tema, largura in formatos:
+        assert (pasta / f"padrao-{tema}-{largura}.png").stat().st_size > 0
