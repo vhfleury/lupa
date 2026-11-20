@@ -114,5 +114,5 @@ def test_envio_de_pdf_sintetico_cria_processo_pela_api() -> None:
         HTTP_HX_REQUEST="true",
     )
     destino = resposta["HX-Redirect"]
-    assert re.fullmatch(r"/processos/[0-9a-f]{64}", destino)
+    assert re.fullmatch(r"/processos/[0-9a-f]{64}\?aviso=criado", destino)
     assert numero in navegador.get(destino).content.decode()

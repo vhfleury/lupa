@@ -799,6 +799,16 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
   - Conferência visual pendente do usuário: o painel do navegador recusou o certificado
     autoassinado de `https://localhost:8443`; a comparação foi por leitura, classe a classe e
     variável a variável, contra os `<style>` dos `.svelte`, `app.css` e `login.css`.
+  - Conferência visual por capturas (feita na T10.15): `capturas.sh` com
+    `LUPA_CAPTURAS_VISUAL` retratou as dezesseis telas em claro e escuro, a 1200 e a 375 px
+    (64 imagens), comparadas às capturas do SvelteKit em `docs/imagens/` (versão anterior).
+    Corrigido em commit próprio: "+ Novo processo" ao lado do título; Corrigir, Anotar,
+    Reclassificar e Corrigir classe com o visual do botão secundário e fatos em linha; "Outro
+    trecho" só com "Informar outro trecho" (`:has`); identificadores da auditoria em mono;
+    tabelas que rolam dentro da página até 55rem (antes a página rolava de lado a 375 px).
+    Ficou diferente: fatos das validações sem marcador de lista; botão "Enviar" habilitado sem
+    arquivo; limite "512,0 MB" (era "512 MB"); ficha do dossiê com os dados da capa; ordem dos
+    dados da capa e dos fatos como vêm da API; foco visível no campo autofocado do login.
 - [x] **T10.14** Paridade de telas fechada. RF-INT-02. Fases 4 a 8.
   - Vermelho: `intranet/web/tests/telas/test_paridade.py::test_cada_tela_responde_ao_papel_permitido` com as onze telas e todas as ações.
   - Verde: o que faltar das tarefas anteriores.
@@ -835,10 +845,38 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
     Verde: `45 passed` no arquivo; suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1`
     `321 passed` (com o envio real), cobertura 100%; ruff, format e mypy `--strict` limpos;
     `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde (pipeline 702, intranet 265, web 321; e2e fora).
-- [ ] **T10.15** Suíte E2E em `pytest-playwright` e capturas dos guias. RF-INT-01, RNF-09. Fase 10; D5, D6.
+- [x] **T10.15** Suíte E2E em `pytest-playwright` e capturas dos guias. RF-INT-01, RNF-09. Fase 10; D5, D6.
   - Revisão manual: E2E fora do ciclo. `intranet/web/tests/e2e/test_seguranca.py::test_navegador_nao_faz_requisicao_para_api`, `test_fluxos.py` (login, processos, dossiê, chat, auditoria, assessores) e `test_capturas.py::test_gera_capturas_dos_guias`.
   - Verde: `intranet/web/e2e/Dockerfile`, serviço `e2e`, `intranet/web/scripts/e2e.sh`, `docs/guias/imagens/`.
   - Pronto quando: `bash intranet/web/scripts/e2e.sh` verde e capturas conferidas.
+  - Suíte em `intranet/web/tests/e2e/` (marcador `e2e`, excluído por padrão): `apoio_e2e.py`
+    (TOTP RFC 6238, contas, login pela tela), `conftest.py` (ordem dos arquivos e contas
+    criadas uma vez), `test_fluxos.py` (login, primeiro acesso, troca, gestão de assessores,
+    bloqueio), `test_processos.py` (lista, cadastro com complemento do número, capa, anexo,
+    duplicata, envio de 500 MiB com progresso, dossiê, visualizador pelo teclado, evidências,
+    correção e anotação), `test_chat_auditoria.py`, `test_acessibilidade.py` (axe-core WCAG 2.1
+    A/AA nos dois temas, teclado, tema), `test_seguranca.py` (inclui
+    `test_navegador_nao_faz_requisicao_para_api`, cabeçalhos, CSP e texto hostil) e
+    `test_capturas.py` (`test_gera_capturas_dos_guias` e as telas em claro, escuro e 375 px).
+    A suíte TypeScript de `intranet/web/e2e/` saiu. Imagem `intranet/web/e2e/Dockerfile` em
+    `python:3.12-slim-bookworm` (o Playwright 1.49 não instala as dependências do Chromium no
+    Debian 13), `requirements-dev.txt` de `lupa_web` com `pytest-playwright`, `playwright` 1.49.1
+    e `axe-playwright-python` (só o `axe.min.js`, injetado por `page.evaluate`). `e2e.sh` roda tudo
+    menos as capturas; `capturas.sh`, numa stack nova, grava em `docs/imagens/`.
+  - Achados do E2E corrigidos com teste vermelho antes, em commits próprios: CSRF recusava todo
+    formulário (`Origin: null` com `no-referrer`; D18 `same-origin`); `visualizador.js` (D8);
+    aviso de sessão expirada no login; avisos de processo criado, anexado ou já enviado; aviso
+    de revisão no chat sem recarregar (OOB); rótulos do SvelteKit em `legivel` e
+    `texto_do_valor` e número CNJ com máscara no dossiê; anexo dava 500 (a API não devolve
+    `processo_id`). O dígito do CNJ fica na API; "desembargador só cria assessor" segue em
+    `intranet/api/tests/acesso/test_usuarios.py`.
+  - O TOTP do E2E espera o relógio real (até 30 s entre logins da mesma conta): o servidor
+    recusa passo repetido; exceção aceita por estar fora do ciclo.
+  - Comando: `bash intranet/web/scripts/e2e.sh` e `bash intranet/web/scripts/capturas.sh`.
+    Vermelho: `1 failed, 1 passed` (403 de CSRF no primeiro acesso). Verde: `35 passed` em 76 s
+    (2 min 17 s com a stack); capturas `2 passed` em 54 s (2 min 6 s); suíte de `lupa_web`
+    `348 passed`, cobertura 100%; `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde
+    (pipeline 702, intranet 266, integração 6, injeção 2, web 348, cabeçalhos ok; e2e fora).
 - [ ] **T10.16** Remover o SvelteKit e atualizar `verificar.sh`, `Makefile`, `CLAUDE.md`, documentação, ADRs 0006 e 0016 e `CHANGELOG.md`. RES-06, RNF-08. Fase 11.
   - Revisão manual: remoção e documentação. Testes do Vitest e Playwright em TypeScript saem neste commit, citando a tarefa.
   - Pronto quando: `bash scripts/verificar.sh` verde, sem referência a `lupa_intranet`, `npm` ou SvelteKit fora do histórico, e links locais conferidos.
