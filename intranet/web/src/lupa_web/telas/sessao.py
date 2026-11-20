@@ -8,7 +8,9 @@ import functools
 from collections.abc import Callable, Coroutine
 from typing import Any, Concatenate, ParamSpec
 
+import httpx
 from django.http import HttpRequest, HttpResponse
+from django.shortcuts import render
 
 from lupa_web import cliente_api
 
@@ -102,3 +104,30 @@ def contexto_da_moldura(request: HttpRequest, sessao: Sessao) -> dict[str, Any]:
         "rotulo_papel": ROTULO_PAPEL.get(str(sessao.get("papel")), ""),
         "itens_menu": itens,
     }
+
+
+def nao_encontrado(request: HttpRequest, sessao: Sessao) -> HttpResponse:
+    """Página "não encontrado" com a moldura, status 404.
+
+    Args:
+        request: Pedido do navegador.
+        sessao: Dados da sessão.
+
+    Returns:
+        Resposta 404.
+    """
+    contexto = contexto_da_moldura(request, sessao)
+    return render(request, "erros/nao_encontrado.html", contexto, status=404)
+
+
+async def obter(request: HttpRequest, caminho: str) -> httpx.Response:
+    """`GET` na API em nome do navegador.
+
+    Args:
+        request: Pedido do navegador.
+        caminho: Caminho da rota na API.
+
+    Returns:
+        Resposta da API.
+    """
+    return await cliente_api.chamar(request, "GET", caminho)

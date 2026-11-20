@@ -1,0 +1,10 @@
+{% if capa.partes %}
+<dt>Partes</dt>
+<dd data-testid="partes">
+  {% for parte in capa.partes %}<div><a href="{{ parte.link }}">{{ parte.nome }}</a> · Polo {{ parte.polo }} · {{ parte.qualidade }}</div>{% endfor %}
+</dd>
+{% endif %}
+{% for dado in capa.dados %}
+<dt>{{ dado.rotulo }}</dt>
+<dd><a href="{{ dado.link }}">{{ dado.texto }}</a></dd>
+{% endfor %}

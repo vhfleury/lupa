@@ -1,6 +1,8 @@
 """Rótulos em português dos códigos da API e formatação de datas para as telas."""
 
+import re
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -23,6 +25,32 @@ SITUACAO = {
     "pendencias": "Com pendências",
     "concluido": "Concluído",
 }
+
+RESULTADO = {"conforme": "Conforme", "atencao": "Atenção", "verificar": "Verificar"}
+
+STATUS_FATO = {"automatico": "Automático", "confirmado": "Confirmado", "corrigido": "Corrigido"}
+
+TIPOS_PECA = (
+    "peticao_inicial",
+    "contestacao",
+    "replica",
+    "decisao_interlocutoria",
+    "sentenca",
+    "embargos_declaracao",
+    "apelacao",
+    "agravo_instrumento",
+    "agravo_interno",
+    "contrarrazoes",
+    "acordao",
+    "certidao",
+    "procuracao",
+    "comprovante_preparo",
+    "laudo_pericial",
+    "parecer_mp",
+    "outros",
+)
+
+VALOR_DECIMAL = re.compile(r"\d+(\.\d+)?")
 
 ESTADO_JOB = {
     "recebido": "Na fila",
@@ -163,3 +191,30 @@ def pares(
         for chave, valor in (dados or {}).items()
         if chave not in omitir
     ]
+
+
+def formatar_moeda(valor: str) -> str:
+    """Valor decimal da API (`1500.50`) em reais (`R$ 1.500,50`).
+
+    Args:
+        valor: Texto do valor.
+
+    Returns:
+        O valor em reais, ou o próprio texto se não for decimal.
+    """
+    if not VALOR_DECIMAL.fullmatch(valor):
+        return valor
+    texto = f"{Decimal(valor):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"R$ {texto}"
+
+
+def percentual(valor: float) -> str:
+    """Fração como percentual inteiro.
+
+    Args:
+        valor: Fração entre 0 e 1.
+
+    Returns:
+        Texto como `92%`.
+    """
+    return f"{round(valor * 100)}%"

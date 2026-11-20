@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block titulo %}Validações · Lupa{% endblock %}
+{% block conteudo %}
+<p><a href="/processos/{{ processo_id }}">← Processo</a></p>
+<h1>Validações</h1>
+{% if erro %}{% include "componentes/aviso.html" with tipo="erro" mensagem=erro %}{% endif %}
+{% if aviso %}{% include "componentes/aviso.html" with tipo="sucesso" mensagem=aviso %}{% endif %}
+
+{% for achado in achados %}
+<article class="cartao achado {{ achado.resultado }}" data-testid="achado" data-validacao="{{ achado.validacao }}">
+  <header>
+    <h2>{{ achado.validacao_rotulo }}</h2>
+    <span class="resultado {{ achado.resultado }}" data-testid="resultado">{{ achado.resultado_rotulo }}</span>
+  </header>
+  <p>{{ achado.explicacao }}</p>
+  <h3>Valores</h3>
+  <dl class="valores">
+    {% for rotulo, no in achado.valores_exibidos %}<dt>{{ rotulo }}</dt><dd>{% include "processos/_valor.html" %}</dd>{% endfor %}
+  </dl>
+  <h3>Fatos usados</h3>
+  <ul class="fatos">
+    {% for usado in achado.usados %}
+    {% with fato=usado.fato %}
+    {% if fato %}
+    <li data-testid="fato" data-fato="{{ fato.id }}">
+      <span>{{ fato.tipo_rotulo }}: <strong>{{ fato.valor_texto }}</strong></span>
+      <span class="selo" data-testid="status-fato">{{ fato.status_rotulo }}</span>
+      {% if not fato.vigente %}<span class="selo antigo">substituído</span>{% endif %}
+      {% for evidencia in fato.links %}<a href="{{ evidencia.link }}" data-testid="link-evidencia">fl. {{ evidencia.pagina }}</a> {% endfor %}
+      {% if fato.vigente and pode_anotar %}
+      <form method="post" action="/processos/{{ processo_id }}/fatos/{{ fato.id }}/corrigir" class="confirmar">
+        {% csrf_token %}
+        <input type="hidden" name="status" value="confirmado">
+        <button type="submit" class="secundario">Confirmar</button>
+      </form>
+      <details class="correcao">
+        <summary>Corrigir</summary>
+        <form method="post" action="/processos/{{ processo_id }}/fatos/{{ fato.id }}/corrigir">
+          {% csrf_token %}
+          <input type="hidden" name="status" value="corrigido">
+          <label for="valor-{{ fato.chave }}">Valor corrigido</label>
+          <input id="valor-{{ fato.chave }}" name="valor" value="{{ fato.valor_edicao }}">
+          <label for="fonte-{{ fato.chave }}">Fonte da correção</label>
+          <select id="fonte-{{ fato.chave }}" name="fonte">
+            {% for valor, rotulo in fato.opcoes_fonte %}<option value="{{ valor }}">{{ rotulo }}</option>{% endfor %}
+            <option value="">Informar outro trecho</option>
+          </select>
+          <fieldset>
+            <legend>Outro trecho</legend>
+            <label for="pagina-{{ fato.chave }}">Identificador da página</label>
+            <input id="pagina-{{ fato.chave }}" name="pagina_id" pattern="[a-fA-F0-9]{64}">
+            <label for="inicio-{{ fato.chave }}">Início do trecho (posição a partir de zero)</label>
+            <input id="inicio-{{ fato.chave }}" name="inicio" type="number" min="0" step="1">
+            <label for="fim-{{ fato.chave }}">Fim do trecho (posição exclusiva)</label>
+            <input id="fim-{{ fato.chave }}" name="fim" type="number" min="1" step="1">
+            <label for="trecho-{{ fato.chave }}">Trecho literal dos autos</label>
+            <textarea id="trecho-{{ fato.chave }}" name="trecho" rows="2"></textarea>
+          </fieldset>
+          <button type="submit">Salvar correção</button>
+        </form>
+      </details>
+      {% endif %}
+      {% include "processos/_notas.html" with notas=fato.notas campo_alvo="fato_id" alvo=fato.id chave_nota="f-"|add:fato.chave %}
+    </li>
+    {% else %}
+    <li class="dica">Fato {{ usado.id }} (não encontrado)</li>
+    {% endif %}
+    {% endwith %}
+    {% endfor %}
+  </ul>
+  <p class="dica">Versão do catálogo {{ achado.versao_catalogo }} · {{ achado.criado_em_texto }}</p>
+  {% include "processos/_notas.html" with notas=achado.notas campo_alvo="achado_id" alvo=achado.id chave_nota="a-"|add:achado.id %}
+</article>
+{% empty %}
+<p class="dica">Nenhum achado ainda. Os achados aparecem quando a ingestão termina.</p>
+{% endfor %}
+
+<h2>Histórico</h2>
+{% if antigos or substituidos %}
+{% if antigos %}
+<h3>Achados anteriores</h3>
+<table data-testid="historico-achados">
+  <thead><tr><th scope="col">Validação</th><th scope="col">Resultado</th><th scope="col">Explicação</th><th scope="col">Gravado em</th></tr></thead>
+  <tbody>
+    {% for achado in antigos %}<tr><td>{{ achado.validacao }}</td><td>{{ achado.resultado }}</td><td>{{ achado.explicacao }}</td><td>{{ achado.quando }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% if substituidos %}
+<h3>Fatos substituídos</h3>
+<ul data-testid="historico-fatos">
+  {% for fato in substituidos %}<li data-fato="{{ fato.id }}">{{ fato.texto }} ({{ fato.status }}) · {{ fato.quando }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% else %}
+<p class="dica">Sem versões anteriores.</p>
+{% endif %}
+{% endblock %}

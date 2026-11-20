@@ -692,10 +692,35 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
     -q`. Vermelho: `11 failed, 11 passed` (rotas inexistentes; os 11 verdes são as funções puras
     `formatar_bytes` e `detalhe_do_estado`, escritas junto com a view). Verde: `22 passed`; suíte
     de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1` `87 passed`, cobertura 100%.
-- [ ] **T10.10** Dossiê, peças, fatos, achados, anotações e visualizador com imagem repassada. RF-INT-02, RF-INT-05. Fase 6; A6.
+- [x] **T10.10** Dossiê, peças, fatos, achados, anotações e visualizador com imagem repassada. RF-INT-02, RF-INT-05. Fase 6; A6.
   - Vermelho: `intranet/web/tests/telas/test_dossie.py::test_evidencia_do_dossie_abre_a_pagina_do_arquivo`; `intranet/web/tests/telas/test_visualizador.py::test_imagem_da_pagina_e_repassada_com_tipo_e_cache_da_api`; casos `dossie`, `validacoes` e `visualizador` de `test_paridade.py`.
   - Verde: `telas/dossie.py`, `telas/validacoes.py`, `telas/visualizador.py` e templates.
   - Limpeza: nenhuma.
+  - Dossiê (`/processos/<id>/dossie`): ficha com partes, dados da capa (valor da causa em reais,
+    data de distribuição), responsáveis e ingestão; linha do tempo; índice com reclassificação do
+    tipo por formulário POST (`/pecas/<peca>/reclassificar`, papel com `anotar`; o SvelteKit não
+    tinha) e `?resumos=1` (GET, `resumos=true` na API, texto marcado "gerado"); alertas; achados
+    com as fontes. Partes e dados da capa também no cabeçalho do processo (o que a T10.9 deixou).
+    Validações (`/processos/<id>/validacoes`): valores do achado com link para a evidência (data
+    do marco, fato, página), fatos usados com "Confirmar" e "Corrigir" (`<details>`, sem
+    JavaScript; fonte existente ou trecho novo conferido no front, valor no tipo do original),
+    anotações por fato e por achado, histórico de achados e fatos substituídos; avisos por
+    `?aviso=`. Visualizador (`/processos/<id>/visualizador`): `evidencia` ou `arquivo`/`pagina`,
+    navegação e zoom (50% a 300%) por links, seletor de arquivo por formulário GET; destaque em
+    SVG (`viewBox="0 0 1 1"`, `<rect>` com x/y/width/height em fração) sobre a imagem, posicionado
+    por `static/css/visualizador.css` (classes `zoom-NN`), sem estilo inline. Imagem (A6):
+    `/processos/<id>/arquivos/<arquivo>/paginas/<n>/imagem` repassa PNG, `Content-Type` e
+    `Cache-Control` da API; outro status volta sem corpo; sem a consulta de sessão (401 vai ao
+    login pelo middleware). `nao_encontrado` e `obter` passaram de `processo.py` a `sessao.py`.
+    Extras em `test_dossie.py`, `test_visualizador.py` e `test_validacoes.py`.
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas --no-cov -q`. Vermelho: `17 failed, 24 passed` em `test_dossie.py`,
+    `test_paridade.py` e `test_processo.py` e `ImportError: cannot import name 'visualizador'` em
+    `test_visualizador.py`. Verde: suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1`
+    `173 passed`, cobertura 100%; ruff, format e mypy `--strict` limpos.
+  - Pelo proxy (httpx no contêiner `front`, assessor sintético novo, PDF sintético): processo,
+    dossiê, validações e visualizador 200 sem estilo nem script inline; imagem 200 `image/png`,
+    `private, max-age=3600`; página inexistente 404.
 - [ ] **T10.11** Chat com HTMX, histórico, teto, revisão e liberação. RF-INT-02, RF-INT-05. Fase 7; A5, D13.
   - Vermelho: `intranet/web/tests/telas/test_chat.py::test_resposta_conferida_aparece_em_bloco_rotulado_com_link_da_pagina`, `::test_resposta_sem_citacao_conferida_mostra_sem_evidencia`, `::test_aviso_de_teto_aparece_sem_bloco_de_ia`; caso `chat` de `test_paridade.py`.
   - Verde: `telas/chat.py`, `templates/chat/`, fragmentos.

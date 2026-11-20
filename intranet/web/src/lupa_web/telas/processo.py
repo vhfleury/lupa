@@ -12,8 +12,16 @@ from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from lupa_web import cliente_api, rotulos
+from lupa_web.telas.dossie import capa
 from lupa_web.telas.envio import limite_de_envio
-from lupa_web.telas.sessao import Sessao, contexto_da_moldura, tela_autenticada, tem
+from lupa_web.telas.sessao import (
+    Sessao,
+    contexto_da_moldura,
+    nao_encontrado,
+    obter,
+    tela_autenticada,
+    tem,
+)
 
 UNIDADES = ("B", "KB", "MB", "GB")
 BYTES_POR_UNIDADE = 1024
@@ -104,26 +112,21 @@ def contexto_do_estado(processo_id: str, arquivos: dict[str, Any]) -> dict[str, 
     }
 
 
-def _nao_encontrado(request: HttpRequest, sessao: Sessao) -> HttpResponse:
-    contexto = contexto_da_moldura(request, sessao)
-    return render(request, "erros/nao_encontrado.html", contexto, status=404)
-
-
-async def _obter(request: HttpRequest, caminho: str) -> httpx.Response:
-    return await cliente_api.chamar(request, "GET", caminho)
-
-
 async def _contexto_do_processo(
     request: HttpRequest, sessao: Sessao, processo_id: str
 ) -> dict[str, Any] | None:
     base = f"/processos/{processo_id}"
-    resposta = await _obter(request, base)
+    resposta = await obter(request, base)
     if resposta.status_code == httpx.codes.NOT_FOUND:
         return None
     processo: dict[str, Any] = resposta.json()
-    arquivos = (await _obter(request, f"{base}/arquivos")).json()
-    responsaveis = (await _obter(request, f"{base}/responsaveis")).json()
+    arquivos = (await obter(request, f"{base}/arquivos")).json()
+    responsaveis = (await obter(request, f"{base}/responsaveis")).json()
     ativo = processo["status"] != "descartado"
+    ficha = None
+    if ativo:
+        dossie = await obter(request, f"{base}/dossie")
+        ficha = None if dossie.is_error else capa(processo_id, dossie.json()["ficha"])
     vigentes = {u["id"] for u in responsaveis["responsaveis"]}
     return contexto_da_moldura(request, sessao) | {
         "processo": processo,
@@ -132,6 +135,7 @@ async def _contexto_do_processo(
         "classe_anterior_rotulo": rotulos.CLASSES.get(processo.get("classe_anterior") or "", ""),
         "classe_corrigida_em_texto": rotulos.formatar_data(processo.get("classe_corrigida_em")),
         "classes": rotulos.CLASSES.items(),
+        "capa": ficha,
         **contexto_do_estado(processo_id, arquivos),
         "responsaveis": responsaveis["responsaveis"],
         "disponiveis": [u | {"marcado": u["id"] in vigentes} for u in responsaveis["disponiveis"]],
@@ -153,7 +157,7 @@ async def _pagina(
 ) -> HttpResponse:
     contexto = await _contexto_do_processo(request, sessao, processo_id)
     if contexto is None:
-        return _nao_encontrado(request, sessao)
+        return nao_encontrado(request, sessao)
     contexto |= mensagens or {}
     return render(request, "processos/processo.html", contexto, status=status)
 
@@ -246,9 +250,9 @@ async def descartar(request: HttpRequest, sessao: Sessao, processo_id: str) -> H
     base = f"/processos/{processo_id}"
     if request.method == "POST":
         return await _acao(request, sessao, processo_id, f"{base}/descartar", {}, "/processos")
-    resposta = await _obter(request, base)
+    resposta = await obter(request, base)
     if resposta.status_code == httpx.codes.NOT_FOUND:
-        return _nao_encontrado(request, sessao)
+        return nao_encontrado(request, sessao)
     contexto = contexto_da_moldura(request, sessao) | {
         "processo": resposta.json(),
         "titulo": "Descartar processo",
@@ -281,11 +285,11 @@ async def arquivo(
         Página do arquivo, ou 404 se a API não o encontra.
     """
     base = f"/processos/{processo_id}/arquivos/{arquivo_id}"
-    relatorio = await _obter(request, f"{base}/relatorio")
+    relatorio = await obter(request, f"{base}/relatorio")
     if relatorio.status_code == httpx.codes.NOT_FOUND:
-        return _nao_encontrado(request, sessao)
-    diagnostico = await _obter(request, f"{base}/diagnostico")
-    alertas = (await _obter(request, f"{base}/alertas")).json()
+        return nao_encontrado(request, sessao)
+    diagnostico = await obter(request, f"{base}/diagnostico")
+    alertas = (await obter(request, f"{base}/alertas")).json()
     dados_relatorio = relatorio.json()
     estado = dados_relatorio.get("estado") or ""
     sem_id = frozenset({"arquivo_id"})
@@ -319,5 +323,5 @@ async def estado(request: HttpRequest, sessao: Sessao, processo_id: str) -> Http
     Returns:
         Fragmento da tabela de arquivos.
     """
-    arquivos = (await _obter(request, f"/processos/{processo_id}/arquivos")).json()
+    arquivos = (await obter(request, f"/processos/{processo_id}/arquivos")).json()
     return render(request, "processos/_estado.html", contexto_do_estado(processo_id, arquivos))

@@ -29,6 +29,11 @@
     <dt>Corrigida em</dt><dd>{{ classe_corrigida_em_texto }}</dd>
   </dl>
   {% endif %}
+  {% if capa.partes or capa.dados %}
+  <dl class="ficha-capa" aria-label="Dados da capa">
+    {% include "processos/_capa.html" %}
+  </dl>
+  {% endif %}
 </header>
 <nav class="atalhos" aria-label="Telas do processo">
   <a href="/processos/{{ processo.id }}/dossie">Dossiê e linha do tempo</a>

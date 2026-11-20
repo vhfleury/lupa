@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load static %}
+{% block titulo %}Visualizador · Lupa{% endblock %}
+{% block cabeca %}<link rel="stylesheet" href="{% static 'css/visualizador.css' %}">{% endblock %}
+{% block conteudo %}
+<p><a href="/processos/{{ processo_id }}">← Processo</a></p>
+<h1>Visualizador</h1>
+{% if erro %}{% include "componentes/aviso.html" with tipo="erro" mensagem=erro %}{% endif %}
+
+{% if legiveis|length > 1 %}
+<form method="get" action="/processos/{{ processo_id }}/visualizador" class="campo seletor">
+  <label for="arquivo">Arquivo</label>
+  <select id="arquivo" name="arquivo">
+    {% for item in legiveis %}<option value="{{ item.arquivo_id }}"{% if item.arquivo_id == arquivo_id %} selected{% endif %}>{{ item.nome }}</option>{% endfor %}
+  </select>
+  <input type="hidden" name="zoom" value="{{ zoom }}">
+  <button type="submit" class="secundario">Abrir</button>
+</form>
+{% endif %}
+
+{% if destaque %}
+<section class="cartao evidencia" aria-label="Evidência destacada">
+  <strong>Trecho da evidência</strong> (página {{ destaque.pagina }}):
+  <q data-testid="trecho-evidencia">{{ destaque.trecho }}</q>
+  {% if not retangulos %}<p class="dica">Esta página não tem coordenadas de texto; o trecho não pôde ser destacado.</p>{% endif %}
+</section>
+{% endif %}
+
+{% if arquivo_id %}
+<div class="barra" role="toolbar" aria-label="Navegação da página">
+  {% if anterior %}<a class="botao secundario" href="{{ anterior }}">← Anterior</a>{% else %}<span class="botao secundario desabilitado" aria-disabled="true">← Anterior</span>{% endif %}
+  <span data-testid="pagina-atual">Página {{ pagina }}{% if total %} de {{ total }}{% endif %}</span>
+  {% if proxima %}<a class="botao secundario" href="{{ proxima }}">Próxima →</a>{% else %}<span class="botao secundario desabilitado" aria-disabled="true">Próxima →</span>{% endif %}
+  <span class="separador"></span>
+  {% if menos_zoom %}<a class="botao secundario" href="{{ menos_zoom }}" aria-label="Diminuir zoom">−</a>{% else %}<span class="botao secundario desabilitado" aria-disabled="true">−</span>{% endif %}
+  <span data-testid="zoom">{{ zoom }}%</span>
+  {% if mais_zoom %}<a class="botao secundario" href="{{ mais_zoom }}" aria-label="Aumentar zoom">+</a>{% else %}<span class="botao secundario desabilitado" aria-disabled="true">+</span>{% endif %}
+</div>
+<div class="moldura" tabindex="0" role="region" aria-label="Página {{ pagina }}" data-testid="moldura-pagina">
+  <div class="folha zoom-{{ zoom }}">
+    <img src="{{ imagem }}" alt="Página {{ pagina }} do arquivo, renderizada pelo servidor" draggable="false" data-testid="imagem-pagina">
+    {% if retangulos %}
+    <svg class="destaques" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      {% for r in retangulos %}<rect x="{{ r.x }}" y="{{ r.y }}" width="{{ r.largura }}" height="{{ r.altura }}" class="destaque" data-testid="destaque-evidencia"></rect>{% endfor %}
+    </svg>
+    {% endif %}
+  </div>
+</div>
+<p class="dica">A página é uma imagem desenhada pelo servidor a partir do original, sem camadas opcionais e recortada à área visível. O texto extraído não é exibido aqui.</p>
+{% else %}
+<p class="dica">Nenhum arquivo processado para visualizar.</p>
+{% endif %}
+{% endblock %}

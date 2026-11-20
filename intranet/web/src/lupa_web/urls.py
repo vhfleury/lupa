@@ -3,7 +3,7 @@
 from django.http import HttpRequest, HttpResponse
 from django.urls import path
 
-from lupa_web.telas import acesso, envio, processo, processos
+from lupa_web.telas import acesso, dossie, envio, processo, processos, validacoes, visualizador
 
 
 async def saude(request: HttpRequest) -> HttpResponse:
@@ -34,5 +34,26 @@ urlpatterns = [
     path("processos/<str:processo_id>/responsaveis", processo.distribuir, name="responsaveis"),
     path("processos/<str:processo_id>/descartar", processo.descartar, name="descartar"),
     path("processos/<str:processo_id>/arquivos/<str:arquivo_id>", processo.arquivo, name="arquivo"),
+    path(
+        "processos/<str:processo_id>/arquivos/<str:arquivo_id>/paginas/<int:numero>/imagem",
+        visualizador.imagem,
+        name="imagem",
+    ),
+    path("processos/<str:processo_id>/dossie", dossie.dossie, name="dossie"),
+    path(
+        "processos/<str:processo_id>/pecas/<str:peca_id>/reclassificar",
+        dossie.reclassificar,
+        name="reclassificar",
+    ),
+    path("processos/<str:processo_id>/validacoes", validacoes.validacoes, name="validacoes"),
+    path(
+        "processos/<str:processo_id>/fatos/<str:fato_id>/corrigir",
+        validacoes.corrigir,
+        name="corrigir_fato",
+    ),
+    path("processos/<str:processo_id>/anotacoes", validacoes.anotar, name="anotar"),
+    path(
+        "processos/<str:processo_id>/visualizador", visualizador.visualizador, name="visualizador"
+    ),
     path("", acesso.inicio, name="inicio"),
 ]

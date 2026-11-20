@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block titulo %}Dossiê · Lupa{% endblock %}
+{% block conteudo %}
+<p><a href="/processos/{{ processo_id }}">← Processo</a></p>
+<h1>Dossiê</h1>
+{% if erro %}{% include "componentes/aviso.html" with tipo="erro" mensagem=erro %}{% endif %}
+{% if aviso %}{% include "componentes/aviso.html" with tipo="sucesso" mensagem=aviso %}{% endif %}
+
+<section class="cartao" aria-labelledby="t-ficha">
+  <h2 id="t-ficha">Ficha</h2>
+  <dl class="ficha" data-testid="ficha">
+    <dt>Número</dt><dd class="mono">{{ ficha.numero_cnj }}</dd>
+    <dt>Classe</dt><dd>{{ classe_rotulo }}</dd>
+    <dt>Status</dt><dd>{{ status_rotulo }}</dd>
+    {% if not capa.partes %}<dt>Partes</dt><dd data-testid="partes">Nenhuma parte identificada.</dd>{% endif %}
+    {% include "processos/_capa.html" %}
+    <dt>Responsáveis</dt><dd>{{ responsaveis|default:"Sem responsável atribuído" }}</dd>
+    <dt>Ingestão</dt><dd>{{ situacao_rotulo }}</dd>
+  </dl>
+</section>
+
+<h2>Linha do tempo</h2>
+{% if linha_do_tempo %}
+<ol class="linha-tempo" data-testid="linha-do-tempo">
+  {% for evento in linha_do_tempo %}
+  <li>
+    <a href="{{ evento.link }}" data-testid="evento"><strong>{{ evento.data_texto }}</strong> — {{ evento.tipo_rotulo }}{% if evento.pagina is not None %} <span class="dica">(fl. {{ evento.pagina }})</span>{% endif %}</a>
+    {% if evento.status != "automatico" %}<span class="selo">{{ evento.status_rotulo }}</span>{% endif %}
+    <q>{{ evento.trecho }}</q>
+  </li>
+  {% endfor %}
+</ol>
+{% else %}
+<p class="dica">Nenhum evento extraído.</p>
+{% endif %}
+
+<h2>Índice de peças</h2>
+{% if pecas %}
+<table data-testid="indice-pecas">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Tipo</th>
+      <th scope="col">Origem</th>
+      <th scope="col">Páginas</th>
+      <th scope="col">Data</th>
+      <th scope="col">Confiança</th>
+      <th scope="col">Flags</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for peca in pecas %}
+    <tr>
+      <td>{{ peca.ordem }}</td>
+      <td>
+        {{ peca.tipo_rotulo }}
+        {% if peca.resumo %}<div class="gerado" data-testid="gerado"><span class="rotulo-gerado">gerado</span> {{ peca.resumo }}</div>{% endif %}
+        {% if pode_reclassificar %}
+        <details class="reclassificar">
+          <summary>Reclassificar</summary>
+          <form method="post" action="/processos/{{ processo_id }}/pecas/{{ peca.id }}/reclassificar">
+            {% csrf_token %}
+            <label for="tipo-{{ peca.id }}">Tipo da peça</label>
+            <select id="tipo-{{ peca.id }}" name="tipo">
+              {% for valor, rotulo in tipos_peca %}<option value="{{ valor }}"{% if valor == peca.tipo %} selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+            </select>
+            <button type="submit">Salvar tipo</button>
+          </form>
+        </details>
+        {% endif %}
+      </td>
+      <td>{{ peca.origem_rotulo }}</td>
+      <td><a href="{{ peca.link }}">{{ peca.paginas }}</a></td>
+      <td>{{ peca.data_texto }}</td>
+      <td>{{ peca.confianca_texto }} <span class="dica">({{ peca.metodo_rotulo }})</span></td>
+      <td>
+        {% for sinal in peca.sinais %}<span class="selo">{{ sinal }}</span>{% endfor %}
+        {% if peca.total_saneamento %}<span class="selo alerta">{{ peca.total_saneamento }} alerta(s) de saneamento</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<form method="get" action="/processos/{{ processo_id }}/dossie">
+  <input type="hidden" name="resumos" value="1">
+  <button type="submit" class="secundario">Gerar resumos das peças (modelo)</button>
+  <span class="dica">Texto gerado pelo modelo aparece marcado como <span class="rotulo-gerado">gerado</span>.</span>
+</form>
+{% else %}
+<p class="dica">Índice ainda não disponível.</p>
+{% endif %}
+
+<h2>Alertas de saneamento</h2>
+{% if alertas %}
+<ul data-testid="alertas">
+  {% for alerta in alertas %}<li><a href="{{ alerta.link }}">Página {{ alerta.pagina }}</a>: {{ alerta.sinais }}</li>{% endfor %}
+</ul>
+{% else %}
+<p class="dica">Nenhuma página sinalizada.</p>
+{% endif %}
+
+<h2>Achados</h2>
+{% if achados %}
+<ul>
+  {% for achado in achados %}
+  <li>
+    <strong>{{ achado.validacao_rotulo }}</strong>: {{ achado.resultado_rotulo }} — {{ achado.explicacao }}
+    {% for link in achado.links %}<a href="{{ link }}">Fonte {{ forloop.counter }}</a> {% endfor %}
+  </li>
+  {% endfor %}
+</ul>
+<p><a href="/processos/{{ processo_id }}/validacoes">Ver validações completas</a></p>
+{% else %}
+<p class="dica">Nenhum achado.</p>
+{% endif %}
+{% endblock %}
