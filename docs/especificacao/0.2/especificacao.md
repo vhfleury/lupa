@@ -1,6 +1,6 @@
 # Lupa 0.2 — Especificação
 
-13 de novembro de 2026 · Estado: **aprovada** (alterada e aprovada em 15 de novembro de 2026: decisões 40 a 45; em 19 de novembro de 2026: decisões 46 a 53)
+13 de novembro de 2026 · Estado: **aprovada** (alterada e aprovada em 15 de novembro de 2026: decisões 40 a 45; em 19 de novembro de 2026: decisões 46 a 53; em 20 de novembro de 2026: decisões 54 a 58)
 
 Fonte da verdade da versão 0.2. Diz o que o sistema faz e para quem, com requisitos e critérios
 de aceite verificáveis. Não decide implementação: isso é do plano, que só começa depois desta
@@ -595,6 +595,83 @@ Perguntas e respostas:
   `pytest-playwright` dentro de `lupa_web`, e as capturas dos guias são refeitas a partir dela.
 - Q8. Visual — respondida em 19/11/2026: o front Django reproduz o layout atual.
 
+### 4.13 Padrão visual (VIS)
+
+Aprovada em 20/11/2026 (decisões 54 a 58). Define um padrão visual único para o front
+Django (`lupa_web`), com paleta e tipografia novas, e leva todas as telas atuais a ele. Altera a
+decisão 53 ("reproduz o layout atual"): a estrutura das telas e as ações de RF-INT-02 continuam;
+cores, fontes e componentes passam a seguir este padrão.
+
+**RF-VIS-01 — Tokens únicos.** Cores, tipografia, espaçamento e raio vêm de um único conjunto de
+tokens com tema claro e escuro; nenhuma folha de estilo de tela declara cor ou fonte literal.
+
+- Dada qualquer folha de estilo de `lupa_web` além da de tokens, quando é inspecionada, então não
+  contém valor de cor nem nome de fonte literal, só referência a token.
+- Dado o tema escuro escolhido, quando o usuário abre qualquer tela, então todas as cores vêm da
+  versão escura dos mesmos tokens.
+
+**RF-VIS-02 — Paleta e tipografia.** A cor primária é verde (`#00613b` no claro, `#4cc489` no
+escuro) sobre fundo branco; títulos (h1 a h3) em Source Serif 4, texto em Source Sans 3 e
+monoespaçada em Source Code Pro, servidas pelo próprio front; todo par de texto e fundo dos tokens atinge contraste WCAG AA.
+
+- Dado o conjunto de tokens, quando o teste de contraste calcula cada par texto/fundo declarado,
+  então todos atingem ao menos 4,5:1 (texto normal) nos dois temas, e borda de campo, foco e
+  tarja atingem ao menos 3:1 sobre o fundo (WCAG 1.4.11).
+- Dada qualquer tela, quando carregada, então as fontes vêm da própria origem, sem requisição a
+  domínio externo, e a CSP continua `font-src 'self'`.
+
+**RF-VIS-03 — Selo de resultado.** Resultados de validação e de conferência (sucesso, atenção,
+falha) aparecem num selo com tarja lateral colorida sobre fundo claro do mesmo tom, formato que
+nenhum botão, link ou título usa; o selo traz o texto do resultado, não só a cor.
+
+- Dada uma validação sintética tempestiva, quando a tela de validações é aberta, então o resultado
+  aparece no selo de sucesso, com a palavra do resultado visível.
+- Dadas validações com resultado de atenção e de falha, quando exibidas, então cada uma usa o selo
+  do seu tom, distinto do botão primário.
+
+**RF-VIS-04 — Catálogo de componentes.** Botão, aviso, tabela rolável, formulário, ação em
+`<details>`, paginação, estado vazio, badge de status, cartão, barra de progresso e o selo de
+RF-VIS-03 são templates reutilizáveis; toda tela os usa em vez de marcação própria equivalente.
+
+- Dada qualquer tela de RF-INT-02, quando renderizada, então cada botão, aviso, tabela e
+  formulário vem do template do componente correspondente.
+- Dado um processo em ingestão, quando listado, então o estado aparece no badge de status, pílula
+  neutra distinta do selo de resultado; o badge serve só a estados de fluxo (ingestão, conversa,
+  papel).
+- Dada uma tabela larga a 375 px, quando a página é aberta, então só a tabela rola na horizontal.
+
+**RF-VIS-05 — Página do padrão.** Existe uma página `/padrao` que mostra todos os componentes de
+RF-VIS-04 com dados sintéticos, disponível só com `LUPA_AMBIENTE=desenvolvimento`.
+
+- Dado `LUPA_AMBIENTE=desenvolvimento`, quando um usuário logado abre `/padrao`, então vê cada
+  componente do catálogo.
+- Dado `LUPA_AMBIENTE` diferente de desenvolvimento, quando qualquer pessoa abre `/padrao`, então
+  recebe 404.
+
+**RF-VIS-06 — Acessibilidade verificada.** A suíte de navegador roda o axe em toda tela e na
+`/padrao`, nos temas claro e escuro, e falha em qualquer violação, inclusive as de boas práticas;
+a `/padrao` também gera capturas em claro, escuro e 375 px, e as capturas dos guias em
+`docs/imagens/` são regeradas com o visual novo.
+
+- Dada uma tela com um campo sem rótulo, quando a suíte roda, então o teste dessa tela falha
+  citando a regra do axe.
+- Dada a suíte verde, quando termina, então existem as capturas da `/padrao` nos três formatos.
+
+Alterações propostas em requisitos e decisões existentes:
+
+- Decisão 53 passa a ser: "Mesma estrutura de telas e ações; visual conforme a seção 4.13."
+- RNF-09: a suíte de navegador também roda o axe sem tolerância a violações (RF-VIS-06).
+
+Documentação: `docs/sistema/padrao-visual.md` descreve os tokens e cada componente.
+
+Perguntas e respostas:
+
+- Q1. Fonte monoespaçada — respondida em 20/11/2026: servida pelo projeto (Source Code Pro).
+- Q2. Serifa — respondida em 20/11/2026: só nos títulos (h1 a h3).
+- Q3. Badge e selo — respondida em 20/11/2026: badge só para estados de fluxo, em pílula neutra.
+- Q4. Capturas dos guias — respondida em 20/11/2026: regeradas no mesmo plano.
+- Q5. Contraste não textual — respondida em 20/11/2026: o teste de tokens exige 3:1.
+
 ## 5. Requisitos não funcionais
 
 | Id | Requisito | Critério |
@@ -702,6 +779,16 @@ Respostas do usuário em 19/11/2026 sobre o front em Django (seção 4.12). Subs
 | 51 | Transição (Q6) | troca de uma vez; o SvelteKit sai no mesmo plano |
 | 52 | Testes de navegador (Q7, RNF-09) | `pytest-playwright` em `lupa_web`; capturas dos guias refeitas pela suíte |
 | 53 | Visual (Q8) | reproduz o layout atual |
+
+Respostas do usuário em 20/11/2026 sobre o padrão visual (seção 4.13). Alteram a decisão 53.
+
+| Nº | Decisão | Resposta |
+| --- | --- | --- |
+| 54 | Padrão visual (RF-VIS-01 a RF-VIS-06) | tokens únicos; verde `#00613b`/`#4cc489` sobre branco; Source Serif 4 nos títulos e Source Sans 3 no texto; selo de resultado com tarja; catálogo de componentes adotado por todas as telas no mesmo plano; `/padrao` só no desenvolvimento; axe sem tolerância |
+| 55 | Monoespaçada (Q1) | Source Code Pro servida pelo projeto |
+| 56 | Serifa (Q2) | só nos títulos (h1 a h3) |
+| 57 | Badge e selo (Q3, Q5) | badge só para estados de fluxo, em pílula neutra; contraste não textual de 3:1 no teste de tokens |
+| 58 | Capturas (Q4) e decisão 53 | capturas dos guias regeradas no mesmo plano; a decisão 53 passa a "mesma estrutura de telas e ações; visual conforme a seção 4.13" |
 
 ## 8. Removido em relação à 0.1.0
 

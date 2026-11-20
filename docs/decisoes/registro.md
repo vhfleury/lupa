@@ -853,6 +853,19 @@ RES-06 na redação anterior.
 | 52 | Testes de navegador (Q7, RNF-09) | `pytest-playwright` em `lupa_web`; capturas dos guias refeitas pela suíte |
 | 53 | Visual (Q8) | reproduz o layout atual |
 
+### Padrão visual — 20/11/2026
+
+Substituem a decisão 53 (front reproduz o layout atual) quanto ao visual; a estrutura das telas
+e as ações continuam.
+
+| Decisão | Tema | Resposta |
+| --- | --- | --- |
+| 54 | Padrão visual (RF-VIS-01 a RF-VIS-06) | tokens únicos; verde `#00613b`/`#4cc489` sobre branco; Source Serif 4 nos títulos e Source Sans 3 no texto; selo de resultado com tarja; catálogo de componentes adotado por todas as telas no mesmo plano; `/padrao` só no desenvolvimento; axe sem tolerância |
+| 55 | Monoespaçada (Q1) | Source Code Pro servida pelo projeto |
+| 56 | Serifa (Q2) | só nos títulos (h1 a h3) |
+| 57 | Badge e selo (Q3, Q5) | badge só para estados de fluxo, em pílula neutra; contraste não textual de 3:1 no teste de tokens |
+| 58 | Capturas (Q4) e decisão 53 | capturas dos guias regeradas no mesmo plano; a decisão 53 passa a "mesma estrutura de telas e ações; visual conforme a seção 4.13" |
+
 ## Resultado das revisões
 
 | Revisão | Resultado |

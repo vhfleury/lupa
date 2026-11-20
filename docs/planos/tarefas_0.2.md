@@ -895,3 +895,53 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
   - Comando: `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` e `bash intranet/web/scripts/e2e.sh`.
     Verde: pipeline `702 passed` (95,25%), intranet `266 passed` (98,23%), integração 6, injeção 2,
     web `348 passed` (100%), cabeçalhos ok em 4 rotas, agente 11; E2E `35 passed` em 80 s.
+
+## Fase 11 — Padrão visual
+
+Execução do [plano do padrão visual](plano_padrao_visual.md). Um único PR da branch
+`feat/padrao-visual`. "Pronto quando", salvo indicação: suíte de `lupa_web` verde no contêiner
+`front` depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos.
+
+- [ ] **T11.1** Tokens em `tokens.css` com a paleta verde e o teste de contraste. RF-VIS-01, RF-VIS-02. Fase 1; P1, D1, D6.
+  - Vermelho: `intranet/web/tests/unit/test_tokens.py::test_primaria_e_verde_do_padrao`, `::test_tema_escuro_redefine_todos_os_tokens_de_cor`, `::test_pares_de_texto_atingem_4_5_nos_dois_temas`, `::test_borda_foco_e_tarja_atingem_3_nos_dois_temas`.
+  - Verde: `static/css/tokens.css` (claro e escuro, cores do selo e do badge), `base.css` passa a importá-lo e perde as declarações de token; `base.html` carrega `tokens.css`.
+  - Limpeza: nenhuma.
+- [ ] **T11.2** Fontes Source servidas pelo front. RF-VIS-02. Fase 1; D3, D4.
+  - Vermelho: `intranet/web/tests/e2e/test_seguranca.py::test_fontes_vem_da_propria_origem` falha (nenhum woff2 é carregado).
+  - Verde: `static/fontes/` com os 5 woff2 das releases `adobe-fonts` e `LICENSE.md`; `@font-face` em `tokens.css`; tokens `--fonte-titulo`, `--fonte`, `--mono`. SHA-256 de cada arquivo anotado na tarefa.
+  - Limpeza: nenhuma.
+- [ ] **T11.3** Catálogo de componentes e página `/padrao`. RF-VIS-03, RF-VIS-04, RF-VIS-05. Fase 1; D2, D7, D8.
+  - Vermelho: `intranet/web/tests/telas/test_padrao.py::test_padrao_devolve_404_fora_do_desenvolvimento`, `::test_padrao_sem_sessao_vai_ao_login`, `::test_padrao_mostra_cada_componente_em_desenvolvimento`.
+  - Verde: `telas/padrao.py`, rota em `urls.py`, `templates/padrao.html`; os 11 templates em `templates/componentes/` (`aviso.html` adaptado); estilos em `componentes.css` só com tokens.
+  - Limpeza: nenhuma.
+  - Revisão manual: aparência dos componentes; o usuário aprova o visual pelas capturas da `/padrao` (claro, escuro, 375 px) antes da T11.5.
+- [ ] **T11.4** Teste de conformidade com lista de telas pendentes. RF-VIS-01, RF-VIS-04. Fase 1; D5.
+  - Vermelho: `intranet/web/tests/unit/test_conformidade_templates.py::test_css_de_tela_nao_tem_cor_nem_fonte_literal` e `::test_templates_de_tela_usam_componentes` falham para `base.css` e `componentes.css`, que não estão na lista de pendentes.
+  - Verde: os dois CSS só com `var(--…)`; a lista de pendentes começa com os grupos das fases 2 a 6.
+  - Limpeza: nenhuma.
+- [ ] **T11.5** Telas de acesso no padrão (login, TOTP, troca de senha, erros, acesso negado). RF-VIS-04. Fase 2; P3.
+  - Vermelho: grupo "acesso" sai da lista de pendentes e `test_conformidade_templates.py` falha.
+  - Verde: templates de `acesso/`, `erros/` e `login.css` com componentes e tokens; testes de tela existentes continuam verdes.
+  - Limpeza: nenhuma.
+- [ ] **T11.6** Início, processos, processo e envio no padrão; estado de ingestão no badge. RF-VIS-04. Fase 3; P3, D7.
+  - Vermelho: `intranet/web/tests/telas/test_processos.py::test_estado_de_ingestao_aparece_no_badge`; grupo "processos" sai da lista de pendentes.
+  - Verde: `inicio.html`, `processos/`, `componentes/envio.html`, `inicio.css`, `processos.css`, `processo.css`.
+  - Limpeza: nenhuma.
+- [ ] **T11.7** Dossiê, validações e visualizador no padrão; resultados no selo. RF-VIS-03, RF-VIS-04. Fase 4; P2, P3, D7.
+  - Vermelho: `intranet/web/tests/telas/test_validacoes.py::test_resultado_tempestivo_aparece_no_selo_de_sucesso` e `::test_atencao_e_falha_usam_selo_do_seu_tom`; grupo "dossiê" sai da lista de pendentes.
+  - Verde: templates de dossiê, validações e visualizador; `dossie.css`, `validacoes.css`, `visualizador.css`.
+  - Limpeza: nenhuma.
+- [ ] **T11.8** Chat no padrão. RF-VIS-04. Fase 5; P3.
+  - Vermelho: grupo "chat" sai da lista de pendentes e o teste de conformidade falha.
+  - Verde: templates de `chat/` e `chat.css`; rótulo de IA e citações (RF-INT-05) intactos nos testes existentes.
+  - Limpeza: nenhuma.
+- [ ] **T11.9** Auditoria e usuários no padrão; lista de pendentes eliminada. RF-VIS-01, RF-VIS-04. Fase 6; P1, P3, D5.
+  - Vermelho: grupo "gestão" sai da lista de pendentes e o teste de conformidade falha.
+  - Verde: templates de `auditoria/` e `usuarios/`, `auditoria.css`, `usuarios.css`; a lista de pendentes sai do teste.
+  - Limpeza: remover regras CSS que ficaram sem uso.
+- [ ] **T11.10** Axe com todas as regras, tabela a 375 px e capturas da `/padrao`; guias regerados. RF-VIS-04, RF-VIS-06, RNF-09. Fase 7; P4, D10.
+  - Revisão manual (E2E): `intranet/web/tests/e2e/test_acessibilidade.py::test_axe_sem_violacoes_em_toda_tela` (sem filtro de tags, dois temas, inclui `/padrao`), `::test_tabela_larga_rola_sozinha_em_375px`, `test_capturas.py::test_capturas_do_padrao_nos_tres_formatos`; violações achadas corrigidas em commit próprio; `docs/imagens/` regerado por `capturas.sh`.
+  - Pronto quando: `bash intranet/web/scripts/e2e.sh` verde e capturas conferidas pelo usuário.
+- [ ] **T11.11** Documentação. RF-VIS-04. Fase 8.
+  - Revisão manual: `docs/sistema/padrao-visual.md` (tokens, componentes com exemplo de `include`, SHA-256 das fontes), `docs/sistema/front.md`, `docs/README.md`, `CHANGELOG.md` em "Não publicado".
+  - Pronto quando: `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde.
