@@ -22,6 +22,8 @@ MENSAGEM_RECUSA = "Não foi possível entrar com os dados informados. Confira e 
 MENSAGEM_TENTATIVAS = "Muitas tentativas. Aguarde alguns minutos e tente novamente."
 MENSAGEM_CONFIRMACAO = "A confirmação não confere com a nova senha."
 MENSAGEM_SENHA_ATUAL = "Senha atual incorreta."
+MOTIVO_EXPIRADA = "expirada"
+AVISO_EXPIRADA = "Sessão encerrada ou expirada. Entre de novo."
 DETALHE_SENHA_ATUAL = "senha atual inválida"
 ESCALA_QR = 5
 ROTULO_QR = "QR code para cadastrar o autenticador do Lupa"
@@ -54,7 +56,9 @@ def mensagem_de_recusa(resposta: httpx.Response) -> str:
 
 
 def _pagina_senha(request: HttpRequest, erro: str = "", status: int = 200) -> HttpResponse:
-    return render(request, "acesso/login.html", {"erro": erro, "pagina_login": True}, status=status)
+    expirada = request.GET.get("motivo") == MOTIVO_EXPIRADA
+    contexto = {"erro": erro, "pagina_login": True, "aviso": AVISO_EXPIRADA if expirada else ""}
+    return render(request, "acesso/login.html", contexto, status=status)
 
 
 def _pagina_codigo(

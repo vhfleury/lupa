@@ -23,6 +23,7 @@ PRAZO_API_PADRAO = "30"
 PRAZO_CHAT_PADRAO = "180"
 CHAVE_SET_COOKIE = "lupa_web.set_cookie"
 CAMINHO_LOGIN = "/login"
+CAMINHO_LOGIN_EXPIRADA = "/login?motivo=expirada"
 MENSAGEM_GENERICA = "Algo deu errado. Tente novamente."
 
 logger = logging.getLogger(__name__)
@@ -228,11 +229,14 @@ class DesviosDaApi(MiddlewareMixin):
             exception: Exceção levantada pela view.
 
         Returns:
-            502, redirecionamento para `/login` ou 403; `None` para exceção que não é da API.
+            502, redirecionamento para `/login` (com `?motivo=expirada` quando o navegador tinha o
+            cookie de sessão) ou 403; `None` para exceção que não é da API.
         """
         if isinstance(exception, ApiIndisponivelError):
             return render(request, "erros/servico_indisponivel.html", status=502)
         if isinstance(exception, SessaoExpiradaError):
+            if NOME_COOKIE in request.COOKIES:
+                return redirecionar(request, CAMINHO_LOGIN_EXPIRADA)
             return redirecionar_para_login(request)
         if isinstance(exception, AcessoNegadoError):
             return render(request, "erros/acesso_negado.html", status=403)

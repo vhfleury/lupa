@@ -10,6 +10,7 @@
     <h1>Bem-vindo ao Lupa</h1>
     <p>Entre com suas credenciais para continuar.</p>
   </div>
+  {% if aviso %}{% include "componentes/aviso.html" with tipo="info" mensagem=aviso %}{% endif %}
   {% if erro %}{% include "componentes/aviso.html" with tipo="erro" mensagem=erro %}{% endif %}
   <form method="post" action="/login" aria-label="Entrar">
     {% csrf_token %}

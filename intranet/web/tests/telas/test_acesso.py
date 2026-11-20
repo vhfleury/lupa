@@ -127,21 +127,21 @@ def test_codigo_aceito_com_troca_obrigatoria_vai_a_troca_de_senha(
 def test_sessao_expirada_redireciona_para_login(
     api_simulada: respx.MockRouter, navegador: Client
 ) -> None:
-    """RF-INT-03 (A1.5): tela autenticada com 401 da API vira 303 para `/login`."""
+    """RF-INT-03 (A1.5): tela autenticada com 401 da API vira 303 para o login com o aviso."""
     api_simulada.get("/auth/sessao").respond(401)
     resposta = navegador.get("/trocar-senha")
     assert resposta.status_code == 303
-    assert resposta["Location"] == "/login"
+    assert resposta["Location"] == "/login?motivo=expirada"
 
 
 def test_pedido_htmx_com_sessao_expirada_recebe_hx_redirect(
     api_simulada: respx.MockRouter, navegador: Client
 ) -> None:
-    """RF-INT-03 (A1.5): em pedido HTMX o 401 vira `HX-Redirect: /login`."""
+    """RF-INT-03 (A1.5): em pedido HTMX o 401 vira `HX-Redirect` para o login com o aviso."""
     api_simulada.get("/auth/sessao").respond(401)
     resposta = navegador.get("/trocar-senha", HTTP_HX_REQUEST="true")
     assert resposta.status_code == 200
-    assert resposta["HX-Redirect"] == "/login"
+    assert resposta["HX-Redirect"] == "/login?motivo=expirada"
 
 
 def test_troca_obrigatoria_vem_antes_de_qualquer_tela(
@@ -211,7 +211,7 @@ def test_troca_com_sessao_expirada_vai_ao_login(
         "/trocar-senha", {"senha_atual": "a", "nova_senha": "b" * 12, "confirmacao": "b" * 12}
     )
     assert resposta.status_code == 303
-    assert resposta["Location"] == "/login"
+    assert resposta["Location"] == "/login?motivo=expirada"
 
 
 def test_troca_com_senha_fraca_mostra_a_mensagem_da_api(
@@ -224,6 +224,13 @@ def test_troca_com_senha_fraca_mostra_a_mensagem_da_api(
     )
     assert resposta.status_code == 422
     assert "Senha muito comum." in resposta.content.decode()
+
+
+def test_login_avisa_sessao_encerrada_so_com_o_motivo() -> None:
+    """RF-INT-02 (A1.5): `?motivo=expirada` mostra o aviso; o login comum não mostra."""
+    aviso = "Sessão encerrada ou expirada. Entre de novo."
+    assert aviso in Client().get("/login", {"motivo": "expirada"}).content.decode()
+    assert aviso not in Client().get("/login").content.decode()
 
 
 def test_logout_revoga_na_api_e_volta_ao_login(

@@ -48,7 +48,7 @@ def test_imagem_com_sessao_expirada_vai_ao_login(
 ) -> None:
     """RF-INT-03 (A1.5): 401 da API na imagem redireciona ao login."""
     api_simulada.get(IMAGEM).respond(401, json={"detail": "não autenticado"})
-    assert navegador.get(IMAGEM)["Location"] == "/login"
+    assert navegador.get(IMAGEM)["Location"] == "/login?motivo=expirada"
 
 
 def test_sem_evidencia_abre_a_pagina_pedida_sem_destaque(

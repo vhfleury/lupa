@@ -130,6 +130,14 @@ def test_pedido_htmx_com_sessao_expirada_recebe_hx_redirect(
     assert resposta["HX-Redirect"] == "/login"
 
 
+def test_sessao_expirada_com_cookie_avisa_no_login(api_simulada: respx.MockRouter) -> None:
+    """RF-INT-02 (A1.5): 401 com o cookie de sessão leva a `/login?motivo=expirada`."""
+    api_simulada.get("/auth/sessao").respond(401)
+    assert _atender(cookie="sessao-vencida")["Location"] == "/login?motivo=expirada"
+    resposta = _atender(cookie="sessao-vencida", HTTP_HX_REQUEST="true")
+    assert resposta["HX-Redirect"] == "/login?motivo=expirada"
+
+
 def test_acesso_negado_mostra_pagina_com_403(api_simulada: respx.MockRouter) -> None:
     """RF-INT-03 (A1.6): 403 da API vira a página "Acesso negado" com status 403."""
     api_simulada.get("/auditoria").respond(403, json={"detail": "sem permissão"})
