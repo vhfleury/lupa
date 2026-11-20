@@ -625,7 +625,7 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
     inexistente). Verde: `5 passed`; suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1`
     `64 passed`, cobertura 100%.
 - [ ] **T10.8** Cadastro por arquivo com progresso, complemento e estado da ingestão. RF-INT-04. Fase 5; A4, D8, D14.
-  - Vermelho: `intranet/web/tests/telas/test_envio.py::test_pdf_sem_classe_pede_a_classe_e_reenvio_usa_o_mesmo_arquivo`, `::test_arquivo_acima_do_limite_e_recusado_sem_chamar_api`; `intranet/web/tests/telas/test_processo.py::test_estado_do_arquivo_para_de_atualizar_no_estado_final`; `intranet/web/tests/integracao/test_envio_api_real.py::test_envio_de_pdf_sintetico_cria_processo_pela_api`.
+  - Vermelho: `intranet/web/tests/telas/test_envio.py::test_pdf_sem_classe_pede_a_classe_e_reenvio_usa_o_mesmo_arquivo`, `::test_arquivo_acima_do_limite_e_recusado_sem_chamar_api`; `intranet/web/tests/telas/test_processo.py::test_estado_do_arquivo_para_de_atualizar_no_estado_final`; `intranet/web/tests/integracao/test_envio_api_real.py::test_envio_de_pdf_sintetico_cria_processo_pela_api`; `intranet/web/tests/unit/test_envios_pendentes.py::test_pendente_vencido_ou_de_outra_sessao_nao_e_recuperado`, `::test_pendente_e_apagado_apos_aceite_e_vencidos_no_envio_novo` (D16).
   - Verde: `telas/envio.py`, `telas/processo.py`, fragmentos, `static/js/htmx.min.js`, `static/js/envio.js`.
   - Limpeza: nenhuma.
 - [x] **T10.9** Processo: arquivos com diagnóstico e alertas, responsáveis, correção de classe e descarte. RF-INT-02. Fase 5.

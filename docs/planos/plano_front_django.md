@@ -36,7 +36,8 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 | `intranet/web/e2e/Dockerfile` | criar: imagem Python com `pytest-playwright` e Chromium, perfil `e2e` (D6) |
 | `intranet/web/scripts/e2e.sh` | reescrever: sobe o projeto Compose temporário e roda `pytest -m e2e` na imagem `e2e` |
 | `intranet/api/scripts/e2e_preparar.py`, `e2e_processos.py`, `e2e_semear_chat.py` | manter; só imports |
-| `docker-compose.yml` | alterar: serviço `front` com a imagem Python, rede `borda`, `LUPA_WEB_API_URL`; `e2e` com a imagem nova |
+| `docker-compose.yml` | alterar: serviço `front` com a imagem Python, rede `borda`, `LUPA_WEB_API_URL`, volume `envios-pendentes` (D16); `e2e` com a imagem nova |
+| `intranet/web/src/lupa_web/envios_pendentes.py` | criar: guardar, recuperar e apagar o arquivo pendente de complemento (D16, A4) |
 | `intranet/proxy/Caddyfile` | alterar: remove `handle_path /api/*`; tudo vai a `front:8000`; CSP sem `unsafe-hashes` (D2, D10) |
 | `intranet/api/scripts/verificar_cabecalhos.py` | alterar: CSP esperada nova |
 | `scripts/verificar.sh`, `Makefile` | alterar: etapa `web` (ruff, format, mypy, pytest em `front`) no lugar de `docker build --target verificacao`; rótulo `api` no lugar de `intranet` |
@@ -103,6 +104,12 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 - **D15.** `SECRET_KEY` vem de `LUPA_WEB_CHAVE_SECRETA`; sem a variável, o front gera uma chave
   aleatória a cada subida, e os tokens CSRF emitidos antes de um reinício são recusados uma vez
   (decisão do usuário em 20/11/2026, durante T10.3).
+- **D16.** Envio pendente de complemento: a API não devolve identificador e apaga o arquivo; o
+  Django guarda o arquivo no volume `envios-pendentes` (disco, montado em
+  `/var/lupa/envios-pendentes` no `front`) sob um código aleatório de 32 bytes, junto com o hash
+  SHA-256 do cookie de sessão de quem enviou. Validade de 2 horas. O pendente é apagado quando a
+  API aceita o complemento ou recusa o arquivo; a cada envio novo, o Django apaga os vencidos
+  (decisão do usuário em 20/11/2026, durante T10.8).
 
 ## Fases
 
@@ -163,14 +170,20 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
    `envio.js` mostra a barra com `htmx:xhr:progress`; saída: arquivo no Django.
 2. Desvio: tamanho acima de `LUPA_WEB_TAMANHO_MAXIMO_ENVIO`; saída: fragmento com o motivo, sem
    chamar a API.
-3. Entrada: arquivo temporário; ação: A1 em streaming para `POST /processos/arquivos` (novo) ou
+3. Entrada: arquivo temporário; ação: apaga os pendentes vencidos (D16); A1 em streaming para `POST /processos/arquivos` (novo) ou
    `POST /processos/<id>/arquivos` (anexo); saída:
    resultado (criado, anexado, duplicado, faltando campos).
-4. Desvio: faltam número ou classe; saída: fragmento que pede os campos e guarda o identificador do
-   envio devolvido pela API para o reenvio do mesmo arquivo.
-5. Desvio: arquivo recusado; saída: fragmento com o motivo da API.
-6. Saída final: `HX-Redirect` para a tela do processo.
-7. Entrada: tela do processo com arquivo não finalizado; ação: fragmento de estado com
+4. Desvio: faltam número ou classe; ação: guarda o arquivo como pendente (D16); saída: fragmento
+   que pede os campos, com os números encontrados e o código do pendente em campo oculto.
+5. Entrada: complemento com código, número e classe; ação: recupera o pendente se o código existe,
+   não venceu e o hash do cookie confere; A1 em streaming com o arquivo guardado; saída: resultado
+   como no passo 3.
+6. Desvio: código inexistente, vencido ou de outra sessão; saída: fragmento "Envio expirado,
+   selecione o arquivo de novo", sem chamar a API.
+7. Desvio: arquivo recusado; ação: apaga o pendente, se houver; saída: fragmento com o motivo da
+   API.
+8. Saída final: apaga o pendente, se houver; `HX-Redirect` para a tela do processo.
+9. Entrada: tela do processo com arquivo não finalizado; ação: fragmento de estado com
    `hx-trigger="every 5s"` chama A1; saída: estado atualizado; para quando todos os arquivos
    estão em estado final.
 
@@ -215,7 +228,9 @@ Arquivos de `lupa_web` em `intranet/web/tests/`; os de `lupa_api` seguem em `int
 - RF-INT-03: `intranet/web/tests/unit/test_cliente_api.py::test_api_fora_do_ar_mostra_servico_indisponivel` — 502 sem retentativa.
 - RF-INT-02 (A3): `intranet/web/tests/telas/test_acesso.py::test_login_com_codigo_errado_mostra_recusa_generica` — mensagem sem dizer o campo.
 - RF-INT-02 (D11): `intranet/web/tests/telas/test_acesso.py::test_configuracao_de_mfa_mostra_qr_em_svg` — SVG do `segno` com a URI simulada.
-- RF-INT-04: `intranet/web/tests/telas/test_envio.py::test_pdf_sem_classe_pede_a_classe_e_reenvio_usa_o_mesmo_arquivo` — fragmento com campo de classe e identificador do envio.
+- RF-INT-04: `intranet/web/tests/telas/test_envio.py::test_pdf_sem_classe_pede_a_classe_e_reenvio_usa_o_mesmo_arquivo` — fragmento com campo de classe e código do pendente; o complemento reenvia à API o arquivo guardado, sem novo upload.
+- RF-INT-04 (D16): `intranet/web/tests/unit/test_envios_pendentes.py::test_pendente_vencido_ou_de_outra_sessao_nao_e_recuperado` — validade de 2 horas e hash do cookie.
+- RF-INT-04 (D16): `intranet/web/tests/unit/test_envios_pendentes.py::test_pendente_e_apagado_apos_aceite_e_vencidos_no_envio_novo` — limpeza.
 - RF-INT-04: `intranet/web/tests/telas/test_envio.py::test_arquivo_acima_do_limite_e_recusado_sem_chamar_api` — motivo no fragmento.
 - RF-INT-04: `intranet/web/tests/telas/test_processo.py::test_estado_do_arquivo_para_de_atualizar_no_estado_final` — fragmento sem `hx-trigger` quando tudo está em estado final.
 - RF-INT-04: `intranet/web/tests/integracao/test_envio_api_real.py::test_envio_de_pdf_sintetico_cria_processo_pela_api` — envio real, marcador `integracao`.
