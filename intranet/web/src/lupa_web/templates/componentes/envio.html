@@ -8,6 +8,6 @@
     <label for="{{ id_envio }}-progresso">Enviando… <span class="percentual">0</span>%</label>
     <progress id="{{ id_envio }}-progresso" max="100" value="0">0%</progress>
   </div>
-  <button type="submit">Enviar</button>
+  {% include "componentes/botao.html" with rotulo="Enviar" variante="" href="" %}
 </form>
 <div class="resultado-envio" aria-live="polite"></div>

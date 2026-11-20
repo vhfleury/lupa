@@ -16,7 +16,7 @@
 }
 .sobretitulo {
   font-size: 0.65rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.13em;
   color: var(--texto-suave);
 }
@@ -45,15 +45,16 @@ h2 {
   gap: 1rem;
   padding: 0.8rem 1.1rem;
   border-radius: 10px;
-  background: #063453;
-  color: #fff;
+  background: var(--primaria);
+  color: var(--primaria-texto);
   text-decoration: none;
   font-weight: 600;
   white-space: nowrap;
-  border: 1px solid #22707e;
+  border: 1px solid var(--primaria);
 }
 .acao-principal:hover {
-  background: #09516b;
+  background: var(--primaria);
+  text-decoration: underline;
 }
 .contexto {
   display: flex;
@@ -71,7 +72,7 @@ h2 {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #008e87;
+  background: var(--primaria);
 }
 .indicadores {
   display: grid;
@@ -84,13 +85,12 @@ h2 {
   background: var(--superficie);
   border: 1px solid var(--borda);
   border-radius: 16px;
-  box-shadow: 0 8px 24px rgb(3 30 63 / 5%);
 }
 .indicador {
   display: flex;
   flex-direction: column;
   padding: 1.25rem;
-  border-top: 3px solid #008e87;
+  border-top: var(--tarja) solid var(--primaria);
 }
 .indicador > span {
   color: var(--texto-suave);

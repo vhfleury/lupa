@@ -45,7 +45,7 @@
           {% for assessor in assessores %}<option value="{{ assessor.id }}"{% if filtros.responsavel == assessor.id %} selected{% endif %}>{{ assessor.nome_usuario }}{% if not assessor.ativo %} (desativado){% endif %}</option>{% endfor %}
         </select>
       </div>
-      <div><button type="submit" class="secundario">Filtrar</button></div>
+      <div>{% include "componentes/botao.html" with rotulo="Filtrar" variante="secundario" href="" %}</div>
     </form>
     {% include "processos/_tabela.html" %}
   </section>

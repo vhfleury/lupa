@@ -1,1 +1,1 @@
-<span class="badge" data-componente="badge">{{ texto }}</span>
+<span class="badge" data-componente="badge"{% if testid %} data-testid="{{ testid }}"{% endif %}{% if estado %} data-estado="{{ estado }}"{% endif %}>{{ texto }}</span>

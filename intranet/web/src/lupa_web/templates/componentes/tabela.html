@@ -3,7 +3,7 @@
     <caption class="visualmente-oculto">{{ legenda }}</caption>
     <thead><tr>{% for coluna in colunas %}<th scope="col">{{ coluna }}</th>{% endfor %}</tr></thead>
     <tbody>
-      {% for linha in linhas %}<tr>{% for celula in linha %}<td>{% if celula.href %}<a href="{{ celula.href }}">{{ celula.texto }}</a>{% elif celula.texto %}{{ celula.texto }}{% else %}{{ celula }}{% endif %}</td>{% endfor %}</tr>{% endfor %}
+      {% if corpo %}{% include corpo %}{% else %}{% for linha in linhas %}<tr>{% for celula in linha %}<td>{% if celula.href %}<a href="{{ celula.href }}">{{ celula.texto }}</a>{% elif celula.texto %}{{ celula.texto }}{% else %}{{ celula }}{% endif %}</td>{% endfor %}</tr>{% endfor %}{% endif %}
     </tbody>
   </table>
 </div>

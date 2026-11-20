@@ -1,0 +1,10 @@
+    {% for a in arquivos %}
+    <tr data-arquivo="{{ a.arquivo_id }}">
+      <td><a href="/processos/{{ processo_id }}/arquivos/{{ a.arquivo_id }}">{{ a.nome }}</a></td>
+      <td>{{ a.tamanho_texto }}</td>
+      <td>{{ a.enviado_em_texto }}</td>
+      <td>{% include "componentes/badge.html" with texto=a.estado_rotulo testid="estado-arquivo" estado=a.estado|default:"" %}{% if a.detalhe %}<p class="motivo">{{ a.detalhe }}</p>{% endif %}</td>
+      <td>{% if a.legivel %}<a href="/processos/{{ processo_id }}/visualizador?arquivo={{ a.arquivo_id }}&amp;pagina=1">{{ a.total_paginas }}</a>{% else %}{{ a.total_paginas|default:"—" }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  

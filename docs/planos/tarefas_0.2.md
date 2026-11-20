@@ -974,10 +974,20 @@ Execução do [plano do padrão visual](plano_padrao_visual.md). Um único PR da
     -m pytest -c intranet/web/pyproject.toml intranet/web/tests/unit/test_conformidade_templates.py`.
     Vermelho: 2 failed (`acesso/_troca.html`, `login.css`). Verde: unit e telas 413 passed,
     cobertura 100%.
-- [ ] **T11.6** Início, processos, processo e envio no padrão; estado de ingestão no badge. RF-VIS-04. Fase 3; P3, D7.
+- [x] **T11.6** Início, processos, processo e envio no padrão; estado de ingestão no badge. RF-VIS-04. Fase 3; P3, D7.
   - Vermelho: `intranet/web/tests/telas/test_processos.py::test_estado_de_ingestao_aparece_no_badge`; grupo "processos" sai da lista de pendentes.
   - Verde: `inicio.html`, `processos/`, `componentes/envio.html`, `inicio.css`, `processos.css`, `processo.css`.
   - Limpeza: nenhuma.
+  - Entregue: `componentes/tabela.html` aceita `corpo` (template das linhas), e as tabelas de
+    processos, arquivos e alertas passam por ele (`_linhas_processos.html`,
+    `_linhas_arquivos.html`, `_linhas_alertas.html`; colunas em `COLUNAS_*` das views);
+    `componentes/badge.html` aceita `testid` e `estado`, e a situação da lista e o estado do arquivo
+    vão no badge (o `.selo` de `processos.css` saiu); botões pelo `botao.html`, inclusive no
+    `envio.html`; cores literais e sombras de `inicio.css` e `processos.css` trocadas por tokens,
+    peso 700 virou 600. Testes: `docker compose exec -T front python -m pytest -c
+    intranet/web/pyproject.toml intranet/web/tests/unit/test_conformidade_templates.py
+    intranet/web/tests/telas/test_processos.py`. Vermelho: 3 failed (CSS, templates, badge).
+    Verde: unit e telas 420 passed, cobertura 100%; ruff e mypy limpos.
 - [ ] **T11.7** Dossiê, validações e visualizador no padrão; resultados no selo. RF-VIS-03, RF-VIS-04. Fase 4; P2, P3, D7.
   - Vermelho: `intranet/web/tests/telas/test_validacoes.py::test_resultado_tempestivo_aparece_no_selo_de_sucesso` e `::test_atencao_e_falha_usam_selo_do_seu_tom`; grupo "dossiê" sai da lista de pendentes.
   - Verde: templates de dossiê, validações e visualizador; `dossie.css`, `validacoes.css`, `visualizador.css`.

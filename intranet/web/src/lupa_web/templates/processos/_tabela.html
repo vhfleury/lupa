@@ -12,21 +12,7 @@
     </div>
     {% else %}
     <div class="tabela-container">
-      <table data-testid="lista-processos">
-        <thead><tr><th scope="col">Processo</th><th scope="col">Assessores responsáveis</th><th scope="col">Processamento</th><th scope="col">Criado em</th></tr></thead>
-        <tbody>
-          {% for p in processos %}
-          <tr data-processo="{{ p.id }}">
-            <td data-rotulo="Processo"><a class="numero-processo" href="/processos/{{ p.id }}">{{ p.numero_cnj }}</a><span class="descricao">{{ p.classe_rotulo }}</span></td>
-            <td data-rotulo="Assessores responsáveis"><div class="responsaveis">
-              {% for assessor in p.responsaveis %}<span class="responsavel">{{ assessor.nome_usuario }}{% if not assessor.ativo %}<small> · desativado</small>{% endif %}</span>{% empty %}<span class="sem-responsavel">Sem responsável atribuído</span>{% endfor %}
-            </div></td>
-            <td data-rotulo="Processamento"><span class="selo {{ p.situacao }}" data-testid="situacao">{{ p.situacao_rotulo }}</span></td>
-            <td data-rotulo="Criado em" class="data">{{ p.criado_em_texto }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      {% include "componentes/tabela.html" with legenda="Processos" colunas=colunas_processos testid="lista-processos" corpo="processos/_linhas_processos.html" %}
     </div>
     {% endif %}
     <footer class="rodape-lista">

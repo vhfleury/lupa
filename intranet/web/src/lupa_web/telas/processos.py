@@ -16,6 +16,7 @@ from lupa_web.telas.processo import formatar_bytes
 from lupa_web.telas.sessao import Sessao, contexto_da_moldura, tela_autenticada, tem
 
 SEM_RESPONSAVEL = "sem"
+COLUNAS_PROCESSOS = ("Processo", "Assessores responsáveis", "Processamento", "Criado em")
 
 
 def _texto_de_busca(processo: dict[str, Any]) -> str:
@@ -101,6 +102,7 @@ async def lista(request: HttpRequest, sessao: Sessao) -> HttpResponse:
     filtrados = filtrar(processos, filtros)
     contexto = contexto_da_moldura(request, sessao) | {
         "processos": [linha(p) for p in filtrados],
+        "colunas_processos": COLUNAS_PROCESSOS,
         "total": len(processos),
         "filtros": filtros,
         "situacoes": rotulos.SITUACAO.items(),

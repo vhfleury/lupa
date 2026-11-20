@@ -1,0 +1,11 @@
+          {% for p in processos %}
+          <tr data-processo="{{ p.id }}">
+            <td data-rotulo="Processo"><a class="numero-processo" href="/processos/{{ p.id }}">{{ p.numero_cnj }}</a><span class="descricao">{{ p.classe_rotulo }}</span></td>
+            <td data-rotulo="Assessores responsáveis"><div class="responsaveis">
+              {% for assessor in p.responsaveis %}<span class="responsavel">{{ assessor.nome_usuario }}{% if not assessor.ativo %}<small> · desativado</small>{% endif %}</span>{% empty %}<span class="sem-responsavel">Sem responsável atribuído</span>{% endfor %}
+            </div></td>
+            <td data-rotulo="Processamento">{% include "componentes/badge.html" with texto=p.situacao_rotulo testid="situacao" estado=p.situacao %}</td>
+            <td data-rotulo="Criado em" class="data">{{ p.criado_em_texto }}</td>
+          </tr>
+          {% endfor %}
+        
