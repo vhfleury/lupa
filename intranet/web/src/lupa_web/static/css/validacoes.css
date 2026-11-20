@@ -53,11 +53,18 @@ dd {
   margin-top: 0.5rem;
 }
 .fatos li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
   margin-bottom: 0.6rem;
 }
-.fatos a,
-.fatos button {
-  margin-left: 0.4rem;
+.fatos li > details[open],
+.fatos li > .notas {
+  flex-basis: 100%;
+}
+.fatos li > form {
+  margin: 0;
 }
 .selo {
   display: inline-block;
@@ -72,7 +79,6 @@ dd {
 }
 .correcao,
 .nota {
-  margin-top: 0.5rem;
   max-width: 30rem;
 }
 textarea {
@@ -91,4 +97,11 @@ textarea {
 
 .fatos form.confirmar {
   display: inline;
+}
+
+.correcao fieldset {
+  display: none;
+}
+.correcao form:has(select[name="fonte"] option[value=""]:checked) fieldset {
+  display: block;
 }

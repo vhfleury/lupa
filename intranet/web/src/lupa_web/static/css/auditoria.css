@@ -43,3 +43,7 @@
   color: var(--aviso-texto);
   border-radius: var(--raio);
 }
+
+table td a[title] {
+  font-family: var(--mono);
+}

@@ -18,7 +18,8 @@
 }
 
 .cabecalho-processo .classe {
-  display: flex;
+  display: inline-flex;
+  vertical-align: middle;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.75rem;
@@ -47,8 +48,15 @@
   overflow-wrap: anywhere;
 }
 
-.corrigir-classe summary {
-  cursor: pointer;
+.corrigir-classe {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0.5rem 0 0.5rem 0.75rem;
+}
+
+.corrigir-classe[open] {
+  display: block;
+  margin-left: 0;
 }
 
 .cartao {

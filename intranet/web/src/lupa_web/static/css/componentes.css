@@ -163,3 +163,26 @@
 .complemento .campo {
   max-width: 36rem;
 }
+
+/* Ações em <details> (corrigir, anotar, reclassificar): o <summary> tem o visual do botão
+   secundário dos .svelte; aberto, o formulário ocupa a linha inteira. */
+.corrigir-classe > summary,
+.reclassificar > summary,
+.correcao > summary,
+.nota > summary {
+  display: inline-block;
+  list-style: none;
+  cursor: pointer;
+  border-radius: var(--raio);
+  border: 1px solid var(--primaria);
+  background: transparent;
+  color: var(--primaria);
+  padding: 0.45rem 0.9rem;
+}
+
+.corrigir-classe > summary::-webkit-details-marker,
+.reclassificar > summary::-webkit-details-marker,
+.correcao > summary::-webkit-details-marker,
+.nota > summary::-webkit-details-marker {
+  display: none;
+}

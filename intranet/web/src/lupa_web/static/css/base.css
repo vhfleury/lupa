@@ -274,3 +274,11 @@ main {
     flex-direction: column;
   }
 }
+
+@media (max-width: 55rem) {
+  main table:not([data-testid="lista-processos"]) {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}

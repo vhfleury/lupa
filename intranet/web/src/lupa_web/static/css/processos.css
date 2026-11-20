@@ -252,3 +252,18 @@ td {
 .cadastro .cartao h2 {
   margin-top: 0;
 }
+
+@media (min-width: 55.0625rem) {
+  .pagina-processos {
+    position: relative;
+  }
+  .pagina-processos .topo {
+    padding-right: 12rem;
+  }
+  .cadastro .novo-botao {
+    position: absolute;
+    top: 1.75rem;
+    right: 0;
+    margin: 0;
+  }
+}
