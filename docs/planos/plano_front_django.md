@@ -110,6 +110,10 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
   SHA-256 do cookie de sessão de quem enviou. Validade de 2 horas. O pendente é apagado quando a
   API aceita o complemento ou recusa o arquivo; a cada envio novo, o Django apaga os vencidos
   (decisão do usuário em 20/11/2026, durante T10.8).
+- **D17.** Diferenças do SvelteKit fechadas na paridade (decisão do usuário em 20/11/2026, durante
+  T10.14): o painel "Início" em `/` é reproduzido com os mesmos dados da API; a opção "Visualizar
+  como assessor" do desembargador é removida; o "+ Novo processo" abre e fecha o cadastro com
+  `<details>`, sem JavaScript novo.
 
 ## Fases
 
