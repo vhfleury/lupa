@@ -31,7 +31,7 @@ No exemplo, o recurso chegou um dia útil após o vencimento de 24/08/2026. O pr
 | --- | --- |
 | [pipeline/](pipeline/) | Data Vault, ingestão, leitura de PDF e ZIP, catálogo de validações e gerador sintético |
 | [intranet/api/](intranet/api/) | API, contas, sessão, chat, dossiê e auditoria |
-| [intranet/web/](intranet/web/README.md) | Interface SvelteKit, testes de componentes, Playwright e capturas |
+| [intranet/web/](intranet/web/README.md) | Front Django (`lupa_web`) com HTMX, testes das telas, E2E em `pytest-playwright` e capturas |
 | [intranet/proxy/](intranet/proxy/) | Proxy HTTPS e cabeçalhos de segurança |
 | [docs/](docs/README.md) | Especificação, arquitetura, guias, operação, conformidade e decisões |
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Roda lint, tipagem e testes dos tres pacotes em sequencia; falha no primeiro erro.
+# Roda lint, tipagem e testes dos tres pacotes Python em sequencia; falha no primeiro erro.
 # Roda no host, com a stack de pe (`docker compose up -d --build --wait`): a pipeline e verificada
 # na imagem do `worker`, a API na da `api` (D21) e o front na do `front`, todas com /app como diretorio de trabalho.
 set -euo pipefail
@@ -28,17 +28,28 @@ echo "== web: ruff check ==";               "${WEB[@]}" -m ruff check intranet/w
 echo "== web: ruff format --check ==";      "${WEB[@]}" -m ruff format --check intranet/web/src intranet/web/tests
 echo "== web: mypy --strict ==";            "${WEB[@]}" -m mypy --config-file intranet/web/pyproject.toml intranet/web/src intranet/web/tests
 # T10.8: assessor sintetico novo para o envio do front a API real (test_envio_api_real.py).
-# Usa o desembargador da stack de desenvolvimento; a senha temporaria so passa por variavel.
+# Usa o desembargador da stack; numa stack nova cria um sintetico de senha aleatoria (troca no
+# primeiro acesso). As senhas so passam por variavel.
 read -r LUPA_WEB_TESTE_USUARIO LUPA_WEB_TESTE_SENHA < <(docker compose exec -T api python - <<'PY'
 import secrets
 import sys
+from contextlib import redirect_stdout
 from datetime import UTC, datetime
 
 sys.path.insert(0, "intranet/api/scripts")
 from e2e_processos import desembargador, sessao_e2e
+from lupa_api.acesso.instalacao import criar_desembargador_inicial
 from lupa_api.acesso.servico import Contexto, criar_usuario
+from lupa_pipeline.config import get_settings
 from lupa_pipeline.dominio.enums import PapelUsuario
 
+inicial = {
+    "LUPA_DESEMBARGADOR_USUARIO": f"desembargador.verificar.{secrets.token_hex(3)}",
+    "LUPA_DESEMBARGADOR_SENHA": secrets.token_urlsafe(18),
+}
+with redirect_stdout(sys.stderr):
+    if criar_desembargador_inicial(get_settings(), inicial) != 0:
+        sys.exit("desembargador sintetico nao criado")
 with sessao_e2e() as sessao:
     nome = f"assessor.web.{secrets.token_hex(3)}"
     ctx = Contexto(None, None, datetime.now(UTC))
@@ -62,11 +73,11 @@ METRICAS_AGENTE=/tmp/metricas_agente.json
 MSYS_NO_PATHCONV=1 docker compose exec -T -e LUPA_EXIGIR_INTEGRACAO=1 -e LUPA_METRICAS_AGENTE="$METRICAS_AGENTE" api \
   python -m pytest -c intranet/api/pyproject.toml -m agente intranet/api/tests/agente --no-cov -q
 MSYS_NO_PATHCONV=1 "${INTRANET[@]}" -c "import json,sys; m=json.load(open(sys.argv[1])); print({k: m[k] for k in ('versao_modelo','versao_prompt','cenarios','achados_suprimidos','achados_criados','vazamentos','embutidas_executadas','respostas_bloqueadas')})" "$METRICAS_AGENTE"
-# Etapa 6.10: suite E2E (Playwright), opcional. Ative com LUPA_VERIFICAR_E2E=1; o e2e.sh sobe a
+# T10.15: suite E2E (pytest-playwright), opcional. Ative com LUPA_VERIFICAR_E2E=1; o e2e.sh sobe a
 # stack isolada com o cliente falso e, ao terminar, remove o ambiente sintético.
 if [ "${LUPA_VERIFICAR_E2E:-0}" = "1" ]; then
   echo "== e2e =="
   bash intranet/web/scripts/e2e.sh
 else
-  echo "== e2e == (pulado; defina LUPA_VERIFICAR_E2E=1 para rodar a suite Playwright)"
+  echo "== e2e == (pulado; defina LUPA_VERIFICAR_E2E=1 para rodar a suite pytest-playwright)"
 fi

@@ -1,6 +1,7 @@
 """Testes de `lupa_web.configuracao`: front sem banco, sessão nem administração (D4)."""
 
 from django.conf import settings
+from django.db import connections
 
 APPS_DE_BANCO = (
     "django.contrib.auth",
@@ -12,7 +13,7 @@ APPS_DE_BANCO = (
 
 def test_lupa_web_nao_configura_banco() -> None:
     """RES-12 (D4): `DATABASES = {}` (o Django só põe o motor `dummy`) e nenhum app de banco."""
-    motores = {apelido: banco["ENGINE"] for apelido, banco in settings.DATABASES.items()}
+    motores = {apelido: banco["ENGINE"] for apelido, banco in connections.settings.items()}
     assert motores == {"default": "django.db.backends.dummy"}
     assert not set(APPS_DE_BANCO) & set(settings.INSTALLED_APPS)
 

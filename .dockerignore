@@ -10,9 +10,6 @@
 docs
 .sinteticos
 .vault-dev
-**/node_modules
-intranet/web/.svelte-kit
-intranet/web/build
 .backups
 .backup-chaves
 .segredos

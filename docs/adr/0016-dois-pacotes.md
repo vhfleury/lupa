@@ -2,7 +2,7 @@
 
 | Status | Data de registro | Referência |
 | --- | --- | --- |
-| Aceito | 2026-11-14 | Especificação e plano 0.2 aprovados pelo responsável pelo projeto |
+| Substituído pelo [ADR 0019](0019-front-django-renderizado-no-servidor.md) quanto aos pacotes | 2026-11-14 | Especificação e plano 0.2 aprovados pelo responsável pelo projeto |
 
 ## Contexto
 

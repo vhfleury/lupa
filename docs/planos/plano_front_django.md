@@ -147,7 +147,8 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 4. Entrada: resposta da API; ação: copia cada `Set-Cookie` da API para a resposta ao navegador;
    saída: cookie renovado ou apagado no navegador.
 5. Desvio: status 401; saída: redirecionamento 303 para `/login` (pedido HTMX: cabeçalho
-   `HX-Redirect: /login`).
+   `HX-Redirect: /login`); com o cookie de sessão presente no pedido, o destino é
+   `/login?motivo=expirada`, e o login mostra o aviso de sessão expirada.
 6. Desvio: status 403; saída: página "Acesso negado" com status 403.
 7. Desvio: `GET /auth/sessao` indica troca de senha ou MFA pendente; saída: redirecionamento
    para `/trocar-senha`, antes de qualquer outra tela.
@@ -192,7 +193,11 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
    selecione o arquivo de novo", sem chamar a API.
 7. Desvio: arquivo recusado; ação: apaga o pendente, se houver; saída: fragmento com o motivo da
    API.
-8. Saída final: apaga o pendente, se houver; `HX-Redirect` para a tela do processo.
+8. Saída final: apaga o pendente, se houver; `HX-Redirect` para a tela do processo com
+   `?aviso=criado`, `anexado`, `duplicado` ou `recebido` (anexo), e a tela mostra o aviso
+   correspondente. As ações com POST e redirecionamento seguem o mesmo padrão:
+   `?aviso=responsaveis` no processo, `?aviso=reclassificada` no dossiê e `?aviso=liberado` no
+   chat; chave desconhecida não mostra aviso.
 9. Entrada: tela do processo com arquivo não finalizado; ação: fragmento de estado com
    `hx-trigger="every 5s"` chama A1; saída: estado atualizado; para quando todos os arquivos
    estão em estado final.
@@ -204,8 +209,11 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 2. Entrada: pergunta; ação: A1 em `POST /processos/<id>/chat` com `LUPA_WEB_TIMEOUT_CHAT`; saída:
    resposta com citações conferidas, aviso de teto ou aviso de revisão.
 3. Desvio: aviso de teto ou de revisão; saída: fragmento com o aviso, sem bloco de IA.
-4. Desvio: nenhuma citação conferida; saída: fragmento "sem evidência".
-5. Saída final: fragmento com a pergunta e a resposta em bloco rotulado como gerado por IA, cada
+4. Desvio: a resposta põe o processo em revisão; ação: A1 lê a revisão do processo; saída: o
+   fragmento leva também o banner de revisão com `hx-swap-oob` (troca `#revisao-processo` sem
+   recarregar a página) e o formulário bloqueado.
+5. Desvio: nenhuma citação conferida; saída: fragmento "sem evidência".
+6. Saída final: fragmento com a pergunta e a resposta em bloco rotulado como gerado por IA, cada
    citação com link para `/processos/<id>/visualizador?arquivo=…&pagina=…`, anexado ao fim da
    conversa (`hx-swap="beforeend"`).
 

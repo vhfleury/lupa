@@ -877,6 +877,21 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
     (2 min 17 s com a stack); capturas `2 passed` em 54 s (2 min 6 s); suíte de `lupa_web`
     `348 passed`, cobertura 100%; `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde
     (pipeline 702, intranet 266, integração 6, injeção 2, web 348, cabeçalhos ok; e2e fora).
-- [ ] **T10.16** Remover o SvelteKit e atualizar `verificar.sh`, `Makefile`, `CLAUDE.md`, documentação, ADRs 0006 e 0016 e `CHANGELOG.md`. RES-06, RNF-08. Fase 11.
+- [x] **T10.16** Remover o SvelteKit e atualizar `verificar.sh`, `Makefile`, `CLAUDE.md`, documentação, ADRs 0006 e 0016 e `CHANGELOG.md`. RES-06, RNF-08. Fase 11.
   - Revisão manual: remoção e documentação. Testes do Vitest e Playwright em TypeScript saem neste commit, citando a tarefa.
   - Pronto quando: `bash scripts/verificar.sh` verde, sem referência a `lupa_intranet`, `npm` ou SvelteKit fora do histórico, e links locais conferidos.
+  - Removidos de `intranet/web/`: `src/lib`, `src/routes`, `src/app.*`, `src/testes-setup.ts`,
+    `static/` (os logos já estão em `lupa_web/static`), `.svelte-kit/`, `package*.json`, configs
+    de Vite, Svelte, TS, ESLint e Prettier, `Caddyfile`, `.dockerignore`, `.gitignore` e
+    `scripts/carimbo.mjs`/`externalizar-inicio.mjs`; `.gitignore` e `.dockerignore` da raiz sem as
+    entradas de Node. `Makefile` com `lupa_web` em `test`, `lint`, `typecheck` e `format`.
+  - `verificar.sh` cria um desembargador sintético de senha aleatória (só por variável) quando a
+    stack não tem nenhum (`criar_desembargador_inicial`); com desembargador existente não faz nada.
+  - `test_configuracao.py::test_lupa_web_nao_configura_banco` lê `connections.settings` (o Django
+    só põe o motor `dummy` ao configurar as conexões). Vermelho rodando sozinho com `--no-cov`:
+    `assert {} == {'default': 'django.db.backends.dummy'}`; verde: `1 passed`.
+  - `CLAUDE.md` e `.claude/` (agentes e skills) não alterados pelo executor; ficam com o agente
+    principal.
+  - Comando: `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` e `bash intranet/web/scripts/e2e.sh`.
+    Verde: pipeline `702 passed` (95,25%), intranet `266 passed` (98,23%), integração 6, injeção 2,
+    web `348 passed` (100%), cabeçalhos ok em 4 rotas, agente 11; E2E `35 passed` em 80 s.
