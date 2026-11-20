@@ -20,6 +20,9 @@ from lupa_web.telas.sessao import Sessao, contexto_da_moldura, tela_autenticada
 
 ID_PUBLICO = re.compile(r"[0-9a-fA-F]{64}")
 LIMITE = "50"
+COLUNAS_EVENTOS = ("Quando", "Ação", "Resultado", "Usuário", "Processo", "Objeto", "IP", "Local")
+COLUNAS_CONTAGEM = ("Ação", "Total")
+COLUNAS_CHAMADAS = ("Modelo", "Prompt", "Total")
 CAMPOS_DE_TEXTO = ("usuario_id", "processo_id", "acao", "ip")
 CAMPOS_DE_ID = (("usuario_id", "usuário"), ("processo_id", "processo"))
 TIPOS_DE_RELATORIO = {"processo": "processo", "usuario": "usuario"}
@@ -274,6 +277,9 @@ async def lista(request: HttpRequest, sessao: Sessao) -> HttpResponse:
     contexto: dict[str, Any] = contexto_da_moldura(request, sessao) | {
         "filtros": {c: request.GET.get(c, "") for c in (*CAMPOS_DE_TEXTO, "inicio", "fim")},
         "acoes": ACOES,
+        "colunas_eventos": COLUNAS_EVENTOS,
+        "colunas_contagem": COLUNAS_CONTAGEM,
+        "colunas_chamadas": COLUNAS_CHAMADAS,
         "relatorio_tipo": request.GET.get("relatorio_tipo", "processo"),
         "relatorio_id": request.GET.get("relatorio_id", ""),
     }

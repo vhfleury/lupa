@@ -1,0 +1,14 @@
+{% for evento in eventos %}
+<tr data-testid="evento">
+  <td>{{ evento.quando }}</td>
+  <td>{{ evento.acao }}</td>
+  <td>{{ evento.resultado }}</td>
+  <td>{% if evento.usuario %}<a href="{{ evento.usuario.link }}#titulo-relatorio" title="{{ evento.usuario.id }}" aria-label="Relatório de uso do usuário {{ evento.usuario.id }}">{{ evento.usuario.curto }}</a>{% else %}—{% endif %}</td>
+  <td>{% if evento.processo %}<a href="{{ evento.processo.link }}#titulo-relatorio" title="{{ evento.processo.id }}" aria-label="Relatório de uso do processo {{ evento.processo.id }}">{{ evento.processo.curto }}</a>{% else %}—{% endif %}</td>
+  <td>{{ evento.objeto_tipo|default:"—" }}</td>
+  <td>{{ evento.ip|default:"—" }}</td>
+  <td>{{ evento.localizacao|default:"—" }}</td>
+</tr>
+{% empty %}
+<tr><td colspan="8">Nenhum evento com esses filtros.</td></tr>
+{% endfor %}

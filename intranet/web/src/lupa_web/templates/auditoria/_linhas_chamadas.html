@@ -1,0 +1,1 @@
+{% for chamada in relatorio.chamadas_modelo %}<tr><td>{{ chamada.versao_modelo|default:"—" }}</td><td>{{ chamada.versao_prompt|default:"—" }}</td><td>{{ chamada.total }}</td></tr>{% endfor %}

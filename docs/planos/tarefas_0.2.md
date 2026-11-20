@@ -1015,10 +1015,21 @@ Execução do [plano do padrão visual](plano_padrao_visual.md). Um único PR da
     exec -T front python -m pytest -c intranet/web/pyproject.toml
     intranet/web/tests/unit/test_conformidade_templates.py`. Vermelho: 1 failed (templates de
     `chat/`; o CSS já não tinha cor literal). Verde: unit e telas 426 passed, cobertura 100%.
-- [ ] **T11.9** Auditoria e usuários no padrão; lista de pendentes eliminada. RF-VIS-01, RF-VIS-04. Fase 6; P1, P3, D5.
+- [x] **T11.9** Auditoria e usuários no padrão; lista de pendentes eliminada. RF-VIS-01, RF-VIS-04. Fase 6; P1, P3, D5.
   - Vermelho: grupo "gestão" sai da lista de pendentes e o teste de conformidade falha.
   - Verde: templates de `auditoria/` e `usuarios/`, `auditoria.css`, `usuarios.css`; a lista de pendentes sai do teste.
   - Limpeza: remover regras CSS que ficaram sem uso.
+  - Entregue: as tabelas de eventos, contagem, chamadas ao modelo e usuários passam pelo
+    `tabela.html` com `corpo` (`auditoria/_linhas_*.html`, `usuarios/_linhas_usuarios.html`;
+    colunas em `COLUNAS_*` das views); botões pelo `botao.html`, que ganha `rotulo_acessivel`
+    (`aria-label` de "Reativar", "Resetar senha" e "Resetar autenticador"). `PENDENTES`,
+    `_pendente` e `test_pendentes_citam_arquivos_que_existem` saíram do teste: a regra vale para
+    todos os templates e CSS. Limpeza: a varredura de classes dos CSS contra templates, JS e
+    views só achou classes montadas em tempo de execução (`selo-*`, `zoom-*`); nenhuma regra
+    removida. Testes: `docker compose exec -T front python -m pytest -c
+    intranet/web/pyproject.toml intranet/web/tests/unit/test_conformidade_templates.py`.
+    Vermelho: 1 failed (templates de `auditoria/` e `usuarios/`). Verde: unit e telas 433
+    passed, cobertura 100%; ruff e mypy limpos.
 - [ ] **T11.10** Axe com todas as regras, tabela a 375 px e capturas da `/padrao`; guias regerados. RF-VIS-04, RF-VIS-06, RNF-09. Fase 7; P4, D10.
   - Revisão manual (E2E): `intranet/web/tests/e2e/test_acessibilidade.py::test_axe_sem_violacoes_em_toda_tela` (sem filtro de tags, dois temas, inclui `/padrao`), `::test_tabela_larga_rola_sozinha_em_375px`, `test_capturas.py::test_capturas_do_padrao_nos_tres_formatos`; violações achadas corrigidas em commit próprio; `docs/imagens/` regerado por `capturas.sh`.
   - Pronto quando: `bash intranet/web/scripts/e2e.sh` verde e capturas conferidas pelo usuário.
