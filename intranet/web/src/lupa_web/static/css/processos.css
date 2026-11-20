@@ -1,0 +1,234 @@
+/* Lista de processos (D7): src/routes/processos/+page.svelte e NovoProcesso.svelte. */
+.pagina-processos {
+  width: 100%;
+  max-width: 76rem;
+  margin: 0 auto;
+}
+.topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0 1.75rem;
+}
+.sobretitulo {
+  color: var(--texto-suave);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+}
+h1 {
+  font-size: 2rem;
+  letter-spacing: -0.04em;
+  margin: 0.5rem 0;
+}
+.topo p {
+  color: var(--texto-suave);
+  margin: 0;
+  font-size: 0.9rem;
+}
+.novo-botao {
+  background: #063453;
+  border: 1px solid #22707e;
+  color: white;
+  border-radius: 10px;
+  min-height: 46px;
+  padding: 0.6rem 1.1rem;
+  white-space: nowrap;
+}
+.acervo {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-top: 3px solid #008e87;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.cabecalho-lista {
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+.cabecalho-lista h2 {
+  margin: 0.4rem 0 0;
+}
+.contagem {
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+}
+.filtros {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 0 1.5rem 1.5rem;
+}
+.filtros label {
+  font-size: 0.78rem;
+  color: var(--texto-suave);
+  margin-bottom: 0.5rem;
+}
+.filtros input,
+.filtros select {
+  border-radius: 9px;
+  min-height: 44px;
+  font-size: 0.85rem;
+}
+table {
+  table-layout: fixed;
+}
+th {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--texto-suave);
+  background: var(--fundo);
+}
+th:first-child {
+  width: 34%;
+}
+th:nth-child(2) {
+  width: 28%;
+}
+th:nth-child(3) {
+  width: 19%;
+}
+th,
+td {
+  padding: 1.1rem 1.5rem;
+  text-align: left;
+  vertical-align: middle;
+}
+td {
+  overflow-wrap: anywhere;
+}
+.numero-processo {
+  font-size: 0.87rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.numero-processo:hover {
+  text-decoration: underline;
+}
+.descricao {
+  display: block;
+  font-size: 0.77rem;
+  color: var(--texto-suave);
+  margin-top: 0.45rem;
+}
+.responsaveis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.responsavel {
+  border: 1px solid var(--borda);
+  padding: 0.3rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+}
+.responsavel small,
+.sem-responsavel,
+.data {
+  color: var(--texto-suave);
+  font-size: 0.78rem;
+}
+.vazio {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--texto-suave);
+}
+.rodape-lista {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  color: var(--texto-suave);
+  font-size: 0.73rem;
+}
+@media (max-width: 75rem) {
+  .filtros {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .filtros > div:first-child {
+    grid-column: 1 / -1;
+  }
+  th,
+  td {
+    padding: 1rem;
+  }
+}
+@media (max-width: 55rem) {
+  .topo {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .filtros {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  table,
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: 100%;
+  }
+  thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  tr {
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--borda);
+  }
+  td {
+    padding: 0.65rem 0;
+    border: 0;
+  }
+  td::before {
+    content: attr(data-rotulo);
+    display: block;
+    font-size: 0.68rem;
+    color: var(--texto-suave);
+    margin-bottom: 0.35rem;
+  }
+}
+.selo {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--borda);
+  font-size: 0.85rem;
+}
+.selo.concluido {
+  background: var(--sucesso-fundo);
+  color: var(--sucesso);
+}
+.selo.quarentena,
+.selo.falho {
+  background: var(--perigo-fundo);
+  color: var(--perigo);
+}
+.selo.processando,
+.selo.pendencias {
+  background: var(--aviso-fundo);
+  color: var(--aviso-texto);
+}
+
+#cadastro-processo {
+  border-radius: 16px;
+  margin-bottom: 1.5rem;
+}
+
+#cadastro-processo h2 {
+  margin-top: 0;
+}
+
+.novo-botao {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}

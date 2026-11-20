@@ -1,0 +1,60 @@
+/* Dossiê (D7): src/routes/processos/[id]/dossie/+page.svelte. */
+.ficha {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0;
+}
+dt {
+  font-weight: 600;
+}
+dd {
+  margin: 0;
+}
+.linha-tempo {
+  border-left: 3px solid var(--borda);
+  padding-left: 1.25rem;
+}
+.linha-tempo li {
+  margin-bottom: 0.75rem;
+}
+.linha-tempo q {
+  display: block;
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+}
+.selo {
+  display: inline-block;
+  padding: 0 0.4rem;
+  margin: 0 0.25rem 0.25rem 0;
+  border: 1px solid var(--borda);
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+.selo.alerta {
+  background: var(--aviso-fundo);
+  color: var(--aviso-texto);
+}
+.gerado {
+  margin-top: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border-left: 4px dashed var(--foco);
+  background: var(--aviso-fundo);
+  color: var(--aviso-texto);
+  font-size: 0.9rem;
+}
+.rotulo-gerado {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  border: 1px solid currentColor;
+  border-radius: var(--raio);
+  padding: 0 0.3rem;
+  margin-right: 0.35rem;
+}
+
+.reclassificar {
+  margin-top: 0.35rem;
+  max-width: 20rem;
+}

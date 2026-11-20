@@ -773,9 +773,32 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
   - Pelo proxy (assessor sintético novo): `/auditoria`, `/usuarios` e `/auditoria/exportar`
     respondem 403 com "Acesso negado", sem estilo nem script inline. O fluxo do desembargador
     pelo proxy não foi conferido (sem credencial de desembargador de teste).
-- [ ] **T10.13** CSS e tema reproduzindo o layout atual. RF-INT-02. Fase 9; D7, D8.
+- [x] **T10.13** CSS e tema reproduzindo o layout atual. RF-INT-02. Fase 9; D7, D8.
   - Revisão manual: componente de apresentação; conferência visual tela a tela contra o SvelteKit, nos dois temas.
   - Verde: `static/css/`, `static/js/tema.js`.
+  - `base.css` (tokens claro/escuro de `src/app.css`, elementos, `a.botao` com o visual dos
+    botões e a moldura do `+layout.svelte`), `componentes.css` (aviso, cabeçalho, seletor de
+    tema, menu, confirmação, senha temporária, envio e complemento) e uma folha por tela:
+    `login.css` (`login.css` do SvelteKit e QR), `processos.css`, `processo.css` (processo e
+    arquivo, com `CabecalhoProcesso`, `DadosCapa` e `Responsaveis`), `dossie.css`,
+    `validacoes.css`, `auditoria.css`, `usuarios.css`; `chat.css` ganhou a tela e
+    `MensagemChat`, `visualizador.css` os valores do `Visualizador.svelte`. Seletores que o Svelte
+    escopava pelo componente levam a classe raiz (`.menu a`, `.mensagem .ia`, `.verificacao.ok`);
+    o seletor de tema usa `.seletor-tema` (`.seletor` já é do visualizador). Fontes do sistema,
+    como no SvelteKit; logos e favicon já locais.
+  - `tema.js` (sem `defer`, no `<head>`, antes das folhas): lê `lupa.tema` do `localStorage`
+    (padrão escuro, `data-tema="escuro"` no `<html>` como o `app.html`), aplica antes da pintura e
+    liga os `select[data-seletor-tema]` de `componentes/seletor_tema.html`, no cabeçalho e no
+    rodapé das páginas avulsas, como o SvelteKit. Sem JavaScript o tema fica no padrão.
+  - Teste extra: `tests/unit/test_estaticos.py` (template sem `style`, `<style>`, script inline
+    ou atributo de evento; cada `{% static %}` existe).
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/unit/test_estaticos.py --no-cov -q`: `76 passed`; suíte de `lupa_web` com
+    `LUPA_EXIGIR_INTEGRACAO=1` `307 passed`, cobertura 100% (o envio real só no
+    `verificar.sh`, que cria o assessor); ruff, format e mypy `--strict` limpos.
+  - Conferência visual pendente do usuário: o painel do navegador recusou o certificado
+    autoassinado de `https://localhost:8443`; a comparação foi por leitura, classe a classe e
+    variável a variável, contra os `<style>` dos `.svelte`, `app.css` e `login.css`.
 - [ ] **T10.14** Paridade de telas fechada. RF-INT-02. Fases 4 a 8.
   - Vermelho: `intranet/web/tests/telas/test_paridade.py::test_cada_tela_responde_ao_papel_permitido` com as onze telas e todas as ações.
   - Verde: o que faltar das tarefas anteriores.

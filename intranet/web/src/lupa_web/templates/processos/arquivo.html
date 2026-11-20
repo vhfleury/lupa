@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% load static %}
+{% block cabeca %}<link rel="stylesheet" href="{% static 'css/processo.css' %}">{% endblock %}
 {% block titulo %}Arquivo · Lupa{% endblock %}
 {% block conteudo %}
 <p><a href="/processos/{{ processo_id }}">← Processo</a></p>

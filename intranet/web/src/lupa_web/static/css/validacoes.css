@@ -1,0 +1,94 @@
+/* Validações (D7): src/routes/processos/[id]/validacoes/+page.svelte. */
+.achado {
+  margin-bottom: 1rem;
+}
+.achado header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.achado h2 {
+  margin: 0;
+}
+h3 {
+  font-size: 1rem;
+  margin: 1rem 0 0.5rem;
+}
+.resultado {
+  font-weight: 700;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+.resultado.conforme {
+  color: var(--sucesso);
+  background: var(--sucesso-fundo);
+}
+.resultado.atencao {
+  color: var(--perigo);
+  background: var(--perigo-fundo);
+}
+.resultado.verificar {
+  color: var(--aviso-texto);
+  background: var(--aviso-fundo);
+}
+.valores {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0;
+}
+dt {
+  font-weight: 600;
+}
+dd {
+  margin: 0;
+}
+.itens-valor {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.itens-valor li + li {
+  margin-top: 0.5rem;
+}
+.fatos li {
+  margin-bottom: 0.6rem;
+}
+.fatos a,
+.fatos button {
+  margin-left: 0.4rem;
+}
+.selo {
+  display: inline-block;
+  padding: 0 0.4rem;
+  margin-left: 0.4rem;
+  border: 1px solid var(--borda);
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+.selo.antigo {
+  color: var(--texto-suave);
+}
+.correcao,
+.nota {
+  margin-top: 0.5rem;
+  max-width: 30rem;
+}
+textarea {
+  font: inherit;
+  width: 100%;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 0.4rem;
+}
+.notas {
+  font-size: 0.9rem;
+  color: var(--texto-suave);
+}
+
+.fatos form.confirmar {
+  display: inline;
+}

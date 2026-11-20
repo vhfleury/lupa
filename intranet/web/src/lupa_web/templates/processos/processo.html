@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% load static %}
+{% block cabeca %}<link rel="stylesheet" href="{% static 'css/processo.css' %}">{% endblock %}
 {% block titulo %}{{ processo.numero_cnj }} · Lupa{% endblock %}
 {% block conteudo %}
 <p><a href="/processos">← Processos</a></p>
-<header>
+<header class="cabecalho-processo">
   <h1 class="mono">{{ processo.numero_cnj }}</h1>
   <div class="classe">
     <span>{{ classe_rotulo }}</span>

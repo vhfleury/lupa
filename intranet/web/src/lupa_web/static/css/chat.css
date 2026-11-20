@@ -7,3 +7,118 @@
 .htmx-request.htmx-indicator {
   display: block;
 }
+
+/* Tela do chat e MensagemChat.svelte (D7). */
+.contexto {
+  color: var(--texto-suave);
+  margin-top: 0;
+}
+
+.revisao {
+  border: 2px solid var(--perigo);
+  background: var(--perigo-fundo);
+  color: var(--perigo);
+  border-radius: var(--raio);
+  padding: 0.75rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.revisao .botao {
+  margin-left: 0.5rem;
+}
+
+.contador {
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+}
+
+.pergunta textarea {
+  width: 100%;
+  font: inherit;
+  padding: 0.5rem;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--superficie);
+  color: var(--texto);
+}
+
+.pergunta .acoes {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.restante {
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+}
+
+.anterior {
+  margin-bottom: 0.75rem;
+}
+
+.anterior summary {
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+
+.mensagem {
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 0.75rem 1rem;
+  margin: 0 0 0.75rem;
+  background: var(--superficie);
+}
+
+.mensagem.usuario {
+  border-left: 4px solid var(--primaria);
+}
+
+.mensagem.agente {
+  border-left: 4px solid var(--texto-suave);
+}
+
+.mensagem.sem_evidencia,
+.mensagem.descartada,
+.mensagem.teto {
+  border-left-color: var(--perigo);
+}
+
+.mensagem.recusa {
+  border-left-color: var(--foco);
+}
+
+.mensagem .ia {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--aviso-texto);
+  background: var(--aviso-fundo);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--raio);
+  display: inline-block;
+}
+
+.mensagem .desfecho {
+  margin: 0 0 0.4rem;
+  font-weight: 700;
+  color: var(--perigo);
+}
+
+.mensagem .texto {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.mensagem .citacoes {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.mensagem .descartes,
+.mensagem .aviso-msg {
+  margin: 0.4rem 0 0;
+  font-size: 0.9rem;
+  color: var(--texto-suave);
+}

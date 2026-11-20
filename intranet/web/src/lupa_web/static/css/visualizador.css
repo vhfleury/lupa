@@ -1,17 +1,50 @@
 /* Visualizador (RF-DOS-05): destaque em SVG sobre a imagem da pagina; zoom por classe. */
+.seletor {
+  max-width: 24rem;
+}
+
+.evidencia {
+  margin-bottom: 1rem;
+}
+
+.evidencia q {
+  font-style: italic;
+}
+
+.barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.separador {
+  flex: 1;
+}
+
 .moldura {
+  position: relative;
   overflow: auto;
+  max-height: 80vh;
+  border: 1px solid var(--borda);
+  background: #8a8f98;
+  padding: 1rem;
 }
 
 .folha {
   position: relative;
   margin: 0 auto;
+  min-width: 10rem;
+  box-shadow: 0 1px 6px rgb(0 0 0 / 35%);
 }
 
 .folha img {
   display: block;
   width: 100%;
   height: auto;
+  background: #fff;
+  user-select: none;
 }
 
 .folha .destaques {
@@ -24,7 +57,7 @@
 
 .folha .destaque {
   fill: rgb(255 214 0 / 35%);
-  stroke: rgb(200 120 0 / 90%);
+  stroke: #c77c00;
   stroke-width: 0.002;
 }
 

@@ -1,0 +1,45 @@
+/* Auditoria (D7): src/routes/auditoria/+page.svelte. */
+.filtros,
+.relatorio {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+.botoes {
+  display: flex;
+  gap: 0.5rem;
+}
+.barra {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+.exportar a {
+  margin-left: 0.5rem;
+}
+.verificacao {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--raio);
+  font-weight: 600;
+}
+.verificacao.ok {
+  background: var(--sucesso-fundo);
+  color: var(--sucesso);
+}
+.verificacao.quebrada {
+  background: var(--perigo-fundo);
+  color: var(--perigo);
+}
+.custo {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--aviso-fundo);
+  color: var(--aviso-texto);
+  border-radius: var(--raio);
+}

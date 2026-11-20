@@ -1,0 +1,103 @@
+/* Processo e arquivo (D7): src/routes/processos/[id]/+page.svelte, CabecalhoProcesso.svelte,
+   DadosCapa.svelte e Responsaveis.svelte. */
+.atalhos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.motivo {
+  margin: 0.25rem 0 0;
+  color: var(--perigo);
+  font-size: 0.9rem;
+}
+
+.cabecalho-processo {
+  margin-bottom: 1rem;
+}
+
+.cabecalho-processo .classe {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.cabecalho-processo form {
+  margin: 1rem 0;
+  max-width: 30rem;
+}
+
+.cabecalho-processo dl,
+.cartao dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.4rem 1rem;
+}
+
+.cabecalho-processo dt,
+.cartao dt {
+  font-weight: 600;
+}
+
+.cabecalho-processo dd,
+.cartao dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.corrigir-classe summary {
+  cursor: pointer;
+}
+
+.cartao {
+  margin-bottom: 1.5rem;
+}
+
+.responsaveis {
+  margin: 1.5rem 0;
+  border-radius: 16px;
+}
+
+.responsaveis h2 {
+  margin-top: 0;
+}
+
+.responsaveis .atuais {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.responsaveis .atuais li {
+  border: 1px solid var(--borda);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+}
+
+.responsaveis fieldset {
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  margin: 1rem 0;
+  padding: 1rem;
+}
+
+.responsaveis .opcao {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.4rem 0;
+  font-weight: 400;
+}
+
+.responsaveis .opcao input {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.cartao h2 {
+  margin-top: 0;
+}

@@ -1,0 +1,165 @@
+/* Componentes (D7): estilos dos componentes Svelte de src/lib, com o escopo da classe raiz. */
+.aviso {
+  border-radius: var(--raio);
+  padding: 0.6rem 0.8rem;
+  margin: 0 0 1rem;
+  border: 1px solid transparent;
+}
+
+.aviso.erro {
+  background: var(--perigo-fundo);
+  color: var(--perigo);
+  border-color: var(--perigo);
+}
+
+.aviso.sucesso {
+  background: var(--sucesso-fundo);
+  color: var(--sucesso);
+  border-color: var(--sucesso);
+}
+
+.aviso.info {
+  background: var(--aviso-fundo);
+  color: var(--aviso-texto);
+}
+
+.cabecalho {
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1.25rem;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borda);
+}
+
+.cabecalho .marca {
+  font-weight: 700;
+  font-size: 1.2rem;
+  text-decoration: none;
+}
+
+.cabecalho .usuario {
+  flex-wrap: wrap;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.cabecalho .papel {
+  color: var(--texto-suave);
+  border: 1px solid var(--borda);
+  border-radius: 999px;
+  padding: 0 0.6rem;
+  font-size: 0.9rem;
+}
+
+.seletor-tema {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.seletor-tema label {
+  margin: 0;
+  font-weight: 400;
+  font-size: 0.9rem;
+}
+
+.seletor-tema select {
+  width: auto;
+}
+
+.menu {
+  background: var(--superficie);
+  border-right: 1px solid var(--borda);
+  min-width: 12rem;
+  padding: 1rem 0;
+}
+
+.menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.menu a {
+  display: block;
+  padding: 0.5rem 1.25rem;
+  text-decoration: none;
+  color: var(--texto);
+}
+
+.menu a[aria-current='page'] {
+  font-weight: 700;
+  color: var(--primaria);
+  border-left: 4px solid var(--primaria);
+  padding-left: calc(1.25rem - 4px);
+}
+
+.confirmacao {
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--superficie);
+  color: var(--texto);
+  max-width: 28rem;
+  padding: 1.25rem;
+}
+
+.confirmacao h2 {
+  margin-top: 0;
+}
+
+.confirmacao .acoes {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cartao.destaque {
+  border-color: var(--primaria);
+  border-width: 2px;
+  margin-bottom: 1.5rem;
+}
+
+.cartao.destaque .senha {
+  font-size: 1.25rem;
+  padding: 0.5rem;
+  background: var(--fundo);
+  border-radius: var(--raio);
+}
+
+.form-envio .campo {
+  max-width: 36rem;
+}
+
+.progresso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.progresso[hidden] {
+  display: none;
+}
+
+.progresso label {
+  margin: 0;
+}
+
+.progresso progress {
+  flex: 1;
+  min-width: 12rem;
+  height: 1.1rem;
+}
+
+.complemento {
+  margin-top: 1rem;
+}
+
+.complemento .campo {
+  max-width: 36rem;
+}
