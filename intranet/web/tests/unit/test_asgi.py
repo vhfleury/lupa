@@ -1,9 +1,21 @@
 """Testes de `lupa_web.asgi`: ciclo de vida do ASGI e repasse ao Django (D1)."""
 
 import asyncio
+import tempfile
+from pathlib import Path
 from typing import Any
 
+import pytest
+
 from lupa_web import asgi
+
+
+@pytest.fixture(autouse=True)
+def pendentes_isolados(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Volume dos pendentes numa pasta do teste e o `tempfile` restaurado depois."""
+    monkeypatch.setenv("LUPA_WEB_ENVIOS_PENDENTES", str(tmp_path))
+    monkeypatch.setattr(tempfile, "tempdir", None)
+    return tmp_path
 
 
 def _rodar(scope: dict[str, Any], entradas: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -32,6 +44,15 @@ def test_ciclo_de_vida_confirma_partida_e_encerramento() -> None:
         "lifespan.startup.complete",
         "lifespan.shutdown.complete",
     ]
+
+
+def test_partida_poe_os_temporarios_no_volume_dos_pendentes(pendentes_isolados: Path) -> None:
+    """RF-INT-04 (D16): o corpo grande que o Django grava em temporário vai ao volume."""
+    _rodar({"type": "lifespan"}, [{"type": "lifespan.startup"}, {"type": "lifespan.shutdown"}])
+    destino = pendentes_isolados / "temporarios"
+    assert tempfile.gettempdir() == str(destino)
+    assert destino.is_dir()
+    assert destino.stat().st_mode & 0o777 == 0o700
 
 
 def test_pedido_http_chega_ao_django() -> None:

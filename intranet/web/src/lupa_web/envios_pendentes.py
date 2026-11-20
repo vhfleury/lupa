@@ -2,7 +2,8 @@
 
 A API não guarda o arquivo quando faltam dados da identificação. O front o guarda no volume
 `envios-pendentes` sob um código aleatório de 32 bytes, com o SHA-256 do cookie de sessão de quem
-enviou; só essa sessão o recupera, por até 2 horas.
+enviou; só essa sessão o recupera, por até 2 horas. O corpo dos pedidos grandes, que o Django
+grava em temporário sob ASGI, também fica no volume, na subpasta `temporarios`.
 """
 
 import hashlib
@@ -11,6 +12,7 @@ import os
 import re
 import secrets
 import shutil
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -22,6 +24,8 @@ BYTES_DO_CODIGO = 32
 FORMATO_DO_CODIGO = re.compile(r"[0-9a-f]{64}")
 SUFIXO_DADOS = ".json"
 SUFIXO_ARQUIVO = ".arquivo"
+PASTA_TEMPORARIOS = "temporarios"
+PERMISSAO_TEMPORARIOS = 0o700
 
 
 @dataclass(frozen=True)
@@ -40,6 +44,19 @@ def pasta() -> Path:
         Caminho do volume `envios-pendentes`.
     """
     return Path(os.environ.get("LUPA_WEB_ENVIOS_PENDENTES", PASTA_PADRAO))
+
+
+def preparar_temporarios() -> Path:
+    """Cria `temporarios` no volume e a torna o diretório padrão do `tempfile` no processo.
+
+    Returns:
+        Caminho da subpasta.
+    """
+    destino = pasta() / PASTA_TEMPORARIOS
+    destino.mkdir(mode=PERMISSAO_TEMPORARIOS, exist_ok=True)
+    destino.chmod(PERMISSAO_TEMPORARIOS)
+    tempfile.tempdir = str(destino)
+    return destino
 
 
 def _hash_da_sessao(cookie: str) -> str:

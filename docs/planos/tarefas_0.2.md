@@ -663,6 +663,13 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
   - `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh`: pipeline `702 passed` (95,25%), api
     `265 passed, 3 deselected` (98,23%), ponta a ponta `6 passed`, injeção `2 passed`, web
     `109 passed` (100%), cabeçalhos ok em 4 rotas, agente `11 passed`; E2E não rodou.
+  - Ajuste (consequência de D16): sob ASGI o Django grava o corpo de pedido grande em temporário
+    no diretório padrão (`/tmp`, tmpfs). Na partida do ASGI, `envios_pendentes.preparar_temporarios`
+    cria `temporarios/` (modo 700) no volume e a torna o `tempfile.tempdir` do processo.
+    Vermelho: `intranet/web/tests/unit/test_asgi.py::test_partida_poe_os_temporarios_no_volume_dos_pendentes`
+    (`1 failed, 2 passed`). Verde: `3 passed`; suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1`
+    `110 passed`, cobertura 100%. No contêiner: `/var/lupa/envios-pendentes/temporarios` com dono
+    `lupa` e modo `drwx------`.
 - [x] **T10.9** Processo: arquivos com diagnóstico e alertas, responsáveis, correção de classe e descarte. RF-INT-02. Fase 5.
   - Vermelho: casos `processo` de `intranet/web/tests/telas/test_paridade.py::test_cada_tela_responde_ao_papel_permitido`.
   - Verde: `telas/processo.py`, `templates/processos/processo.html`.
