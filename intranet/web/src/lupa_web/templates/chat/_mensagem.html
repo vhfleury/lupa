@@ -3,7 +3,7 @@
   <p class="texto">{{ mensagem.texto }}</p>
 </article>
 {% elif mensagem.bloco == "aviso" %}
-<div class="aviso info mensagem-aviso" role="status" data-testid="mensagem" data-status="{{ mensagem.status }}">{{ mensagem.texto }}</div>
+{% include "componentes/aviso.html" with tipo="info" mensagem=mensagem.texto testid="mensagem" status=mensagem.status %}
 {% else %}
 <article class="mensagem agente {{ mensagem.status }}" data-testid="mensagem" data-status="{{ mensagem.status }}" aria-label="Resposta do assistente">
   <p class="ia" data-testid="aviso-ia">{{ aviso_ia }}</p>
@@ -17,6 +17,6 @@
   </ol>
   {% endif %}
   {% if mensagem.descartes %}<p class="descartes" data-testid="descartes">{{ mensagem.descartes }} (não conferiram com o texto da página).</p>{% endif %}
-  {% for aviso in mensagem.avisos_da_tela %}<p class="aviso-msg">{{ aviso }}</p>{% endfor %}
+  {% for aviso in mensagem.avisos_da_tela %}<p class="observacao-msg">{{ aviso }}</p>{% endfor %}
 </article>
 {% endif %}

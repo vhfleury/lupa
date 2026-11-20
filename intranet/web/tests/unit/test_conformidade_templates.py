@@ -15,7 +15,6 @@ COR_OU_FONTE_LITERAL = re.compile(
 )
 MARCACAO_PROPRIA = re.compile(r"<button|<table|<progress|class=\"aviso", re.I)
 PENDENTES = {
-    "chat": ("chat/", "chat.css"),
     "gestao": ("auditoria/", "usuarios/", "auditoria.css", "usuarios.css"),
 }
 

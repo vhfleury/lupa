@@ -1004,10 +1004,17 @@ Execução do [plano do padrão visual](plano_padrao_visual.md). Um único PR da
     intranet/web/tests/unit/test_conformidade_templates.py intranet/web/tests/telas/test_validacoes.py`.
     Vermelho: 4 failed (CSS, templates e os dois do selo). Verde: unit e telas 426 passed,
     cobertura 100%; ruff e mypy limpos.
-- [ ] **T11.8** Chat no padrão. RF-VIS-04. Fase 5; P3.
+- [x] **T11.8** Chat no padrão. RF-VIS-04. Fase 5; P3.
   - Vermelho: grupo "chat" sai da lista de pendentes e o teste de conformidade falha.
   - Verde: templates de `chat/` e `chat.css`; rótulo de IA e citações (RF-INT-05) intactos nos testes existentes.
   - Limpeza: nenhuma.
+  - Entregue: o aviso de mensagem do chat passa pelo `aviso.html` (novos parâmetros `testid` e
+    `status`, que mantêm `data-testid="mensagem"` e `data-status`); "Perguntar" pelo `botao.html`
+    com `desabilitado`; a classe `aviso-msg` (nota discreta, não um aviso) virou `observacao-msg`;
+    peso 700 de `chat.css` virou 600. Rótulo de IA e citações sem mudança. Testes: `docker compose
+    exec -T front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/unit/test_conformidade_templates.py`. Vermelho: 1 failed (templates de
+    `chat/`; o CSS já não tinha cor literal). Verde: unit e telas 426 passed, cobertura 100%.
 - [ ] **T11.9** Auditoria e usuários no padrão; lista de pendentes eliminada. RF-VIS-01, RF-VIS-04. Fase 6; P1, P3, D5.
   - Vermelho: grupo "gestão" sai da lista de pendentes e o teste de conformidade falha.
   - Verde: templates de `auditoria/` e `usuarios/`, `auditoria.css`, `usuarios.css`; a lista de pendentes sai do teste.
