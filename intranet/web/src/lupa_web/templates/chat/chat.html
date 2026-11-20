@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load static %}
+{% block titulo %}Chat do processo · Lupa{% endblock %}
+{% block cabeca %}<link rel="stylesheet" href="{% static 'css/chat.css' %}">{% endblock %}
+{% block conteudo %}
+<p><a href="/processos/{{ processo_id }}">← Processo</a></p>
+<h1>Chat sobre os autos</h1>
+<p class="contexto">Consulte os autos deste processo e confira cada resposta na página citada.</p>
+{% if erro %}{% include "componentes/aviso.html" with tipo="erro" mensagem=erro %}{% endif %}
+{% if aviso %}{% include "componentes/aviso.html" with tipo="sucesso" mensagem=aviso %}{% endif %}
+
+{% if em_revisao %}
+<div class="revisao" role="alert" data-testid="processo-em-revisao">
+  <strong>Processo em revisão.</strong>
+  Uma resposta do assistente foi bloqueada porque {{ motivo_revisao }}. O chat e os resumos gerados ficam suspensos até um desembargador liberar.
+  {% if pode_liberar %}<a class="botao" href="/processos/{{ processo_id }}/chat/liberar">Liberar revisão</a>{% endif %}
+</div>
+{% endif %}
+
+<section aria-labelledby="titulo-atual">
+  <h2 id="titulo-atual">Conversa atual</h2>
+  {% if atual %}
+  <p id="descartes-conversa" class="contador" data-testid="descartes-conversa">{{ atual.descartes }}</p>
+  {% elif encerramento == "teto_processo" %}
+  <p role="status">Limite de uso do processo atingido.</p>
+  {% elif encerramento %}
+  <p role="status">Limite de uso da conversa atingido.</p>
+  {% else %}
+  <p>Nenhuma conversa aberta. A próxima pergunta abre uma conversa nova.</p>
+  {% endif %}
+  <div id="conversa-atual" aria-live="polite" data-testid="conversa-atual">
+    {% for mensagem in atual.mensagens %}{% include "chat/_mensagem.html" %}{% endfor %}
+  </div>
+  {% include "chat/_formulario.html" %}
+</section>
+
+<section aria-labelledby="titulo-historico">
+  <h2 id="titulo-historico">Conversas anteriores</h2>
+  {% for conversa in anteriores %}
+  <details class="anterior" data-testid="conversa-anterior">
+    <summary>Conversa de {{ conversa.quando }} — {{ conversa.total }}{% if conversa.motivo %} (encerrada: {{ conversa.motivo }}){% endif %}</summary>
+    {% for mensagem in conversa.mensagens %}{% include "chat/_mensagem.html" %}{% endfor %}
+  </details>
+  {% empty %}
+  <p>Nenhuma conversa anterior neste processo.</p>
+  {% endfor %}
+</section>
+{% endblock %}

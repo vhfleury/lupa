@@ -721,10 +721,34 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
   - Pelo proxy (httpx no contêiner `front`, assessor sintético novo, PDF sintético): processo,
     dossiê, validações e visualizador 200 sem estilo nem script inline; imagem 200 `image/png`,
     `private, max-age=3600`; página inexistente 404.
-- [ ] **T10.11** Chat com HTMX, histórico, teto, revisão e liberação. RF-INT-02, RF-INT-05. Fase 7; A5, D13.
+- [x] **T10.11** Chat com HTMX, histórico, teto, revisão e liberação. RF-INT-02, RF-INT-05. Fase 7; A5, D13.
   - Vermelho: `intranet/web/tests/telas/test_chat.py::test_resposta_conferida_aparece_em_bloco_rotulado_com_link_da_pagina`, `::test_resposta_sem_citacao_conferida_mostra_sem_evidencia`, `::test_aviso_de_teto_aparece_sem_bloco_de_ia`; caso `chat` de `test_paridade.py`.
   - Verde: `telas/chat.py`, `templates/chat/`, fragmentos.
   - Limpeza: nenhuma.
+  - `/processos/<id>/chat`: GET lê `GET /chat` e `/revisao`; conversa atual (a última aberta),
+    contador de descartes, encerramento por teto e conversas anteriores em `<details>`. A
+    pergunta é um formulário `hx-post` com `hx-target="#conversa-atual"`, `hx-swap="beforeend"`,
+    `hx-indicator` ("Aguardando resposta…", escondido por `static/css/chat.css` fora do pedido) e
+    `hx-disabled-elt`; prazo longo (D13). O fragmento `chat/_resposta.html` traz a pergunta, a
+    resposta e, por `hx-swap-oob`, o formulário limpo (travado com conversa encerrada ou processo
+    em revisão) e o contador. Resposta do agente em bloco com "Conteúdo gerado por IA",
+    desfecho ("Sem evidência: resposta não conferida nos autos.", recusa, descartada), citações
+    com link `/visualizador?arquivo=…&pagina=…` e avisos; teto e recusa por revisão aparecem como
+    aviso, sem bloco de IA. Recusa da API e prazo esgotado viram aviso no fragmento, com 200. POST
+    sem HTMX faz a pergunta e volta à tela. Revisão: aviso com o motivo; o papel com
+    `ver_auditoria` vê "Liberar revisão" (`/chat/liberar`: GET confirmação, POST
+    `/liberar-revisao` e `?aviso=liberado`). Sem o contador de caracteres restantes do SvelteKit
+    (exigiria JavaScript; o campo tem `maxlength`). O texto da pergunta não entra em log
+    (`test_pergunta_vai_a_api_com_prazo_longo_e_nao_entra_no_log`).
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas/test_paridade.py intranet/web/tests/telas/test_chat.py --no-cov -q`.
+    Vermelho: `4 failed, 14 passed` em `test_paridade.py` e `ImportError: cannot import name
+    'chat'` em `test_chat.py`. Verde: suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1`
+    `193 passed`, cobertura 100%; ruff, format e mypy `--strict` limpos.
+  - Pelo proxy (assessor sintético novo): tela do chat 200 sem estilo nem script inline, com
+    `hx-swap="beforeend"` e o indicador; POST HTMX com CSRF devolve o fragmento com
+    `hx-swap-oob`; sem CSRF, 403. Nenhuma pergunta foi enviada ao modelo pelo proxy (o `api` do
+    desenvolvimento usa o cliente `sdk`, real).
 - [ ] **T10.12** Auditoria (lista, exportação, verificação, relatório de uso) e gestão de assessores. RF-INT-02, RF-INT-03. Fase 8.
   - Vermelho: `intranet/web/tests/telas/test_paridade.py::test_assessor_recebe_acesso_negado_em_auditoria_e_usuarios`; casos `auditoria` e `usuarios` de `test_paridade.py`.
   - Verde: `telas/auditoria.py`, `telas/usuarios.py` e templates.

@@ -1,0 +1,9 @@
+/* Chat (A5): o indicador "aguardando resposta" so aparece durante o pedido do HTMX (D8). */
+.htmx-indicator {
+  display: none;
+}
+
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  display: block;
+}

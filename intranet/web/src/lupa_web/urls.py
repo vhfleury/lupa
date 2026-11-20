@@ -3,7 +3,16 @@
 from django.http import HttpRequest, HttpResponse
 from django.urls import path
 
-from lupa_web.telas import acesso, dossie, envio, processo, processos, validacoes, visualizador
+from lupa_web.telas import (
+    acesso,
+    chat,
+    dossie,
+    envio,
+    processo,
+    processos,
+    validacoes,
+    visualizador,
+)
 
 
 async def saude(request: HttpRequest) -> HttpResponse:
@@ -52,6 +61,8 @@ urlpatterns = [
         name="corrigir_fato",
     ),
     path("processos/<str:processo_id>/anotacoes", validacoes.anotar, name="anotar"),
+    path("processos/<str:processo_id>/chat", chat.chat, name="chat"),
+    path("processos/<str:processo_id>/chat/liberar", chat.liberar, name="liberar_revisao"),
     path(
         "processos/<str:processo_id>/visualizador", visualizador.visualizador, name="visualizador"
     ),

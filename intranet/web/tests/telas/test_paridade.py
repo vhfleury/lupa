@@ -229,6 +229,60 @@ ARQUIVOS_LEGIVEIS = ARQUIVOS | {
         | {"estado": "concluido", "motivo_quarentena": None, "total_paginas": 3}
     ],
 }
+MENSAGEM_USUARIO = {
+    "mensagem_id": "71" * 32,
+    "papel": "usuario",
+    "status": "pergunta",
+    "texto": "Onde está a certidão?",
+    "citacoes": [],
+    "avisos": [],
+    "citacoes_descartadas": 0,
+    "rotulo": None,
+    "criado_em": "2026-03-05T12:00:00+00:00",
+}
+MENSAGEM_AGENTE = {
+    "mensagem_id": "72" * 32,
+    "papel": "agente",
+    "status": "respondida",
+    "texto": "A certidão está na página 2.",
+    "citacoes": [
+        {
+            "pagina_id": PAGINA,
+            "trecho": "certidão sintética de intimação",
+            "hash_trecho": "73" * 32,
+            "pagina_numero": 2,
+            "arquivo_id": ARQUIVO,
+        }
+    ],
+    "avisos": ["1 citação(ões) não conferiram com o texto da página", "Aviso sintético."],
+    "citacoes_descartadas": 1,
+    "rotulo": "gerado por IA",
+    "criado_em": "2026-03-05T12:00:05+00:00",
+}
+CONVERSA = {
+    "conversa_id": "74" * 32,
+    "criada_em": "2026-03-05T12:00:00+00:00",
+    "encerrada": False,
+    "motivo_encerramento": None,
+    "citacoes_descartadas": 1,
+    "mensagens": [MENSAGEM_USUARIO, MENSAGEM_AGENTE],
+}
+CONVERSA_ANTIGA = {
+    "conversa_id": "75" * 32,
+    "criada_em": "2026-03-01T09:00:00+00:00",
+    "encerrada": True,
+    "motivo_encerramento": "teto_conversa",
+    "citacoes_descartadas": 0,
+    "mensagens": [MENSAGEM_USUARIO | {"texto": "Pergunta anterior sintética"}],
+}
+CHAT = {"processo_id": PROCESSO, "conversas": [CONVERSA_ANTIGA, CONVERSA]}
+REVISAO = {
+    "processo_id": PROCESSO,
+    "status": "criado",
+    "em_revisao": False,
+    "motivo": None,
+    "aberta_em": None,
+}
 ASSESSORA = {"id": ASSESSOR, "nome_usuario": "assessora.sintetica", "ativo": True}
 OUTRA = {"id": OUTRO_ASSESSOR, "nome_usuario": "outra.sintetica", "ativo": True}
 
@@ -257,6 +311,11 @@ def _simular_analise(api: respx.MockRouter) -> None:
     api.get(f"{BASE}/fatos/historico").respond(200, json=HISTORICO_FATOS)
     api.get(f"{BASE}/anotacoes").respond(200, json=ANOTACOES)
     api.get(f"{BASE}/evidencias/{EVIDENCIA}/bbox").respond(200, json=BBOX)
+
+
+def _simular_chat(api: respx.MockRouter) -> None:
+    api.get(f"{BASE}/chat").respond(200, json=CHAT)
+    api.get(f"{BASE}/revisao").respond(200, json=REVISAO)
 
 
 def _simular_arquivo(api: respx.MockRouter, papel: str) -> None:
@@ -520,6 +579,56 @@ CASOS = [
             f'href="{BASE}/visualizador?arquivo={ARQUIVO}&amp;pagina=3&amp;zoom=100"',
         ),
     ),
+    Caso(
+        "chat",
+        "assessor",
+        "GET",
+        f"{BASE}/chat",
+        200,
+        trechos=(
+            "Chat sobre os autos",
+            "Conversa atual",
+            "Conteúdo gerado por IA",
+            "A certidão está na página 2.",
+            f'href="{BASE}/visualizador?arquivo={ARQUIVO}&amp;pagina=2"',
+            "1 citação descartada nesta resposta",
+            "Aviso sintético.",
+            'hx-post="',
+            'hx-swap="beforeend"',
+            "Aguardando resposta",
+            "Conversas anteriores",
+        ),
+        ausentes=("Liberar revisão", "citação(ões) não conferiram"),
+    ),
+    Caso(
+        "chat_pergunta",
+        "assessor",
+        "POST",
+        f"{BASE}/chat",
+        303,
+        dados={"pergunta": "Pergunta sintética"},
+        rota_api=f"{BASE}/chat",
+        corpo_api={"pergunta": "Pergunta sintética"},
+        destino=f"{BASE}/chat",
+    ),
+    Caso(
+        "chat_liberar",
+        "desembargador",
+        "GET",
+        f"{BASE}/chat/liberar",
+        200,
+        trechos=("Liberar a revisão?", f'action="{BASE}/chat/liberar"', "Cancelar"),
+    ),
+    Caso(
+        "chat_liberar",
+        "desembargador",
+        "POST",
+        f"{BASE}/chat/liberar",
+        303,
+        rota_api=f"{BASE}/liberar-revisao",
+        corpo_api={},
+        destino=f"{BASE}/chat?aviso=liberado",
+    ),
 ]
 
 
@@ -532,6 +641,7 @@ def test_cada_tela_responde_ao_papel_permitido(
     _simular_processo(api_simulada, caso.papel)
     _simular_arquivo(api_simulada, caso.papel)
     _simular_analise(api_simulada)
+    _simular_chat(api_simulada)
     if caso.tela == "visualizador":
         api_simulada.get(f"{BASE}/arquivos").respond(200, json=ARQUIVOS_LEGIVEIS)
     rota = api_simulada.post(caso.rota_api).respond(200, json={}) if caso.rota_api else None
