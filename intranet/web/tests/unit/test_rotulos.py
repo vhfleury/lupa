@@ -47,6 +47,13 @@ def test_motivos_de_quarentena_e_falha_tem_frase_para_o_usuario() -> None:
     assert rotulos.motivo_falha(None) == "Falha no processamento."
 
 
+def test_texto_do_valor_usa_rotulos_e_abrevia_identificadores() -> None:
+    """RF-INT-02: como o `textoDoValor` do SvelteKit, código vira rótulo e hash vira prefixo."""
+    assert rotulos.texto_do_valor("apelacao_civel") == "Apelação cível"
+    assert rotulos.texto_do_valor("peticao_inicial") == "Petição inicial"
+    assert rotulos.texto_do_valor("ab" * 32) == "abababab…"
+
+
 def test_texto_do_valor_para_cada_tipo_do_json() -> None:
     """RF-ING-06: valores do relatório e do diagnóstico aparecem em texto legível."""
     assert rotulos.texto_do_valor(None) == "—"

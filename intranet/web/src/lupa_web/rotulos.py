@@ -223,6 +223,19 @@ def motivo_falha(motivo: str | None) -> str:
     return MOTIVO_FALHA.get(motivo, f"Falha no processamento ({legivel(motivo)}).")
 
 
+IDENTIFICADOR = re.compile(r"[0-9a-f]{64}")
+DATA_ISO = re.compile(r"\d{4}-\d{2}-\d{2}")
+PREFIXO_DO_IDENTIFICADOR = 8
+
+
+def _texto_de_codigo(valor: str) -> str:
+    if DATA_ISO.fullmatch(valor):
+        return formatar_data(valor)
+    if IDENTIFICADOR.fullmatch(valor):
+        return valor[:PREFIXO_DO_IDENTIFICADOR] + "…"
+    return ROTULOS.get(valor) or CLASSES.get(valor) or valor
+
+
 def texto_do_valor(valor: object) -> str:
     """Texto de um valor do JSON da API para leitura humana.
 
@@ -230,14 +243,15 @@ def texto_do_valor(valor: object) -> str:
         valor: Valor qualquer do JSON.
 
     Returns:
-        "Sim"/"Não", datas formatadas, listas separadas por " · " e objetos como "Chave: valor".
+        "Sim"/"Não", datas formatadas, códigos com rótulo, identificadores abreviados, listas
+        separadas por " · " e objetos como "Chave: valor".
     """
     if valor is None:
         return SEM_VALOR
     if isinstance(valor, bool):
         return "Sim" if valor else "Não"
     if isinstance(valor, str):
-        return formatar_data(valor) if len(valor) == len("AAAA-MM-DD") else valor
+        return _texto_de_codigo(valor)
     if isinstance(valor, list):
         return " · ".join(texto_do_valor(item) for item in valor) or SEM_VALOR
     if isinstance(valor, dict):
