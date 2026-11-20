@@ -936,11 +936,21 @@ Execução do [plano do padrão visual](plano_padrao_visual.md). Um único PR da
     `test_fontes_declaradas_existem_na_propria_origem`). Vermelho: E2E 1 failed (nenhum woff2
     pedido, `AssertionError: []`); unit 2 failed. Verde: E2E 3 passed (fontes, cabeçalhos, CSP);
     unit e telas 380 passed, cobertura 100%.
-- [ ] **T11.3** Catálogo de componentes e página `/padrao`. RF-VIS-03, RF-VIS-04, RF-VIS-05. Fase 1; D2, D7, D8.
+- [x] **T11.3** Catálogo de componentes e página `/padrao`. RF-VIS-03, RF-VIS-04, RF-VIS-05. Fase 1; D2, D7, D8.
   - Vermelho: `intranet/web/tests/telas/test_padrao.py::test_padrao_devolve_404_fora_do_desenvolvimento`, `::test_padrao_sem_sessao_vai_ao_login`, `::test_padrao_mostra_cada_componente_em_desenvolvimento`.
   - Verde: `telas/padrao.py`, rota em `urls.py`, `templates/padrao.html`; os 11 templates em `templates/componentes/` (`aviso.html` adaptado); estilos em `componentes.css` só com tokens.
   - Limpeza: nenhuma.
   - Revisão manual: aparência dos componentes; o usuário aprova o visual pelas capturas da `/padrao` (claro, escuro, 375 px) antes da T11.5.
+  - Entregue: `telas/padrao.py` (404 por `Http404` antes de `tela_autenticada`), rota `padrao`,
+    `padrao.html` com tipografia e cada componente em suas variantes; `botao`, `aviso`, `tabela`
+    (região rolável com `tabindex`), `campo` (texto, senha, select, textarea, dica), `acao`
+    (`<details>` com formulário), `paginacao`, `vazio`, `badge`, `cartao`, `progresso` e `selo`
+    (tarja de `--tarja` no tom, texto do resultado); raiz de cada um com `data-componente`.
+    `componentes.css` ganha os estilos, só com tokens, e usa peso 600 (a face carregada).
+    Testes: `docker compose exec -T front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas/test_padrao.py`. Vermelho: 4 failed (sem sessão, catálogo, selo,
+    badge); os 4 casos de 404 já passavam por falta da rota. Verde: 8 passed; unit e telas 410
+    passed, cobertura 100%.
 - [ ] **T11.4** Teste de conformidade com lista de telas pendentes. RF-VIS-01, RF-VIS-04. Fase 1; D5.
   - Vermelho: `intranet/web/tests/unit/test_conformidade_templates.py::test_css_de_tela_nao_tem_cor_nem_fonte_literal` e `::test_templates_de_tela_usam_componentes` falham para `base.css` e `componentes.css`, que não estão na lista de pendentes.
   - Verde: os dois CSS só com `var(--…)`; a lista de pendentes começa com os grupos das fases 2 a 6.

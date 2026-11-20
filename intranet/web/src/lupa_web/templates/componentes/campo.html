@@ -1,0 +1,7 @@
+<div class="campo" data-componente="campo">
+  <label for="{{ id_campo }}">{{ rotulo }}</label>
+  {% if tipo == "select" %}<select id="{{ id_campo }}" name="{{ nome }}"{% if dica %} aria-describedby="{{ id_campo }}-dica"{% endif %}{% if obrigatorio %} required{% endif %}>
+    {% for opcao in opcoes %}<option value="{{ opcao.valor }}"{% if opcao.valor == valor %} selected{% endif %}>{{ opcao.rotulo }}</option>{% endfor %}
+  </select>{% elif tipo == "textarea" %}<textarea id="{{ id_campo }}" name="{{ nome }}" rows="3"{% if dica %} aria-describedby="{{ id_campo }}-dica"{% endif %}{% if obrigatorio %} required{% endif %}>{{ valor }}</textarea>{% else %}<input id="{{ id_campo }}" name="{{ nome }}" type="{{ tipo|default:'text' }}"{% if valor %} value="{{ valor }}"{% endif %}{% if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}{% if dica %} aria-describedby="{{ id_campo }}-dica"{% endif %}{% if obrigatorio %} required{% endif %}>{% endif %}
+  {% if dica %}<p class="dica" id="{{ id_campo }}-dica">{{ dica }}</p>{% endif %}
+</div>

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block titulo %}Padrão visual · Lupa{% endblock %}
+{% block conteudo %}
+<div class="padrao">
+<h1>Padrão visual</h1>
+<p class="dica">Catálogo dos componentes da intranet com dados sintéticos. Disponível só no desenvolvimento.</p>
+
+<section aria-labelledby="padrao-tipografia">
+  <h2 id="padrao-tipografia">Tipografia</h2>
+  <h3>Título de terceiro nível em Source Serif 4</h3>
+  <p>Texto corrido em Source Sans 3, com <em>itálico</em>, <strong>seminegrito</strong> e <a href="/padrao">um link</a>.</p>
+  <p class="mono">0000001-00.2026.8.07.0001</p>
+</section>
+
+<section aria-labelledby="padrao-botao">
+  <h2 id="padrao-botao">Botão</h2>
+  <div class="acoes">
+    {% include "componentes/botao.html" with rotulo="Enviar" tipo="button" %}
+    {% include "componentes/botao.html" with rotulo="Cancelar" tipo="button" variante="secundario" %}
+    {% include "componentes/botao.html" with rotulo="Descartar" tipo="button" variante="perigo" %}
+    {% include "componentes/botao.html" with rotulo="Indisponível" tipo="button" desabilitado=True %}
+    {% include "componentes/botao.html" with rotulo="Link como botão" href="/padrao" variante="secundario" %}
+  </div>
+</section>
+
+<section aria-labelledby="padrao-aviso">
+  <h2 id="padrao-aviso">Aviso</h2>
+  {% include "componentes/aviso.html" with tipo="info" mensagem="Sua sessão expirou. Entre de novo." %}
+  {% include "componentes/aviso.html" with tipo="sucesso" mensagem="Usuário assessora.sintetica reativado." %}
+  {% include "componentes/aviso.html" with tipo="erro" mensagem="A API recusou o pedido." %}
+</section>
+
+<section aria-labelledby="padrao-tabela">
+  <h2 id="padrao-tabela">Tabela rolável</h2>
+  {% include "componentes/tabela.html" with legenda="Processos sintéticos" colunas=colunas linhas=linhas %}
+</section>
+
+<section aria-labelledby="padrao-campo">
+  <h2 id="padrao-campo">Formulário</h2>
+  <form class="padrao-formulario" action="/padrao" method="get">
+    {% include "componentes/campo.html" with rotulo="Usuário" nome="usuario" id_campo="padrao-usuario" autocomplete="off" %}
+    {% include "componentes/campo.html" with rotulo="Senha" nome="senha" id_campo="padrao-senha" tipo="password" autocomplete="new-password" dica="Ao menos 12 caracteres." %}
+    {% include "componentes/campo.html" with rotulo="Papel" nome="papel" id_campo="padrao-papel" tipo="select" opcoes=opcoes_papel valor="assessor" %}
+    {% include "componentes/botao.html" with rotulo="Filtrar" tipo="button" %}
+  </form>
+</section>
+
+<section aria-labelledby="padrao-acao">
+  <h2 id="padrao-acao">Ação em details</h2>
+  {% include "componentes/acao.html" with rotulo="Corrigir classe" acao="/padrao" campos=campos_da_acao rotulo_enviar="Salvar correção" %}
+</section>
+
+<section aria-labelledby="padrao-paginacao">
+  <h2 id="padrao-paginacao">Paginação</h2>
+  {% include "componentes/paginacao.html" with pagina=2 total_paginas=3 anterior_href="/padrao" proxima_href="/padrao" %}
+</section>
+
+<section aria-labelledby="padrao-vazio">
+  <h2 id="padrao-vazio">Estado vazio</h2>
+  {% include "componentes/vazio.html" with mensagem="Nenhum processo encontrado." dica="Ajuste os filtros ou cadastre um processo." acao_href="/padrao" acao_rotulo="Limpar filtros" %}
+</section>
+
+<section aria-labelledby="padrao-badge">
+  <h2 id="padrao-badge">Badge de estado</h2>
+  <p class="acoes">{% for texto in badges %}{% include "componentes/badge.html" with texto=texto %}{% endfor %}</p>
+</section>
+
+<section aria-labelledby="padrao-cartao">
+  <h2 id="padrao-cartao">Cartão</h2>
+  <div class="padrao-cartoes">
+    {% include "componentes/cartao.html" with id_cartao="padrao-cartao-1" titulo="Processos" texto="3 sob sua responsabilidade." %}
+    {% include "componentes/cartao.html" with id_cartao="padrao-cartao-2" titulo="Senha temporária" texto="Entregue ao assessor por canal seguro." destaque=True %}
+  </div>
+</section>
+
+<section aria-labelledby="padrao-progresso">
+  <h2 id="padrao-progresso">Barra de progresso</h2>
+  {% include "componentes/progresso.html" with id_progresso="padrao-progresso-envio" rotulo="Enviando…" valor=40 %}
+</section>
+
+<section aria-labelledby="padrao-selo">
+  <h2 id="padrao-selo">Selo de resultado</h2>
+  <ul class="padrao-selos">
+    {% for selo in selos %}<li>{% include "componentes/selo.html" with tom=selo.tom texto=selo.texto detalhe=selo.detalhe %}</li>{% endfor %}
+  </ul>
+</section>
+</div>
+{% endblock %}

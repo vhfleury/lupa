@@ -1,0 +1,9 @@
+<div class="tabela-rolavel" data-componente="tabela" role="region" aria-label="{{ legenda }}" tabindex="0">
+  <table{% if testid %} data-testid="{{ testid }}"{% endif %}>
+    <caption class="visualmente-oculto">{{ legenda }}</caption>
+    <thead><tr>{% for coluna in colunas %}<th scope="col">{{ coluna }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for linha in linhas %}<tr>{% for celula in linha %}<td>{% if celula.href %}<a href="{{ celula.href }}">{{ celula.texto }}</a>{% elif celula.texto %}{{ celula.texto }}{% else %}{{ celula }}{% endif %}</td>{% endfor %}</tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
