@@ -983,7 +983,7 @@ CASOS = [
         dados={"arquivo": SimpleUploadedFile("autos.pdf", PDF, content_type="application/pdf")},
         rota_api="/processos/arquivos",
         resposta_api={"arquivo_id": ARQUIVO, "processo_id": PROCESSO, "duplicado": False},
-        destino=BASE,
+        destino=f"{BASE}?aviso=recebido",
     ),
     Caso(
         "envio_anexo",
@@ -994,7 +994,7 @@ CASOS = [
         dados={"arquivo": SimpleUploadedFile("anexo.pdf", PDF, content_type="application/pdf")},
         rota_api=f"{BASE}/arquivos",
         resposta_api={"arquivo_id": ARQUIVO, "processo_id": PROCESSO, "duplicado": False},
-        destino=BASE,
+        destino=f"{BASE}?aviso=recebido",
     ),
     Caso(
         "processo_estado",

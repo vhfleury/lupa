@@ -28,6 +28,13 @@ BYTES_POR_UNIDADE = 1024
 MENSAGEM_RESPONSAVEIS = (
     "Responsáveis atualizados. O processo aparece na área de trabalho de cada assessor selecionado."
 )
+AVISOS = {
+    "responsaveis": MENSAGEM_RESPONSAVEIS,
+    "criado": "Processo criado e arquivo recebido.",
+    "anexado": "Arquivo anexado ao processo existente.",
+    "duplicado": "Este arquivo já foi enviado ao processo.",
+    "recebido": "Arquivo recebido. Processando…",
+}
 MENSAGEM_SEM_DIAGNOSTICO = "Diagnóstico ainda não disponível."
 
 
@@ -168,14 +175,14 @@ async def processo(request: HttpRequest, sessao: Sessao, processo_id: str) -> Ht
     """Tela do processo, com as ações que o papel permite.
 
     Args:
-        request: Pedido do navegador; `?aviso=responsaveis` mostra a confirmação da distribuição.
+        request: Pedido do navegador; `?aviso=` mostra a confirmação da distribuição ou do envio.
         sessao: Dados da sessão.
         processo_id: Identificador público do processo.
 
     Returns:
         Página do processo, ou 404 se a API não o encontra.
     """
-    aviso = MENSAGEM_RESPONSAVEIS if request.GET.get("aviso") == "responsaveis" else ""
+    aviso = AVISOS.get(request.GET.get("aviso", ""), "")
     return await _pagina(request, sessao, processo_id, {"aviso": aviso})
 
 

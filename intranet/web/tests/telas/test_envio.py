@@ -68,7 +68,7 @@ def test_pdf_sem_classe_pede_a_classe_e_reenvio_usa_o_mesmo_arquivo(
     assert reenvio.url.params["classe"] == "apelacao_civel"
     assert reenvio.url.params["numero_cnj"] == "0000004-89.2026.8.07.0001"
     assert reenvio.url.params["nome"] == "autos.pdf"
-    assert resposta["HX-Redirect"] == f"/processos/{PROCESSO}"
+    assert resposta["HX-Redirect"] == f"/processos/{PROCESSO}?aviso=recebido"
     assert list(pasta.iterdir()) == []
 
 
@@ -131,7 +131,28 @@ def test_anexo_ao_processo_redireciona_para_ele(
         f"/processos/{PROCESSO}/envio", {"arquivo": _arquivo()}, HTTP_HX_REQUEST="true"
     )
     assert rota.calls.last.request.content == PDF
-    assert resposta["HX-Redirect"] == f"/processos/{PROCESSO}"
+    assert resposta["HX-Redirect"] == f"/processos/{PROCESSO}?aviso=recebido"
+
+
+@pytest.mark.parametrize(
+    ("extra", "aviso"),
+    [
+        ({"processo_criado": True}, "criado"),
+        ({"processo_criado": False}, "anexado"),
+        ({"processo_criado": False, "duplicado": True}, "duplicado"),
+    ],
+)
+def test_cadastro_avisa_criacao_anexo_ou_duplicata(
+    logado: respx.MockRouter,
+    navegador: Client,
+    pasta: Path,
+    extra: dict[str, bool],
+    aviso: str,
+) -> None:
+    """RF-INT-04 (A4.8): o destino diz se o processo foi criado, anexado ou já tinha o arquivo."""
+    logado.post("/processos/arquivos").respond(200, json=CRIADO | extra)
+    resposta = navegador.post("/processos/envio", {"arquivo": _arquivo()}, HTTP_HX_REQUEST="true")
+    assert resposta["HX-Redirect"] == f"/processos/{PROCESSO}?aviso={aviso}"
 
 
 def test_complemento_que_a_api_ainda_recusa_mantem_o_pendente(

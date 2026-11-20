@@ -68,6 +68,23 @@ def test_aviso_da_distribuicao_aparece_depois_do_redirecionamento(
 
 
 @pytest.mark.parametrize(
+    ("aviso", "texto"),
+    [
+        ("criado", "Processo criado e arquivo recebido."),
+        ("anexado", "Arquivo anexado ao processo existente."),
+        ("duplicado", "Este arquivo já foi enviado ao processo."),
+        ("recebido", "Arquivo recebido. Processando…"),
+    ],
+)
+def test_aviso_do_envio_aparece_no_processo(
+    logado: respx.MockRouter, navegador: Client, aviso: str, texto: str
+) -> None:
+    """RF-INT-04 (A4.8): depois do envio, o processo diz o que aconteceu com o arquivo."""
+    _simular_processo(logado, "assessor")
+    assert texto in navegador.get(BASE, {"aviso": aviso}).content.decode()
+
+
+@pytest.mark.parametrize(
     ("tamanho", "esperado"),
     [
         (None, "—"),

@@ -109,6 +109,22 @@ def _corpo(resposta: httpx.Response) -> dict[str, Any]:
     return corpo if isinstance(corpo, dict) else {}
 
 
+def aviso_do_envio(corpo: dict[str, Any]) -> str:
+    """Chave do aviso que o processo mostra depois do envio aceito (A4, passo 8).
+
+    Args:
+        corpo: Resposta da API ao envio.
+
+    Returns:
+        `duplicado`, `criado`, `anexado` (cadastro que achou o processo) ou `recebido` (anexo).
+    """
+    if corpo.get("duplicado"):
+        return "duplicado"
+    if "processo_criado" not in corpo:
+        return "recebido"
+    return "criado" if corpo["processo_criado"] else "anexado"
+
+
 def _agora() -> datetime:
     return datetime.now(UTC)
 
@@ -124,7 +140,8 @@ def _concluir(
     corpo = _corpo(resposta)
     if not resposta.is_error:
         envios_pendentes.apagar(codigo)
-        return cliente_api.redirecionar(request, f"/processos/{corpo['processo_id']}")
+        destino = f"/processos/{corpo['processo_id']}?aviso={aviso_do_envio(corpo)}"
+        return cliente_api.redirecionar(request, destino)
     if corpo.get("motivo") == MOTIVO_INCOMPLETA:
         if not codigo:
             sessao = request.COOKIES.get(cliente_api.NOME_COOKIE, "")
