@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% load static %}
 {% block titulo %}Visualizador · Lupa{% endblock %}
-{% block cabeca %}<link rel="stylesheet" href="{% static 'css/visualizador.css' %}">{% endblock %}
+{% block cabeca %}<link rel="stylesheet" href="{% static 'css/visualizador.css' %}">
+<script src="{% static 'js/visualizador.js' %}" defer></script>{% endblock %}
 {% block conteudo %}
 <p><a href="/processos/{{ processo_id }}">← Processo</a></p>
 <h1>Visualizador</h1>
@@ -28,15 +29,15 @@
 
 {% if arquivo_id %}
 <div class="barra" role="toolbar" aria-label="Navegação da página">
-  {% if anterior %}<a class="botao secundario" href="{{ anterior }}">← Anterior</a>{% else %}<span class="botao secundario desabilitado" aria-disabled="true">← Anterior</span>{% endif %}
+  {% if anterior %}<a class="botao secundario" href="{{ anterior }}" data-atalho="anterior">← Anterior</a>{% else %}<span class="botao secundario desabilitado" aria-disabled="true">← Anterior</span>{% endif %}
   <span data-testid="pagina-atual">Página {{ pagina }}{% if total %} de {{ total }}{% endif %}</span>
-  {% if proxima %}<a class="botao secundario" href="{{ proxima }}">Próxima →</a>{% else %}<span class="botao secundario desabilitado" aria-disabled="true">Próxima →</span>{% endif %}
+  {% if proxima %}<a class="botao secundario" href="{{ proxima }}" data-atalho="proxima">Próxima →</a>{% else %}<span class="botao secundario desabilitado" aria-disabled="true">Próxima →</span>{% endif %}
   <span class="separador"></span>
-  {% if menos_zoom %}<a class="botao secundario" href="{{ menos_zoom }}" aria-label="Diminuir zoom">−</a>{% else %}<span class="botao secundario desabilitado" aria-disabled="true">−</span>{% endif %}
+  {% if menos_zoom %}<a class="botao secundario" href="{{ menos_zoom }}" data-atalho="menos-zoom" aria-label="Diminuir zoom">−</a>{% else %}<span class="botao secundario desabilitado" aria-disabled="true">−</span>{% endif %}
   <span data-testid="zoom">{{ zoom }}%</span>
-  {% if mais_zoom %}<a class="botao secundario" href="{{ mais_zoom }}" aria-label="Aumentar zoom">+</a>{% else %}<span class="botao secundario desabilitado" aria-disabled="true">+</span>{% endif %}
+  {% if mais_zoom %}<a class="botao secundario" href="{{ mais_zoom }}" data-atalho="mais-zoom" aria-label="Aumentar zoom">+</a>{% else %}<span class="botao secundario desabilitado" aria-disabled="true">+</span>{% endif %}
 </div>
-<div class="moldura" tabindex="0" role="region" aria-label="Página {{ pagina }}" data-testid="moldura-pagina">
+<div class="moldura" id="moldura" tabindex="0" role="region" aria-label="Página {{ pagina }}" data-testid="moldura-pagina">
   <div class="folha zoom-{{ zoom }}">
     <img src="{{ imagem }}" alt="Página {{ pagina }} do arquivo, renderizada pelo servidor" draggable="false" data-testid="imagem-pagina">
     {% if retangulos %}

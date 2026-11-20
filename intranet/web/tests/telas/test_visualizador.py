@@ -1,5 +1,7 @@
 """Visualizador: página como imagem repassada da API e destaque da evidência (A6)."""
 
+import re
+
 import pytest
 import respx
 from django.test import Client
@@ -134,3 +136,17 @@ def test_retangulo_do_destaque_nao_sai_da_pagina(
 ) -> None:
     """RF-DOS-05: o retângulo é recortado à página, em fração com ponto decimal."""
     assert visualizador.retangulo_do_destaque(retangulo) == esperado
+
+
+def test_atalhos_de_teclado_por_script_externo_sobre_os_links(
+    logado: respx.MockRouter, navegador: Client
+) -> None:
+    """RF-DOS-05 (D8): `visualizador.js` externo liga setas e zoom aos links da barra."""
+    logado.get(f"{BASE}/arquivos").respond(200, json=ARQUIVOS_LEGIVEIS)
+    html = navegador.get(
+        f"{BASE}/visualizador", {"arquivo": ARQUIVO, "pagina": "2", "zoom": "100"}
+    ).content.decode()
+    assert re.search(r'<script src="/static/js/visualizador\.[0-9a-f]+\.js" defer></script>', html)
+    for atalho in ("anterior", "proxima", "menos-zoom", "mais-zoom"):
+        assert f'data-atalho="{atalho}"' in html
+    assert 'id="moldura"' in html
