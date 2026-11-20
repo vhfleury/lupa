@@ -902,10 +902,17 @@ Execução do [plano do padrão visual](plano_padrao_visual.md). Um único PR da
 `feat/padrao-visual`. "Pronto quando", salvo indicação: suíte de `lupa_web` verde no contêiner
 `front` depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos.
 
-- [ ] **T11.1** Tokens em `tokens.css` com a paleta verde e o teste de contraste. RF-VIS-01, RF-VIS-02. Fase 1; P1, D1, D6.
+- [x] **T11.1** Tokens em `tokens.css` com a paleta verde e o teste de contraste. RF-VIS-01, RF-VIS-02. Fase 1; P1, D1, D6.
   - Vermelho: `intranet/web/tests/unit/test_tokens.py::test_primaria_e_verde_do_padrao`, `::test_tema_escuro_redefine_todos_os_tokens_de_cor`, `::test_pares_de_texto_atingem_4_5_nos_dois_temas`, `::test_borda_foco_e_tarja_atingem_3_nos_dois_temas`.
   - Verde: `static/css/tokens.css` (claro e escuro, cores do selo e do badge), `base.css` passa a importá-lo e perde as declarações de token; `base.html` carrega `tokens.css`.
   - Limpeza: nenhuma.
+  - Entregue: `tokens.css` com tema claro, escuro manual e escuro do sistema (fundo, superfícies,
+    texto, borda e `--borda-campo`, primária, sucesso/atenção/perigo com fundo, aviso, foco,
+    badge, raio, tarja, espaços); `base.css` sem tokens; `base.html` carrega `tokens.css` antes
+    de `base.css` (por `<link>`, sem `@import` duplicado). Testes: `docker compose exec -T front
+    python -m pytest -c intranet/web/pyproject.toml intranet/web/tests/unit/test_tokens.py`.
+    Vermelho: 33 falhas (`tokens.css` ausente). Verde: 33 passed; unit e telas 378 passed,
+    cobertura 100%.
 - [ ] **T11.2** Fontes Source servidas pelo front. RF-VIS-02. Fase 1; D3, D4.
   - Vermelho: `intranet/web/tests/e2e/test_seguranca.py::test_fontes_vem_da_propria_origem` falha (nenhum woff2 é carregado).
   - Verde: `static/fontes/` com os 5 woff2 das releases `adobe-fonts` e `LICENSE.md`; `@font-face` em `tokens.css`; tokens `--fonte-titulo`, `--fonte`, `--mono`. SHA-256 de cada arquivo anotado na tarefa.
