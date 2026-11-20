@@ -913,10 +913,29 @@ Execução do [plano do padrão visual](plano_padrao_visual.md). Um único PR da
     python -m pytest -c intranet/web/pyproject.toml intranet/web/tests/unit/test_tokens.py`.
     Vermelho: 33 falhas (`tokens.css` ausente). Verde: 33 passed; unit e telas 378 passed,
     cobertura 100%.
-- [ ] **T11.2** Fontes Source servidas pelo front. RF-VIS-02. Fase 1; D3, D4.
+- [x] **T11.2** Fontes Source servidas pelo front. RF-VIS-02. Fase 1; D3, D4.
   - Vermelho: `intranet/web/tests/e2e/test_seguranca.py::test_fontes_vem_da_propria_origem` falha (nenhum woff2 é carregado).
   - Verde: `static/fontes/` com os 5 woff2 das releases `adobe-fonts` e `LICENSE.md`; `@font-face` em `tokens.css`; tokens `--fonte-titulo`, `--fonte`, `--mono`. SHA-256 de cada arquivo anotado na tarefa.
   - Limpeza: nenhuma.
+  - Entregue: o subconjunto latino não é publicado pronto nas releases; vão os woff2 da variante
+    TTF de cada release, inteiros (total 460 KiB). `@font-face` com `font-display: swap` em
+    `tokens.css`; h1 a h3 em `--fonte-titulo` 600; `code`, `kbd`, `pre`, `samp` em `--mono`.
+    `LICENSE.md` reúne o `LICENSE.md` (OFL 1.1) dos três repositórios.
+
+    | Arquivo | Origem | Bytes | SHA-256 |
+    | --- | --- | --- | --- |
+    | `SourceSerif4-Semibold.woff2` | source-serif 4.005R, `source-serif-4.005_WOFF2.zip`, `TTF/SourceSerif4-Semibold.ttf.woff2` | 80732 | `457a13ac92e977d82e376038a2daac7fdb5433610910bf5787bdf6c1c3781865` |
+    | `SourceSans3-Regular.woff2` | source-sans 3.052R, `WOFF2-source-sans-3.052R.zip`, `TTF/SourceSans3-Regular.ttf.woff2` | 109632 | `53492fb3a0def77354f166a55d09b63a10855e91c206c7620a81cf56e97f8ec3` |
+    | `SourceSans3-It.woff2` | idem, `TTF/SourceSans3-It.ttf.woff2` | 86452 | `4d80b3b801f4c457f1b4adbd3911d8501338e6d282141663770c38d3a2e97859` |
+    | `SourceSans3-Semibold.woff2` | idem, `TTF/SourceSans3-Semibold.ttf.woff2` | 108900 | `47b9b661b9f395fe7f0d0e119637fba5c8dad97bde3df60066fd24229c0792f4` |
+    | `SourceCodePro-Regular.woff2` | source-code-pro 2.042R-u/1.062R-i/1.026R-vf, `WOFF2-source-code-pro-2.042R-u_1.062R-i_1.026Rvf.zip`, `TTF/SourceCodePro-Regular.ttf.woff2` | 74052 | `714eee29b70d191f5bf4b3a06b68f2c50522b1303d31c7d44dcefdcc5f9defd0` |
+
+    Testes: `bash intranet/web/scripts/e2e.sh -k fontes_vem_da_propria_origem` e, no `front`,
+    `python -m pytest -c intranet/web/pyproject.toml intranet/web/tests/unit/test_estaticos.py`
+    (casos novos `test_tokens_declaram_as_cinco_faces_source_com_swap` e
+    `test_fontes_declaradas_existem_na_propria_origem`). Vermelho: E2E 1 failed (nenhum woff2
+    pedido, `AssertionError: []`); unit 2 failed. Verde: E2E 3 passed (fontes, cabeçalhos, CSP);
+    unit e telas 380 passed, cobertura 100%.
 - [ ] **T11.3** Catálogo de componentes e página `/padrao`. RF-VIS-03, RF-VIS-04, RF-VIS-05. Fase 1; D2, D7, D8.
   - Vermelho: `intranet/web/tests/telas/test_padrao.py::test_padrao_devolve_404_fora_do_desenvolvimento`, `::test_padrao_sem_sessao_vai_ao_login`, `::test_padrao_mostra_cada_componente_em_desenvolvimento`.
   - Verde: `telas/padrao.py`, rota em `urls.py`, `templates/padrao.html`; os 11 templates em `templates/componentes/` (`aviso.html` adaptado); estilos em `componentes.css` só com tokens.
