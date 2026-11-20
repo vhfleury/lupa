@@ -162,7 +162,8 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 
 1. Entrada: usuário e senha; ação: A1 em `POST /auth/login`; saída: pedido de código TOTP.
 2. Entrada: código; ação: A1 em `POST /auth/mfa`; saída: `Set-Cookie` da API copiado e
-   redirecionamento para `/processos`.
+   redirecionamento para `/` (painel "Início", D17; `/trocar-senha` com troca pendente), como no
+   SvelteKit.
 3. Desvio: credencial ou código recusado, ou usuário bloqueado; saída: a mensagem da API no
    formulário, sem dizer qual campo errou.
 4. Desvio: MFA ainda não configurado; ação: A1 obtém a URI `otpauth`; `segno` gera o SVG; saída:

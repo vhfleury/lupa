@@ -218,17 +218,37 @@ td {
   color: var(--aviso-texto);
 }
 
-#cadastro-processo {
-  border-radius: 16px;
+.cadastro {
   margin-bottom: 1.5rem;
 }
 
-#cadastro-processo h2 {
-  margin-top: 0;
+.cadastro .novo-botao {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  margin: 0 0 1rem auto;
+  list-style: none;
+  cursor: pointer;
+  font-weight: 600;
 }
 
-.novo-botao {
-  display: inline-flex;
-  align-items: center;
-  text-decoration: none;
+.cadastro .novo-botao::-webkit-details-marker {
+  display: none;
+}
+
+.cadastro .fechar,
+.cadastro[open] .abrir {
+  display: none;
+}
+
+.cadastro[open] .fechar {
+  display: inline;
+}
+
+.cadastro .cartao {
+  border-radius: 16px;
+}
+
+.cadastro .cartao h2 {
+  margin-top: 0;
 }

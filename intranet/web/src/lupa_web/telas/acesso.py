@@ -16,7 +16,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from lupa_web import cliente_api
 from lupa_web.telas.sessao import Sessao, contexto_da_moldura, tela_autenticada
 
-CAMINHO_PROCESSOS = "/processos"
+CAMINHO_INICIO = "/"
 ETAPA_CONFIGURAR = "configurar_mfa"
 MENSAGEM_RECUSA = "Não foi possível entrar com os dados informados. Confira e tente novamente."
 MENSAGEM_TENTATIVAS = "Muitas tentativas. Aguarde alguns minutos e tente novamente."
@@ -105,7 +105,7 @@ async def login_codigo(request: HttpRequest) -> HttpResponse:
         request: Pedido do navegador com o desafio em campo oculto.
 
     Returns:
-        Redirecionamento para `/processos` ou `/trocar-senha`; o formulário com a recusa.
+        Redirecionamento para `/` (início) ou `/trocar-senha`; o formulário com a recusa.
     """
     etapa = {
         chave: request.POST.get(chave, "") for chave in ("etapa", "desafio", "segredo", "uri_qr")
@@ -116,7 +116,7 @@ async def login_codigo(request: HttpRequest) -> HttpResponse:
     if resposta.is_error:
         return _pagina_codigo(request, etapa, mensagem_de_recusa(resposta), resposta.status_code)
     destino = "/trocar-senha" if resposta.json().get("troca_senha_obrigatoria") else None
-    return cliente_api.redirecionar(request, destino or CAMINHO_PROCESSOS)
+    return cliente_api.redirecionar(request, destino or CAMINHO_INICIO)
 
 
 def _pagina_troca(
@@ -145,7 +145,7 @@ async def trocar_senha(request: HttpRequest, sessao: Sessao) -> HttpResponse:
         sessao: Dados da sessão.
 
     Returns:
-        Formulário (com a mensagem do erro) ou redirecionamento para `/processos`.
+        Formulário (com a mensagem do erro) ou redirecionamento para `/` (início).
     """
     if request.method == "GET":
         return _pagina_troca(request, sessao)
@@ -159,7 +159,7 @@ async def trocar_senha(request: HttpRequest, sessao: Sessao) -> HttpResponse:
     if resposta.is_error:
         mensagem = cliente_api.detalhe_do_erro(resposta)
         return _pagina_troca(request, sessao, mensagem, resposta.status_code)
-    return cliente_api.redirecionar(request, CAMINHO_PROCESSOS)
+    return cliente_api.redirecionar(request, CAMINHO_INICIO)
 
 
 @require_POST
@@ -175,17 +175,3 @@ async def sair(request: HttpRequest) -> HttpResponse:
     with contextlib.suppress(cliente_api.SessaoExpiradaError):
         await cliente_api.chamar(request, "POST", "/auth/logout")
     return cliente_api.redirecionar_para_login(request)
-
-
-@tela_autenticada
-async def inicio(request: HttpRequest, sessao: Sessao) -> HttpResponse:
-    """Raiz: com sessão válida, leva à lista de processos (A3.2).
-
-    Args:
-        request: Pedido do navegador.
-        sessao: Dados da sessão.
-
-    Returns:
-        Redirecionamento para `/processos`.
-    """
-    return cliente_api.redirecionar(request, CAMINHO_PROCESSOS)

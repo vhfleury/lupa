@@ -125,3 +125,18 @@ def test_cadastro_de_processo_aparece_para_quem_pode_subir(
     html = navegador.get("/processos").content.decode()
     assert 'hx-post="/processos/envio"' in html
     assert 'hx-encoding="multipart/form-data"' in html
+
+
+def test_novo_processo_abre_e_fecha_o_cadastro_sem_javascript(
+    logado: respx.MockRouter, navegador: Client
+) -> None:
+    """RF-INT-04 (D17): "+ Novo processo" é o `<summary>` e o formulário fica no `<details>`."""
+    logado.get("/processos").respond(200, json=LISTA)
+    html = navegador.get("/processos").content.decode()
+    inicio = html.index('<details id="cadastro-processo"')
+    fim = html.index("</details>", inicio)
+    cadastro = html[inicio:fim]
+    assert '<summary class="novo-botao"><span class="abrir">+ Novo processo</span>' in cadastro
+    assert "Fechar cadastro" in cadastro
+    assert 'hx-post="/processos/envio"' in cadastro
+    assert 'href="#cadastro-processo"' not in html

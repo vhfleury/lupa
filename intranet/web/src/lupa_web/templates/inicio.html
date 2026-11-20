@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% load static %}
+{% block titulo %}Início · Lupa{% endblock %}
+{% block cabeca %}<link rel="stylesheet" href="{% static 'css/inicio.css' %}">{% endblock %}
+{% block conteudo %}
+<div class="painel">
+  <header class="boas-vindas">
+    <div>
+      <span class="sobretitulo">LUPA / {{ papel_rotulo }}</span>
+      <h1>{% if assessor %}Minha área de trabalho{% else %}Visão geral do gabinete{% endif %}</h1>
+      <p>{% if assessor %}Acompanhe seus processos e as próximas atividades.{% else %}Acompanhe a equipe, o acervo e o processamento do gabinete.{% endif %}</p>
+    </div>
+    <a class="acao-principal" href="/processos">Acessar processos <span aria-hidden="true">↗</span></a>
+  </header>
+
+  <div class="contexto">
+    <span class="ponto" aria-hidden="true"></span>{% if assessor %}Processos sob sua responsabilidade{% else %}Visão do seu gabinete{% endif %}<span class="contexto-nota">Resumo dos dados disponíveis</span>
+  </div>
+  {% for erro in erros %}{% include "componentes/aviso.html" with tipo="erro" mensagem=erro %}{% endfor %}
+
+  <section class="indicadores" aria-label="Resumo da plataforma">
+    <article class="indicador">
+      <span>{% if assessor %}Sob minha responsabilidade{% else %}Processos do gabinete{% endif %}</span><strong>{% if resumo %}{{ resumo.total }}{% else %}—{% endif %}</strong><small>Disponíveis para consulta</small>
+    </article>
+    <article class="indicador">
+      <span>Em processamento</span><strong>{% if resumo %}{{ resumo.processando }}{% else %}—{% endif %}</strong><small>Arquivos em preparação</small>
+    </article>
+    <article class="indicador">
+      <span>Processamento concluído</span><strong>{% if resumo %}{{ resumo.concluidos }}{% else %}—{% endif %}</strong><small>Consulte os resultados da análise</small>
+    </article>
+    <article class="indicador atencao">
+      <span>Exigem atenção</span><strong>{% if resumo %}{{ resumo.pendentes }}{% else %}—{% endif %}</strong><small>Pendências, falhas ou quarentena</small>
+    </article>
+  </section>
+
+  <div class="colunas">
+    <section class="bloco" aria-labelledby="recentes-titulo">
+      <div class="titulo-bloco">
+        <div>
+          <span class="sobretitulo">ACOMPANHAMENTO</span>
+          <h2 id="recentes-titulo">{% if assessor %}Meus processos{% else %}Processos recentes do gabinete{% endif %}</h2>
+        </div>
+        <a href="/processos">Ver todos <span aria-hidden="true">→</span></a>
+      </div>
+      {% if resumo is None %}
+      <p class="vazio">Não foi possível carregar os processos. Acesse a lista para tentar novamente.</p>
+      {% elif not resumo.recentes %}
+      <div class="vazio">
+        <strong>Seu próximo processo começa aqui.</strong>
+        <p>Os processos atribuídos a você aparecerão neste painel.</p>
+        <a href="/processos">Ir para processos →</a>
+      </div>
+      {% else %}
+      <ul class="lista-processos">
+        {% for processo in resumo.recentes %}<li><a class="linha-processo" href="/processos/{{ processo.id }}"><div><strong>{{ processo.numero_cnj }}</strong><span>{{ processo.classe_rotulo }} · {{ processo.criado_em_texto }}</span></div><span class="situacao{% if processo.pendente %} pendente{% endif %}">{{ processo.situacao_rotulo }}</span></a></li>{% endfor %}
+      </ul>
+      {% endif %}
+    </section>
+
+    <section class="bloco atalhos" aria-labelledby="atalhos-titulo">
+      <span class="sobretitulo">SEU ESPAÇO DE TRABALHO</span>
+      <h2 id="atalhos-titulo">Acesso rápido</h2>
+      <a class="atalho" href="/processos"><div><strong>Abrir ou cadastrar processo</strong><span>Autos, validações, dossiê e chat</span></div><span aria-hidden="true">↗</span></a>
+      {% if gere_usuarios %}<a class="atalho" href="/usuarios"><div><strong>Equipe do gabinete</strong><span>Consulte e gerencie os assessores</span></div><span aria-hidden="true">↗</span></a>{% endif %}
+      {% if ve_auditoria %}<a class="atalho" href="/auditoria"><div><strong>Consultar auditoria</strong><span>Acompanhe os registros de atividade</span></div><span aria-hidden="true">↗</span></a>{% endif %}
+      {% if assessor %}<p class="nota">Para enviar documentos, abra um processo ou cadastre um novo na página de Processos.</p>{% endif %}
+    </section>
+  </div>
+
+  {% if not assessor %}
+  <section class="bloco equipe-gabinete" aria-labelledby="equipe-titulo">
+    <div class="titulo-bloco">
+      <div>
+        <span class="sobretitulo">PESSOAS E ACERVO</span>
+        <h2 id="equipe-titulo">Equipe do gabinete</h2>
+      </div>
+      <a href="/usuarios">Gerenciar equipe →</a>
+    </div>
+    {% if equipe is None %}
+    <p class="nota">Equipe indisponível.</p>
+    {% elif not equipe %}
+    <p class="nota">Nenhum assessor cadastrado neste gabinete.</p>
+    {% else %}
+    <ul class="lista-processos">
+      {% for usuario in equipe %}<li class="unidade"><strong>{{ usuario.nome_usuario }}</strong><span>{% if usuario.ativo %}Ativo{% else %}Desativado{% endif %}</span></li>{% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section class="bloco" aria-labelledby="atencao-titulo">
+    <div class="titulo-bloco">
+      <div>
+        <span class="sobretitulo">PRÓXIMOS PASSOS</span>
+        <h2 id="atencao-titulo">Pontos de atenção</h2>
+      </div>
+      <span class="situacao">{% if resumo %}{{ resumo.pendentes }}{% else %}—{% endif %} processos</span>
+    </div>
+    {% if resumo is None %}
+    <p class="nota">Indicador indisponível. Consulte os processos para verificar as pendências.</p>
+    {% elif not resumo.pendentes %}
+    <p class="nota">Nenhuma pendência, falha ou quarentena de processamento identificada nos processos disponíveis.</p>
+    {% else %}
+    <ul class="lista-processos">
+      {% for processo in resumo.pendentes_exibidos %}<li><a class="linha-processo" href="/processos/{{ processo.id }}"><div><strong>{{ processo.numero_cnj }}</strong><span>Abra o processo para conferir os arquivos e as pendências.</span></div><span class="situacao pendente">{{ processo.situacao_rotulo }}</span></a></li>{% endfor %}
+    </ul>
+    {% if resumo.mais_pendentes %}<a href="/processos">Ver os demais processos →</a>{% endif %}
+    {% endif %}
+  </section>
+
+  <details class="sessao-detalhes">
+    <summary>Dados da sessão</summary>
+    <dl data-testid="estado-sessao">
+      <dt>Usuário</dt><dd>{{ sessao.nome_usuario }}</dd>
+      <dt>Papel</dt><dd>{{ papel_rotulo }}</dd>
+      <dt>Situação</dt><dd>Sessão ativa</dd>
+    </dl>
+  </details>
+</div>
+{% endblock %}

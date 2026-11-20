@@ -811,11 +811,24 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
     `test_envio.py` (precisa de pendente no volume). Comparação rota a rota com
     `src/routes` e `src/lib`: as onze telas e as ações das fases 4 a 8 já existiam; nenhum código
     de view mudou, e a limpeza não achou repetição nova entre views.
-  - Sem reprodução, por exigir decisão nova (a especificação não os lista em RF-INT-02 e o
-    plano manda `/` a `/processos`, A3.2): o painel "Início" (`/`, com `GET /processos?meus=true`,
-    indicadores e atalhos) e o "Visualizar como assessor" do desembargador (cabeçalho com
-    `fieldset` desabilitado). Diferença menor: o "+ Novo processo" da lista é âncora para o
-    cadastro sempre visível, não botão que abre e fecha.
+  - Complemento (D17, decisão do usuário): o painel "Início" é reproduzido em `/`
+    (`telas/inicio.py`, `templates/inicio.html`, `static/css/inicio.css` do `+page.svelte`):
+    assessor com `GET /processos?meus=true`, desembargador com `GET /processos` e a equipe de
+    `GET /usuarios`; indicadores (total, processando, concluídos, pendências/falha/quarentena),
+    cinco recentes, atalhos por permissão, até três pontos de atenção e dados da sessão; falha da
+    API vira aviso "Processos: …" e "—". O menu começa por "Início" (corrente só em `/`). Como no
+    SvelteKit, o login e a troca de senha aceitos levam a `/` (A3.2 atualizado no plano); os
+    testes de `test_acesso.py` e os destinos da paridade mudaram com a regra, e o teste da raiz
+    que levava a `/processos` saiu. "+ Novo processo" é o `<summary>` de um `<details>` com o
+    cadastro dentro, com o visual do botão do SvelteKit e o texto "Fechar cadastro" quando aberto,
+    só por CSS. "Visualizar como assessor" removido: o Django nunca o teve (sem resquício em
+    `lupa_web`); a remoção entra no `CHANGELOG.md` na T10.16.
+  - Comando do complemento: `docker compose exec front python -m pytest -c
+    intranet/web/pyproject.toml intranet/web/tests/telas --no-cov -q`. Vermelho: `11 failed,
+    193 passed` (`test_inicio.py` 4, `test_processos.py` 1, destinos de `test_acesso.py` 2 e
+    paridade 4). Verde: `test_inicio.py` `4 passed`, `test_paridade.py` `47 passed`; suíte de
+    `lupa_web` `329 passed`, cobertura 100%; ruff, format e mypy `--strict` limpos;
+    `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde (pipeline 702, intranet 265, web 329; e2e fora).
   - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
     intranet/web/tests/telas/test_paridade.py --no-cov -q`. Vermelho: `10 failed, 35 passed`
     (API sem `/processos` nem imagem simuladas, papel anônimo inexistente, corpo binário).

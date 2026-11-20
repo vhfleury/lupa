@@ -10,13 +10,15 @@
       <h1>Processos</h1>
       <p>Consulte os autos, acompanhe o processamento e veja quem está responsável.</p>
     </div>
-    {% if pode_criar %}<a class="novo-botao" href="#cadastro-processo">+ Novo processo</a>{% endif %}
   </header>
   {% if pode_criar %}
-  <section id="cadastro-processo" class="cartao" aria-labelledby="titulo-novo">
-    <h2 id="titulo-novo">Novo processo</h2>
-    {% include "componentes/envio.html" with acao_envio="/processos/envio" id_envio="novos-autos" %}
-  </section>
+  <details id="cadastro-processo" class="cadastro">
+    <summary class="novo-botao"><span class="abrir">+ Novo processo</span><span class="fechar">Fechar cadastro</span></summary>
+    <section class="cartao" aria-labelledby="titulo-novo">
+      <h2 id="titulo-novo">Novo processo</h2>
+      {% include "componentes/envio.html" with acao_envio="/processos/envio" id_envio="novos-autos" %}
+    </section>
+  </details>
   {% endif %}
   <section id="acervo" class="acervo" aria-labelledby="titulo-acervo">
     <div class="cabecalho-lista">

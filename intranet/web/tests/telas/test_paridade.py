@@ -900,7 +900,7 @@ CASOS = [
         rota_api="/auth/mfa",
         corpo_api={"desafio": "desafio-sintetico", "codigo": "123456"},
         resposta_api={"troca_senha_obrigatoria": False},
-        destino="/processos",
+        destino="/",
     ),
     Caso(
         "trocar_senha",
@@ -923,7 +923,7 @@ CASOS = [
         },
         rota_api="/auth/trocar-senha",
         corpo_api={"senha_atual": "a", "nova_senha": "frase-longa-sintetica"},
-        destino="/processos",
+        destino="/",
     ),
     Caso(
         "sair",
@@ -933,6 +933,22 @@ CASOS = [
         303,
         rota_api="/auth/logout",
         destino="/login",
+    ),
+    Caso(
+        "inicio",
+        "assessor",
+        "GET",
+        "/",
+        200,
+        trechos=("Minha área de trabalho", "0000003-67.2026.8.07.0001", "Acesso rápido"),
+    ),
+    Caso(
+        "inicio",
+        "desembargador",
+        "GET",
+        "/",
+        200,
+        trechos=("Visão geral do gabinete", "Equipe do gabinete", "assessora.sintetica"),
     ),
     Caso(
         "processos",

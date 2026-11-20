@@ -9,6 +9,7 @@ from lupa_web.telas import (
     chat,
     dossie,
     envio,
+    inicio,
     processo,
     processos,
     usuarios,
@@ -74,5 +75,5 @@ urlpatterns = [
     path("usuarios", usuarios.usuarios, name="usuarios"),
     path("usuarios/<str:usuario_id>/desativar", usuarios.desativar, name="desativar_usuario"),
     path("usuarios/<str:usuario_id>/<str:acao>", usuarios.agir, name="acao_usuario"),
-    path("", acesso.inicio, name="inicio"),
+    path("", inicio.inicio, name="inicio"),
 ]

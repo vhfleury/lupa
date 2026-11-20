@@ -17,6 +17,7 @@ from lupa_web import cliente_api
 CAMINHO_TROCA = "/trocar-senha"
 ROTULO_PAPEL = {"assessor": "Assessor", "desembargador": "Desembargador"}
 ITENS_DO_MENU = (
+    ("/", "Início", ""),
     ("/processos", "Processos", "ver_processo"),
     ("/usuarios", "Usuários", "gerir_assessor"),
     ("/auditoria", "Auditoria", "ver_auditoria"),
@@ -93,10 +94,10 @@ def contexto_da_moldura(request: HttpRequest, sessao: Sessao) -> dict[str, Any]:
         {
             "href": href,
             "rotulo": rotulo,
-            "atual": caminho == href or caminho.startswith(f"{href}/"),
+            "atual": caminho == href or (href != "/" and caminho.startswith(f"{href}/")),
         }
         for href, rotulo, permissao in ITENS_DO_MENU
-        if tem(sessao, permissao)
+        if not permissao or tem(sessao, permissao)
     ]
     return {
         "sessao": sessao,

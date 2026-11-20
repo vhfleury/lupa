@@ -95,10 +95,10 @@ def test_configuracao_de_mfa_mostra_qr_em_svg(api_simulada: respx.MockRouter) ->
     assert 'value="configurar_mfa"' in html
 
 
-def test_confirmacao_do_autenticador_cria_sessao_e_vai_aos_processos(
+def test_confirmacao_do_autenticador_cria_sessao_e_vai_ao_inicio(
     api_simulada: respx.MockRouter,
 ) -> None:
-    """RF-INT-02 (A3.4, A3.2): o código confirma o MFA, o cookie volta e vai a `/processos`."""
+    """RF-INT-02 (A3.4, A3.2): o código confirma o MFA, o cookie volta e vai ao início (D17)."""
     rota = api_simulada.post("/auth/mfa/confirmar").respond(
         200,
         json={"troca_senha_obrigatoria": False},
@@ -110,7 +110,7 @@ def test_confirmacao_do_autenticador_cria_sessao_e_vai_aos_processos(
     )
     assert _corpo(rota) == {"desafio": "d", "codigo": "654321"}
     assert resposta.status_code == 303
-    assert resposta["Location"] == "/processos"
+    assert resposta["Location"] == "/"
     assert resposta.cookies[cliente_api.NOME_COOKIE].value == COOKIE_NOVO
 
 
@@ -178,10 +178,8 @@ def test_troca_de_senha_confere_a_confirmacao_sem_chamar_a_api(
     assert not rota.called
 
 
-def test_troca_de_senha_aceita_vai_aos_processos(
-    logado: respx.MockRouter, navegador: Client
-) -> None:
-    """RF-INT-03: a troca aceita pela API leva a `/processos`."""
+def test_troca_de_senha_aceita_vai_ao_inicio(logado: respx.MockRouter, navegador: Client) -> None:
+    """RF-INT-03 (D17): a troca aceita pela API leva ao início, como no SvelteKit."""
     rota = logado.post("/auth/trocar-senha").respond(204)
     resposta = navegador.post(
         "/trocar-senha",
@@ -189,7 +187,7 @@ def test_troca_de_senha_aceita_vai_aos_processos(
     )
     assert _corpo(rota) == {"senha_atual": "a", "nova_senha": "frase-longa"}
     assert resposta.status_code == 303
-    assert resposta["Location"] == "/processos"
+    assert resposta["Location"] == "/"
 
 
 def test_troca_com_senha_atual_errada_fica_no_formulario(
@@ -240,13 +238,6 @@ def test_logout_revoga_na_api_e_volta_ao_login(
     assert resposta.status_code == 303
     assert resposta["Location"] == "/login"
     assert resposta.cookies[cliente_api.NOME_COOKIE]["max-age"] == "0"
-
-
-def test_raiz_leva_aos_processos(logado: respx.MockRouter, navegador: Client) -> None:
-    """RF-INT-02 (A3.2): a raiz, com sessão válida, leva à lista de processos."""
-    resposta = navegador.get("/")
-    assert resposta.status_code == 303
-    assert resposta["Location"] == "/processos"
 
 
 def test_cabecalho_mostra_usuario_papel_e_sair(
