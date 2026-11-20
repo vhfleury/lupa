@@ -29,3 +29,11 @@ def test_estaticos_pelo_whitenoise_com_hash_no_nome() -> None:
     assert "whitenoise.middleware.WhiteNoiseMiddleware" in settings.MIDDLEWARE
     backend = settings.STORAGES["staticfiles"]["BACKEND"]
     assert backend == "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+
+def test_envio_vai_para_arquivo_temporario_no_volume_dos_pendentes() -> None:
+    """RF-INT-04 (D14, D16): upload só em arquivo temporário, no volume `envios-pendentes`."""
+    assert settings.FILE_UPLOAD_HANDLERS == [
+        "django.core.files.uploadhandler.TemporaryFileUploadHandler"
+    ]
+    assert settings.FILE_UPLOAD_TEMP_DIR == "/var/lupa/envios-pendentes"

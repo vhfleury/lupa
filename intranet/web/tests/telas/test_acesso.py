@@ -260,3 +260,14 @@ def test_cabecalho_mostra_usuario_papel_e_sair(
     assert 'action="/sair"' in html
     assert 'href="/auditoria"' in html
     assert 'href="/usuarios"' in html
+
+
+def test_base_carrega_htmx_configurado_sem_eval() -> None:
+    """RF-INT-01 (D8): HTMX local, `allowEval=false`, sem estilos de indicador, só a origem."""
+    html = Client().get("/login").content.decode()
+    assert "js/htmx.min" in html
+    assert "js/envio" in html
+    assert '"allowEval":false' in html
+    assert '"includeIndicatorStyles":false' in html
+    assert '"selfRequestsOnly":true' in html
+    assert "<script>" not in html

@@ -186,3 +186,39 @@ def test_excecao_que_nao_e_da_api_segue_adiante() -> None:
 def test_detalhe_do_erro_vira_frase_da_tela(resposta: httpx.Response, esperado: str) -> None:
     """RF-INT-03 (A1.8): o `detail` em texto da API vira frase; o resto, mensagem genérica."""
     assert cliente_api.detalhe_do_erro(resposta) == esperado
+
+
+def test_cliente_e_um_por_loop_de_eventos() -> None:
+    """RF-INT-03 (D1): no mesmo loop o cliente é o mesmo; num loop novo, outro cliente."""
+
+    async def cliente_duas_vezes() -> tuple[httpx.AsyncClient, httpx.AsyncClient]:
+        return cliente_api.obter_cliente(), cliente_api.obter_cliente()
+
+    primeiro, repetido = asyncio.run(cliente_duas_vezes())
+    segundo, _ = asyncio.run(cliente_duas_vezes())
+    assert primeiro is repetido
+    assert segundo is not primeiro
+    asyncio.run(cliente_api.encerrar_cliente())
+
+
+def test_encerrar_fecha_o_cliente_do_proprio_loop() -> None:
+    """RF-INT-03 (D1): no `lifespan.shutdown`, o cliente do loop do servidor é fechado."""
+
+    async def criar_e_encerrar() -> httpx.AsyncClient:
+        cliente = cliente_api.obter_cliente()
+        await cliente_api.encerrar_cliente()
+        return cliente
+
+    assert asyncio.run(criar_e_encerrar()).is_closed
+
+
+def test_log_do_httpx_nao_registra_a_consulta(
+    api_simulada: respx.MockRouter, caplog: pytest.LogCaptureFixture
+) -> None:
+    """RF-INT-04: nome do arquivo e número CNJ na consulta da API não vão para o log."""
+    api_simulada.get("/auth/sessao").respond(200)
+    with caplog.at_level(logging.INFO):
+        _atender(caminho="/auth/sessao?nome=autos-0000001.pdf&numero_cnj=0000001")
+    assert "autos-0000001" not in caplog.text
+    assert "numero_cnj" not in caplog.text
+    assert logging.getLogger("httpx").getEffectiveLevel() >= logging.WARNING

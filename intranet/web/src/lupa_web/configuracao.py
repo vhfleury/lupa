@@ -1,5 +1,8 @@
 """Configuração do Django do front: sem banco, sem sessão própria, CSRF por cookie (D4).
 
+O envio de arquivo vai direto para arquivo temporário no volume dos pendentes (D14, D16); o
+logger do `httpx` fica em `WARNING`, porque a URL das chamadas leva nome de arquivo e número CNJ.
+
 O front não guarda estado: a sessão é o cookie da API (D3) e todos os dados vêm de
 `LUPA_WEB_API_URL` (D2). Os estáticos saem do WhiteNoise com hash no nome (D12).
 """
@@ -55,6 +58,9 @@ STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
+FILE_UPLOAD_HANDLERS = ["django.core.files.uploadhandler.TemporaryFileUploadHandler"]
+FILE_UPLOAD_TEMP_DIR = os.environ.get("LUPA_WEB_ENVIOS_PENDENTES", "/var/lupa/envios-pendentes")
+
 LANGUAGE_CODE = "pt-br"
 TIME_ZONE = "America/Sao_Paulo"
 USE_I18N = False
@@ -70,4 +76,5 @@ LOGGING = {
     },
     "handlers": {"saida": {"class": "logging.StreamHandler", "formatter": "json"}},
     "root": {"handlers": ["saida"], "level": "INFO"},
+    "loggers": {"httpx": {"level": "WARNING"}, "httpcore": {"level": "WARNING"}},
 }

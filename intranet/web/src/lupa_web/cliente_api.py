@@ -1,10 +1,12 @@
 """Chamada do Django à API do Lupa (A1, D1, D3, D13).
 
-Um `httpx.AsyncClient` único por processo, sem guardar cookie: cada chamada leva o cookie de
-sessão do navegador e o `X-Forwarded-For` do proxy. O middleware `DesviosDaApi` copia para a
-resposta todo `Set-Cookie` da API e transforma 401, 403 e falha de conexão nas respostas da tela.
+Um `httpx.AsyncClient` por loop de eventos (um só sob o uvicorn), sem guardar cookie: cada
+chamada leva o cookie de sessão do navegador e o `X-Forwarded-For` do proxy. O middleware
+`DesviosDaApi` copia para a resposta todo `Set-Cookie` da API e transforma 401, 403 e falha de
+conexão nas respostas da tela.
 """
 
+import asyncio
 import http.cookiejar
 import logging
 import os
@@ -25,7 +27,7 @@ MENSAGEM_GENERICA = "Algo deu errado. Tente novamente."
 
 logger = logging.getLogger(__name__)
 
-_clientes: list[httpx.AsyncClient] = []
+_clientes: list[tuple[asyncio.AbstractEventLoop, httpx.AsyncClient]] = []
 
 
 class DesvioDaApiError(Exception):
@@ -68,26 +70,33 @@ def prazo(longo: bool) -> float:
 
 
 def obter_cliente() -> httpx.AsyncClient:
-    """Cliente HTTP do processo, criado na primeira chamada e sem pote de cookies.
+    """Cliente HTTP do loop de eventos corrente, criado na primeira chamada, sem pote de cookies.
+
+    Sob o uvicorn há um só loop e, portanto, um só cliente; um loop novo (como nos testes, a cada
+    pedido) ganha cliente próprio, porque as conexões de um cliente pertencem ao loop que as abriu.
 
     Returns:
-        O `httpx.AsyncClient` compartilhado, apontado para `LUPA_WEB_API_URL`.
+        O `httpx.AsyncClient` do loop, apontado para `LUPA_WEB_API_URL`.
     """
-    if not _clientes:
-        recusa_tudo = http.cookiejar.DefaultCookiePolicy(allowed_domains=[])
-        _clientes.append(
-            httpx.AsyncClient(
-                base_url=os.environ.get("LUPA_WEB_API_URL", URL_API_PADRAO),
-                cookies=http.cookiejar.CookieJar(policy=recusa_tudo),
-            )
-        )
-    return _clientes[0]
+    loop = asyncio.get_running_loop()
+    if _clientes and _clientes[0][0] is loop:
+        return _clientes[0][1]
+    _clientes.clear()
+    recusa_tudo = http.cookiejar.DefaultCookiePolicy(allowed_domains=[])
+    cliente = httpx.AsyncClient(
+        base_url=os.environ.get("LUPA_WEB_API_URL", URL_API_PADRAO),
+        cookies=http.cookiejar.CookieJar(policy=recusa_tudo),
+    )
+    _clientes.append((loop, cliente))
+    return cliente
 
 
 async def encerrar_cliente() -> None:
-    """Fecha o cliente compartilhado, se houver; a próxima chamada cria outro."""
+    """Fecha o cliente do loop corrente; o de outro loop, já encerrado, só é descartado."""
     while _clientes:
-        await _clientes.pop().aclose()
+        loop, cliente = _clientes.pop()
+        if loop is asyncio.get_running_loop():
+            await cliente.aclose()
 
 
 def cabecalhos_de_repasse(request: HttpRequest) -> dict[str, str]:
@@ -122,7 +131,8 @@ async def chamar(
         metodo: Método HTTP.
         caminho: Caminho da rota na API.
         longo: Usa o prazo do chat e do envio de arquivo (D13).
-        **opcoes: Corpo e parâmetros repassados ao `httpx` (`json`, `data`, `params`...).
+        **opcoes: Corpo, parâmetros e cabeçalhos extras repassados ao `httpx` (`json`,
+            `content`, `params`, `headers`...).
 
     Returns:
         Resposta da API, com status diferente de 401 e 403.
@@ -136,7 +146,7 @@ async def chamar(
         resposta = await obter_cliente().request(
             metodo,
             caminho,
-            headers=cabecalhos_de_repasse(request),
+            headers=cabecalhos_de_repasse(request) | opcoes.pop("headers", {}),
             timeout=prazo(longo),
             **opcoes,
         )

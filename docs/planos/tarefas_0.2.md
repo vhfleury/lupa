@@ -624,10 +624,45 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
     intranet/web/tests/telas/test_processos.py --no-cov -q`. Vermelho: `5 failed` (rota
     inexistente). Verde: `5 passed`; suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1`
     `64 passed`, cobertura 100%.
-- [ ] **T10.8** Cadastro por arquivo com progresso, complemento e estado da ingestão. RF-INT-04. Fase 5; A4, D8, D14.
+- [x] **T10.8** Cadastro por arquivo com progresso, complemento e estado da ingestão. RF-INT-04. Fase 5; A4, D8, D14.
   - Vermelho: `intranet/web/tests/telas/test_envio.py::test_pdf_sem_classe_pede_a_classe_e_reenvio_usa_o_mesmo_arquivo`, `::test_arquivo_acima_do_limite_e_recusado_sem_chamar_api`; `intranet/web/tests/telas/test_processo.py::test_estado_do_arquivo_para_de_atualizar_no_estado_final`; `intranet/web/tests/integracao/test_envio_api_real.py::test_envio_de_pdf_sintetico_cria_processo_pela_api`; `intranet/web/tests/unit/test_envios_pendentes.py::test_pendente_vencido_ou_de_outra_sessao_nao_e_recuperado`, `::test_pendente_e_apagado_apos_aceite_e_vencidos_no_envio_novo` (D16).
   - Verde: `telas/envio.py`, `telas/processo.py`, fragmentos, `static/js/htmx.min.js`, `static/js/envio.js`.
   - Limpeza: nenhuma.
+  - `telas/envio.py`: `POST /processos/envio` (novo), `/processos/<id>/envio` (anexo) e
+    `/processos/envio/complemento`; recusa no front sem chamar a API (sem arquivo, tipo, vazio,
+    acima de `LUPA_WEB_TAMANHO_MAXIMO_ENVIO`, padrão 512 MiB); repasse em streaming (blocos de
+    1 MiB, `application/octet-stream`, prazo longo); fragmentos com status 200 (o HTMX não troca
+    4xx). `envios_pendentes.py` (D16): arquivo e metadados (nome, SHA-256 do cookie, momento e a
+    identificação incompleta da API, para refazer o formulário) no volume; código de 32 bytes
+    conferido por regex; complemento que a API ainda recusa sem `motivo` (número inválido) mantém
+    o pendente; recusa com `motivo` o apaga. Upload só por `TemporaryFileUploadHandler` em
+    `FILE_UPLOAD_TEMP_DIR` = volume. Volume `envios-pendentes` no compose; o Dockerfile cria
+    `/var/lupa/envios-pendentes` com dono `lupa` (o volume novo herda o dono).
+  - Estado (A4.9): `GET /processos/<id>/estado`, fragmento `processos/_estado.html` com
+    `hx-trigger="every 5s"` só com arquivo fora de `ESTADOS_FINAIS`. Lista (paridade RF-INT-02):
+    `processos/_tabela.html` com `every 4s` enquanto há processamento, como o SvelteKit; o pedido
+    HTMX recebe só a tabela, e os filtros ficam fora do fragmento.
+  - HTMX 2.0.4 de `https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js` (50 917 bytes, SHA-256
+    `4gndpcgjVHnzFm3vx3UOHbzVpcGAi3eS/C5nM3aPtEc=`, igual ao publicado pelo jsDelivr; SHA-384
+    `HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+`), `meta htmx-config`
+    com `allowEval=false`, `includeIndicatorStyles=false`, `selfRequestsOnly=true`; `envio.js`
+    com `htmx:xhr:progress`.
+  - Logger `httpx`/`httpcore` em `WARNING` (a URL leva nome do arquivo e número CNJ):
+    `test_cliente_api.py::test_log_do_httpx_nao_registra_a_consulta`. Cliente da API por loop de
+    eventos (`::test_cliente_e_um_por_loop_de_eventos`, `::test_encerrar_fecha_o_cliente_do_proprio_loop`);
+    `chamar` aceita cabeçalhos extras.
+  - Integração: o teste entra como assessor novo (TOTP calculado no teste, troca de senha), envia
+    um PDF mínimo sem identificação e completa com número CNJ válido aleatório. `verificar.sh`
+    cria o assessor no contêiner `api` com o desembargador existente e passa usuário e senha por
+    `LUPA_WEB_TESTE_USUARIO`/`LUPA_WEB_TESTE_SENHA`; sem eles e com `LUPA_EXIGIR_INTEGRACAO=1` o
+    teste falha. O TOTP usa o relógio real (a API confere o código no tempo real).
+  - Comando: `docker compose exec -e LUPA_EXIGIR_INTEGRACAO=1 -e LUPA_WEB_TESTE_USUARIO -e
+    LUPA_WEB_TESTE_SENHA front python -m pytest -c intranet/web/pyproject.toml intranet/web/tests
+    -q`. Vermelho: `15 failed, 88 passed, 1 skipped` e `ImportError: cannot import name
+    'envios_pendentes'`. Verde: `109 passed`, cobertura 100%; ruff, format e mypy limpos.
+  - `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh`: pipeline `702 passed` (95,25%), api
+    `265 passed, 3 deselected` (98,23%), ponta a ponta `6 passed`, injeção `2 passed`, web
+    `109 passed` (100%), cabeçalhos ok em 4 rotas, agente `11 passed`; E2E não rodou.
 - [x] **T10.9** Processo: arquivos com diagnóstico e alertas, responsáveis, correção de classe e descarte. RF-INT-02. Fase 5.
   - Vermelho: casos `processo` de `intranet/web/tests/telas/test_paridade.py::test_cada_tela_responde_ao_papel_permitido`.
   - Verde: `telas/processo.py`, `templates/processos/processo.html`.

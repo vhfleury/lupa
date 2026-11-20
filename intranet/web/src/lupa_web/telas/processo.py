@@ -12,6 +12,7 @@ from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from lupa_web import cliente_api, rotulos
+from lupa_web.telas.envio import limite_de_envio
 from lupa_web.telas.sessao import Sessao, contexto_da_moldura, tela_autenticada, tem
 
 UNIDADES = ("B", "KB", "MB", "GB")
@@ -82,6 +83,27 @@ def linha_do_arquivo(arquivo: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def contexto_do_estado(processo_id: str, arquivos: dict[str, Any]) -> dict[str, Any]:
+    """Contexto do fragmento de estado dos arquivos (A4, passo 9).
+
+    Args:
+        processo_id: Identificador público do processo.
+        arquivos: Corpo de `GET /processos/<id>/arquivos`.
+
+    Returns:
+        Situação, linhas dos arquivos e `pendente`, verdadeiro com arquivo fora do estado final.
+    """
+    linhas = [linha_do_arquivo(a) for a in arquivos["arquivos"]]
+    return {
+        "processo_id": processo_id,
+        "situacao_rotulo": rotulos.SITUACAO.get(arquivos["situacao"], arquivos["situacao"]),
+        "arquivos": linhas,
+        "pendente": any(
+            a.get("estado") and a["estado"] not in rotulos.ESTADOS_FINAIS for a in linhas
+        ),
+    }
+
+
 def _nao_encontrado(request: HttpRequest, sessao: Sessao) -> HttpResponse:
     contexto = contexto_da_moldura(request, sessao)
     return render(request, "erros/nao_encontrado.html", contexto, status=404)
@@ -110,13 +132,15 @@ async def _contexto_do_processo(
         "classe_anterior_rotulo": rotulos.CLASSES.get(processo.get("classe_anterior") or "", ""),
         "classe_corrigida_em_texto": rotulos.formatar_data(processo.get("classe_corrigida_em")),
         "classes": rotulos.CLASSES.items(),
-        "situacao_rotulo": rotulos.SITUACAO.get(arquivos["situacao"], arquivos["situacao"]),
-        "arquivos": [linha_do_arquivo(a) for a in arquivos["arquivos"]],
+        **contexto_do_estado(processo_id, arquivos),
         "responsaveis": responsaveis["responsaveis"],
         "disponiveis": [u | {"marcado": u["id"] in vigentes} for u in responsaveis["disponiveis"]],
         "pode_gerir": responsaveis["pode_gerir"] and tem(sessao, "gerir_assessor"),
         "pode_corrigir": ativo and tem(sessao, "anotar"),
         "pode_descartar": ativo and tem(sessao, "ver_auditoria"),
+        "pode_enviar": ativo and tem(sessao, "subir_processo"),
+        "acao_anexo": f"{base}/envio",
+        "limite_envio": formatar_bytes(limite_de_envio()),
     }
 
 
@@ -280,3 +304,20 @@ async def arquivo(
         "metadados_suspeitos": [rotulos.pares(m) for m in alertas.get("metadados_suspeitos", [])],
     }
     return render(request, "processos/arquivo.html", contexto)
+
+
+@require_GET
+@tela_autenticada
+async def estado(request: HttpRequest, sessao: Sessao, processo_id: str) -> HttpResponse:
+    """Fragmento HTMX com o estado dos arquivos; repete a cada 5 s até o estado final (A4.9).
+
+    Args:
+        request: Pedido HTMX.
+        sessao: Dados da sessão.
+        processo_id: Identificador público do processo.
+
+    Returns:
+        Fragmento da tabela de arquivos.
+    """
+    arquivos = (await _obter(request, f"/processos/{processo_id}/arquivos")).json()
+    return render(request, "processos/_estado.html", contexto_do_estado(processo_id, arquivos))

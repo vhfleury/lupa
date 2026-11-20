@@ -8,8 +8,15 @@
       <h1>Processos</h1>
       <p>Consulte os autos, acompanhe o processamento e veja quem está responsável.</p>
     </div>
+    {% if pode_criar %}<a class="novo-botao" href="#cadastro-processo">+ Novo processo</a>{% endif %}
   </header>
-  <section class="acervo" aria-labelledby="titulo-acervo">
+  {% if pode_criar %}
+  <section id="cadastro-processo" class="cartao" aria-labelledby="titulo-novo">
+    <h2 id="titulo-novo">Novo processo</h2>
+    {% include "componentes/envio.html" with acao_envio="/processos/envio" id_envio="novos-autos" %}
+  </section>
+  {% endif %}
+  <section id="acervo" class="acervo" aria-labelledby="titulo-acervo">
     <div class="cabecalho-lista">
       <div><h2 id="titulo-acervo">Lista de processos</h2></div>
       <span class="contagem">{{ processos|length }} de {{ total }}</span>
@@ -36,40 +43,7 @@
       </div>
       <div><button type="submit" class="secundario">Filtrar</button></div>
     </form>
-    {% if total == 0 %}
-    <div class="vazio">
-      <strong>Nenhum processo cadastrado.</strong>
-      <p>Os processos e seus responsáveis aparecerão aqui.</p>
-    </div>
-    {% elif not processos %}
-    <div class="vazio">
-      <strong>Nenhum processo encontrado.</strong>
-      <p>Experimente outros termos ou remova os filtros.</p>
-      <a class="botao secundario" href="/processos">Limpar filtros</a>
-    </div>
-    {% else %}
-    <div class="tabela-container">
-      <table data-testid="lista-processos">
-        <thead><tr><th scope="col">Processo</th><th scope="col">Assessores responsáveis</th><th scope="col">Processamento</th><th scope="col">Criado em</th></tr></thead>
-        <tbody>
-          {% for p in processos %}
-          <tr data-processo="{{ p.id }}">
-            <td data-rotulo="Processo"><a class="numero-processo" href="/processos/{{ p.id }}">{{ p.numero_cnj }}</a><span class="descricao">{{ p.classe_rotulo }}</span></td>
-            <td data-rotulo="Assessores responsáveis"><div class="responsaveis">
-              {% for assessor in p.responsaveis %}<span class="responsavel">{{ assessor.nome_usuario }}{% if not assessor.ativo %}<small> · desativado</small>{% endif %}</span>{% empty %}<span class="sem-responsavel">Sem responsável atribuído</span>{% endfor %}
-            </div></td>
-            <td data-rotulo="Processamento"><span class="selo {{ p.situacao }}" data-testid="situacao">{{ p.situacao_rotulo }}</span></td>
-            <td data-rotulo="Criado em" class="data">{{ p.criado_em_texto }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% endif %}
-    <footer class="rodape-lista">
-      <span>Abra um processo para consultar os detalhes e os responsáveis.</span>
-      {% if processando %}<span>Há arquivos em processamento; recarregue a página para ver o estado atual.</span>{% endif %}
-    </footer>
+    {% include "processos/_tabela.html" %}
   </section>
 </div>
 {% endblock %}

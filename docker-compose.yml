@@ -62,6 +62,9 @@ services:
       retries: 5
     read_only: true
     tmpfs: [/tmp]
+    # 0.2 D16: arquivo a espera do complemento de numero ou classe; unico caminho gravavel.
+    volumes:
+      - envios-pendentes:/var/lupa/envios-pendentes
     networks: [borda]
     security_opt: ["no-new-privileges:true"]
 
@@ -218,3 +221,4 @@ networks:
 volumes:
   db-dados:
   minio-dados:
+  envios-pendentes:

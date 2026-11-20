@@ -1,0 +1,29 @@
+{% if codigo %}
+<form hx-post="/processos/envio/complemento" hx-target="closest .resultado-envio" class="complemento">
+  {% csrf_token %}
+  <input type="hidden" name="codigo" value="{{ codigo }}">
+  <h3>Complete a identificação do processo</h3>
+  {% if numero_lido %}<p>Número lido: <strong>{{ numero_lido }}</strong></p>{% endif %}
+  {% if classe_lida %}<p>Classe lida: <strong>{{ classe_lida }}</strong></p>{% endif %}
+  {% if erro %}{% include "componentes/aviso.html" with tipo="erro" mensagem=erro %}{% endif %}
+  {% if "numero_cnj" in faltando %}
+  {% if numeros_encontrados %}<p class="dica">Escolha um dos números encontrados ou digite o número CNJ: {% for numero in numeros_encontrados %}<span class="mono">{{ numero }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+  <div class="campo">
+    <label for="cnj">Número CNJ</label>
+    <input id="cnj" name="numero_cnj" inputmode="numeric" autocomplete="off" placeholder="0000000-00.0000.0.00.0000" required>
+  </div>
+  {% endif %}
+  {% if "classe" in faltando %}
+  <div class="campo">
+    <label for="classe">Classe</label>
+    <select id="classe" name="classe" required>
+      <option value="" disabled selected>Selecione a classe</option>
+      {% for valor, rotulo in classes %}<option value="{{ valor }}">{{ rotulo }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  <button type="submit">Confirmar e reenviar</button>
+</form>
+{% elif erro %}
+{% include "componentes/aviso.html" with tipo="erro" mensagem=erro %}
+{% endif %}

@@ -27,7 +27,29 @@ MSYS_NO_PATHCONV=1 "${PIPELINE[@]}" -c "import json,sys; m=json.load(open(sys.ar
 echo "== web: ruff check ==";               "${WEB[@]}" -m ruff check intranet/web/src intranet/web/tests
 echo "== web: ruff format --check ==";      "${WEB[@]}" -m ruff format --check intranet/web/src intranet/web/tests
 echo "== web: mypy --strict ==";            "${WEB[@]}" -m mypy --config-file intranet/web/pyproject.toml intranet/web/src intranet/web/tests
-echo "== web: pytest ==";                   "${WEB[@]}" -m pytest -c intranet/web/pyproject.toml intranet/web/tests
+# T10.8: assessor sintetico novo para o envio do front a API real (test_envio_api_real.py).
+# Usa o desembargador da stack de desenvolvimento; a senha temporaria so passa por variavel.
+read -r LUPA_WEB_TESTE_USUARIO LUPA_WEB_TESTE_SENHA < <(docker compose exec -T api python - <<'PY'
+import secrets
+import sys
+from datetime import UTC, datetime
+
+sys.path.insert(0, "intranet/api/scripts")
+from e2e_processos import desembargador, sessao_e2e
+from lupa_api.acesso.servico import Contexto, criar_usuario
+from lupa_pipeline.dominio.enums import PapelUsuario
+
+with sessao_e2e() as sessao:
+    nome = f"assessor.web.{secrets.token_hex(3)}"
+    ctx = Contexto(None, None, datetime.now(UTC))
+    criado = criar_usuario(sessao, desembargador(sessao), nome, PapelUsuario.ASSESSOR, ctx)
+    print(nome, criado.senha_temporaria)
+PY
+)
+export LUPA_WEB_TESTE_USUARIO LUPA_WEB_TESTE_SENHA
+echo "== web: pytest ==";                   docker compose exec -T -e LUPA_EXIGIR_INTEGRACAO=1 \
+  -e LUPA_WEB_TESTE_USUARIO -e LUPA_WEB_TESTE_SENHA front \
+  python -m pytest -c intranet/web/pyproject.toml intranet/web/tests
 # Etapa 6.10: cabecalhos de seguranca do proxy (CSP, HSTS, Permissions-Policy, COOP...). Falha se
 # faltar algum ou se a CSP afrouxar; com o proxy fora do ar so avisa (LUPA_EXIGIR_CABECALHOS=1 exige).
 echo "== cabecalhos de seguranca =="

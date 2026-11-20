@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block titulo %}Lupa{% endblock %}</title>
+<meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false,"selfRequestsOnly":true}'>
 <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
+<script src="{% static 'js/htmx.min.js' %}" defer></script>
+<script src="{% static 'js/envio.js' %}" defer></script>
 {% block cabeca %}{% endblock %}
 </head>
 <body>

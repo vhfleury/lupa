@@ -22,7 +22,8 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --chown=lupa:lupa intranet/web/pyproject.toml ./intranet/web/pyproject.toml
 COPY --chown=lupa:lupa intranet/web/src ./intranet/web/src
 COPY --chown=lupa:lupa intranet/web/tests ./intranet/web/tests
-RUN LUPA_WEB_CHAVE_SECRETA=coleta python -m django collectstatic --noinput -v 0
+RUN LUPA_WEB_CHAVE_SECRETA=coleta python -m django collectstatic --noinput -v 0 \
+    && mkdir -p /var/lupa/envios-pendentes && chown lupa:lupa /var/lupa/envios-pendentes
 USER lupa
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \

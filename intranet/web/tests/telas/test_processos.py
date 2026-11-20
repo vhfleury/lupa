@@ -94,3 +94,34 @@ def test_lista_vazia_avisa_que_nao_ha_processos(
     """RF-INT-02: sem processos, a tela diz que nenhum foi cadastrado."""
     logado.get("/processos").respond(200, json=[])
     assert "Nenhum processo cadastrado." in navegador.get("/processos").content.decode()
+
+
+def test_lista_atualiza_sozinha_enquanto_ha_processamento(
+    logado: respx.MockRouter, navegador: Client
+) -> None:
+    """RF-INT-02: com processo em processamento, a lista se atualiza a cada 4 s pelo HTMX."""
+    logado.get("/processos").respond(200, json=LISTA)
+    html = navegador.get("/processos", {"situacao": "processando"}).content.decode()
+    assert 'hx-trigger="every 4s"' in html
+    assert 'hx-get="/processos?situacao=processando"' in html
+    fragmento = navegador.get("/processos", HTTP_HX_REQUEST="true").content.decode()
+    assert "<html" not in fragmento
+    assert "0000001-23.2026.8.07.0001" in fragmento
+
+
+def test_lista_sem_processamento_nao_se_atualiza(
+    logado: respx.MockRouter, navegador: Client
+) -> None:
+    """RF-INT-02: sem processamento em curso, nenhum `hx-trigger` periódico."""
+    logado.get("/processos").respond(200, json=LISTA[:1])
+    assert "hx-trigger" not in navegador.get("/processos").content.decode()
+
+
+def test_cadastro_de_processo_aparece_para_quem_pode_subir(
+    logado: respx.MockRouter, navegador: Client
+) -> None:
+    """RF-INT-04 (A4.1): o assessor vê o cadastro por arquivo com `hx-post` multipart."""
+    logado.get("/processos").respond(200, json=[])
+    html = navegador.get("/processos").content.decode()
+    assert 'hx-post="/processos/envio"' in html
+    assert 'hx-encoding="multipart/form-data"' in html

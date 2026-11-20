@@ -94,3 +94,52 @@ def test_formatar_bytes(tamanho: int | None, esperado: str) -> None:
 def test_detalhe_do_estado(arquivo: dict[str, object], esperado: str) -> None:
     """RF-ING-06: falha, páginas faltantes e quarentena têm explicação na linha do arquivo."""
     assert processo.detalhe_do_estado(arquivo) == esperado
+
+
+def _arquivos_em(*estados: str) -> dict[str, object]:
+    return {
+        "processo_id": "c3" * 32,
+        "status": "criado",
+        "situacao": "processando",
+        "arquivos": [
+            {
+                "arquivo_id": f"{indice:064x}",
+                "nome": f"parte-{indice}.pdf",
+                "tamanho_bytes": 10,
+                "enviado_em": None,
+                "estado": estado,
+                "total_paginas": None,
+            }
+            for indice, estado in enumerate(estados)
+        ],
+    }
+
+
+def test_estado_do_arquivo_para_de_atualizar_no_estado_final(
+    logado: respx.MockRouter, navegador: Client
+) -> None:
+    """RF-INT-04 (A4.9): com arquivo em andamento há `every 5s`; tudo final, sem `hx-trigger`."""
+    rota = logado.get(f"{BASE}/arquivos")
+    rota.respond(200, json=_arquivos_em("concluido", "em_extracao"))
+    html = navegador.get(f"{BASE}/estado", HTTP_HX_REQUEST="true").content.decode()
+    assert 'hx-trigger="every 5s"' in html
+    assert f'hx-get="{BASE}/estado"' in html
+    assert "Extraindo páginas" in html
+    assert "<html" not in html
+
+    rota.respond(200, json=_arquivos_em("concluido", "quarentena", "parcial"))
+    html = navegador.get(f"{BASE}/estado", HTTP_HX_REQUEST="true").content.decode()
+    assert "hx-trigger" not in html
+    assert "Em quarentena" in html
+
+
+def test_processo_com_envio_permitido_mostra_formulario_com_progresso(
+    logado: respx.MockRouter, navegador: Client
+) -> None:
+    """RF-INT-04 (A4.1, D8): o anexo usa `hx-post` multipart e a barra de progresso."""
+    _simular_processo(logado, "assessor")
+    html = navegador.get(BASE).content.decode()
+    assert f'hx-post="{BASE}/envio"' in html
+    assert 'hx-encoding="multipart/form-data"' in html
+    assert "<progress" in html
+    assert 'id="estado-arquivos"' in html

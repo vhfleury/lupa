@@ -63,26 +63,15 @@
   {% endif %}
 </section>
 
-<h2>Arquivos</h2>
-<p>Situação: <strong data-testid="situacao-processo">{{ situacao_rotulo }}</strong></p>
-{% if arquivos %}
-<table data-testid="lista-arquivos">
-  <thead><tr><th scope="col">Arquivo</th><th scope="col">Tamanho</th><th scope="col">Enviado em</th><th scope="col">Estado</th><th scope="col">Páginas</th></tr></thead>
-  <tbody>
-    {% for a in arquivos %}
-    <tr data-arquivo="{{ a.arquivo_id }}">
-      <td><a href="/processos/{{ processo.id }}/arquivos/{{ a.arquivo_id }}">{{ a.nome }}</a></td>
-      <td>{{ a.tamanho_texto }}</td>
-      <td>{{ a.enviado_em_texto }}</td>
-      <td><span data-testid="estado-arquivo" data-estado="{{ a.estado|default:'' }}">{{ a.estado_rotulo }}</span>{% if a.detalhe %}<p class="motivo">{{ a.detalhe }}</p>{% endif %}</td>
-      <td>{% if a.legivel %}<a href="/processos/{{ processo.id }}/visualizador?arquivo={{ a.arquivo_id }}&amp;pagina=1">{{ a.total_paginas }}</a>{% else %}{{ a.total_paginas|default:"—" }}{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<p class="dica">Nenhum arquivo enviado.</p>
+{% if pode_enviar %}
+<section class="cartao" aria-labelledby="titulo-envio">
+  <h2 id="titulo-envio">Enviar autos</h2>
+  {% include "componentes/envio.html" with acao_envio=acao_anexo id_envio="arquivo" %}
+</section>
 {% endif %}
+
+<h2>Arquivos</h2>
+{% include "processos/_estado.html" %}
 
 {% if pode_descartar %}
 <section class="cartao zona-perigo" aria-labelledby="titulo-descarte">

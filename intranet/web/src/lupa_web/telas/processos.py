@@ -1,6 +1,8 @@
 """Lista de processos renderizada a partir de `GET /processos` (RF-INT-01, RF-INT-02).
 
 Os filtros (busca, situação e responsável) vêm do formulário GET e são aplicados no servidor.
+Com processo em processamento, a tabela se atualiza pelo HTMX a cada 4 s, como no SvelteKit; o
+pedido HTMX recebe só o fragmento da tabela.
 """
 
 from typing import Any
@@ -9,6 +11,8 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
 from lupa_web import cliente_api, rotulos
+from lupa_web.telas.envio import limite_de_envio
+from lupa_web.telas.processo import formatar_bytes
 from lupa_web.telas.sessao import Sessao, contexto_da_moldura, tela_autenticada, tem
 
 SEM_RESPONSAVEL = "sem"
@@ -103,5 +107,9 @@ async def lista(request: HttpRequest, sessao: Sessao) -> HttpResponse:
         "assessores": assessores_da_lista(processos),
         "pode_criar": tem(sessao, "subir_processo"),
         "processando": any(p["ingestao"]["situacao"] == "processando" for p in processos),
+        "endereco": request.get_full_path(),
+        "limite_envio": formatar_bytes(limite_de_envio()),
     }
+    if request.headers.get("HX-Request") == "true":
+        return render(request, "processos/_tabela.html", contexto)
     return render(request, "processos/lista.html", contexto)
