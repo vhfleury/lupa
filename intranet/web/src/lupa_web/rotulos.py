@@ -1,6 +1,7 @@
 """Rótulos em português dos códigos da API e formatação de datas para as telas."""
 
 from datetime import date, datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 FUSO = ZoneInfo("America/Sao_Paulo")
@@ -121,3 +122,44 @@ def motivo_falha(motivo: str | None) -> str:
     if not motivo:
         return "Falha no processamento."
     return MOTIVO_FALHA.get(motivo, f"Falha no processamento ({legivel(motivo)}).")
+
+
+def texto_do_valor(valor: object) -> str:
+    """Texto de um valor do JSON da API para leitura humana.
+
+    Args:
+        valor: Valor qualquer do JSON.
+
+    Returns:
+        "Sim"/"Não", datas formatadas, listas separadas por " · " e objetos como "Chave: valor".
+    """
+    if valor is None:
+        return SEM_VALOR
+    if isinstance(valor, bool):
+        return "Sim" if valor else "Não"
+    if isinstance(valor, str):
+        return formatar_data(valor) if len(valor) == len("AAAA-MM-DD") else valor
+    if isinstance(valor, list):
+        return " · ".join(texto_do_valor(item) for item in valor) or SEM_VALOR
+    if isinstance(valor, dict):
+        return " · ".join(f"{legivel(str(k))}: {texto_do_valor(v)}" for k, v in valor.items())
+    return str(valor)
+
+
+def pares(
+    dados: dict[str, Any] | None, omitir: frozenset[str] = frozenset()
+) -> list[tuple[str, str]]:
+    """Pares (rótulo, texto) de um objeto da API, para uma lista de definições.
+
+    Args:
+        dados: Objeto da API ou `None`.
+        omitir: Chaves que não aparecem.
+
+    Returns:
+        Lista na ordem do objeto.
+    """
+    return [
+        (legivel(chave), texto_do_valor(valor))
+        for chave, valor in (dados or {}).items()
+        if chave not in omitir
+    ]

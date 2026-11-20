@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block titulo %}Descartar processo · Lupa{% endblock %}
+{% block conteudo %}
+<p><a href="/processos/{{ processo.id }}">← {{ processo.numero_cnj }}</a></p>
+{% include "componentes/confirmacao.html" %}
+{% endblock %}

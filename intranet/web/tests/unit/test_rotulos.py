@@ -36,3 +36,18 @@ def test_motivos_de_quarentena_e_falha_tem_frase_para_o_usuario() -> None:
     assert rotulos.motivo_falha("erro_parser") == "Erro ao ler o PDF."
     assert rotulos.motivo_falha("outro") == "Falha no processamento (Outro)."
     assert rotulos.motivo_falha(None) == "Falha no processamento."
+
+
+def test_texto_do_valor_para_cada_tipo_do_json() -> None:
+    """RF-ING-06: valores do relatório e do diagnóstico aparecem em texto legível."""
+    assert rotulos.texto_do_valor(None) == "—"
+    assert rotulos.texto_do_valor(True) == "Sim"
+    assert rotulos.texto_do_valor(False) == "Não"
+    assert rotulos.texto_do_valor("2026-03-04") == "04/03/2026"
+    assert rotulos.texto_do_valor([1, "a"]) == "1 · a"
+    assert rotulos.texto_do_valor([]) == "—"
+    assert rotulos.texto_do_valor({"tem_indice": False}) == "Tem indice: Não"
+    assert rotulos.pares({"arquivo_id": "x", "cenario": "y"}, frozenset({"arquivo_id"})) == [
+        ("Cenario", "y")
+    ]
+    assert rotulos.pares(None) == []

@@ -628,10 +628,28 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
   - Vermelho: `intranet/web/tests/telas/test_envio.py::test_pdf_sem_classe_pede_a_classe_e_reenvio_usa_o_mesmo_arquivo`, `::test_arquivo_acima_do_limite_e_recusado_sem_chamar_api`; `intranet/web/tests/telas/test_processo.py::test_estado_do_arquivo_para_de_atualizar_no_estado_final`; `intranet/web/tests/integracao/test_envio_api_real.py::test_envio_de_pdf_sintetico_cria_processo_pela_api`.
   - Verde: `telas/envio.py`, `telas/processo.py`, fragmentos, `static/js/htmx.min.js`, `static/js/envio.js`.
   - Limpeza: nenhuma.
-- [ ] **T10.9** Processo: arquivos com diagnóstico e alertas, responsáveis, correção de classe e descarte. RF-INT-02. Fase 5.
+- [x] **T10.9** Processo: arquivos com diagnóstico e alertas, responsáveis, correção de classe e descarte. RF-INT-02. Fase 5.
   - Vermelho: casos `processo` de `intranet/web/tests/telas/test_paridade.py::test_cada_tela_responde_ao_papel_permitido`.
   - Verde: `telas/processo.py`, `templates/processos/processo.html`.
   - Limpeza: nenhuma.
+  - Feita antes da T10.8 (o envio e o estado com `hx-trigger` ficam para ela). A tela lê
+    `GET /processos/<id>`, `/arquivos` e `/responsaveis`; cada ação é um formulário POST que
+    chama a API e volta com 303: `/classe` (papel com `anotar`), `/responsaveis` (só com
+    `gerir_assessor` e `pode_gerir` da API, `?aviso=responsaveis` mostra a confirmação),
+    `/descartar` (GET com `componentes/confirmacao.html`, POST descarta e vai à lista; papel com
+    `ver_auditoria`, como a API). Página do arquivo `/processos/<id>/arquivos/<arquivo>` com
+    relatório, diagnóstico (404 da API vira "Diagnóstico ainda não disponível.") e alertas
+    (resumo, páginas com sinal, metadados suspeitos). 404 da API vira `erros/nao_encontrado.html`;
+    4xx das ações volta à tela com a mensagem da API e o mesmo status (A1.8). Os dados da capa
+    (ficha do dossiê) no cabeçalho ficam para a T10.10. Casos de `test_paridade.py`: processo
+    (assessor e desembargador), arquivo, classe, responsáveis, confirmação e descarte; extras em
+    `test_processo.py` (404, sem diagnóstico, 409, aviso, tamanhos e motivos) e
+    `test_rotulos.py`.
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas/test_paridade.py intranet/web/tests/telas/test_processo.py --no-cov
+    -q`. Vermelho: `11 failed, 11 passed` (rotas inexistentes; os 11 verdes são as funções puras
+    `formatar_bytes` e `detalhe_do_estado`, escritas junto com a view). Verde: `22 passed`; suíte
+    de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1` `87 passed`, cobertura 100%.
 - [ ] **T10.10** Dossiê, peças, fatos, achados, anotações e visualizador com imagem repassada. RF-INT-02, RF-INT-05. Fase 6; A6.
   - Vermelho: `intranet/web/tests/telas/test_dossie.py::test_evidencia_do_dossie_abre_a_pagina_do_arquivo`; `intranet/web/tests/telas/test_visualizador.py::test_imagem_da_pagina_e_repassada_com_tipo_e_cache_da_api`; casos `dossie`, `validacoes` e `visualizador` de `test_paridade.py`.
   - Verde: `telas/dossie.py`, `telas/validacoes.py`, `telas/visualizador.py` e templates.
