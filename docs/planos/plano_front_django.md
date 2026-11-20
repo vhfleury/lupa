@@ -100,6 +100,9 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
   `LUPA_WEB_TIMEOUT_CHAT` (padrão 180 s) para a pergunta do chat e o envio de arquivo.
 - **D14.** O envio de arquivo usa `TemporaryFileUploadHandler` e é repassado à API em streaming;
   o limite de tamanho do Django é o mesmo da API, lido de `LUPA_WEB_TAMANHO_MAXIMO_ENVIO`.
+- **D15.** `SECRET_KEY` vem de `LUPA_WEB_CHAVE_SECRETA`; sem a variável, o front gera uma chave
+  aleatória a cada subida, e os tokens CSRF emitidos antes de um reinício são recusados uma vez
+  (decisão do usuário em 20/11/2026, durante T10.3).
 
 ## Fases
 
