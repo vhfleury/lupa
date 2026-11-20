@@ -187,6 +187,22 @@ docs/
 - Tela em `telas/` e `templates/`; CSS por assunto em `static/css/`. JavaScript próprio só em
   `static/js/envio.js`, `tema.js` e `visualizador.js`; sem script inline.
 
+### Git
+
+- Branches: `main` (versões publicadas) e `develop` (integração). Nenhum commit nem push direto
+  em nenhuma das duas; tudo entra por PR.
+- Branch de trabalho sai de `develop`, no formato `<tipo>/T<nn>-<descricao-curta>` (exemplo:
+  `feat/T10.3-tela-processos`). Tipos: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
+- Commit em Conventional Commits, em português: `<tipo>(<escopo>): <resumo no imperativo>`, até
+  72 caracteres na primeira linha; corpo com o porquê; rodapé `Tarefa: T<nn>` e, quando houver,
+  `BREAKING CHANGE: <o que quebra>`.
+- PR de um assunto só, com a tarefa e os requisitos atendidos na descrição. Merge em `develop`
+  por squash, com a mensagem do squash em Conventional Commits.
+- Versão: `release/x.y.z` sai de `develop`, atualiza o `CHANGELOG.md` e entra na `main` por merge
+  commit; a `main` recebe a tag anotada `vx.y.z` (SemVer) e a `release` volta para `develop`.
+- Sem force-push em `main`, `develop` ou branch com PR aberto de outra pessoa; sem reescrever
+  histórico publicado.
+
 ### Padrão de script
 
 - Script novo vai em `pipeline/scripts/` (quando só usa `lupa_pipeline`) ou em

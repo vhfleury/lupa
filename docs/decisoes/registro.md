@@ -866,6 +866,18 @@ e as ações continuam.
 | 57 | Badge e selo (Q3, Q5) | badge só para estados de fluxo, em pílula neutra; contraste não textual de 3:1 no teste de tokens |
 | 58 | Capturas (Q4) e decisão 53 | capturas dos guias regeradas no mesmo plano; a decisão 53 passa a "mesma estrutura de telas e ações; visual conforme a seção 4.13" |
 
+### Regras de Git — 20/11/2026
+
+Formalizam o fluxo já praticado (`main`, `develop`, `feat/*`, `release/*`); não substituem
+decisão anterior.
+
+| Decisão | Tema | Resposta |
+| --- | --- | --- |
+| 59 | Fluxo de branches | Git Flow leve: `tipo/Tnn-descricao` sai de `develop`; `release/x.y.z` leva à `main` |
+| 60 | Mensagem de commit | Conventional Commits em português, tarefa no rodapé |
+| 61 | Merge | squash em `develop`; merge commit de `release/x.y.z` em `main`, com tag anotada |
+| 62 | Proteção | push direto em `main` e `develop` proibido; só por PR |
+
 ## Resultado das revisões
 
 | Revisão | Resultado |
