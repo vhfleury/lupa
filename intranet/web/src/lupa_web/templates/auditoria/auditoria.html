@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block titulo %}Auditoria · Lupa{% endblock %}
+{% block conteudo %}
+<h1>Auditoria</h1>
+{% if erro %}{% include "componentes/aviso.html" with tipo="erro" mensagem=erro %}{% endif %}
+
+<form class="filtros" method="get" action="/auditoria" aria-label="Filtros da auditoria">
+  <div><label for="f-usuario">Usuário (id)</label><input id="f-usuario" name="usuario_id" value="{{ filtros.usuario_id }}" autocomplete="off"></div>
+  <div><label for="f-processo">Processo (id)</label><input id="f-processo" name="processo_id" value="{{ filtros.processo_id }}" autocomplete="off"></div>
+  <div>
+    <label for="f-acao">Ação</label>
+    <select id="f-acao" name="acao">
+      <option value="">Todas</option>
+      {% for acao in acoes %}<option value="{{ acao }}"{% if acao == filtros.acao %} selected{% endif %}>{{ acao }}</option>{% endfor %}
+    </select>
+  </div>
+  <div><label for="f-inicio">De</label><input id="f-inicio" name="inicio" type="datetime-local" value="{{ filtros.inicio }}"></div>
+  <div><label for="f-fim">Até</label><input id="f-fim" name="fim" type="datetime-local" value="{{ filtros.fim }}"></div>
+  <div><label for="f-ip">IP</label><input id="f-ip" name="ip" value="{{ filtros.ip }}" maxlength="64" autocomplete="off"></div>
+  <div class="botoes">
+    <button type="submit">Consultar</button>
+    <a class="botao secundario" href="/auditoria">Limpar</a>
+  </div>
+</form>
+
+<div class="barra">
+  {% if consultado %}<span role="status" data-testid="tempo-consulta">{{ eventos|length }} evento(s) exibido(s).</span>{% endif %}
+  <span class="exportar">Exportar o filtro aplicado: <a href="{{ exportar_csv }}" download="auditoria.csv">CSV</a> <a href="{{ exportar_json }}" download="auditoria.json">JSON</a></span>
+</div>
+
+{% if consultado %}
+<table data-testid="tabela-eventos">
+  <caption>Eventos, do mais recente ao mais antigo</caption>
+  <thead>
+    <tr>
+      <th scope="col">Quando</th>
+      <th scope="col">Ação</th>
+      <th scope="col">Resultado</th>
+      <th scope="col">Usuário</th>
+      <th scope="col">Processo</th>
+      <th scope="col">Objeto</th>
+      <th scope="col">IP</th>
+      <th scope="col">Local</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for evento in eventos %}
+    <tr data-testid="evento">
+      <td>{{ evento.quando }}</td>
+      <td>{{ evento.acao }}</td>
+      <td>{{ evento.resultado }}</td>
+      <td>{% if evento.usuario %}<a href="{{ evento.usuario.link }}#titulo-relatorio" title="{{ evento.usuario.id }}" aria-label="Relatório de uso do usuário {{ evento.usuario.id }}">{{ evento.usuario.curto }}</a>{% else %}—{% endif %}</td>
+      <td>{% if evento.processo %}<a href="{{ evento.processo.link }}#titulo-relatorio" title="{{ evento.processo.id }}" aria-label="Relatório de uso do processo {{ evento.processo.id }}">{{ evento.processo.curto }}</a>{% else %}—{% endif %}</td>
+      <td>{{ evento.objeto_tipo|default:"—" }}</td>
+      <td>{{ evento.ip|default:"—" }}</td>
+      <td>{{ evento.localizacao|default:"—" }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="8">Nenhum evento com esses filtros.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if proxima_pagina %}<p><a class="botao secundario" href="{{ proxima_pagina }}">Próxima página</a></p>{% endif %}
+{% endif %}
+
+<section aria-labelledby="titulo-verificacao">
+  <h2 id="titulo-verificacao">Integridade da cadeia</h2>
+  <form method="get" action="/auditoria#titulo-verificacao">
+    <input type="hidden" name="verificar" value="1">
+    <button type="submit">Verificar integridade</button>
+  </form>
+  {% if verificacao %}
+  <div class="verificacao {% if verificacao.integra %}ok{% else %}quebrada{% endif %}" role="{% if verificacao.integra %}status{% else %}alert{% endif %}" data-testid="resultado-verificacao">{{ texto_verificacao }}</div>
+  {% endif %}
+</section>
+
+<section aria-labelledby="titulo-relatorio">
+  <h2 id="titulo-relatorio">Relatório de uso</h2>
+  <p><a href="{{ exportar_uso }}" download="relatorio-uso.csv">Exportar uso por processo e usuário em CSV</a></p>
+  <form class="relatorio" method="get" action="/auditoria#titulo-relatorio">
+    <input type="hidden" name="inicio" value="{{ filtros.inicio }}">
+    <input type="hidden" name="fim" value="{{ filtros.fim }}">
+    <div>
+      <label for="r-tipo">Por</label>
+      <select id="r-tipo" name="relatorio_tipo">
+        <option value="processo"{% if relatorio_tipo == "processo" %} selected{% endif %}>Processo</option>
+        <option value="usuario"{% if relatorio_tipo == "usuario" %} selected{% endif %}>Usuário</option>
+      </select>
+    </div>
+    <div><label for="r-id">Identificador</label><input id="r-id" name="relatorio_id" value="{{ relatorio_id }}" autocomplete="off"></div>
+    <div class="botoes"><button type="submit">Gerar relatório</button></div>
+  </form>
+  {% if erro_relatorio %}{% include "componentes/aviso.html" with tipo="erro" mensagem=erro_relatorio %}{% endif %}
+  {% if relatorio %}
+  <div data-testid="relatorio-uso">
+    <p>Primeiro acesso: {{ relatorio.primeiro }} · Último acesso: {{ relatorio.ultimo }}</p>
+    <table>
+      <caption>Eventos por ação</caption>
+      <thead><tr><th scope="col">Ação</th><th scope="col">Total</th></tr></thead>
+      <tbody>
+        {% for acao, total in relatorio.contagem %}<tr><td>{{ acao }}</td><td>{{ total }}</td></tr>{% empty %}<tr><td colspan="2">Sem eventos.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    {% if relatorio.chamadas_modelo %}
+    <table>
+      <caption>Chamadas ao modelo por versão</caption>
+      <thead><tr><th scope="col">Modelo</th><th scope="col">Prompt</th><th scope="col">Total</th></tr></thead>
+      <tbody>
+        {% for chamada in relatorio.chamadas_modelo %}<tr><td>{{ chamada.versao_modelo|default:"—" }}</td><td>{{ chamada.versao_prompt|default:"—" }}</td><td>{{ chamada.total }}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    <div class="custo" data-testid="custo-estimado">
+      <strong>Custo estimado: {{ relatorio.custo_total }}</strong> — {{ relatorio.custo_estimado.observacao }}
+      <br><small>Tabela de preços versão {{ relatorio.custo_estimado.versao_tabela }}; fonte: {{ relatorio.custo_estimado.fonte }}.</small>
+      {% for modelo in relatorio.por_modelo %}
+      <br><small>{{ modelo.modelo }}: {{ modelo.tokens_entrada }} tokens de entrada, {{ modelo.tokens_saida }} de saída — {% if modelo.custo_texto %}{{ modelo.custo_texto }}{% else %}modelo fora da tabela de preços{% endif %}</small>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -283,6 +283,66 @@ REVISAO = {
     "motivo": None,
     "aberta_em": None,
 }
+DESEMBARGADOR = "ab" * 32
+EVENTO = {
+    "id": "e1" * 32,
+    "sequencia": 41,
+    "ocorrido_em": "2026-03-04T15:30:00+00:00",
+    "usuario_id": ASSESSOR,
+    "processo_id": PROCESSO,
+    "acao": "processo_aberto",
+    "objeto_tipo": "processo",
+    "objeto_id": PROCESSO,
+    "ip": "10.0.0.7",
+    "localizacao": "Brasília",
+    "resultado": "ok",
+    "versao_modelo": None,
+    "versao_prompt": None,
+}
+EVENTOS: dict[str, Any] = {"eventos": [EVENTO], "proximo_cursor": "cursor-sintetico"}
+VERIFICACAO = {"integra": True, "total": 41, "primeira_sequencia_quebrada": None, "motivo": None}
+RELATORIO: dict[str, Any] = {
+    "processo": PROCESSO,
+    "usuario": None,
+    "contagem_por_acao": {"processo_aberto": 3},
+    "primeiro_acesso": "2026-03-04T15:30:00+00:00",
+    "ultimo_acesso": "2026-03-05T10:00:00+00:00",
+    "chamadas_modelo": [{"versao_modelo": "modelo-sintetico", "versao_prompt": "p1", "total": 2}],
+    "custo_estimado": {
+        "total": "0.1234",
+        "moeda": "BRL",
+        "versao_tabela": "2026.1",
+        "fonte": "tabela sintética",
+        "observacao": "Estimativa sintética.",
+        "por_modelo": [
+            {"modelo": "modelo-sintetico", "tokens_entrada": 100, "tokens_saida": 50, "custo": None}
+        ],
+    },
+}
+USUARIO_DESEMBARGADOR = {
+    "id": DESEMBARGADOR,
+    "nome_usuario": "desembargador.sintetico",
+    "papel": "desembargador",
+    "ativo": True,
+    "mfa_confirmado": True,
+    "troca_senha_obrigatoria": False,
+}
+USUARIO_ASSESSOR = {
+    "id": ASSESSOR,
+    "nome_usuario": "assessora.sintetica",
+    "papel": "assessor",
+    "ativo": True,
+    "mfa_confirmado": False,
+    "troca_senha_obrigatoria": True,
+}
+USUARIO_INATIVO = USUARIO_ASSESSOR | {
+    "id": OUTRO_ASSESSOR,
+    "nome_usuario": "outra.sintetica",
+    "ativo": False,
+    "troca_senha_obrigatoria": False,
+}
+USUARIOS = [USUARIO_DESEMBARGADOR, USUARIO_ASSESSOR, USUARIO_INATIVO]
+SENHA_TEMPORARIA = "senha-temporaria-sintetica"
 ASSESSORA = {"id": ASSESSOR, "nome_usuario": "assessora.sintetica", "ativo": True}
 OUTRA = {"id": OUTRO_ASSESSOR, "nome_usuario": "outra.sintetica", "ativo": True}
 
@@ -316,6 +376,29 @@ def _simular_analise(api: respx.MockRouter) -> None:
 def _simular_chat(api: respx.MockRouter) -> None:
     api.get(f"{BASE}/chat").respond(200, json=CHAT)
     api.get(f"{BASE}/revisao").respond(200, json=REVISAO)
+
+
+def _simular_gestao(api: respx.MockRouter) -> None:
+    api.get("/auditoria").respond(200, json=EVENTOS)
+    api.get("/auditoria/verificar").respond(200, json=VERIFICACAO)
+    api.get("/auditoria/relatorio-uso", params={"formato": "csv"}).respond(
+        200,
+        text="processo,usuario\n",
+        headers={
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": 'attachment; filename="relatorio-uso.csv"',
+        },
+    )
+    api.get("/auditoria/relatorio-uso").respond(200, json=RELATORIO)
+    api.get("/auditoria/exportar").respond(
+        200,
+        text="sequencia,acao\n",
+        headers={
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": 'attachment; filename="auditoria.csv"',
+        },
+    )
+    api.get("/usuarios").respond(200, json=USUARIOS)
 
 
 def _simular_arquivo(api: respx.MockRouter, papel: str) -> None:
@@ -366,6 +449,7 @@ class Caso:
     dados: dict[str, Any] = field(default_factory=dict)
     rota_api: str = ""
     corpo_api: dict[str, Any] | None = None
+    resposta_api: dict[str, Any] = field(default_factory=dict)
     destino: str = ""
 
 
@@ -580,6 +664,153 @@ CASOS = [
         ),
     ),
     Caso(
+        "auditoria",
+        "desembargador",
+        "GET",
+        "/auditoria",
+        200,
+        trechos=(
+            "Auditoria",
+            "processo_aberto",
+            "04/03/2026 12:30",
+            "10.0.0.7",
+            "Brasília",
+            f'title="{ASSESSOR}"',
+            "relatorio_tipo=usuario",
+            "cursor=cursor-sintetico",
+            'href="/auditoria/exportar?formato=csv"',
+            'href="/auditoria/exportar?formato=json"',
+            "Verificar integridade",
+            "Gerar relatório",
+        ),
+    ),
+    Caso(
+        "auditoria_verificacao",
+        "desembargador",
+        "GET",
+        "/auditoria?verificar=1",
+        200,
+        trechos=("Cadeia íntegra: 41 evento(s) conferido(s), nenhum hash divergente.",),
+    ),
+    Caso(
+        "auditoria_relatorio",
+        "desembargador",
+        "GET",
+        f"/auditoria?relatorio_tipo=processo&relatorio_id={PROCESSO}",
+        200,
+        trechos=(
+            "Primeiro acesso: 04/03/2026 12:30",
+            "modelo-sintetico",
+            "Custo estimado: R$ 0,1234",
+            "Estimativa sintética.",
+            "modelo fora da tabela de preços",
+        ),
+    ),
+    Caso(
+        "auditoria_exportacao",
+        "desembargador",
+        "GET",
+        "/auditoria/exportar?formato=csv&acao=processo_aberto",
+        200,
+        trechos=("sequencia,acao",),
+    ),
+    Caso(
+        "auditoria_exportacao",
+        "desembargador",
+        "GET",
+        f"/auditoria/relatorio-uso?formato=csv&processo={PROCESSO}",
+        200,
+        trechos=("processo,usuario",),
+    ),
+    Caso(
+        "usuarios",
+        "desembargador",
+        "GET",
+        "/usuarios",
+        200,
+        trechos=(
+            "desembargador.sintetico",
+            "Ativo · troca de senha pendente",
+            "Inativo",
+            "Pendente",
+            f'href="/usuarios/{ASSESSOR}/desativar"',
+            f'action="/usuarios/{OUTRO_ASSESSOR}/reativar"',
+            f'action="/usuarios/{ASSESSOR}/resetar-senha"',
+            f'action="/usuarios/{ASSESSOR}/resetar-mfa"',
+            "Criar assessor",
+        ),
+        ausentes=(f'action="/usuarios/{DESEMBARGADOR}/', SENHA_TEMPORARIA),
+    ),
+    Caso(
+        "usuarios_criar",
+        "desembargador",
+        "POST",
+        "/usuarios",
+        200,
+        trechos=("Usuário nova.sintetica criado.", SENHA_TEMPORARIA, "não será exibida de novo"),
+        dados={"nome_usuario": " nova.sintetica "},
+        rota_api="/usuarios",
+        corpo_api={"nome_usuario": "nova.sintetica", "papel": "assessor"},
+        resposta_api=USUARIO_ASSESSOR
+        | {"nome_usuario": "nova.sintetica", "senha_temporaria": SENHA_TEMPORARIA},
+    ),
+    Caso(
+        "usuarios_resetar_senha",
+        "desembargador",
+        "POST",
+        f"/usuarios/{ASSESSOR}/resetar-senha",
+        200,
+        trechos=("assessora.sintetica com senha temporária nova.", SENHA_TEMPORARIA),
+        rota_api=f"/usuarios/{ASSESSOR}/resetar-senha",
+        corpo_api={},
+        resposta_api=USUARIO_ASSESSOR | {"senha_temporaria": SENHA_TEMPORARIA},
+    ),
+    Caso(
+        "usuarios_reativar",
+        "desembargador",
+        "POST",
+        f"/usuarios/{OUTRO_ASSESSOR}/reativar",
+        303,
+        rota_api=f"/usuarios/{OUTRO_ASSESSOR}/reativar",
+        corpo_api={},
+        resposta_api=USUARIO_INATIVO | {"ativo": True},
+        destino=f"/usuarios?aviso=reativar&usuario={OUTRO_ASSESSOR}",
+    ),
+    Caso(
+        "usuarios_resetar_mfa",
+        "desembargador",
+        "POST",
+        f"/usuarios/{ASSESSOR}/resetar-mfa",
+        303,
+        rota_api=f"/usuarios/{ASSESSOR}/resetar-mfa",
+        corpo_api={},
+        resposta_api=USUARIO_ASSESSOR,
+        destino=f"/usuarios?aviso=resetar-mfa&usuario={ASSESSOR}",
+    ),
+    Caso(
+        "usuarios_desativar",
+        "desembargador",
+        "GET",
+        f"/usuarios/{ASSESSOR}/desativar",
+        200,
+        trechos=(
+            "Desativar usuário?",
+            "assessora.sintetica perde o acesso imediatamente",
+            f'action="/usuarios/{ASSESSOR}/desativar"',
+        ),
+    ),
+    Caso(
+        "usuarios_desativar",
+        "desembargador",
+        "POST",
+        f"/usuarios/{ASSESSOR}/desativar",
+        303,
+        rota_api=f"/usuarios/{ASSESSOR}/desativar",
+        corpo_api={},
+        resposta_api=USUARIO_ASSESSOR | {"ativo": False},
+        destino=f"/usuarios?aviso=desativar&usuario={ASSESSOR}",
+    ),
+    Caso(
         "chat",
         "assessor",
         "GET",
@@ -642,9 +873,14 @@ def test_cada_tela_responde_ao_papel_permitido(
     _simular_arquivo(api_simulada, caso.papel)
     _simular_analise(api_simulada)
     _simular_chat(api_simulada)
+    _simular_gestao(api_simulada)
     if caso.tela == "visualizador":
         api_simulada.get(f"{BASE}/arquivos").respond(200, json=ARQUIVOS_LEGIVEIS)
-    rota = api_simulada.post(caso.rota_api).respond(200, json={}) if caso.rota_api else None
+    rota = (
+        api_simulada.post(caso.rota_api).respond(200, json=caso.resposta_api)
+        if caso.rota_api
+        else None
+    )
 
     if caso.metodo == "GET":
         resposta = navegador.get(caso.caminho)
@@ -659,4 +895,17 @@ def test_cada_tela_responde_ao_papel_permitido(
         assert trecho not in html
     if rota is not None:
         assert json.loads(rota.calls.last.request.content) == caso.corpo_api
+    if caso.destino:
         assert resposta["Location"] == caso.destino
+
+
+@pytest.mark.parametrize("caminho", ["/auditoria", "/usuarios"])
+def test_assessor_recebe_acesso_negado_em_auditoria_e_usuarios(
+    api_simulada: respx.MockRouter, navegador: Client, caminho: str
+) -> None:
+    """RF-INT-02: o 403 da API para o assessor vira a página de acesso negado."""
+    api_simulada.get("/auth/sessao").respond(200, json=sessao_da_api("assessor"))
+    api_simulada.get(caminho).respond(403, json={"detail": "ação não permitida"})
+    resposta = navegador.get(caminho)
+    assert resposta.status_code == 403
+    assert "Acesso negado" in resposta.content.decode()

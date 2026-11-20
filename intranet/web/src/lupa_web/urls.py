@@ -5,11 +5,13 @@ from django.urls import path
 
 from lupa_web.telas import (
     acesso,
+    auditoria,
     chat,
     dossie,
     envio,
     processo,
     processos,
+    usuarios,
     validacoes,
     visualizador,
 )
@@ -66,5 +68,11 @@ urlpatterns = [
     path(
         "processos/<str:processo_id>/visualizador", visualizador.visualizador, name="visualizador"
     ),
+    path("auditoria", auditoria.lista, name="auditoria"),
+    path("auditoria/exportar", auditoria.exportar, name="auditoria_exportar"),
+    path("auditoria/relatorio-uso", auditoria.relatorio_uso, name="relatorio_uso"),
+    path("usuarios", usuarios.usuarios, name="usuarios"),
+    path("usuarios/<str:usuario_id>/desativar", usuarios.desativar, name="desativar_usuario"),
+    path("usuarios/<str:usuario_id>/<str:acao>", usuarios.agir, name="acao_usuario"),
     path("", acesso.inicio, name="inicio"),
 ]

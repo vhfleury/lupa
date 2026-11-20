@@ -749,10 +749,30 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
     `hx-swap="beforeend"` e o indicador; POST HTMX com CSRF devolve o fragmento com
     `hx-swap-oob`; sem CSRF, 403. Nenhuma pergunta foi enviada ao modelo pelo proxy (o `api` do
     desenvolvimento usa o cliente `sdk`, real).
-- [ ] **T10.12** Auditoria (lista, exportação, verificação, relatório de uso) e gestão de assessores. RF-INT-02, RF-INT-03. Fase 8.
+- [x] **T10.12** Auditoria (lista, exportação, verificação, relatório de uso) e gestão de assessores. RF-INT-02, RF-INT-03. Fase 8.
   - Vermelho: `intranet/web/tests/telas/test_paridade.py::test_assessor_recebe_acesso_negado_em_auditoria_e_usuarios`; casos `auditoria` e `usuarios` de `test_paridade.py`.
   - Verde: `telas/auditoria.py`, `telas/usuarios.py` e templates.
   - Limpeza: nenhuma.
+  - `/auditoria`: tudo por GET. Filtros (ids conferidos no front, `datetime-local` em horário
+    de Brasília convertido para UTC, início antes do fim) vão a `GET /auditoria` com `limite=50`;
+    "Próxima página" leva o `cursor` (substitui o "Carregar mais" do SvelteKit). `?verificar=1`
+    mostra a verificação da cadeia; `relatorio_tipo`/`relatorio_id` o relatório de uso (custo com
+    2 a 4 casas). Os ids da tabela são links para o relatório. `/auditoria/exportar` e
+    `/auditoria/relatorio-uso` repassam o arquivo da API com `Content-Type` e
+    `Content-Disposition`; recusa volta com o status e a mensagem em texto. `/usuarios`: lista com
+    ações por papel (`acoes_sobre` do SvelteKit), criação por POST que mostra a senha temporária
+    uma vez na própria resposta (`Cache-Control: no-store`, nunca na URL; `componentes/
+    senha_temporaria.html`), desativar com confirmação (`/usuarios/<id>/desativar`), reativar e
+    resetar senha e MFA por POST (`/usuarios/<id>/<acao>`); depois da ação, `?aviso=&usuario=`
+    com o id. Assessor: a API responde 403 e o front mostra "Acesso negado". `Caso` de
+    `test_paridade.py` ganhou `resposta_api` e confere `Location` só quando há `destino`.
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas/test_paridade.py --no-cov -q`. Vermelho: `14 failed, 18 passed`.
+    Verde: suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1` `232 passed`, cobertura 100%;
+    ruff, format e mypy `--strict` limpos.
+  - Pelo proxy (assessor sintético novo): `/auditoria`, `/usuarios` e `/auditoria/exportar`
+    respondem 403 com "Acesso negado", sem estilo nem script inline. O fluxo do desembargador
+    pelo proxy não foi conferido (sem credencial de desembargador de teste).
 - [ ] **T10.13** CSS e tema reproduzindo o layout atual. RF-INT-02. Fase 9; D7, D8.
   - Revisão manual: componente de apresentação; conferência visual tela a tela contra o SvelteKit, nos dois temas.
   - Verde: `static/css/`, `static/js/tema.js`.
