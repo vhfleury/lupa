@@ -55,6 +55,7 @@ services:
     environment:
       LUPA_WEB_API_URL: http://api:8000
       LUPA_WEB_CHAVE_SECRETA: ${LUPA_WEB_CHAVE_SECRETA:-}
+      LUPA_AMBIENTE: ${LUPA_AMBIENTE:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/saude', timeout=2).status == 200 else 1)"]
       interval: 10s

@@ -29,11 +29,12 @@ Nenhum objeto do banco muda.
 | `intranet/web/tests/e2e/test_acessibilidade.py`, `test_capturas.py` | alterar |
 | `docs/sistema/padrao-visual.md`, `docs/sistema/front.md`, `docs/README.md`, `CHANGELOG.md` | criar / alterar |
 | `docs/imagens/*` | regerar |
+| `docker-compose.yml` (serviço `front`) e `intranet/web/e2e/compose.yaml` | alterar: `LUPA_AMBIENTE` (D11) |
 
 O que não muda:
 
 - API, rotas e dados da API; estrutura das telas e ações de RF-INT-02.
-- CSP (`font-src 'self'` já existe), Caddyfile, `docker-compose.yml`, Dockerfiles e requirements.
+- CSP (`font-src 'self'` já existe), Caddyfile, Dockerfiles e requirements.
 - JavaScript próprio (`envio.js`, `tema.js`, `visualizador.js`) e o seletor de tema.
 
 ## Problemas
@@ -59,6 +60,7 @@ O que não muda:
   - a fase 1 entrega os tokens, as fontes, o catálogo e a `/padrao`, e o usuário aprova o visual pelas capturas;
   - as fases 2 a 6 levam um grupo de telas cada.
 - D10. As capturas continuam só geradas, sem comparação pixel a pixel.
+- D11. O serviço `front` recebe `LUPA_AMBIENTE` no `docker-compose.yml`, interpolado do `.env` como o da `api`. O E2E fixa `desenvolvimento` para o `front` em `intranet/web/e2e/compose.yaml`, para que a `/padrao` rode com o axe e as capturas; a `api` e o `worker` do E2E seguem em `teste`.
 
 ## Fases
 
@@ -68,7 +70,7 @@ O que não muda:
 4. Dossiê, validações e visualizador (P2, P3; D2, D5, D7; RF-VIS-03, 04).
 5. Chat (P3; D2, D5; RF-VIS-04).
 6. Auditoria e usuários; o teste de conformidade (D5) passa a valer para todos os templates (P1, P3; D5; RF-VIS-01, 04).
-7. Axe com todas as regras nos dois temas, capturas da `/padrao` e guias regerados (P4; D10; RF-VIS-06, RNF-09).
+7. Axe com todas as regras nos dois temas, capturas da `/padrao` e guias regerados (P4; D10, D11; RF-VIS-06, RNF-09).
 8. `padrao-visual.md`, `front.md`, `docs/README.md` e CHANGELOG (RF-VIS-04).
 
 ## Passo a passo do algoritmo
