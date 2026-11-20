@@ -153,6 +153,15 @@ def contexto_das_conversas(processo_id: str, conversas: list[dict[str, Any]]) ->
     }
 
 
+async def _revisao(request: HttpRequest, sessao: Sessao, processo_id: str) -> dict[str, Any]:
+    revisao = (await obter(request, f"/processos/{processo_id}/revisao")).json()
+    return {
+        "em_revisao": bool(revisao.get("em_revisao")),
+        "motivo_revisao": MOTIVO_REVISAO.get(revisao.get("motivo") or "", MOTIVO_REVISAO_PADRAO),
+        "pode_liberar": tem(sessao, "ver_auditoria"),
+    }
+
+
 async def _pagina(
     request: HttpRequest,
     sessao: Sessao,
@@ -162,17 +171,14 @@ async def _pagina(
 ) -> HttpResponse:
     base = f"/processos/{processo_id}"
     conversas = (await obter(request, f"{base}/chat")).json()["conversas"]
-    revisao = (await obter(request, f"{base}/revisao")).json()
+    revisao = await _revisao(request, sessao, processo_id)
     contexto_conversas = contexto_das_conversas(processo_id, conversas)
-    em_revisao = bool(revisao.get("em_revisao"))
     contexto = contexto_da_moldura(request, sessao) | {
         "processo_id": processo_id,
         "aviso_ia": AVISO_IA,
         "limite_pergunta": LIMITE_PERGUNTA,
-        "em_revisao": em_revisao,
-        "motivo_revisao": MOTIVO_REVISAO.get(revisao.get("motivo") or "", MOTIVO_REVISAO_PADRAO),
-        "pode_liberar": tem(sessao, "ver_auditoria"),
-        "bloqueado": em_revisao or bool(contexto_conversas["encerramento"]),
+        **revisao,
+        "bloqueado": revisao["em_revisao"] or bool(contexto_conversas["encerramento"]),
         **contexto_conversas,
         **mensagens,
     }
@@ -192,7 +198,9 @@ def _fragmento(request: HttpRequest, processo_id: str, contexto: dict[str, Any])
     return render(request, "chat/_resposta.html", base | contexto)
 
 
-async def _perguntar(request: HttpRequest, processo_id: str, pergunta: str) -> HttpResponse:
+async def _perguntar(
+    request: HttpRequest, sessao: Sessao, processo_id: str, pergunta: str
+) -> HttpResponse:
     caminho = f"/processos/{processo_id}/chat"
     try:
         resposta = await cliente_api.chamar(
@@ -207,10 +215,13 @@ async def _perguntar(request: HttpRequest, processo_id: str, pergunta: str) -> H
         return _fragmento(request, processo_id, {"pergunta": pergunta, "erro": erro})
     dados = resposta.json()
     em_revisao = bool(dados.get("processo_em_revisao"))
+    revisao = await _revisao(request, sessao, processo_id) if em_revisao else {}
     return _fragmento(
         request,
         processo_id,
-        {
+        revisao
+        | {
+            "oob_revisao": em_revisao,
             "pergunta": pergunta,
             "resposta": mensagem_da_tela(processo_id, dados, em_revisao),
             "bloqueado": em_revisao or bool(dados.get("conversa_encerrada")),
@@ -243,7 +254,7 @@ async def chat(request: HttpRequest, sessao: Sessao, processo_id: str) -> HttpRe
     if not pergunta:
         return _fragmento(request, processo_id, {})
     if request.headers.get("HX-Request") == "true":
-        return await _perguntar(request, processo_id, pergunta)
+        return await _perguntar(request, sessao, processo_id, pergunta)
     caminho = f"/processos/{processo_id}/chat"
     await cliente_api.chamar(request, "POST", caminho, longo=True, json={"pergunta": pergunta})
     return cliente_api.redirecionar(request, caminho)

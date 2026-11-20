@@ -9,13 +9,7 @@
 {% if erro %}{% include "componentes/aviso.html" with tipo="erro" mensagem=erro %}{% endif %}
 {% if aviso %}{% include "componentes/aviso.html" with tipo="sucesso" mensagem=aviso %}{% endif %}
 
-{% if em_revisao %}
-<div class="revisao" role="alert" data-testid="processo-em-revisao">
-  <strong>Processo em revisão.</strong>
-  Uma resposta do assistente foi bloqueada porque {{ motivo_revisao }}. O chat e os resumos gerados ficam suspensos até um desembargador liberar.
-  {% if pode_liberar %}<a class="botao" href="/processos/{{ processo_id }}/chat/liberar">Liberar revisão</a>{% endif %}
-</div>
-{% endif %}
+{% include "chat/_revisao.html" %}
 
 <section aria-labelledby="titulo-atual">
   <h2 id="titulo-atual">Conversa atual</h2>

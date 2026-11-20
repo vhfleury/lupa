@@ -93,6 +93,7 @@ def test_processo_em_revisao_responde_aviso_sem_bloco_de_ia(
     logado: respx.MockRouter, navegador: Client
 ) -> None:
     """RF-INT-05 (A5.3): a recusa por revisão aparece como aviso, sem bloco de IA."""
+    logado.get(f"{BASE}/revisao").respond(200, json=REVISAO | {"em_revisao": True})
     resposta = _resposta(
         status="recusa",
         citacoes=[],
@@ -225,3 +226,27 @@ def test_citacao_sem_arquivo_usa_so_a_pagina() -> None:
     """RF-INT-05: sem arquivo conhecido, o link leva só a página."""
     citacao = {"pagina_id": PAGINA, "trecho": "x", "pagina_numero": 3, "arquivo_id": None}
     assert chat.link_da_citacao("p", citacao) == "/processos/p/visualizador?pagina=3"
+
+
+def test_incidente_mostra_o_aviso_de_revisao_sem_recarregar(
+    logado: respx.MockRouter, navegador: Client
+) -> None:
+    """RF-INT-05 (A5.3): a resposta que põe o processo em revisão traz o aviso fora da conversa."""
+    logado.get(f"{BASE}/revisao").respond(
+        200, json={"em_revisao": True, "motivo": "instrucao_refletida"}
+    )
+    resposta = _resposta(status="descartada", citacoes=[], processo_em_revisao=True)
+    html = _perguntar(logado, navegador, resposta)
+
+    assert 'id="revisao-processo" hx-swap-oob="true"' in html
+    assert 'data-testid="processo-em-revisao"' in html
+    assert chat.MOTIVO_REVISAO["instrucao_refletida"] in html
+
+
+def test_resposta_comum_nao_troca_o_aviso_de_revisao(
+    logado: respx.MockRouter, navegador: Client
+) -> None:
+    """RF-INT-05 (A5.3): sem revisão, o fragmento não mexe no aviso da tela."""
+    html = _perguntar(logado, navegador, _resposta())
+
+    assert "revisao-processo" not in html
