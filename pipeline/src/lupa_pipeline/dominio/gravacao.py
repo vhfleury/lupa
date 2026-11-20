@@ -93,7 +93,7 @@ def gravar_hub(
         session: Sessão com transação aberta.
         tabela: Hub de `dominio.tabelas`.
         chave: Valor de cada coluna da chave de negócio.
-        record_source: Origem da gravação (`intranet.acesso`, `pipeline.ingestao`...).
+        record_source: Origem da gravação (`api.acesso`, `pipeline.ingestao`...).
 
     Returns:
         O `hk` do hub.

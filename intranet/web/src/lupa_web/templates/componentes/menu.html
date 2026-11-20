@@ -1,0 +1,7 @@
+<nav class="menu" aria-label="Menu principal">
+  <ul>
+    {% for item in itens_menu %}
+    <li><a href="{{ item.href }}"{% if item.atual %} aria-current="page"{% endif %}>{{ item.rotulo }}</a></li>
+    {% endfor %}
+  </ul>
+</nav>

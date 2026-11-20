@@ -8,8 +8,8 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from apoio_comum import integracao_indisponivel
-from lupa_intranet.api import saude
-from lupa_intranet.api.app import create_app
+from lupa_api.api import saude
+from lupa_api.api.app import create_app
 from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.logging import get_logger
 

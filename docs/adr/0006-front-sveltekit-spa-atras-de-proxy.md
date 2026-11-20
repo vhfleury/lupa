@@ -2,7 +2,7 @@
 
 | Status | Data | Responsável |
 | --- | --- | --- |
-| Aceito | `{{data exata da decisão}}` (até 2026-10-22, data do primeiro commit) | Executor da Etapa 6; endossada nas revisões 6.1-6.3 e 6.4-6.9 |
+| Substituído pelo [ADR 0019](0019-front-django-renderizado-no-servidor.md) | `{{data exata da decisão}}` (até 2026-10-22, data do primeiro commit) | Executor da Etapa 6; endossada nas revisões 6.1-6.3 e 6.4-6.9 |
 
 ## Contexto
 
@@ -37,4 +37,4 @@ SvelteKit 2 com Svelte 5, `adapter-static`, `ssr = false`. O serviço `front` se
 
 - [decisoes/registro.md](../decisoes/registro.md), 6.1 e revisões da Etapa 6
 - [sistema/front.md](../sistema/front.md)
-- [front/README.md](../../front/README.md)
+- [intranet/web/README.md](../../intranet/web/README.md)

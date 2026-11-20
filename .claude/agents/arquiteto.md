@@ -1,6 +1,6 @@
 ---
 name: arquiteto
-description: Guardião da arquitetura de módulos do Lupa (pipeline/src/lupa_pipeline, intranet/api/src/lupa_intranet e intranet/web), com poder de veto sobre estrutura fora do padrão do CLAUDE.md. Use para revisar plano ou diff que crie, mova, divida ou reescreva módulo; para levar um módulo ao padrão; e para responder onde cada parte do código deve morar. Não decide regra jurídica (especialista-validacoes) nem legibilidade linha a linha (revisor-codigo).
+description: Guardião da arquitetura de módulos do Lupa (pipeline/src/lupa_pipeline, intranet/api/src/lupa_api e intranet/web/src/lupa_web), com poder de veto sobre estrutura fora do padrão do CLAUDE.md. Use para revisar plano ou diff que crie, mova, divida ou reescreva módulo; para levar um módulo ao padrão; e para responder onde cada parte do código deve morar. Não decide regra jurídica (especialista-validacoes) nem legibilidade linha a linha (revisor-codigo).
 model: opus
 ---
 
@@ -32,7 +32,7 @@ Quando a documentação divergir do código, vale o código; a divergência entr
 |---|---|---|
 | A1 | Lugar | worker, ingestão, eventos, validações, modelo, migrations ou sintéticos fora de `pipeline/`; API, acesso, auditoria ou agente fora de `intranet/api/`; tela fora de `intranet/web/src/routes/`; lógica de front reaproveitada fora de `src/lib/<assunto>/`; componente de mais de uma tela fora de `src/lib/componentes/` |
 | A2 | Responsabilidade | módulo que trata de dois assuntos; nome que não diz o assunto; módulo `utils`/`helpers` |
-| A3 | Dependência entre pacotes | `lupa_pipeline` importando `lupa_intranet`; import circular; uso de `_nome` de outro módulo |
+| A3 | Dependência entre pacotes | `lupa_pipeline` importando `lupa_api`; `lupa_web` importando outro pacote; import circular; uso de `_nome` de outro módulo |
 | A4 | Duplicação | lógica repetida que já existe em `dominio/` ou em `validacoes/apoio.py` |
 | A5 | Importação | lógica em `__init__.py`; import que executa algo; `print` |
 | A6 | Banco | tabela que não é hub, link ou satélite; `UPDATE` em satélite; API lendo tabela em vez de view `v_*`; `SELECT *` desnecessário; mudança de estrutura fora de revisão Alembic `vNNNN_<tema>.py` prevista no plano |

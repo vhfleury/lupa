@@ -1,0 +1,17 @@
+{% if notas %}
+<ul class="notas">
+  {% for nota in notas %}<li><strong>{{ nota.autor }}</strong> ({{ nota.quando }}): {{ nota.texto }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% if pode_anotar %}
+<details class="nota">
+  <summary>Anotar</summary>
+  <form method="post" action="/processos/{{ processo_id }}/anotacoes">
+    {% csrf_token %}
+    <input type="hidden" name="{{ campo_alvo }}" value="{{ alvo }}">
+    <label for="nota-{{ chave_nota }}">Anotação</label>
+    <textarea id="nota-{{ chave_nota }}" name="texto" maxlength="2000" rows="2" required></textarea>
+    <button type="submit">Salvar anotação</button>
+  </form>
+</details>
+{% endif %}

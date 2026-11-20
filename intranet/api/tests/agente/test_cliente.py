@@ -12,8 +12,8 @@ from claude_agent_sdk import (
     ToolUseBlock,
 )
 
-from lupa_intranet.agente import cliente as modulo
-from lupa_intranet.agente.cliente import (
+from lupa_api.agente import cliente as modulo
+from lupa_api.agente.cliente import (
     FERRAMENTAS_EMBUTIDAS,
     ClienteAgenteError,
     ClienteFalso,

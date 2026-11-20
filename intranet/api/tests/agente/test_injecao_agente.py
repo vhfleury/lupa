@@ -14,15 +14,15 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from apoio_comum import UsuarioTeste, eventos_do_banco
-from lupa_intranet.agente.cliente import (
+from lupa_api.agente.cliente import (
     ClienteFalso,
     PassoFerramenta,
     PedidoAgente,
     Roteiro,
     resposta_json,
 )
-from lupa_intranet.agente.contexto import prompt_sistema
-from lupa_intranet.agente.recusa import politica_padrao
+from lupa_api.agente.contexto import prompt_sistema
+from lupa_api.agente.recusa import politica_padrao
 from lupa_pipeline.config import get_settings
 from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.dominio.esquemas import calcular_hash

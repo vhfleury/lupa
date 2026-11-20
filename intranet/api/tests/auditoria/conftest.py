@@ -7,8 +7,8 @@ import pytest
 from sqlalchemy import insert
 from sqlalchemy.orm import Session
 
-from lupa_intranet.auditoria.eventos import AcaoAuditoria, NovoEvento
-from lupa_intranet.auditoria.registrador import registrar
+from lupa_api.auditoria.eventos import AcaoAuditoria, NovoEvento
+from lupa_api.auditoria.registrador import registrar
 from lupa_pipeline.dominio.chaves import chave_hash
 from lupa_pipeline.dominio.tabelas import link_chamada_modelo
 

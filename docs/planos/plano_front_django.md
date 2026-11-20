@@ -1,6 +1,6 @@
 # Plano — front da intranet em Django
 
-19 de novembro de 2026 · Estado: **proposto** · Atende a
+19 de novembro de 2026 · Estado: **aprovado** · Atende a
 [especificação da 0.2](../especificacao/0.2/especificacao.md): RF-INT-01 a RF-INT-05, RES-06,
 RES-12, RNF-08, RNF-09; decisões 46 a 53. [ADR 0019](../adr/0019-front-django-renderizado-no-servidor.md).
 
@@ -22,7 +22,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 | `intranet/api/tests/**`, `intranet/api/scripts/*.py` | alterar: imports `lupa_api` |
 | `intranet/api/pyproject.toml`, `intranet/api/Dockerfile` | alterar: nome do pacote, `packages`, cobertura e caminhos |
 | `pipeline/tests/unit/test_dependencias.py`, `pipeline/tests/validacoes/test_motor_e_regras.py` | alterar: pacote proibido `lupa_api` (e `lupa_web`) |
-| `pipeline/scripts/limpar_dev.py` | alterar: imports `lupa_api` (P1) |
+| `pipeline/scripts/limpar_dev.py` | mover para `intranet/api/scripts/limpar_dev.py`, com imports `lupa_api`; teste para `intranet/api/tests/unit/` (P1) |
 | `intranet/web/` (SvelteKit: `src/`, `static/`, `e2e/`, `scripts/`, `package*.json`, `node_modules`, configs de Vite, Svelte, TS, ESLint, `Caddyfile`, `Dockerfile`) | remover (decisão 51) |
 | `intranet/web/pyproject.toml`, `requirements.txt`, `requirements-dev.txt` | criar: pacote `lupa_web`, Django, httpx, WhiteNoise, segno, uvicorn; dev com pytest, pytest-django, respx, pytest-playwright, django-stubs, ruff, mypy (via `make lock`) |
 | `intranet/web/Dockerfile` | criar: `python:3.12-slim`, usuário não root, `uvicorn lupa_web.asgi:application` (D1, D6) |
@@ -31,12 +31,13 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 | `intranet/web/src/lupa_web/telas/<tela>.py` | criar: uma view por tela da RF-INT-02 (acesso, processos, processo, dossiê, validações, visualizador, chat, auditoria, usuários) |
 | `intranet/web/src/lupa_web/templates/` | criar: `base.html`, parciais em `componentes/` (cabeçalho, menu, aviso, confirmação, senha temporária, QR) e uma pasta por tela; fragmentos HTMX em `fragmentos/` |
 | `intranet/web/src/lupa_web/static/css/` | criar: `base.css`, `componentes.css` e uma folha por tela, extraídas dos estilos Svelte (D7) |
-| `intranet/web/src/lupa_web/static/js/htmx.min.js`, `static/js/envio.js` | criar: HTMX versionado no repositório e o progresso do envio (D8) |
+| `intranet/web/src/lupa_web/static/js/htmx.min.js`, `static/js/envio.js`, `static/js/tema.js` | criar: HTMX versionado no repositório, o progresso do envio e a troca de tema (D8) |
 | `intranet/web/tests/unit/`, `tests/telas/`, `tests/integracao/`, `tests/e2e/` | criar: testes de `lupa_web` (D5) |
 | `intranet/web/e2e/Dockerfile` | criar: imagem Python com `pytest-playwright` e Chromium, perfil `e2e` (D6) |
 | `intranet/web/scripts/e2e.sh` | reescrever: sobe o projeto Compose temporário e roda `pytest -m e2e` na imagem `e2e` |
 | `intranet/api/scripts/e2e_preparar.py`, `e2e_processos.py`, `e2e_semear_chat.py` | manter; só imports |
-| `docker-compose.yml` | alterar: serviço `front` com a imagem Python, rede `borda`, `LUPA_WEB_API_URL`; `e2e` com a imagem nova |
+| `docker-compose.yml` | alterar: serviço `front` com a imagem Python, rede `borda`, `LUPA_WEB_API_URL`, volume `envios-pendentes` (D16); `e2e` com a imagem nova |
+| `intranet/web/src/lupa_web/envios_pendentes.py` | criar: guardar, recuperar e apagar o arquivo pendente de complemento (D16, A4) |
 | `intranet/proxy/Caddyfile` | alterar: remove `handle_path /api/*`; tudo vai a `front:8000`; CSP sem `unsafe-hashes` (D2, D10) |
 | `intranet/api/scripts/verificar_cabecalhos.py` | alterar: CSP esperada nova |
 | `scripts/verificar.sh`, `Makefile` | alterar: etapa `web` (ruff, format, mypy, pytest em `front`) no lugar de `docker build --target verificacao`; rótulo `api` no lugar de `intranet` |
@@ -45,7 +46,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 | `docs/arquitetura.md` | alterar: componente `front`, proxy sem `/api` |
 | `docs/adr/0019-front-django-renderizado-no-servidor.md` | criar |
 | `docs/adr/0006-front-sveltekit-spa-atras-de-proxy.md`, `docs/adr/0016-dois-pacotes.md` | alterar: status "Substituído por 0019" |
-| `docs/guias/imagens/` | substituir: capturas geradas pela suíte E2E nova |
+| `docs/imagens/` | substituir: capturas geradas pela suíte E2E nova |
 | `CHANGELOG.md` | alterar: seção `Não publicado` |
 | `docs/README.md` | alterar: inclui este plano e o ADR 0019 |
 
@@ -60,7 +61,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 ## Problemas
 
 - **P1.** `pipeline/scripts/limpar_dev.py` importa `lupa_intranet`, contra a regra de dependência
-  do `CLAUDE.md`; o rename só troca o nome, a violação fica registrada como dívida em `docs/dividas/`.
+  do `CLAUDE.md`; o script vai para `intranet/api/scripts/` na fase 1.
 - **P2.** A CSP atual depende do hash do anunciador de rota do SvelteKit (`unsafe-hashes`).
 - **P3.** O QR do MFA, o progresso do envio, o seletor de tema e o visualizador hoje dependem de
   JavaScript do SvelteKit.
@@ -88,7 +89,8 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
   classes, variáveis de tema e layout (decisão 53).
 - **D8.** HTMX 2 versionado em `static/js/`, com `htmx.config.allowEval = false`,
   `includeIndicatorStyles = false` e `selfRequestsOnly = true`. JavaScript próprio só em
-  `envio.js` (progresso do envio pelo evento `htmx:xhr:progress`) e na troca de tema; sem script
+  `envio.js` (progresso do envio pelo evento `htmx:xhr:progress`), `tema.js` (troca de tema) e
+  `visualizador.js` (atalhos de teclado do visualizador, decisão do usuário em 20/11/2026); sem script
   inline.
 - **D9.** `record_source` das linhas novas passa de `intranet.*` para `api.*`; linhas antigas não
   mudam (sem `UPDATE`, RES-13). Consultas que filtram por `record_source` aceitam os dois prefixos.
@@ -100,6 +102,23 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
   `LUPA_WEB_TIMEOUT_CHAT` (padrão 180 s) para a pergunta do chat e o envio de arquivo.
 - **D14.** O envio de arquivo usa `TemporaryFileUploadHandler` e é repassado à API em streaming;
   o limite de tamanho do Django é o mesmo da API, lido de `LUPA_WEB_TAMANHO_MAXIMO_ENVIO`.
+- **D15.** `SECRET_KEY` vem de `LUPA_WEB_CHAVE_SECRETA`; sem a variável, o front gera uma chave
+  aleatória a cada subida, e os tokens CSRF emitidos antes de um reinício são recusados uma vez
+  (decisão do usuário em 20/11/2026, durante T10.3).
+- **D16.** Envio pendente de complemento: a API não devolve identificador e apaga o arquivo; o
+  Django guarda o arquivo no volume `envios-pendentes` (disco, montado em
+  `/var/lupa/envios-pendentes` no `front`) sob um código aleatório de 32 bytes, junto com o hash
+  SHA-256 do cookie de sessão de quem enviou. Validade de 2 horas. O pendente é apagado quando a
+  API aceita o complemento ou recusa o arquivo; a cada envio novo, o Django apaga os vencidos
+  (decisão do usuário em 20/11/2026, durante T10.8).
+- **D17.** Diferenças do SvelteKit fechadas na paridade (decisão do usuário em 20/11/2026, durante
+  T10.14): o painel "Início" em `/` é reproduzido com os mesmos dados da API; a opção "Visualizar
+  como assessor" do desembargador é removida; o "+ Novo processo" abre e fecha o cadastro com
+  `<details>`, sem JavaScript novo.
+- **D18.** `Referrer-Policy: same-origin` no proxy e no Django, no lugar de `no-referrer`: com
+  `no-referrer` o navegador manda `Origin: null` no POST de formulário e o CSRF do Django recusa
+  todos (bug achado pelo E2E na T10.15; decisão do usuário em 20/11/2026). Não se aceita `null`
+  em `CSRF_TRUSTED_ORIGINS`.
 
 ## Fases
 
@@ -128,7 +147,8 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 4. Entrada: resposta da API; ação: copia cada `Set-Cookie` da API para a resposta ao navegador;
    saída: cookie renovado ou apagado no navegador.
 5. Desvio: status 401; saída: redirecionamento 303 para `/login` (pedido HTMX: cabeçalho
-   `HX-Redirect: /login`).
+   `HX-Redirect: /login`); com o cookie de sessão presente no pedido, o destino é
+   `/login?motivo=expirada`, e o login mostra o aviso de sessão expirada.
 6. Desvio: status 403; saída: página "Acesso negado" com status 403.
 7. Desvio: `GET /auth/sessao` indica troca de senha ou MFA pendente; saída: redirecionamento
    para `/trocar-senha`, antes de qualquer outra tela.
@@ -148,7 +168,8 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 
 1. Entrada: usuário e senha; ação: A1 em `POST /auth/login`; saída: pedido de código TOTP.
 2. Entrada: código; ação: A1 em `POST /auth/mfa`; saída: `Set-Cookie` da API copiado e
-   redirecionamento para `/processos`.
+   redirecionamento para `/` (painel "Início", D17; `/trocar-senha` com troca pendente), como no
+   SvelteKit.
 3. Desvio: credencial ou código recusado, ou usuário bloqueado; saída: a mensagem da API no
    formulário, sem dizer qual campo errou.
 4. Desvio: MFA ainda não configurado; ação: A1 obtém a URI `otpauth`; `segno` gera o SVG; saída:
@@ -160,14 +181,24 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
    `envio.js` mostra a barra com `htmx:xhr:progress`; saída: arquivo no Django.
 2. Desvio: tamanho acima de `LUPA_WEB_TAMANHO_MAXIMO_ENVIO`; saída: fragmento com o motivo, sem
    chamar a API.
-3. Entrada: arquivo temporário; ação: A1 em streaming para `POST /processos/arquivos` (novo) ou
+3. Entrada: arquivo temporário; ação: apaga os pendentes vencidos (D16); A1 em streaming para `POST /processos/arquivos` (novo) ou
    `POST /processos/<id>/arquivos` (anexo); saída:
    resultado (criado, anexado, duplicado, faltando campos).
-4. Desvio: faltam número ou classe; saída: fragmento que pede os campos e guarda o identificador do
-   envio devolvido pela API para o reenvio do mesmo arquivo.
-5. Desvio: arquivo recusado; saída: fragmento com o motivo da API.
-6. Saída final: `HX-Redirect` para a tela do processo.
-7. Entrada: tela do processo com arquivo não finalizado; ação: fragmento de estado com
+4. Desvio: faltam número ou classe; ação: guarda o arquivo como pendente (D16); saída: fragmento
+   que pede os campos, com os números encontrados e o código do pendente em campo oculto.
+5. Entrada: complemento com código, número e classe; ação: recupera o pendente se o código existe,
+   não venceu e o hash do cookie confere; A1 em streaming com o arquivo guardado; saída: resultado
+   como no passo 3.
+6. Desvio: código inexistente, vencido ou de outra sessão; saída: fragmento "Envio expirado,
+   selecione o arquivo de novo", sem chamar a API.
+7. Desvio: arquivo recusado; ação: apaga o pendente, se houver; saída: fragmento com o motivo da
+   API.
+8. Saída final: apaga o pendente, se houver; `HX-Redirect` para a tela do processo com
+   `?aviso=criado`, `anexado`, `duplicado` ou `recebido` (anexo), e a tela mostra o aviso
+   correspondente. As ações com POST e redirecionamento seguem o mesmo padrão:
+   `?aviso=responsaveis` no processo, `?aviso=reclassificada` no dossiê e `?aviso=liberado` no
+   chat; chave desconhecida não mostra aviso.
+9. Entrada: tela do processo com arquivo não finalizado; ação: fragmento de estado com
    `hx-trigger="every 5s"` chama A1; saída: estado atualizado; para quando todos os arquivos
    estão em estado final.
 
@@ -178,8 +209,11 @@ Nenhuma tabela, coluna, índice, função ou view muda. Não há migration.
 2. Entrada: pergunta; ação: A1 em `POST /processos/<id>/chat` com `LUPA_WEB_TIMEOUT_CHAT`; saída:
    resposta com citações conferidas, aviso de teto ou aviso de revisão.
 3. Desvio: aviso de teto ou de revisão; saída: fragmento com o aviso, sem bloco de IA.
-4. Desvio: nenhuma citação conferida; saída: fragmento "sem evidência".
-5. Saída final: fragmento com a pergunta e a resposta em bloco rotulado como gerado por IA, cada
+4. Desvio: a resposta põe o processo em revisão; ação: A1 lê a revisão do processo; saída: o
+   fragmento leva também o banner de revisão com `hx-swap-oob` (troca `#revisao-processo` sem
+   recarregar a página) e o formulário bloqueado.
+5. Desvio: nenhuma citação conferida; saída: fragmento "sem evidência".
+6. Saída final: fragmento com a pergunta e a resposta em bloco rotulado como gerado por IA, cada
    citação com link para `/processos/<id>/visualizador?arquivo=…&pagina=…`, anexado ao fim da
    conversa (`hx-swap="beforeend"`).
 
@@ -212,7 +246,9 @@ Arquivos de `lupa_web` em `intranet/web/tests/`; os de `lupa_api` seguem em `int
 - RF-INT-03: `intranet/web/tests/unit/test_cliente_api.py::test_api_fora_do_ar_mostra_servico_indisponivel` — 502 sem retentativa.
 - RF-INT-02 (A3): `intranet/web/tests/telas/test_acesso.py::test_login_com_codigo_errado_mostra_recusa_generica` — mensagem sem dizer o campo.
 - RF-INT-02 (D11): `intranet/web/tests/telas/test_acesso.py::test_configuracao_de_mfa_mostra_qr_em_svg` — SVG do `segno` com a URI simulada.
-- RF-INT-04: `intranet/web/tests/telas/test_envio.py::test_pdf_sem_classe_pede_a_classe_e_reenvio_usa_o_mesmo_arquivo` — fragmento com campo de classe e identificador do envio.
+- RF-INT-04: `intranet/web/tests/telas/test_envio.py::test_pdf_sem_classe_pede_a_classe_e_reenvio_usa_o_mesmo_arquivo` — fragmento com campo de classe e código do pendente; o complemento reenvia à API o arquivo guardado, sem novo upload.
+- RF-INT-04 (D16): `intranet/web/tests/unit/test_envios_pendentes.py::test_pendente_vencido_ou_de_outra_sessao_nao_e_recuperado` — validade de 2 horas e hash do cookie.
+- RF-INT-04 (D16): `intranet/web/tests/unit/test_envios_pendentes.py::test_pendente_e_apagado_apos_aceite_e_vencidos_no_envio_novo` — limpeza.
 - RF-INT-04: `intranet/web/tests/telas/test_envio.py::test_arquivo_acima_do_limite_e_recusado_sem_chamar_api` — motivo no fragmento.
 - RF-INT-04: `intranet/web/tests/telas/test_processo.py::test_estado_do_arquivo_para_de_atualizar_no_estado_final` — fragmento sem `hx-trigger` quando tudo está em estado final.
 - RF-INT-04: `intranet/web/tests/integracao/test_envio_api_real.py::test_envio_de_pdf_sintetico_cria_processo_pela_api` — envio real, marcador `integracao`.
@@ -225,7 +261,7 @@ Arquivos de `lupa_web` em `intranet/web/tests/`; os de `lupa_api` seguem em `int
 - RNF-08: `scripts/verificar.sh` — ruff, format, mypy `--strict` e pytest com cobertura de 90% em `lupa_web` no contêiner `front`.
 - RNF-09: `intranet/web/tests/e2e/test_fluxos.py` (login, processos, dossiê, chat, auditoria, gestão de assessores) e `intranet/web/tests/e2e/test_capturas.py::test_gera_capturas_dos_guias` — marcador `e2e`, fora do ciclo; revisão manual das capturas.
 
-Revisão manual: conferência visual do layout contra o atual (D7) e as capturas de `docs/guias/imagens/`.
+Revisão manual: conferência visual do layout contra o atual (D7) e as capturas de `docs/imagens/`.
 
 ## Execução
 

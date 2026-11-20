@@ -6,7 +6,7 @@ Lê `LUPA_DB_USUARIO_APP` e `LUPA_DB_SENHA_APP`; conecta com `LUPA_DATABASE_URL`
 
 import sys
 
-from lupa_intranet.acesso.instalacao import criar_usuario_banco
+from lupa_api.acesso.instalacao import criar_usuario_banco
 from lupa_pipeline.config import get_settings
 from lupa_pipeline.logging import configurar_logging
 

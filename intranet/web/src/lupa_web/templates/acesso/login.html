@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load static %}
+{% block cabeca %}<link rel="stylesheet" href="{% static 'css/login.css' %}">{% endblock %}
+{% block titulo %}Entrar · Lupa{% endblock %}
+{% block avulso %}
+<div class="cartao login-cartao">
+  {% include "acesso/_marca.html" %}
+  <div class="login-introducao">
+    <span class="login-etapa">ACESSO AO SISTEMA · 01 / 02</span>
+    <h1>Bem-vindo ao Lupa</h1>
+    <p>Entre com suas credenciais para continuar.</p>
+  </div>
+  {% if aviso %}{% include "componentes/aviso.html" with tipo="info" mensagem=aviso %}{% endif %}
+  {% if erro %}{% include "componentes/aviso.html" with tipo="erro" mensagem=erro %}{% endif %}
+  <form method="post" action="/login" aria-label="Entrar">
+    {% csrf_token %}
+    <div class="campo">
+      <label for="nome_usuario">Usuário</label>
+      <input id="nome_usuario" name="nome_usuario" autocomplete="username" placeholder="Digite seu usuário" autocapitalize="none" spellcheck="false" required maxlength="64" autofocus>
+    </div>
+    <div class="campo">
+      <label for="senha">Senha</label>
+      <input id="senha" name="senha" type="password" autocomplete="current-password" placeholder="Digite sua senha" required maxlength="256">
+    </div>
+    <button type="submit">Continuar <span aria-hidden="true">→</span></button>
+  </form>
+  <p class="login-seguranca">Acesso protegido por verificação em duas etapas</p>
+</div>
+{% endblock %}

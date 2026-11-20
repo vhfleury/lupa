@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: Implementa uma mudança de código no Lupa em ciclo TDD (teste falhando, implementação mínima, verde, limpeza) com pytest nos contêineres worker e api ou Vitest no front, delegando ao agente tdd. Use para toda lógica nova ou alterada em pipeline/ e intranet/, e para correção de bug.
+description: Implementa uma mudança de código no Lupa em ciclo TDD (teste falhando, implementação mínima, verde, limpeza) com pytest nos contêineres worker e api ou front, delegando ao agente tdd. Use para toda lógica nova ou alterada em pipeline/ e intranet/, e para correção de bug.
 argument-hint: "[tarefa de tarefas_0.2.md ou comportamento esperado]"
 ---
 
@@ -27,10 +27,10 @@ skill prepara a chamada e confere o retorno.
 | Código | Teste |
 |---|---|
 | `pipeline/src/lupa_pipeline/<sub>/<modulo>.py` | `pipeline/tests/<sub>/test_<modulo>.py` |
-| `intranet/api/src/lupa_intranet/<sub>/<modulo>.py` ou rota | `intranet/api/tests/<sub>/test_<modulo>.py` |
+| `intranet/api/src/lupa_api/<sub>/<modulo>.py` ou rota | `intranet/api/tests/<sub>/test_<modulo>.py` |
 | revisão Alembic | `test_migracao_NNNN.py` na área do assunto, com `migrar` |
 | `config.py`, `logging.py`, scripts | `tests/unit/` do pacote |
-| `intranet/web/src/lib/**/<nome>.ts` | `<nome>.test.ts` ao lado |
+| `intranet/web/src/lupa_web/<sub>/<modulo>.py` ou tela | `intranet/web/tests/<sub>/test_<modulo>.py` |
 
 ## Comandos
 
@@ -38,7 +38,7 @@ skill prepara a chamada e confere o retorno.
 docker compose up -d --build --wait api worker
 docker compose exec worker python -m pytest -c pipeline/pyproject.toml pipeline/tests/<sub>/test_<modulo>.py --no-cov -q
 docker compose exec api python -m pytest -c intranet/api/pyproject.toml intranet/api/tests/<sub>/test_<modulo>.py --no-cov -q
-cd intranet/web && npx vitest run src/lib/<nome>.test.ts
+docker compose exec front python -m pytest -c intranet/web/pyproject.toml intranet/web/tests/<sub>/test_<modulo>.py --no-cov -q
 ```
 
 ## Regras

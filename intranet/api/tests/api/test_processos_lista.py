@@ -14,7 +14,7 @@ from apoio_comum import (
     criar_processo_teste,
     eventos_do_banco,
 )
-from lupa_intranet.api.rotas.processos import resumir_ingestao
+from lupa_api.api.rotas.processos import resumir_ingestao
 from lupa_pipeline.dominio.enums import ClasseProcessual, EstadoJob, PapelUsuario
 from lupa_pipeline.dominio.esquemas import calcular_hash
 from lupa_pipeline.dominio.gravacao import gravar_hub, gravar_link, gravar_satelite

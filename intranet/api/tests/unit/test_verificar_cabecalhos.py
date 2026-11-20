@@ -12,8 +12,7 @@ import pytest
 CAMINHO = Path(__file__).resolve().parents[2] / "scripts" / "verificar_cabecalhos.py"
 CSP = (
     "default-src 'none'; script-src 'self'; "
-    "style-src 'self' 'unsafe-hashes' 'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo='; "
-    "img-src 'self'; font-src 'self'; "
+    "style-src 'self'; img-src 'self'; font-src 'self'; "
     "connect-src 'self'; manifest-src 'self'; form-action 'self'; frame-ancestors 'none'; "
     "base-uri 'none'; object-src 'none'"
 )
@@ -23,7 +22,7 @@ BONS = {
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     "Cross-Origin-Opener-Policy": "same-origin",
     "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "no-referrer",
+    "Referrer-Policy": "same-origin",
     "X-Frame-Options": "DENY",
 }
 
@@ -48,6 +47,7 @@ def test_cabecalhos_do_proxy_passam(modulo: ModuleType) -> None:
     caddy = Path(__file__).resolve().parents[3] / "proxy" / "Caddyfile"
     if caddy.exists():  # no contêiner da API o intranet/proxy/ não é copiado
         assert CSP in caddy.read_text("utf-8")
+        assert "Referrer-Policy same-origin" in caddy.read_text("utf-8")
 
 
 @pytest.mark.parametrize(
@@ -60,6 +60,7 @@ def test_cabecalhos_do_proxy_passam(modulo: ModuleType) -> None:
         ({"Strict-Transport-Security": "max-age=60"}, "max-age menor"),
         ({"Permissions-Policy": "camera=()"}, "não bloqueia microphone"),
         ({"Server": "Caddy"}, "server exposto"),
+        ({"Referrer-Policy": "no-referrer"}, "referrer-policy deve ser same-origin"),
         (
             _csp("script-src 'self'", "script-src 'self' 'unsafe-inline'"),
             "script-src deve ser",
@@ -68,7 +69,6 @@ def test_cabecalhos_do_proxy_passam(modulo: ModuleType) -> None:
             _csp("style-src 'self'", "style-src 'self' 'unsafe-inline'"),
             "style-src tem 'unsafe-inline'",
         ),
-        (_csp("S8qMpvofolR8", "outroHash000"), "style-src deve ser"),
         (
             _csp("img-src 'self'", "img-src *"),
             "img-src tem *",
@@ -98,6 +98,18 @@ def test_falha_se_faltar_ou_afrouxar(
     cabecalhos = {**BONS, **alteracao}
     filtrados = {k: v for k, v in cabecalhos.items() if v is not None}
     assert any(esperado in p for p in modulo.problemas(filtrados)), modulo.problemas(filtrados)
+
+
+def test_csp_sem_unsafe_hashes(modulo: ModuleType) -> None:
+    """RF-INT-01 (D10): `style-src 'self'` passa; `unsafe-hashes` com hash volta a ser problema."""
+    assert modulo.problemas_csp(CSP) == []
+    antiga = CSP.replace(
+        "style-src 'self'",
+        "style-src 'self' 'unsafe-hashes' 'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo='",
+    )
+    erros = modulo.problemas_csp(antiga)
+    assert "CSP style-src tem 'unsafe-hashes'" in erros
+    assert "CSP style-src deve ser 'self'" in erros
 
 
 def test_main_com_proxy_fora_do_ar(modulo: ModuleType, capsys: pytest.CaptureFixture[str]) -> None:

@@ -13,9 +13,9 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from apoio_comum import UsuarioTeste, eventos_do_banco
-from lupa_intranet.acesso import servico, sessoes
-from lupa_intranet.acesso.autorizacao import AtorAutenticado, contexto_requisicao, relogio
-from lupa_intranet.acesso.servico import Contexto
+from lupa_api.acesso import servico, sessoes
+from lupa_api.acesso.autorizacao import AtorAutenticado, contexto_requisicao, relogio
+from lupa_api.acesso.servico import Contexto
 from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.dominio.gravacao import gravar_satelite
 from lupa_pipeline.dominio.tabelas import sat_sessao_estado, sat_usuario_cadastro

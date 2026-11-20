@@ -8,8 +8,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
 from apoio_comum import eventos_do_banco
-from lupa_intranet.agente.cliente import ClienteFalso, PedidoAgente, Roteiro, resposta_json
-from lupa_intranet.agente.contexto import segmentos
+from lupa_api.agente.cliente import ClienteFalso, PedidoAgente, Roteiro, resposta_json
+from lupa_api.agente.contexto import segmentos
 from lupa_pipeline.ingestao.saneamento import normalizar
 from tests.agente.conftest import NOME_PARTE, TEXTOS, ProcessoAgente
 from tests.conftest import logar

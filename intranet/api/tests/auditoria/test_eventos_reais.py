@@ -15,8 +15,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from apoio_arquivos import pdf_texto
 from apoio_comum import UsuarioTeste, eventos_do_banco, gerar_numero_cnj
-from lupa_intranet.agente.cliente import ClienteFalso, PassoFerramenta, Roteiro, resposta_json
-from lupa_intranet.auditoria.geoip import REDE_INTERNA, ResolvedorNulo
+from lupa_api.agente.cliente import ClienteFalso, PassoFerramenta, Roteiro, resposta_json
+from lupa_api.auditoria.geoip import REDE_INTERNA, ResolvedorNulo
 from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.enums import PapelUsuario
 from lupa_pipeline.dominio.esquemas import calcular_hash

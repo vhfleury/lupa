@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from lupa_intranet.api.app import create_app
+from lupa_api.api.app import create_app
 from lupa_pipeline.config import get_settings
 
 

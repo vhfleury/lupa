@@ -3,7 +3,7 @@
 import json
 from secrets import token_hex
 
-from lupa_intranet.agente.citacoes import (
+from lupa_api.agente.citacoes import (
     Desfecho,
     PaginaConferencia,
     conferir,
@@ -11,7 +11,7 @@ from lupa_intranet.agente.citacoes import (
     interpretar,
     outro_processo,
 )
-from lupa_intranet.agente.contexto import segmentos
+from lupa_api.agente.contexto import segmentos
 from lupa_pipeline.dominio.esquemas import calcular_hash
 from lupa_pipeline.ingestao.saneamento import normalizar
 

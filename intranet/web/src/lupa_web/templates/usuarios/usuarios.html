@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load static %}
+{% block cabeca %}<link rel="stylesheet" href="{% static 'css/usuarios.css' %}">{% endblock %}
+{% block titulo %}Usuários · Lupa{% endblock %}
+{% block conteudo %}
+<h1>Usuários</h1>
+{% if senha %}{% include "componentes/senha_temporaria.html" %}{% endif %}
+{% if erro %}{% include "componentes/aviso.html" with tipo="erro" mensagem=erro %}{% endif %}
+{% if sucesso %}{% include "componentes/aviso.html" with tipo="sucesso" mensagem=sucesso %}{% endif %}
+{% if aviso %}{% include "componentes/aviso.html" with tipo="sucesso" mensagem=aviso %}{% endif %}
+
+<table>
+  <caption class="visualmente-oculto">Usuários cadastrados</caption>
+  <thead>
+    <tr>
+      <th scope="col">Usuário</th>
+      <th scope="col">Papel</th>
+      <th scope="col">Situação</th>
+      <th scope="col">Autenticador</th>
+      <th scope="col">Ações</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for usuario in usuarios %}
+    <tr data-testid="linha-usuario" data-usuario="{{ usuario.nome_usuario }}">
+      <th scope="row">{{ usuario.nome_usuario }}</th>
+      <td>{{ usuario.papel_rotulo }}</td>
+      <td data-testid="situacao">{{ usuario.situacao }}</td>
+      <td>{{ usuario.autenticador }}</td>
+      <td>
+        <div class="acoes">
+          {% if usuario.acoes.gerir %}
+          {% if usuario.ativo %}
+          <a class="botao perigo" href="/usuarios/{{ usuario.id }}/desativar" aria-label="Desativar {{ usuario.nome_usuario }}">Desativar</a>
+          {% else %}
+          <form method="post" action="/usuarios/{{ usuario.id }}/reativar">{% csrf_token %}<button type="submit" class="secundario" aria-label="Reativar {{ usuario.nome_usuario }}">Reativar</button></form>
+          {% endif %}
+          {% endif %}
+          {% if usuario.acoes.resetar %}
+          <form method="post" action="/usuarios/{{ usuario.id }}/resetar-senha">{% csrf_token %}<button type="submit" class="secundario" aria-label="Resetar senha de {{ usuario.nome_usuario }}">Resetar senha</button></form>
+          <form method="post" action="/usuarios/{{ usuario.id }}/resetar-mfa">{% csrf_token %}<button type="submit" class="secundario" aria-label="Resetar autenticador de {{ usuario.nome_usuario }}">Resetar autenticador</button></form>
+          {% endif %}
+        </div>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5">Nenhum usuário.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="novo">
+  <form class="cartao" method="post" action="/usuarios" aria-labelledby="novo-titulo">
+    {% csrf_token %}
+    <h2 id="novo-titulo">Novo assessor</h2>
+    <div class="campo">
+      <label for="novo-nome">Nome de usuário</label>
+      <input id="novo-nome" name="nome_usuario" required minlength="3" maxlength="64" pattern="[a-z0-9][a-z0-9._\-]{2,63}" autocomplete="off" aria-describedby="novo-dica">
+      <p class="dica" id="novo-dica">3 a 64 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado.</p>
+    </div>
+    <button type="submit">Criar assessor</button>
+  </form>
+</div>
+{% endblock %}

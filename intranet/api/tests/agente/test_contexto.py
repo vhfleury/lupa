@@ -1,6 +1,6 @@
 """Montagem de contexto (5.5): origem, delimitadores, segmentos e prompt versionado."""
 
-from lupa_intranet.agente.contexto import (
+from lupa_api.agente.contexto import (
     Delimitador,
     formatar_segmentos,
     montar_mensagem,

@@ -1,33 +1,35 @@
 # Front do Lupa
 
-Interface web do Lupa: SvelteKit 2 + Svelte 5, TypeScript, gerada como SPA estática e servida por
-Caddy. O documento principal (arquitetura, telas, segurança, E2E) é
-[docs/sistema/front.md](../../docs/sistema/front.md).
+Interface web do Lupa: pacote Django `lupa_web` (templates renderizados no servidor, HTMX), servido
+por uvicorn no serviço `front` atrás do Caddy. Não tem banco nem sessão própria: toda tela chama a
+API por HTTP na rede interna. O documento principal é
+[docs/sistema/front.md](../../docs/sistema/front.md); a decisão está no
+[ADR 0019](../../docs/adr/0019-front-django-renderizado-no-servidor.md).
 
 ## Pastas
 
 | Caminho | Conteúdo |
 | --- | --- |
-| `src/routes/` | Telas, uma pasta por rota (`login`, `processos/[id]/chat`, `usuarios`...) |
-| `src/lib/` | Cliente da API, sessão, permissões, tema, armazenamento do navegador e atualização automática. Testes Vitest ao lado (`*.test.ts`) |
-| `src/lib/<assunto>/` | Lógica e componentes de cada assunto: `auditoria`, `chat`, `processos`, `visualizador` |
-| `src/lib/componentes/` | Componentes usados por mais de uma tela |
-| `static/` | Favicon e logos |
-| `e2e/` | Testes ponta a ponta (Playwright), com imagem própria. Suíte em `e2e/testes/` |
-| `scripts/` | `e2e.sh` e `capturas.sh` (com o preparo comum em `preparar-e2e.sh`), `carimbo.mjs` e `externalizar-inicio.mjs` (usados no build) |
-| `Dockerfile`, `Caddyfile` | Imagem: verificação, build e servidor estático na porta 8080 |
+| `src/lupa_web/` | Configuração, ASGI, rotas, cliente da API (`cliente_api.py`), rótulos e envios pendentes |
+| `src/lupa_web/telas/` | Views, uma por assunto (`acesso`, `processos`, `processo`, `envio`, `dossie`, `chat`...) |
+| `src/lupa_web/templates/` | Templates Django das telas e dos fragmentos HTMX |
+| `src/lupa_web/static/` | CSS, HTMX, scripts de tema, envio e visualizador, favicon e logos |
+| `tests/` | `unit/`, `telas/` (API simulada com `respx`), `integracao/` e `e2e/` (`pytest-playwright`) |
+| `e2e/` | Imagem e arquivo Compose da suíte ponta a ponta |
+| `scripts/` | `e2e.sh` e `capturas.sh`, com o preparo comum em `preparar-e2e.sh` |
+| `Dockerfile` | Imagem do serviço `front` (contexto na raiz do repositório) |
 
 ## Comandos
 
-Tudo roda em contêiner. Não é preciso Node na máquina. Os comandos abaixo partem da raiz do repositório.
+Tudo roda em contêiner. Os comandos abaixo partem da raiz do repositório, com a stack de pé
+(`docker compose up -d --build --wait`).
 
 ```bash
-docker build --target verificacao intranet/web
+docker compose exec front python -m pytest -c intranet/web/pyproject.toml intranet/web/tests
 ```
 
-Roda lint (Prettier e ESLint), typecheck e testes unitários. O `docker compose up --build` só gera
-a imagem do front se os três passarem. Se o Prettier acusar formatação, rode `npm run format` num
-contêiner Node.
+Roda os testes de `lupa_web` com cobertura; `bash scripts/verificar.sh` roda também ruff, format e
+`mypy --strict`.
 
 ```bash
 bash intranet/web/scripts/e2e.sh

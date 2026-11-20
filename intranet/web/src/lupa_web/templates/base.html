@@ -1,0 +1,34 @@
+{% load static %}<!doctype html>
+<html lang="pt-BR" data-tema="escuro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{% block titulo %}Lupa{% endblock %}</title>
+<meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false,"selfRequestsOnly":true}'>
+<script src="{% static 'js/tema.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/base.css' %}">
+<link rel="stylesheet" href="{% static 'css/componentes.css' %}">
+<link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
+<script src="{% static 'js/htmx.min.js' %}" defer></script>
+<script src="{% static 'js/envio.js' %}" defer></script>
+{% block cabeca %}{% endblock %}
+</head>
+<body>
+<a class="pular" href="#conteudo">Pular para o conteúdo</a>
+{% if moldura %}
+{% include "componentes/cabecalho.html" %}
+<div class="corpo">
+{% include "componentes/menu.html" %}
+<main id="conteudo" tabindex="-1">
+{% block conteudo %}{% endblock %}
+</main>
+</div>
+{% else %}
+<main id="conteudo" class="avulso{% if pagina_login %} pagina-login{% endif %}" tabindex="-1">
+{% block avulso %}{% endblock %}
+<footer class="rodape">{% include "componentes/seletor_tema.html" with id_tema="tema-avulso" %}</footer>
+</main>
+{% endif %}
+</body>
+</html>

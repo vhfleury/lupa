@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load static %}
+{% block cabeca %}<link rel="stylesheet" href="{% static 'css/processo.css' %}">{% endblock %}
+{% block titulo %}Arquivo · Lupa{% endblock %}
+{% block conteudo %}
+<p><a href="/processos/{{ processo_id }}">← Processo</a></p>
+<h1>Arquivo</h1>
+<section class="cartao" aria-labelledby="titulo-relatorio">
+  <h2 id="titulo-relatorio">Relatório de qualidade</h2>
+  <dl>
+    <dt>Estado</dt><dd data-testid="estado-arquivo">{{ estado_rotulo }}</dd>
+    <dt>Versão do extrator</dt><dd>{{ versao_extrator }}</dd>
+    {% for rotulo, texto in relatorio %}<dt>{{ rotulo }}</dt><dd>{{ texto }}</dd>{% endfor %}
+  </dl>
+</section>
+<section class="cartao" aria-labelledby="titulo-diagnostico">
+  <h2 id="titulo-diagnostico">Diagnóstico</h2>
+  {% if diagnostico is None %}
+  <p class="dica">{{ sem_diagnostico }}</p>
+  {% else %}
+  <dl>{% for rotulo, texto in diagnostico %}<dt>{{ rotulo }}</dt><dd>{{ texto }}</dd>{% endfor %}</dl>
+  {% endif %}
+</section>
+<section class="cartao" aria-labelledby="titulo-alertas">
+  <h2 id="titulo-alertas">Alertas</h2>
+  {% if resumo_alertas %}<dl>{% for rotulo, texto in resumo_alertas %}<dt>{{ rotulo }}</dt><dd>{{ texto }}</dd>{% endfor %}</dl>{% endif %}
+  {% if paginas_alertas %}
+  <table data-testid="alertas-paginas">
+    <thead><tr><th scope="col">Página</th><th scope="col">Sinais</th></tr></thead>
+    <tbody>{% for p in paginas_alertas %}<tr><td>{{ p.numero }}</td><td>{{ p.flags }}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% else %}
+  <p class="dica">Nenhuma página com sinal de injeção.</p>
+  {% endif %}
+  {% if metadados_suspeitos %}
+  <h3>Metadados suspeitos</h3>
+  {% for itens in metadados_suspeitos %}<dl>{% for rotulo, texto in itens %}<dt>{{ rotulo }}</dt><dd>{{ texto }}</dd>{% endfor %}</dl>{% endfor %}
+  {% endif %}
+</section>
+{% endblock %}

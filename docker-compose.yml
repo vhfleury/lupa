@@ -22,7 +22,7 @@ services:
     # (sub-rede fixa abaixo), para o rate limit por IP e a auditoria.
     command:
       - uvicorn
-      - lupa_intranet.api.app:create_app
+      - lupa_api.api.app:create_app
       - --factory
       - --host
       - 0.0.0.0
@@ -44,17 +44,31 @@ services:
     networks: [interna, borda]
     security_opt: ["no-new-privileges:true"]
 
-  # Front (Etapa 6): SPA SvelteKit estatica servida por Caddy sem TLS, usuario nao root, so na
-  # rede `borda`. A imagem so e gerada se lint, typecheck e testes unitarios passarem.
+  # Front (0.2, plano_front_django D1, D6): Django sob uvicorn, usuario nao root, so na rede
+  # `borda`; chama a API em LUPA_WEB_API_URL. A imagem tambem roda os testes de lupa_web.
   front:
     build:
-      context: ./intranet/web
+      context: .
+      dockerfile: intranet/web/Dockerfile
+      args:
+        INSTALAR_DEV: "true"
+    environment:
+      LUPA_WEB_API_URL: http://api:8000
+      LUPA_WEB_CHAVE_SECRETA: ${LUPA_WEB_CHAVE_SECRETA:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/saude', timeout=2).status == 200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     read_only: true
     tmpfs: [/tmp]
+    # 0.2 D16: arquivo a espera do complemento de numero ou classe; unico caminho gravavel.
+    volumes:
+      - envios-pendentes:/var/lupa/envios-pendentes
     networks: [borda]
     security_opt: ["no-new-privileges:true"]
 
-  # Proxy reverso (Etapa 6): mesmo origin para front (/) e API (/api, prefixo removido), HTTPS
+  # Proxy reverso (Etapa 6; 0.2 D2): tudo vai ao front; a API nao e alcancavel pelo proxy. HTTPS
   # com certificado autoassinado do proprio Caddy (`tls internal`). CA em tmpfs: um certificado
   # novo a cada subida, aceitavel no piloto local.
   proxy:
@@ -83,14 +97,17 @@ services:
     networks: [borda, cliente]
     security_opt: ["no-new-privileges:true"]
 
-  # Testes ponta a ponta (Playwright) contra a stack real, pelo proxy. So sobe sob demanda:
-  # `docker compose run --rm e2e` (ver docs/sistema/front.md e intranet/web/scripts/e2e.sh).
+  # Testes ponta a ponta (0.2, plano_front_django D5, D6): pytest-playwright contra a stack real,
+  # pelo proxy, aceitando o certificado interno do Caddy. So sobe sob demanda pelo
+  # intranet/web/scripts/e2e.sh ou capturas.sh (ver docs/sistema/front.md).
   e2e:
     build:
-      context: ./intranet/web/e2e
+      context: .
+      dockerfile: intranet/web/e2e/Dockerfile
     profiles: [e2e]
     environment:
       LUPA_E2E_URL: https://proxy:8443
+      LUPA_E2E_UPLOAD_MB: ${LUPA_E2E_UPLOAD_MB:-500}
       LUPA_E2E_DES_USUARIO: ${LUPA_E2E_DES_USUARIO:-}
       LUPA_E2E_DES_SENHA: ${LUPA_E2E_DES_SENHA:-}
       LUPA_E2E_PROC_USUARIO: ${LUPA_E2E_PROC_USUARIO:-}
@@ -207,3 +224,4 @@ networks:
 volumes:
   db-dados:
   minio-dados:
+  envios-pendentes:

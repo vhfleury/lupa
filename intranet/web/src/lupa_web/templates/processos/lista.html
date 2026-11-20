@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load static %}
+{% block cabeca %}<link rel="stylesheet" href="{% static 'css/processos.css' %}">{% endblock %}
+{% block titulo %}Processos · Lupa{% endblock %}
+{% block conteudo %}
+<div class="pagina-processos">
+  <header class="topo">
+    <div>
+      <span class="sobretitulo">ACERVO / PROCESSOS</span>
+      <h1>Processos</h1>
+      <p>Consulte os autos, acompanhe o processamento e veja quem está responsável.</p>
+    </div>
+  </header>
+  {% if pode_criar %}
+  <details id="cadastro-processo" class="cadastro">
+    <summary class="novo-botao"><span class="abrir">+ Novo processo</span><span class="fechar">Fechar cadastro</span></summary>
+    <section class="cartao" aria-labelledby="titulo-novo">
+      <h2 id="titulo-novo">Novo processo</h2>
+      {% include "componentes/envio.html" with acao_envio="/processos/envio" id_envio="novos-autos" %}
+    </section>
+  </details>
+  {% endif %}
+  <section id="acervo" class="acervo" aria-labelledby="titulo-acervo">
+    <div class="cabecalho-lista">
+      <div><h2 id="titulo-acervo">Lista de processos</h2></div>
+      <span class="contagem">{{ processos|length }} de {{ total }}</span>
+    </div>
+    <form class="filtros" method="get" action="/processos">
+      <div>
+        <label for="buscar-processo">Buscar processo ou assessor</label>
+        <input id="buscar-processo" name="busca" type="search" value="{{ filtros.busca }}" placeholder="Número CNJ, classe ou nome do assessor">
+      </div>
+      <div>
+        <label for="filtro-situacao">Processamento</label>
+        <select id="filtro-situacao" name="situacao">
+          <option value="">Todas as situações</option>
+          {% for valor, rotulo in situacoes %}<option value="{{ valor }}"{% if filtros.situacao == valor %} selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="filtro-responsavel">Responsável</label>
+        <select id="filtro-responsavel" name="responsavel">
+          <option value="">Todos os responsáveis</option>
+          <option value="sem"{% if filtros.responsavel == "sem" %} selected{% endif %}>Sem responsável</option>
+          {% for assessor in assessores %}<option value="{{ assessor.id }}"{% if filtros.responsavel == assessor.id %} selected{% endif %}>{{ assessor.nome_usuario }}{% if not assessor.ativo %} (desativado){% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      <div><button type="submit" class="secundario">Filtrar</button></div>
+    </form>
+    {% include "processos/_tabela.html" %}
+  </section>
+</div>
+{% endblock %}

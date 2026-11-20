@@ -1,0 +1,10 @@
+<form id="formulario-pergunta"{% if oob %} hx-swap-oob="true"{% endif %} class="pergunta" method="post" action="/processos/{{ processo_id }}/chat" hx-post="/processos/{{ processo_id }}/chat" hx-target="#conversa-atual" hx-swap="beforeend" hx-indicator="#aguardando" hx-disabled-elt="find button">
+  {% csrf_token %}
+  <label for="pergunta">Pergunta</label>
+  <textarea id="pergunta" name="pergunta" maxlength="{{ limite_pergunta }}" rows="3" required placeholder="Em que página está a certidão de intimação da parte apelada?"{% if bloqueado %} disabled{% endif %}></textarea>
+  <div class="acoes">
+    <span class="restante">Até {{ limite_pergunta }} caracteres</span>
+    <button type="submit"{% if bloqueado %} disabled{% endif %}>Perguntar</button>
+  </div>
+  <p id="aguardando" class="htmx-indicator" role="status">Aguardando resposta…</p>
+</form>

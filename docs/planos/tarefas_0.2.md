@@ -499,3 +499,399 @@ Execução do [plano de remoção do Vault](plano_remocao_vault.md).
   - `bash scripts/verificar.sh` terminou com código 0, sem o serviço `vault`: ingestão ponta a ponta (6), regressão de injeção (16 de 16, zero falso positivo), front, cabeçalhos em 4 rotas, isolamento do worker e 16 cenários do agente sem vazamento. `bash intranet/web/scripts/e2e.sh` passou nos 36 testes em Chromium, numa stack sem Vault.
 - [x] **T9.5** Atualizar documentação, ADR 0018, registro de decisões, `CLAUDE.md` e `CHANGELOG.md`. RF-SEG-01, RES-08. D1 a D7.
   - A conferência de links locais nos 21 documentos alterados não achou link quebrado.
+
+## Fase 10 — Front em Django
+
+Execução do [plano do front em Django](plano_front_django.md). Um único PR para todas as tarefas
+(fases 1 a 11 do plano). "Pronto quando", salvo indicação: suíte do pacote verde no contêiner
+depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos; mudança em
+`lupa_api` roda também a suíte da pipeline e a de `lupa_web`.
+
+- [x] **T10.1** Renomear `lupa_intranet` para `lupa_api` e mover `limpar_dev.py`. RES-12. Fase 1; P1.
+  - Vermelho: `pipeline/tests/unit/test_dependencias.py::test_pipeline_nao_importa_lupa_api_nem_lupa_web` falha (pacote ainda se chama `lupa_intranet` e `pipeline/scripts/limpar_dev.py` importa a API).
+  - Verde: `git mv` do pacote, imports, `resources.files`, `pyproject.toml`, Dockerfile, scripts; `limpar_dev.py` e seu teste para `intranet/api/`.
+  - Limpeza: nenhuma.
+  - Comando: `docker compose exec worker python -m pytest -c pipeline/pyproject.toml
+    pipeline/tests/unit/test_dependencias.py --no-cov -q`. Vermelho (pacote renomeado, com
+    `pipeline/scripts/limpar_dev.py` importando `lupa_api`): `1 failed, 1 passed`. Verde (script
+    em `intranet/api/scripts/`, teste em `intranet/api/tests/unit/test_limpar_dev.py`): `2 passed`.
+  - Suítes com `LUPA_EXIGIR_INTEGRACAO=1`: pipeline `702 passed`, cobertura 95,25%; intranet/api
+    `262 passed, 3 deselected`, cobertura 98,23%.
+- [x] **T10.2** Gravar `record_source` `api.*` nas linhas novas e listar os dois prefixos na auditoria. RES-12. Fase 1; D9.
+  - Vermelho: `intranet/api/tests/auditoria/test_registrador.py::test_evento_novo_grava_record_source_api` e `intranet/api/tests/auditoria/test_consulta.py::test_auditoria_lista_eventos_com_record_source_antigo_e_novo`.
+  - Verde: constantes `ORIGEM` e filtros por `record_source`.
+  - Limpeza: nenhuma.
+  - Nenhuma consulta da API filtra por `record_source`; o segundo teste fixa que eventos
+    `intranet.auditoria` e `api.auditoria` aparecem juntos na lista. `intranet.anotacao`
+    (`api/rotas/achados.py`) também passa a `api.anotacao` (D9 cobre todo prefixo `intranet.*`):
+    `intranet/api/tests/ingestao/test_validacoes_api.py::test_anotacao_nova_grava_record_source_api`,
+    vermelho `1 failed` (`['intranet.anotacao'] == ['api.anotacao']`), verde `1 passed`.
+  - Imports de `intranet/api/scripts/limpar_dev.py` e `e2e_preparar.py` reordenados (I001
+    consequência do rename: `lupa_api` passou a primeiro partido).
+  - Comando: `docker compose exec api python -m pytest -c intranet/api/pyproject.toml
+    intranet/api/tests/auditoria/test_registrador.py::test_evento_novo_grava_record_source_api
+    intranet/api/tests/auditoria/test_consulta.py::test_auditoria_lista_eventos_com_record_source_antigo_e_novo
+    --no-cov -q`. Vermelho: `2 failed` (`'intranet.auditoria' != 'api.auditoria'`). Verde:
+    `2 passed`.
+  - Suítes com `LUPA_EXIGIR_INTEGRACAO=1`: pipeline `702 passed`, cobertura 95,25%; intranet/api
+    `265 passed, 3 deselected`, cobertura 98,23%.
+- [x] **T10.3** Criar o pacote `lupa_web` sem banco, a imagem e o serviço `front` Python. RES-12, RNF-08. Fase 2; D1, D4, D6, D12.
+  - Vermelho: `intranet/web/tests/unit/test_configuracao.py::test_lupa_web_nao_configura_banco` e `intranet/web/tests/unit/test_dependencias.py::test_lupa_web_nao_importa_lupa_api_nem_lupa_pipeline`.
+  - Verde: `pyproject.toml`, requirements por `make lock`, `configuracao.py`, `asgi.py`, `urls.py`, Dockerfile, serviço `front` no compose, etapa `web` em `scripts/verificar.sh`. O SvelteKit fica no repositório até T10.16, fora do compose.
+  - Limpeza: nenhuma.
+  - O Dockerfile Python substitui `intranet/web/Dockerfile` (contexto na raiz, como `api`); o
+    serviço `front` passa a ser o Django na porta 8000, e o `reverse_proxy` do Caddyfile vai a
+    `front:8000`. O SvelteKit (`src/`, `e2e/`, `package*.json`, `Caddyfile`) fica só como código
+    a remover na T10.16; `intranet/web/scripts/e2e.sh` deixa de funcionar até a T10.15.
+  - Django 5.2.1, httpx 0.28.1, WhiteNoise 6.8.2, segno 1.6.1, uvicorn 0.34.0; alvo `lock` do
+    `Makefile` com as duas linhas de `intranet/web`. Com `DATABASES = {}` o Django põe o motor
+    `django.db.backends.dummy` em `default`; o teste confere isso. `/saude` e uma página inicial
+    mínima até a T10.6. Imagem `read_only`: caches de pytest, coverage, mypy e ruff em `/tmp`.
+    `SECRET_KEY` de `LUPA_WEB_CHAVE_SECRETA`, aleatória por processo quando ausente.
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/unit/test_configuracao.py::test_lupa_web_nao_configura_banco
+    intranet/web/tests/unit/test_dependencias.py::test_lupa_web_nao_importa_lupa_api_nem_lupa_pipeline
+    --no-cov -q`. Vermelho: `ImportError: No module named 'lupa_web.configuracao'`. Verde:
+    `2 passed`; suíte de `lupa_web` `9 passed`, cobertura 100%.
+- [x] **T10.4** Cliente da API com repasse de cookie, IP e desvios 401/403/falha. RF-INT-03. Fase 2; A1, D3, D13.
+  - Vermelho: `intranet/web/tests/unit/test_cliente_api.py::test_cookie_da_api_e_repassado_e_set_cookie_volta`, `::test_x_forwarded_for_e_repassado`, `::test_api_fora_do_ar_mostra_servico_indisponivel`.
+  - Verde: `cliente_api.py`.
+  - Limpeza: nenhuma.
+  - `chamar()` usa um `httpx.AsyncClient` único, criado na primeira chamada e fechado no
+    `lifespan.shutdown` do `asgi.py`, com pote de cookies que recusa tudo (o cookie de um usuário
+    não vai no pedido de outro). Sem `X-Forwarded-For` vai o `REMOTE_ADDR`. Os desvios são
+    exceções (`ApiIndisponivelError`, `SessaoExpiradaError`, `AcessoNegadoError`) tratadas pelo
+    middleware `DesviosDaApi`, que também copia todo `Set-Cookie` da API, inclusive no 401. HTMX
+    com 401: status 200 e `HX-Redirect: /login`. Páginas `erros/servico_indisponivel.html` e
+    `erros/acesso_negado.html` mínimas até a T10.6. O log da falha tem método, caminho sem
+    consulta e o tipo do erro. Testes extras: cookie não guardado entre pedidos, IP da conexão,
+    401, HTMX, 403, prazos de D13; tela de teste em `tests/unit/rotas_de_teste.py`.
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/unit/test_cliente_api.py --no-cov -q`. Vermelho: `ImportError: cannot
+    import name 'cliente_api' from 'lupa_web'`. Verde: `13 passed` (os três da tarefa: `4 passed`,
+    com o 502 parametrizado em conexão recusada e prazo esgotado); suíte de `lupa_web`
+    `22 passed`, cobertura 100%.
+- [x] **T10.5** Proxy sem `/api` e CSP nova. RF-INT-01. Fase 3; D2, D10.
+  - Vermelho: `intranet/web/tests/integracao/test_proxy.py::test_proxy_responde_404_para_api` e `intranet/api/tests/unit/test_verificar_cabecalhos.py::test_csp_sem_unsafe_hashes`.
+  - Verde: `intranet/proxy/Caddyfile`, `verificar_cabecalhos.py`.
+  - Limpeza: nenhuma.
+  - Pronto quando: também `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde.
+  - Caddyfile: um só `reverse_proxy front:8000`; CSP com `style-src 'self'`.
+    `verificar_cabecalhos.py`: `style-src` exato `'self'`, `unsafe-hashes` proibido em toda
+    diretiva, rotas `/`, `/login`, `/saude`, `/api/saude` (`/inicio.js` era do SvelteKit). No
+    teste, a constante `CSP` passa à nova e sai o caso do hash do anunciador (regra mudada por
+    D10). Extra: `test_proxy.py::test_proxy_entrega_o_front`. `validar_caddyfile.sh`: ok.
+  - Comando: `docker compose exec -T -e LUPA_EXIGIR_INTEGRACAO=1 front python -m pytest -c
+    intranet/web/pyproject.toml intranet/web/tests/integracao/test_proxy.py --no-cov -q` e
+    `docker compose exec api python -m pytest -c intranet/api/pyproject.toml
+    intranet/api/tests/unit/test_verificar_cabecalhos.py --no-cov -q`. Vermelho: `1 failed`
+    (`assert 200 == 404`) e `3 failed` (`test_csp_sem_unsafe_hashes`,
+    `test_cabecalhos_do_proxy_passam`, `test_main_confere_cada_rota`). Verde: `2 passed` e
+    `18 passed`.
+  - `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh`: pipeline `702 passed` (95,25%), api
+    `265 passed, 3 deselected` (98,23%), ponta a ponta `6 passed`, injeção `2 passed`, web
+    `24 passed` (100%), cabeçalhos ok em 4 rotas, agente `11 passed`; E2E não rodou.
+- [x] **T10.6** Login com TOTP, MFA com QR, troca de senha, logout e redirecionamento por sessão. RF-INT-02, RF-INT-03. Fase 4; A2, A3, D11.
+  - Vermelho: `intranet/web/tests/telas/test_acesso.py::test_login_com_codigo_errado_mostra_recusa_generica`, `::test_configuracao_de_mfa_mostra_qr_em_svg`, `::test_sessao_expirada_redireciona_para_login`, `::test_pedido_htmx_com_sessao_expirada_recebe_hx_redirect`; `intranet/web/tests/telas/test_csrf.py::test_post_sem_csrf_e_recusado_sem_chamar_api`.
+  - Verde: `telas/acesso.py`, `templates/base.html`, `templates/acesso/`, `componentes/`.
+  - Limpeza: nenhuma.
+  - `telas/sessao.py`: `tela_autenticada` consulta `GET /auth/sessao` antes da view e manda a
+    `/trocar-senha` quando a troca está pendente (A1.7); `contexto_da_moldura` monta cabeçalho e
+    menu por permissão. `/login` e `/login/codigo` (desafio, segredo e URI em campos ocultos; QR
+    do `segno` em SVG inline sem `style`); recusa de senha ou código com uma só mensagem, 429 com o
+    aviso de tentativas. `cliente_api`: `SessaoExpiradaError` guarda a resposta (o 401 do login e
+    da senha atual não é sessão expirada), `detalhe_do_erro` (A1.8) e `redirecionar`. `/` com
+    sessão vai a `/processos` (A3.2); a página inicial mínima sai, e `test_urls.py` e
+    `test_proxy.py::test_proxy_entrega_o_front` passam a conferir `/login`. Confirmação sem
+    JavaScript: `componentes/confirmacao.html` é uma página com formulário POST e "Cancelar".
+    Logos e favicon copiados para `lupa_web/static/`. O painel "Início" do SvelteKit não foi
+    reproduzido (fica para a paridade, T10.14).
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas --no-cov -q`. Vermelho: `22 failed` (rotas inexistentes, 404).
+    Verde: `22 passed`; suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1` `51 passed`,
+    cobertura 100%; ruff, format e mypy `--strict` limpos.
+- [x] **T10.7** Lista de processos renderizada a partir da API. RF-INT-01, RF-INT-02. Fase 5.
+  - Vermelho: `intranet/web/tests/telas/test_processos.py::test_lista_de_processos_vem_renderizada_da_api`.
+  - Verde: `telas/processos.py`, `templates/processos/lista.html`.
+  - Limpeza: nenhuma.
+  - Filtros (busca, situação, responsável) num formulário GET, aplicados no servidor sobre a
+    resposta de `GET /processos`; sem atualização automática (o SvelteKit repetia a cada 4 s com
+    arquivo em processamento; a lista avisa para recarregar). `lupa_web/rotulos.py` com classes,
+    situações, estados e motivos do SvelteKit (`lib/processos/rotulos.ts`) e datas no fuso de
+    Brasília; teste em `tests/unit/test_rotulos.py`. Extras: filtros, lista vazia e filtro sem
+    resultado.
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas/test_processos.py --no-cov -q`. Vermelho: `5 failed` (rota
+    inexistente). Verde: `5 passed`; suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1`
+    `64 passed`, cobertura 100%.
+- [x] **T10.8** Cadastro por arquivo com progresso, complemento e estado da ingestão. RF-INT-04. Fase 5; A4, D8, D14.
+  - Vermelho: `intranet/web/tests/telas/test_envio.py::test_pdf_sem_classe_pede_a_classe_e_reenvio_usa_o_mesmo_arquivo`, `::test_arquivo_acima_do_limite_e_recusado_sem_chamar_api`; `intranet/web/tests/telas/test_processo.py::test_estado_do_arquivo_para_de_atualizar_no_estado_final`; `intranet/web/tests/integracao/test_envio_api_real.py::test_envio_de_pdf_sintetico_cria_processo_pela_api`; `intranet/web/tests/unit/test_envios_pendentes.py::test_pendente_vencido_ou_de_outra_sessao_nao_e_recuperado`, `::test_pendente_e_apagado_apos_aceite_e_vencidos_no_envio_novo` (D16).
+  - Verde: `telas/envio.py`, `telas/processo.py`, fragmentos, `static/js/htmx.min.js`, `static/js/envio.js`.
+  - Limpeza: nenhuma.
+  - `telas/envio.py`: `POST /processos/envio` (novo), `/processos/<id>/envio` (anexo) e
+    `/processos/envio/complemento`; recusa no front sem chamar a API (sem arquivo, tipo, vazio,
+    acima de `LUPA_WEB_TAMANHO_MAXIMO_ENVIO`, padrão 512 MiB); repasse em streaming (blocos de
+    1 MiB, `application/octet-stream`, prazo longo); fragmentos com status 200 (o HTMX não troca
+    4xx). `envios_pendentes.py` (D16): arquivo e metadados (nome, SHA-256 do cookie, momento e a
+    identificação incompleta da API, para refazer o formulário) no volume; código de 32 bytes
+    conferido por regex; complemento que a API ainda recusa sem `motivo` (número inválido) mantém
+    o pendente; recusa com `motivo` o apaga. Upload só por `TemporaryFileUploadHandler` em
+    `FILE_UPLOAD_TEMP_DIR` = volume. Volume `envios-pendentes` no compose; o Dockerfile cria
+    `/var/lupa/envios-pendentes` com dono `lupa` (o volume novo herda o dono).
+  - Estado (A4.9): `GET /processos/<id>/estado`, fragmento `processos/_estado.html` com
+    `hx-trigger="every 5s"` só com arquivo fora de `ESTADOS_FINAIS`. Lista (paridade RF-INT-02):
+    `processos/_tabela.html` com `every 4s` enquanto há processamento, como o SvelteKit; o pedido
+    HTMX recebe só a tabela, e os filtros ficam fora do fragmento.
+  - HTMX 2.0.4 de `https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js` (50 917 bytes, SHA-256
+    `4gndpcgjVHnzFm3vx3UOHbzVpcGAi3eS/C5nM3aPtEc=`, igual ao publicado pelo jsDelivr; SHA-384
+    `HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+`), `meta htmx-config`
+    com `allowEval=false`, `includeIndicatorStyles=false`, `selfRequestsOnly=true`; `envio.js`
+    com `htmx:xhr:progress`.
+  - Logger `httpx`/`httpcore` em `WARNING` (a URL leva nome do arquivo e número CNJ):
+    `test_cliente_api.py::test_log_do_httpx_nao_registra_a_consulta`. Cliente da API por loop de
+    eventos (`::test_cliente_e_um_por_loop_de_eventos`, `::test_encerrar_fecha_o_cliente_do_proprio_loop`);
+    `chamar` aceita cabeçalhos extras.
+  - Integração: o teste entra como assessor novo (TOTP calculado no teste, troca de senha), envia
+    um PDF mínimo sem identificação e completa com número CNJ válido aleatório. `verificar.sh`
+    cria o assessor no contêiner `api` com o desembargador existente e passa usuário e senha por
+    `LUPA_WEB_TESTE_USUARIO`/`LUPA_WEB_TESTE_SENHA`; sem eles e com `LUPA_EXIGIR_INTEGRACAO=1` o
+    teste falha. O TOTP usa o relógio real (a API confere o código no tempo real).
+  - Comando: `docker compose exec -e LUPA_EXIGIR_INTEGRACAO=1 -e LUPA_WEB_TESTE_USUARIO -e
+    LUPA_WEB_TESTE_SENHA front python -m pytest -c intranet/web/pyproject.toml intranet/web/tests
+    -q`. Vermelho: `15 failed, 88 passed, 1 skipped` e `ImportError: cannot import name
+    'envios_pendentes'`. Verde: `109 passed`, cobertura 100%; ruff, format e mypy limpos.
+  - `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh`: pipeline `702 passed` (95,25%), api
+    `265 passed, 3 deselected` (98,23%), ponta a ponta `6 passed`, injeção `2 passed`, web
+    `109 passed` (100%), cabeçalhos ok em 4 rotas, agente `11 passed`; E2E não rodou.
+  - Ajuste (consequência de D16): sob ASGI o Django grava o corpo de pedido grande em temporário
+    no diretório padrão (`/tmp`, tmpfs). Na partida do ASGI, `envios_pendentes.preparar_temporarios`
+    cria `temporarios/` (modo 700) no volume e a torna o `tempfile.tempdir` do processo.
+    Vermelho: `intranet/web/tests/unit/test_asgi.py::test_partida_poe_os_temporarios_no_volume_dos_pendentes`
+    (`1 failed, 2 passed`). Verde: `3 passed`; suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1`
+    `110 passed`, cobertura 100%. No contêiner: `/var/lupa/envios-pendentes/temporarios` com dono
+    `lupa` e modo `drwx------`.
+- [x] **T10.9** Processo: arquivos com diagnóstico e alertas, responsáveis, correção de classe e descarte. RF-INT-02. Fase 5.
+  - Vermelho: casos `processo` de `intranet/web/tests/telas/test_paridade.py::test_cada_tela_responde_ao_papel_permitido`.
+  - Verde: `telas/processo.py`, `templates/processos/processo.html`.
+  - Limpeza: nenhuma.
+  - Feita antes da T10.8 (o envio e o estado com `hx-trigger` ficam para ela). A tela lê
+    `GET /processos/<id>`, `/arquivos` e `/responsaveis`; cada ação é um formulário POST que
+    chama a API e volta com 303: `/classe` (papel com `anotar`), `/responsaveis` (só com
+    `gerir_assessor` e `pode_gerir` da API, `?aviso=responsaveis` mostra a confirmação),
+    `/descartar` (GET com `componentes/confirmacao.html`, POST descarta e vai à lista; papel com
+    `ver_auditoria`, como a API). Página do arquivo `/processos/<id>/arquivos/<arquivo>` com
+    relatório, diagnóstico (404 da API vira "Diagnóstico ainda não disponível.") e alertas
+    (resumo, páginas com sinal, metadados suspeitos). 404 da API vira `erros/nao_encontrado.html`;
+    4xx das ações volta à tela com a mensagem da API e o mesmo status (A1.8). Os dados da capa
+    (ficha do dossiê) no cabeçalho ficam para a T10.10. Casos de `test_paridade.py`: processo
+    (assessor e desembargador), arquivo, classe, responsáveis, confirmação e descarte; extras em
+    `test_processo.py` (404, sem diagnóstico, 409, aviso, tamanhos e motivos) e
+    `test_rotulos.py`.
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas/test_paridade.py intranet/web/tests/telas/test_processo.py --no-cov
+    -q`. Vermelho: `11 failed, 11 passed` (rotas inexistentes; os 11 verdes são as funções puras
+    `formatar_bytes` e `detalhe_do_estado`, escritas junto com a view). Verde: `22 passed`; suíte
+    de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1` `87 passed`, cobertura 100%.
+- [x] **T10.10** Dossiê, peças, fatos, achados, anotações e visualizador com imagem repassada. RF-INT-02, RF-INT-05. Fase 6; A6.
+  - Vermelho: `intranet/web/tests/telas/test_dossie.py::test_evidencia_do_dossie_abre_a_pagina_do_arquivo`; `intranet/web/tests/telas/test_visualizador.py::test_imagem_da_pagina_e_repassada_com_tipo_e_cache_da_api`; casos `dossie`, `validacoes` e `visualizador` de `test_paridade.py`.
+  - Verde: `telas/dossie.py`, `telas/validacoes.py`, `telas/visualizador.py` e templates.
+  - Limpeza: nenhuma.
+  - Dossiê (`/processos/<id>/dossie`): ficha com partes, dados da capa (valor da causa em reais,
+    data de distribuição), responsáveis e ingestão; linha do tempo; índice com reclassificação do
+    tipo por formulário POST (`/pecas/<peca>/reclassificar`, papel com `anotar`; o SvelteKit não
+    tinha) e `?resumos=1` (GET, `resumos=true` na API, texto marcado "gerado"); alertas; achados
+    com as fontes. Partes e dados da capa também no cabeçalho do processo (o que a T10.9 deixou).
+    Validações (`/processos/<id>/validacoes`): valores do achado com link para a evidência (data
+    do marco, fato, página), fatos usados com "Confirmar" e "Corrigir" (`<details>`, sem
+    JavaScript; fonte existente ou trecho novo conferido no front, valor no tipo do original),
+    anotações por fato e por achado, histórico de achados e fatos substituídos; avisos por
+    `?aviso=`. Visualizador (`/processos/<id>/visualizador`): `evidencia` ou `arquivo`/`pagina`,
+    navegação e zoom (50% a 300%) por links, seletor de arquivo por formulário GET; destaque em
+    SVG (`viewBox="0 0 1 1"`, `<rect>` com x/y/width/height em fração) sobre a imagem, posicionado
+    por `static/css/visualizador.css` (classes `zoom-NN`), sem estilo inline. Imagem (A6):
+    `/processos/<id>/arquivos/<arquivo>/paginas/<n>/imagem` repassa PNG, `Content-Type` e
+    `Cache-Control` da API; outro status volta sem corpo; sem a consulta de sessão (401 vai ao
+    login pelo middleware). `nao_encontrado` e `obter` passaram de `processo.py` a `sessao.py`.
+    Extras em `test_dossie.py`, `test_visualizador.py` e `test_validacoes.py`.
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas --no-cov -q`. Vermelho: `17 failed, 24 passed` em `test_dossie.py`,
+    `test_paridade.py` e `test_processo.py` e `ImportError: cannot import name 'visualizador'` em
+    `test_visualizador.py`. Verde: suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1`
+    `173 passed`, cobertura 100%; ruff, format e mypy `--strict` limpos.
+  - Pelo proxy (httpx no contêiner `front`, assessor sintético novo, PDF sintético): processo,
+    dossiê, validações e visualizador 200 sem estilo nem script inline; imagem 200 `image/png`,
+    `private, max-age=3600`; página inexistente 404.
+- [x] **T10.11** Chat com HTMX, histórico, teto, revisão e liberação. RF-INT-02, RF-INT-05. Fase 7; A5, D13.
+  - Vermelho: `intranet/web/tests/telas/test_chat.py::test_resposta_conferida_aparece_em_bloco_rotulado_com_link_da_pagina`, `::test_resposta_sem_citacao_conferida_mostra_sem_evidencia`, `::test_aviso_de_teto_aparece_sem_bloco_de_ia`; caso `chat` de `test_paridade.py`.
+  - Verde: `telas/chat.py`, `templates/chat/`, fragmentos.
+  - Limpeza: nenhuma.
+  - `/processos/<id>/chat`: GET lê `GET /chat` e `/revisao`; conversa atual (a última aberta),
+    contador de descartes, encerramento por teto e conversas anteriores em `<details>`. A
+    pergunta é um formulário `hx-post` com `hx-target="#conversa-atual"`, `hx-swap="beforeend"`,
+    `hx-indicator` ("Aguardando resposta…", escondido por `static/css/chat.css` fora do pedido) e
+    `hx-disabled-elt`; prazo longo (D13). O fragmento `chat/_resposta.html` traz a pergunta, a
+    resposta e, por `hx-swap-oob`, o formulário limpo (travado com conversa encerrada ou processo
+    em revisão) e o contador. Resposta do agente em bloco com "Conteúdo gerado por IA",
+    desfecho ("Sem evidência: resposta não conferida nos autos.", recusa, descartada), citações
+    com link `/visualizador?arquivo=…&pagina=…` e avisos; teto e recusa por revisão aparecem como
+    aviso, sem bloco de IA. Recusa da API e prazo esgotado viram aviso no fragmento, com 200. POST
+    sem HTMX faz a pergunta e volta à tela. Revisão: aviso com o motivo; o papel com
+    `ver_auditoria` vê "Liberar revisão" (`/chat/liberar`: GET confirmação, POST
+    `/liberar-revisao` e `?aviso=liberado`). Sem o contador de caracteres restantes do SvelteKit
+    (exigiria JavaScript; o campo tem `maxlength`). O texto da pergunta não entra em log
+    (`test_pergunta_vai_a_api_com_prazo_longo_e_nao_entra_no_log`).
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas/test_paridade.py intranet/web/tests/telas/test_chat.py --no-cov -q`.
+    Vermelho: `4 failed, 14 passed` em `test_paridade.py` e `ImportError: cannot import name
+    'chat'` em `test_chat.py`. Verde: suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1`
+    `193 passed`, cobertura 100%; ruff, format e mypy `--strict` limpos.
+  - Pelo proxy (assessor sintético novo): tela do chat 200 sem estilo nem script inline, com
+    `hx-swap="beforeend"` e o indicador; POST HTMX com CSRF devolve o fragmento com
+    `hx-swap-oob`; sem CSRF, 403. Nenhuma pergunta foi enviada ao modelo pelo proxy (o `api` do
+    desenvolvimento usa o cliente `sdk`, real).
+- [x] **T10.12** Auditoria (lista, exportação, verificação, relatório de uso) e gestão de assessores. RF-INT-02, RF-INT-03. Fase 8.
+  - Vermelho: `intranet/web/tests/telas/test_paridade.py::test_assessor_recebe_acesso_negado_em_auditoria_e_usuarios`; casos `auditoria` e `usuarios` de `test_paridade.py`.
+  - Verde: `telas/auditoria.py`, `telas/usuarios.py` e templates.
+  - Limpeza: nenhuma.
+  - `/auditoria`: tudo por GET. Filtros (ids conferidos no front, `datetime-local` em horário
+    de Brasília convertido para UTC, início antes do fim) vão a `GET /auditoria` com `limite=50`;
+    "Próxima página" leva o `cursor` (substitui o "Carregar mais" do SvelteKit). `?verificar=1`
+    mostra a verificação da cadeia; `relatorio_tipo`/`relatorio_id` o relatório de uso (custo com
+    2 a 4 casas). Os ids da tabela são links para o relatório. `/auditoria/exportar` e
+    `/auditoria/relatorio-uso` repassam o arquivo da API com `Content-Type` e
+    `Content-Disposition`; recusa volta com o status e a mensagem em texto. `/usuarios`: lista com
+    ações por papel (`acoes_sobre` do SvelteKit), criação por POST que mostra a senha temporária
+    uma vez na própria resposta (`Cache-Control: no-store`, nunca na URL; `componentes/
+    senha_temporaria.html`), desativar com confirmação (`/usuarios/<id>/desativar`), reativar e
+    resetar senha e MFA por POST (`/usuarios/<id>/<acao>`); depois da ação, `?aviso=&usuario=`
+    com o id. Assessor: a API responde 403 e o front mostra "Acesso negado". `Caso` de
+    `test_paridade.py` ganhou `resposta_api` e confere `Location` só quando há `destino`.
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas/test_paridade.py --no-cov -q`. Vermelho: `14 failed, 18 passed`.
+    Verde: suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1` `232 passed`, cobertura 100%;
+    ruff, format e mypy `--strict` limpos.
+  - Pelo proxy (assessor sintético novo): `/auditoria`, `/usuarios` e `/auditoria/exportar`
+    respondem 403 com "Acesso negado", sem estilo nem script inline. O fluxo do desembargador
+    pelo proxy não foi conferido (sem credencial de desembargador de teste).
+- [x] **T10.13** CSS e tema reproduzindo o layout atual. RF-INT-02. Fase 9; D7, D8.
+  - Revisão manual: componente de apresentação; conferência visual tela a tela contra o SvelteKit, nos dois temas.
+  - Verde: `static/css/`, `static/js/tema.js`.
+  - `base.css` (tokens claro/escuro de `src/app.css`, elementos, `a.botao` com o visual dos
+    botões e a moldura do `+layout.svelte`), `componentes.css` (aviso, cabeçalho, seletor de
+    tema, menu, confirmação, senha temporária, envio e complemento) e uma folha por tela:
+    `login.css` (`login.css` do SvelteKit e QR), `processos.css`, `processo.css` (processo e
+    arquivo, com `CabecalhoProcesso`, `DadosCapa` e `Responsaveis`), `dossie.css`,
+    `validacoes.css`, `auditoria.css`, `usuarios.css`; `chat.css` ganhou a tela e
+    `MensagemChat`, `visualizador.css` os valores do `Visualizador.svelte`. Seletores que o Svelte
+    escopava pelo componente levam a classe raiz (`.menu a`, `.mensagem .ia`, `.verificacao.ok`);
+    o seletor de tema usa `.seletor-tema` (`.seletor` já é do visualizador). Fontes do sistema,
+    como no SvelteKit; logos e favicon já locais.
+  - `tema.js` (sem `defer`, no `<head>`, antes das folhas): lê `lupa.tema` do `localStorage`
+    (padrão escuro, `data-tema="escuro"` no `<html>` como o `app.html`), aplica antes da pintura e
+    liga os `select[data-seletor-tema]` de `componentes/seletor_tema.html`, no cabeçalho e no
+    rodapé das páginas avulsas, como o SvelteKit. Sem JavaScript o tema fica no padrão.
+  - Teste extra: `tests/unit/test_estaticos.py` (template sem `style`, `<style>`, script inline
+    ou atributo de evento; cada `{% static %}` existe).
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/unit/test_estaticos.py --no-cov -q`: `76 passed`; suíte de `lupa_web` com
+    `LUPA_EXIGIR_INTEGRACAO=1` `307 passed`, cobertura 100% (o envio real só no
+    `verificar.sh`, que cria o assessor); ruff, format e mypy `--strict` limpos.
+  - Conferência visual pendente do usuário: o painel do navegador recusou o certificado
+    autoassinado de `https://localhost:8443`; a comparação foi por leitura, classe a classe e
+    variável a variável, contra os `<style>` dos `.svelte`, `app.css` e `login.css`.
+  - Conferência visual por capturas (feita na T10.15): `capturas.sh` com
+    `LUPA_CAPTURAS_VISUAL` retratou as dezesseis telas em claro e escuro, a 1200 e a 375 px
+    (64 imagens), comparadas às capturas do SvelteKit em `docs/imagens/` (versão anterior).
+    Corrigido em commit próprio: "+ Novo processo" ao lado do título; Corrigir, Anotar,
+    Reclassificar e Corrigir classe com o visual do botão secundário e fatos em linha; "Outro
+    trecho" só com "Informar outro trecho" (`:has`); identificadores da auditoria em mono;
+    tabelas que rolam dentro da página até 55rem (antes a página rolava de lado a 375 px).
+    Ficou diferente: fatos das validações sem marcador de lista; botão "Enviar" habilitado sem
+    arquivo; limite "512,0 MB" (era "512 MB"); ficha do dossiê com os dados da capa; ordem dos
+    dados da capa e dos fatos como vêm da API; foco visível no campo autofocado do login.
+- [x] **T10.14** Paridade de telas fechada. RF-INT-02. Fases 4 a 8.
+  - Vermelho: `intranet/web/tests/telas/test_paridade.py::test_cada_tela_responde_ao_papel_permitido` com as onze telas e todas as ações.
+  - Verde: o que faltar das tarefas anteriores.
+  - Limpeza: extrair o que se repetir entre views.
+  - Casos novos: login (GET e senha aceita, anônimo), código TOTP, troca de senha (GET e POST),
+    sair, lista de processos (assessor; desembargador com filtro sem resultado), cadastro por
+    arquivo e anexo (303 para o processo), estado dos arquivos, imagem da página e resumos do
+    dossiê. Papel `anonimo` sem `GET /auth/sessao`; `corpo_api=None` dispensa a conferência do
+    corpo (envio em `application/octet-stream`). O complemento do cadastro fica em
+    `test_envio.py` (precisa de pendente no volume). Comparação rota a rota com
+    `src/routes` e `src/lib`: as onze telas e as ações das fases 4 a 8 já existiam; nenhum código
+    de view mudou, e a limpeza não achou repetição nova entre views.
+  - Complemento (D17, decisão do usuário): o painel "Início" é reproduzido em `/`
+    (`telas/inicio.py`, `templates/inicio.html`, `static/css/inicio.css` do `+page.svelte`):
+    assessor com `GET /processos?meus=true`, desembargador com `GET /processos` e a equipe de
+    `GET /usuarios`; indicadores (total, processando, concluídos, pendências/falha/quarentena),
+    cinco recentes, atalhos por permissão, até três pontos de atenção e dados da sessão; falha da
+    API vira aviso "Processos: …" e "—". O menu começa por "Início" (corrente só em `/`). Como no
+    SvelteKit, o login e a troca de senha aceitos levam a `/` (A3.2 atualizado no plano); os
+    testes de `test_acesso.py` e os destinos da paridade mudaram com a regra, e o teste da raiz
+    que levava a `/processos` saiu. "+ Novo processo" é o `<summary>` de um `<details>` com o
+    cadastro dentro, com o visual do botão do SvelteKit e o texto "Fechar cadastro" quando aberto,
+    só por CSS. "Visualizar como assessor" removido: o Django nunca o teve (sem resquício em
+    `lupa_web`); a remoção entra no `CHANGELOG.md` na T10.16.
+  - Comando do complemento: `docker compose exec front python -m pytest -c
+    intranet/web/pyproject.toml intranet/web/tests/telas --no-cov -q`. Vermelho: `11 failed,
+    193 passed` (`test_inicio.py` 4, `test_processos.py` 1, destinos de `test_acesso.py` 2 e
+    paridade 4). Verde: `test_inicio.py` `4 passed`, `test_paridade.py` `47 passed`; suíte de
+    `lupa_web` `329 passed`, cobertura 100%; ruff, format e mypy `--strict` limpos;
+    `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde (pipeline 702, intranet 265, web 329; e2e fora).
+  - Comando: `docker compose exec front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas/test_paridade.py --no-cov -q`. Vermelho: `10 failed, 35 passed`
+    (API sem `/processos` nem imagem simuladas, papel anônimo inexistente, corpo binário).
+    Verde: `45 passed` no arquivo; suíte de `lupa_web` com `LUPA_EXIGIR_INTEGRACAO=1`
+    `321 passed` (com o envio real), cobertura 100%; ruff, format e mypy `--strict` limpos;
+    `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde (pipeline 702, intranet 265, web 321; e2e fora).
+- [x] **T10.15** Suíte E2E em `pytest-playwright` e capturas dos guias. RF-INT-01, RNF-09. Fase 10; D5, D6.
+  - Revisão manual: E2E fora do ciclo. `intranet/web/tests/e2e/test_seguranca.py::test_navegador_nao_faz_requisicao_para_api`, `test_fluxos.py` (login, processos, dossiê, chat, auditoria, assessores) e `test_capturas.py::test_gera_capturas_dos_guias`.
+  - Verde: `intranet/web/e2e/Dockerfile`, serviço `e2e`, `intranet/web/scripts/e2e.sh`, `docs/guias/imagens/`.
+  - Pronto quando: `bash intranet/web/scripts/e2e.sh` verde e capturas conferidas.
+  - Suíte em `intranet/web/tests/e2e/` (marcador `e2e`, excluído por padrão): `apoio_e2e.py`
+    (TOTP RFC 6238, contas, login pela tela), `conftest.py` (ordem dos arquivos e contas
+    criadas uma vez), `test_fluxos.py` (login, primeiro acesso, troca, gestão de assessores,
+    bloqueio), `test_processos.py` (lista, cadastro com complemento do número, capa, anexo,
+    duplicata, envio de 500 MiB com progresso, dossiê, visualizador pelo teclado, evidências,
+    correção e anotação), `test_chat_auditoria.py`, `test_acessibilidade.py` (axe-core WCAG 2.1
+    A/AA nos dois temas, teclado, tema), `test_seguranca.py` (inclui
+    `test_navegador_nao_faz_requisicao_para_api`, cabeçalhos, CSP e texto hostil) e
+    `test_capturas.py` (`test_gera_capturas_dos_guias` e as telas em claro, escuro e 375 px).
+    A suíte TypeScript de `intranet/web/e2e/` saiu. Imagem `intranet/web/e2e/Dockerfile` em
+    `python:3.12-slim-bookworm` (o Playwright 1.49 não instala as dependências do Chromium no
+    Debian 13), `requirements-dev.txt` de `lupa_web` com `pytest-playwright`, `playwright` 1.49.1
+    e `axe-playwright-python` (só o `axe.min.js`, injetado por `page.evaluate`). `e2e.sh` roda tudo
+    menos as capturas; `capturas.sh`, numa stack nova, grava em `docs/imagens/`.
+  - Achados do E2E corrigidos com teste vermelho antes, em commits próprios: CSRF recusava todo
+    formulário (`Origin: null` com `no-referrer`; D18 `same-origin`); `visualizador.js` (D8);
+    aviso de sessão expirada no login; avisos de processo criado, anexado ou já enviado; aviso
+    de revisão no chat sem recarregar (OOB); rótulos do SvelteKit em `legivel` e
+    `texto_do_valor` e número CNJ com máscara no dossiê; anexo dava 500 (a API não devolve
+    `processo_id`). O dígito do CNJ fica na API; "desembargador só cria assessor" segue em
+    `intranet/api/tests/acesso/test_usuarios.py`.
+  - O TOTP do E2E espera o relógio real (até 30 s entre logins da mesma conta): o servidor
+    recusa passo repetido; exceção aceita por estar fora do ciclo.
+  - Comando: `bash intranet/web/scripts/e2e.sh` e `bash intranet/web/scripts/capturas.sh`.
+    Vermelho: `1 failed, 1 passed` (403 de CSRF no primeiro acesso). Verde: `35 passed` em 76 s
+    (2 min 17 s com a stack); capturas `2 passed` em 54 s (2 min 6 s); suíte de `lupa_web`
+    `348 passed`, cobertura 100%; `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde
+    (pipeline 702, intranet 266, integração 6, injeção 2, web 348, cabeçalhos ok; e2e fora).
+- [x] **T10.16** Remover o SvelteKit e atualizar `verificar.sh`, `Makefile`, `CLAUDE.md`, documentação, ADRs 0006 e 0016 e `CHANGELOG.md`. RES-06, RNF-08. Fase 11.
+  - Revisão manual: remoção e documentação. Testes do Vitest e Playwright em TypeScript saem neste commit, citando a tarefa.
+  - Pronto quando: `bash scripts/verificar.sh` verde, sem referência a `lupa_intranet`, `npm` ou SvelteKit fora do histórico, e links locais conferidos.
+  - Removidos de `intranet/web/`: `src/lib`, `src/routes`, `src/app.*`, `src/testes-setup.ts`,
+    `static/` (os logos já estão em `lupa_web/static`), `.svelte-kit/`, `package*.json`, configs
+    de Vite, Svelte, TS, ESLint e Prettier, `Caddyfile`, `.dockerignore`, `.gitignore` e
+    `scripts/carimbo.mjs`/`externalizar-inicio.mjs`; `.gitignore` e `.dockerignore` da raiz sem as
+    entradas de Node. `Makefile` com `lupa_web` em `test`, `lint`, `typecheck` e `format`.
+  - `verificar.sh` cria um desembargador sintético de senha aleatória (só por variável) quando a
+    stack não tem nenhum (`criar_desembargador_inicial`); com desembargador existente não faz nada.
+  - `test_configuracao.py::test_lupa_web_nao_configura_banco` lê `connections.settings` (o Django
+    só põe o motor `dummy` ao configurar as conexões). Vermelho rodando sozinho com `--no-cov`:
+    `assert {} == {'default': 'django.db.backends.dummy'}`; verde: `1 passed`.
+  - `CLAUDE.md` e `.claude/` (agentes e skills) não alterados pelo executor; ficam com o agente
+    principal.
+  - Comando: `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` e `bash intranet/web/scripts/e2e.sh`.
+    Verde: pipeline `702 passed` (95,25%), intranet `266 passed` (98,23%), integração 6, injeção 2,
+    web `348 passed` (100%), cabeçalhos ok em 4 rotas, agente 11; E2E `35 passed` em 80 s.

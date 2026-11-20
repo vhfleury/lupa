@@ -14,7 +14,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from apoio_comum import banco_vazio, migrar
-from lupa_intranet.acesso import instalacao
+from lupa_api.acesso import instalacao
 from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao
 from lupa_pipeline.dominio.visoes import VisaoAuditoria, VisaoUsuario

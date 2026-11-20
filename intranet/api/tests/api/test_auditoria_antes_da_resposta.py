@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 
 from apoio_comum import criar_processo_teste, eventos_do_banco
-from lupa_intranet.api import middleware
+from lupa_api.api import middleware
 from lupa_pipeline.dominio.enums import ClasseProcessual, PapelUsuario
 from tests.conftest import criar_usuario_teste, logar
 

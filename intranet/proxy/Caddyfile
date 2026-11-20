@@ -1,9 +1,8 @@
-# Proxy reverso do Lupa (Etapa 6). Um unico origin HTTPS:
-#   /api/*  -> api:8000 (prefixo /api removido; a API nao sabe do prefixo)
-#   /*      -> front:8080 (SPA estatica)
-# Assim nao ha CORS e o cookie de sessao (Secure, SameSite=Strict, Path=/) funciona.
+# Proxy reverso do Lupa. Um unico origin HTTPS, tudo para o front Django (front:8000); a API nao
+# e alcancavel pelo proxy (0.2, plano_front_django D2): o Django a chama pela rede `borda`.
+# O cookie de sessao da API (Secure, SameSite=Strict, Path=/) passa pelo Django.
 # O Caddy substitui o X-Forwarded-For recebido pelo IP real do cliente (nao confia em cabecalho
-# vindo de fora); a API confia nesse cabecalho so quando vem da rede `borda`.
+# vindo de fora); o Django o repassa a API, que confia nele so quando vem da rede `borda`.
 #
 # Certificado: so o modo interno (intranet/proxy/modos/interno.caddy), CA interna do Caddy com
 # `tls internal` para localhost e proxy.
@@ -20,30 +19,21 @@
 (lupa_site) {
 	encode gzip
 	# Etapa 6.10: cabecalhos de seguranca (conferidos por intranet/api/scripts/verificar_cabecalhos.py e pelo
-	# E2E seguranca.spec.ts, que falham se faltar algum ou se a CSP afrouxar).
-	# CSP: nada inline. O script de partida do SvelteKit e externalizado no build
-	# (intranet/web/scripts/externalizar-inicio.mjs) e os estilos dinamicos usam `style:` (CSSOM), entao
-	# `unsafe-inline` nao e necessario. Unica excecao: o anunciador de rota do proprio SvelteKit
-	# (div aria-live com atributo style fixo, gerado pelo framework) exige o hash desse estilo
-	# com 'unsafe-hashes' (vale so para esse texto exato). Imagens das paginas vem da propria API.
+	# E2E de seguranca, que falham se faltar algum ou se a CSP afrouxar).
+	# CSP (D10): nada inline e sem 'unsafe-hashes'; scripts e estilos so do proprio front.
 	# HSTS: fica em intranet/proxy/modos/interno.caddy.
 	header {
 		X-Content-Type-Options nosniff
-		Referrer-Policy no-referrer
+		Referrer-Policy same-origin
 		X-Frame-Options DENY
-		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-hashes' 'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo='; img-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
+		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
 		Permissions-Policy "accelerometer=(), autoplay=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), xr-spatial-tracking=()"
 		Cross-Origin-Opener-Policy same-origin
 		Cross-Origin-Resource-Policy same-origin
 		X-Permitted-Cross-Domain-Policies none
 		-Server
 	}
-	handle_path /api/* {
-		reverse_proxy api:8000
-	}
-	handle {
-		reverse_proxy front:8080
-	}
+	reverse_proxy front:8000
 }
 
 import modos/interno.caddy

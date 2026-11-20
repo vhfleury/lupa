@@ -11,8 +11,8 @@ from tempfile import TemporaryDirectory
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from lupa_intranet.acesso.servico import Ator, Contexto, criar_usuario
-from lupa_intranet.api.rotas.ingestao import cadastrar_por_arquivo
+from lupa_api.acesso.servico import Ator, Contexto, criar_usuario
+from lupa_api.api.rotas.ingestao import cadastrar_por_arquivo
 from lupa_pipeline.config import get_settings
 from lupa_pipeline.dominio.enums import ClasseProcessual, PapelUsuario
 from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao

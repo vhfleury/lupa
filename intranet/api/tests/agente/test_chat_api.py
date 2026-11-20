@@ -12,7 +12,7 @@ from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
 
 from apoio_comum import eventos_do_banco
-from lupa_intranet.agente.cliente import (
+from lupa_api.agente.cliente import (
     ClienteAgenteError,
     ClienteFalso,
     PassoFerramenta,
@@ -21,8 +21,8 @@ from lupa_intranet.agente.cliente import (
     Roteiro,
     resposta_json,
 )
-from lupa_intranet.agente.contexto import prompt_sistema, segmentos
-from lupa_intranet.auditoria.eventos import AcaoAuditoria
+from lupa_api.agente.contexto import prompt_sistema, segmentos
+from lupa_api.auditoria.eventos import AcaoAuditoria
 from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.dominio.esquemas import calcular_hash
 from lupa_pipeline.dominio.tabelas import link_chamada_modelo

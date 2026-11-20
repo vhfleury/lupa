@@ -13,7 +13,7 @@ crie um ADR novo e ligue os dois.
 | [0003](0003-sandbox-de-parsing-por-subprocesso.md) | Sandbox de parsing por subprocesso com limites | Aceito |
 | [0004](0004-autenticacao-local-com-totp.md) | Autenticação local com senha e TOTP | Aceito |
 | [0005](0005-agente-com-claude-agent-sdk.md) | Agente com o Claude Agent SDK e modelo externo | Aceito |
-| [0006](0006-front-sveltekit-spa-atras-de-proxy.md) | Front em SvelteKit como SPA estática atrás de proxy | Aceito |
+| [0006](0006-front-sveltekit-spa-atras-de-proxy.md) | Front em SvelteKit como SPA estática atrás de proxy | Substituído por 0019 |
 | [0007](0007-cifra-na-aplicacao-com-dek-por-processo.md) | Cifra na aplicação com DEK por processo | Substituído por 0018 |
 | [0008](0008-imagem-do-object-storage.md) | Imagem do object storage | Proposto |
 | [0009](0009-dependencias-com-pip-compile.md) | Dependências com `pip-compile` a partir de `.in` | Substituído por 0010 |
@@ -23,10 +23,10 @@ crie um ADR novo e ligue os dois.
 | [0013](0013-data-vault.md) | Data Vault e histórico de leitura | Aceito |
 | [0014](0014-fila-no-banco.md) | Fila de arquivos no PostgreSQL | Aceito |
 | [0015](0015-gabinete-unico-sem-pseudonimizacao.md) | Gabinete único e nomes das partes | Aceito |
-| [0016](0016-dois-pacotes.md) | Pacotes de pipeline e intranet | Aceito |
+| [0016](0016-dois-pacotes.md) | Pacotes de pipeline e intranet | Substituído por 0019 quanto aos pacotes |
 | [0017](0017-cadastro-pelo-arquivo.md) | Cadastro pela leitura da capa no sandbox da API | Aceito |
 | [0018](0018-remocao-do-cofre-e-da-cifra.md) | Remoção do cofre e da cifra da aplicação | Aceito |
-| [0019](0019-front-django-renderizado-no-servidor.md) | Front Django renderizado no servidor | Proposto |
+| [0019](0019-front-django-renderizado-no-servidor.md) | Front Django renderizado no servidor | Aceito |
 
 ## Modelo
 

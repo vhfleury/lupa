@@ -1,0 +1,10 @@
+{% if pergunta %}
+<article class="mensagem usuario" data-testid="mensagem" data-status="pergunta" aria-label="Sua pergunta">
+  <p class="texto">{{ pergunta }}</p>
+</article>
+{% endif %}
+{% if erro %}{% include "componentes/aviso.html" with tipo="erro" mensagem=erro %}{% endif %}
+{% if resposta %}{% include "chat/_mensagem.html" with mensagem=resposta %}{% endif %}
+{% if descartes_conversa %}<p id="descartes-conversa" class="contador" hx-swap-oob="true" data-testid="descartes-conversa">{{ descartes_conversa }}</p>{% endif %}
+{% if oob_revisao %}{% include "chat/_revisao.html" %}{% endif %}
+{% include "chat/_formulario.html" with oob=True %}

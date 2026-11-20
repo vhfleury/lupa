@@ -6,7 +6,8 @@ from pathlib import Path
 import lupa_pipeline
 
 PACOTE = Path(lupa_pipeline.__file__).resolve().parent
-PACOTE_PROIBIDO = "lupa_intranet"
+SCRIPTS = PACOTE.parents[1] / "scripts"
+PACOTES_PROIBIDOS = ("lupa_api", "lupa_web")
 
 
 def _modulos_importados(arquivo: Path) -> list[str]:
@@ -21,14 +22,20 @@ def _modulos_importados(arquivo: Path) -> list[str]:
 
 
 def _importa_pacote_proibido(modulo: str) -> bool:
-    return modulo == PACOTE_PROIBIDO or modulo.startswith(f"{PACOTE_PROIBIDO}.")
+    return any(
+        modulo == proibido or modulo.startswith(f"{proibido}.") for proibido in PACOTES_PROIBIDOS
+    )
 
 
-def test_nenhum_modulo_da_pipeline_importa_a_intranet() -> None:
-    """RES-12: nenhum módulo de `lupa_pipeline` importa `lupa_intranet` (D2)."""
+def _arquivos_da_pipeline() -> list[Path]:
+    return sorted(PACOTE.rglob("*.py")) + sorted(SCRIPTS.rglob("*.py"))
+
+
+def test_pipeline_nao_importa_lupa_api_nem_lupa_web() -> None:
+    """RES-12: nem `lupa_pipeline` nem `pipeline/scripts` importam `lupa_api` ou `lupa_web` (P1)."""
     violacoes = [
-        f"{arquivo.relative_to(PACOTE)}: {modulo}"
-        for arquivo in sorted(PACOTE.rglob("*.py"))
+        f"{arquivo.name}: {modulo}"
+        for arquivo in _arquivos_da_pipeline()
         for modulo in _modulos_importados(arquivo)
         if _importa_pacote_proibido(modulo)
     ]
@@ -39,11 +46,8 @@ def test_varredura_reconhece_import_da_intranet(tmp_path: Path) -> None:
     """RES-12: a varredura acusa `import` e `from ... import` da intranet, não nomes parecidos."""
     arquivo = tmp_path / "modulo.py"
     arquivo.write_text(
-        "import lupa_intranet.api\nfrom lupa_intranet import agente\nimport lupa_intranetx\n",
+        "import lupa_api.api\nfrom lupa_web import telas\nimport lupa_apix\n",
         encoding="utf-8",
     )
     modulos = _modulos_importados(arquivo)
-    assert [m for m in modulos if _importa_pacote_proibido(m)] == [
-        "lupa_intranet.api",
-        "lupa_intranet",
-    ]
+    assert [m for m in modulos if _importa_pacote_proibido(m)] == ["lupa_api.api", "lupa_web"]

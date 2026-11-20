@@ -43,7 +43,7 @@ diagnósticos com `git diff -U0 develop...HEAD`. Omita legado independente da mu
 - Conteúdo de autos, senha, token ou texto de pergunta em log ou mensagem de erro.
 - Rota sem checagem de papel ou sessão; resposta do agente sem citação.
 - Regra jurídica fora de `validacoes/`; data contada com relógio real em vez de injetado.
-- `lupa_pipeline` importando `lupa_intranet`; lógica em `__init__.py`; `print`.
+- `lupa_pipeline` importando `lupa_api`; `lupa_web` importando outro pacote; lógica em `__init__.py`; `print`.
 - Número mágico fora de constante; duplicação real.
 - Comentário inline, código comentado, sobra de depuração; docstring que diverge do código
   (sinalizar como possível bug); `# type: ignore` ou `# noqa` silenciando erro.

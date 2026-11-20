@@ -2,7 +2,7 @@
 
 | Status | Data | Responsável |
 | --- | --- | --- |
-| Proposto | 2026-11-19 | Projeto Lupa |
+| Aceito | 2026-11-19 | Projeto Lupa |
 
 Substitui o ADR [0006](0006-front-sveltekit-spa-atras-de-proxy.md) e, quanto aos pacotes, o
 [0016](0016-dois-pacotes.md).

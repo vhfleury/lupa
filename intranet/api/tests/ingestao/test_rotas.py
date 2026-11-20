@@ -12,8 +12,8 @@ from sqlalchemy.orm import Session
 
 from apoio_arquivos import pdf_minimo, pdf_texto, zip_por_peca
 from apoio_comum import criar_processo_teste, eventos_do_banco
-from lupa_intranet.api.rotas import ingestao
-from lupa_intranet.auditoria.eventos import AcaoAuditoria
+from lupa_api.api.rotas import ingestao
+from lupa_api.auditoria.eventos import AcaoAuditoria
 from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.dominio.enums import EstadoJob, MotivoQuarentena, PapelUsuario, StatusProcesso
 from lupa_pipeline.dominio.gravacao import gravar_satelite

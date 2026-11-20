@@ -16,6 +16,23 @@ O formato segue o [Keep a Changelog 1.1.0](https://keepachangelog.com/pt-BR/1.1.
 
 ## [Não publicado]
 
+### Alterado
+
+- A intranet passa a ser renderizada no servidor por um front Django (`lupa_web`) com HTMX, com o
+  mesmo visual. O navegador só fala com o front, e o proxy deixa de expor `/api`. O pacote da API
+  passa a se chamar `lupa_api`, e as linhas novas de auditoria usam o prefixo `api.`; as antigas
+  mantêm `intranet.`. Ação: `docker compose up -d --build --wait --remove-orphans`.
+- A suíte ponta a ponta (`bash intranet/web/scripts/e2e.sh`) e as capturas dos guias passam a usar
+  `pytest-playwright`.
+- `bash scripts/verificar.sh` roda lint, tipagem e testes de `lupa_web` no contêiner `front` e
+  funciona numa stack nova, sem desembargador cadastrado.
+
+### Removido
+
+- A opção "Visualizar como assessor" do desembargador.
+- O SvelteKit e toda a cadeia Node do front (Vitest, Playwright em TypeScript, Prettier, ESLint e
+  `npm`).
+
 ## [0.2.0] - 2026-11-15
 
 ### Adicionado

@@ -9,9 +9,9 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from apoio_comum import eventos_do_banco
-from lupa_intranet.agente.cliente import ClienteFalso, Roteiro, resposta_json
-from lupa_intranet.agente.revisao import MSG_EM_REVISAO
-from lupa_intranet.auditoria.eventos import AcaoAuditoria
+from lupa_api.agente.cliente import ClienteFalso, Roteiro, resposta_json
+from lupa_api.agente.revisao import MSG_EM_REVISAO
+from lupa_api.auditoria.eventos import AcaoAuditoria
 from lupa_pipeline.dominio.enums import PapelUsuario, StatusProcesso
 from lupa_pipeline.dominio.visoes import VisaoProcesso
 from tests.agente.conftest import ProcessoAgente, semear_processo_agente

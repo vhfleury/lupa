@@ -2,9 +2,9 @@
 
 Uso: `python intranet/api/scripts/verificar_cabecalhos.py [--url https://proxy:8443] [--exigir]`.
 
-Pede algumas rotas (SPA, arquivo estático e API) e falha (saída 1) se faltar algum cabeçalho
-obrigatório ou se a CSP afrouxar: `unsafe-inline`/`unsafe-eval`, curinga, `data:`/`blob:`/http
-em script, estilo inline sem nonce/hash, ou diretivas de bloqueio ausentes. Sem `--exigir`, proxy
+Pede algumas rotas do front (páginas, saúde e o antigo prefixo `/api`) e falha (saída 1) se faltar algum cabeçalho
+obrigatório ou se a CSP afrouxar: `unsafe-inline`/`unsafe-eval`/`unsafe-hashes`, curinga,
+`data:`/`blob:`/http em script ou estilo, ou diretivas de bloqueio ausentes. Sem `--exigir`, proxy
 inacessível só gera aviso (saída 0): o passo roda em `verificar.sh` mesmo sem a stack no ar. O
 certificado de desenvolvimento é autoassinado; a conferência do certificado fica desligada aqui
 porque o que se testa são os cabeçalhos, não o TLS.
@@ -17,26 +17,24 @@ import urllib.request
 from collections.abc import Mapping, Sequence
 
 URL_PADRAO = "https://proxy:8443"
-ROTAS = ("/", "/login", "/inicio.js", "/api/saude")
+ROTAS = ("/", "/login", "/saude", "/api/saude")
 OBRIGATORIOS: dict[str, str | None] = {
     "content-security-policy": None,
     "strict-transport-security": None,
     "permissions-policy": None,
     "cross-origin-opener-policy": "same-origin",
     "x-content-type-options": "nosniff",
-    "referrer-policy": "no-referrer",
+    "referrer-policy": "same-origin",
     "x-frame-options": "DENY",
 }
 PROIBIDOS_SEMPRE = ("'unsafe-inline'", "'unsafe-eval'", "'unsafe-hashes'", "*", "data:", "http:")
-ESTILO_ANUNCIADOR = "'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo='"
 DIRETIVAS_EXATAS = {
     "default-src": {"'none'"},
     "script-src": {"'self'"},
     "object-src": {"'none'"},
     "frame-ancestors": {"'none'"},
     "base-uri": {"'none'"},
-    # Só o estilo fixo do anunciador de rota do SvelteKit (aria-live), por hash (6.10).
-    "style-src": {"'self'", "'unsafe-hashes'", ESTILO_ANUNCIADOR},
+    "style-src": {"'self'"},
 }
 MIN_HSTS = 15_552_000  # 180 dias
 
@@ -74,8 +72,6 @@ def problemas_csp(valor: str) -> list[str]:
             erros.append(f"CSP {diretiva} deve ser {' '.join(sorted(esperado))}")
     for diretiva, fontes in csp.items():
         for proibido in PROIBIDOS_SEMPRE:
-            if proibido == "'unsafe-hashes'" and diretiva == "style-src":
-                continue  # conferido acima: só junto do hash fixo do anunciador
             if proibido in fontes:
                 erros.append(f"CSP {diretiva} tem {proibido}")
         if diretiva.startswith(("script-src", "style-src")) and (
