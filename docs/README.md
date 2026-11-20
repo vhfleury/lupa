@@ -17,6 +17,7 @@
 | [Agente](sistema/agente.md) | Dossiê, escopo, fontes, tetos e revisão |
 | [Auditoria](sistema/auditoria.md) | Cadeia única e relatórios de uso |
 | [Interface](sistema/front.md) | Telas por papel, sessão e proxy |
+| [Padrão visual](sistema/padrao-visual.md) | Tokens, fontes, componentes da intranet e página `/padrao` |
 | [Sintéticos](sistema/sinteticos.md) | Gerador de cinco classes, evidências conhecidas e medição |
 
 ## Especificação, plano e decisões
@@ -26,6 +27,7 @@
 - [Plano do cadastro pelo arquivo](planos/plano_cadastro_pelo_arquivo.md) e [ADR 0017 sobre identificação no envio](adr/0017-cadastro-pelo-arquivo.md).
 - [Plano da remoção do Vault e da cifra](planos/plano_remocao_vault.md).
 - [Plano do front em Django](planos/plano_front_django.md) e [ADR 0019 sobre o front renderizado no servidor](adr/0019-front-django-renderizado-no-servidor.md).
+- [Plano do padrão visual](planos/plano_padrao_visual.md).
 - [ADRs](adr/README.md) e [registro das decisões](decisoes/registro.md).
 - [Defesas contra instruções presentes nos autos](especificacao/prompt-injection.md) e [decisão sobre o object storage](decisoes/object-storage.md).
 

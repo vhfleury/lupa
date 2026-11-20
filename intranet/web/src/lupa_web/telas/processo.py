@@ -36,6 +36,8 @@ AVISOS = {
     "recebido": "Arquivo recebido. Processando…",
 }
 MENSAGEM_SEM_DIAGNOSTICO = "Diagnóstico ainda não disponível."
+COLUNAS_ARQUIVOS = ("Arquivo", "Tamanho", "Enviado em", "Estado", "Páginas")
+COLUNAS_ALERTAS = ("Página", "Sinais")
 
 
 def formatar_bytes(tamanho: int | None) -> str:
@@ -113,6 +115,7 @@ def contexto_do_estado(processo_id: str, arquivos: dict[str, Any]) -> dict[str, 
         "processo_id": processo_id,
         "situacao_rotulo": rotulos.SITUACAO.get(arquivos["situacao"], arquivos["situacao"]),
         "arquivos": linhas,
+        "colunas_arquivos": COLUNAS_ARQUIVOS,
         "pendente": any(
             a.get("estado") and a["estado"] not in rotulos.ESTADOS_FINAIS for a in linhas
         ),
@@ -308,6 +311,7 @@ async def arquivo(
         "diagnostico": None if diagnostico.is_error else rotulos.pares(diagnostico.json(), sem_id),
         "sem_diagnostico": MENSAGEM_SEM_DIAGNOSTICO,
         "resumo_alertas": rotulos.pares(alertas.get("resumo")),
+        "colunas_alertas": COLUNAS_ALERTAS,
         "paginas_alertas": [
             {"numero": p["numero"], "flags": ", ".join(rotulos.legivel(f) for f in p["flags"])}
             for p in alertas.get("paginas", [])

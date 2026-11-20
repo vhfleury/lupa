@@ -22,7 +22,7 @@
     </select>
   </div>
   {% endif %}
-  <button type="submit">Confirmar e reenviar</button>
+  {% include "componentes/botao.html" with rotulo="Confirmar e reenviar" variante="" href="" %}
 </form>
 {% elif erro %}
 {% include "componentes/aviso.html" with tipo="erro" mensagem=erro %}

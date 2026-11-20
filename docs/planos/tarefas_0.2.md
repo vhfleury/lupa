@@ -895,3 +895,166 @@ depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos;
   - Comando: `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` e `bash intranet/web/scripts/e2e.sh`.
     Verde: pipeline `702 passed` (95,25%), intranet `266 passed` (98,23%), integração 6, injeção 2,
     web `348 passed` (100%), cabeçalhos ok em 4 rotas, agente 11; E2E `35 passed` em 80 s.
+
+## Fase 11 — Padrão visual
+
+Execução do [plano do padrão visual](plano_padrao_visual.md). Um único PR da branch
+`feat/padrao-visual`. "Pronto quando", salvo indicação: suíte de `lupa_web` verde no contêiner
+`front` depois do rebuild, `ruff check`, `ruff format --check` e `mypy --strict` limpos.
+
+- [x] **T11.1** Tokens em `tokens.css` com a paleta verde e o teste de contraste. RF-VIS-01, RF-VIS-02. Fase 1; P1, D1, D6.
+  - Vermelho: `intranet/web/tests/unit/test_tokens.py::test_primaria_e_verde_do_padrao`, `::test_tema_escuro_redefine_todos_os_tokens_de_cor`, `::test_pares_de_texto_atingem_4_5_nos_dois_temas`, `::test_borda_foco_e_tarja_atingem_3_nos_dois_temas`.
+  - Verde: `static/css/tokens.css` (claro e escuro, cores do selo e do badge), `base.css` passa a importá-lo e perde as declarações de token; `base.html` carrega `tokens.css`.
+  - Limpeza: nenhuma.
+  - Entregue: `tokens.css` com tema claro, escuro manual e escuro do sistema (fundo, superfícies,
+    texto, borda e `--borda-campo`, primária, sucesso/atenção/perigo com fundo, aviso, foco,
+    badge, raio, tarja, espaços); `base.css` sem tokens; `base.html` carrega `tokens.css` antes
+    de `base.css` (por `<link>`, sem `@import` duplicado). Testes: `docker compose exec -T front
+    python -m pytest -c intranet/web/pyproject.toml intranet/web/tests/unit/test_tokens.py`.
+    Vermelho: 33 falhas (`tokens.css` ausente). Verde: 33 passed; unit e telas 378 passed,
+    cobertura 100%.
+- [x] **T11.2** Fontes Source servidas pelo front. RF-VIS-02. Fase 1; D3, D4.
+  - Vermelho: `intranet/web/tests/e2e/test_seguranca.py::test_fontes_vem_da_propria_origem` falha (nenhum woff2 é carregado).
+  - Verde: `static/fontes/` com os 5 woff2 das releases `adobe-fonts` e `LICENSE.md`; `@font-face` em `tokens.css`; tokens `--fonte-titulo`, `--fonte`, `--mono`. SHA-256 de cada arquivo anotado na tarefa.
+  - Limpeza: nenhuma.
+  - Entregue: o subconjunto latino não é publicado pronto nas releases; vão os woff2 da variante
+    TTF de cada release, inteiros (total 460 KiB). `@font-face` com `font-display: swap` em
+    `tokens.css`; h1 a h3 em `--fonte-titulo` 600; `code`, `kbd`, `pre`, `samp` em `--mono`.
+    `LICENSE.md` reúne o `LICENSE.md` (OFL 1.1) dos três repositórios.
+
+    | Arquivo | Origem | Bytes | SHA-256 |
+    | --- | --- | --- | --- |
+    | `SourceSerif4-Semibold.woff2` | source-serif 4.005R, `source-serif-4.005_WOFF2.zip`, `TTF/SourceSerif4-Semibold.ttf.woff2` | 80732 | `457a13ac92e977d82e376038a2daac7fdb5433610910bf5787bdf6c1c3781865` |
+    | `SourceSans3-Regular.woff2` | source-sans 3.052R, `WOFF2-source-sans-3.052R.zip`, `TTF/SourceSans3-Regular.ttf.woff2` | 109632 | `53492fb3a0def77354f166a55d09b63a10855e91c206c7620a81cf56e97f8ec3` |
+    | `SourceSans3-It.woff2` | idem, `TTF/SourceSans3-It.ttf.woff2` | 86452 | `4d80b3b801f4c457f1b4adbd3911d8501338e6d282141663770c38d3a2e97859` |
+    | `SourceSans3-Semibold.woff2` | idem, `TTF/SourceSans3-Semibold.ttf.woff2` | 108900 | `47b9b661b9f395fe7f0d0e119637fba5c8dad97bde3df60066fd24229c0792f4` |
+    | `SourceCodePro-Regular.woff2` | source-code-pro 2.042R-u/1.062R-i/1.026R-vf, `WOFF2-source-code-pro-2.042R-u_1.062R-i_1.026Rvf.zip`, `TTF/SourceCodePro-Regular.ttf.woff2` | 74052 | `714eee29b70d191f5bf4b3a06b68f2c50522b1303d31c7d44dcefdcc5f9defd0` |
+
+    Testes: `bash intranet/web/scripts/e2e.sh -k fontes_vem_da_propria_origem` e, no `front`,
+    `python -m pytest -c intranet/web/pyproject.toml intranet/web/tests/unit/test_estaticos.py`
+    (casos novos `test_tokens_declaram_as_cinco_faces_source_com_swap` e
+    `test_fontes_declaradas_existem_na_propria_origem`). Vermelho: E2E 1 failed (nenhum woff2
+    pedido, `AssertionError: []`); unit 2 failed. Verde: E2E 3 passed (fontes, cabeçalhos, CSP);
+    unit e telas 380 passed, cobertura 100%.
+- [x] **T11.3** Catálogo de componentes e página `/padrao`. RF-VIS-03, RF-VIS-04, RF-VIS-05. Fase 1; D2, D7, D8.
+  - Vermelho: `intranet/web/tests/telas/test_padrao.py::test_padrao_devolve_404_fora_do_desenvolvimento`, `::test_padrao_sem_sessao_vai_ao_login`, `::test_padrao_mostra_cada_componente_em_desenvolvimento`.
+  - Verde: `telas/padrao.py`, rota em `urls.py`, `templates/padrao.html`; os 11 templates em `templates/componentes/` (`aviso.html` adaptado); estilos em `componentes.css` só com tokens.
+  - Limpeza: nenhuma.
+  - Revisão manual: aparência dos componentes; o usuário aprova o visual pelas capturas da `/padrao` (claro, escuro, 375 px) antes da T11.5.
+  - Entregue: `telas/padrao.py` (404 por `Http404` antes de `tela_autenticada`), rota `padrao`,
+    `padrao.html` com tipografia e cada componente em suas variantes; `botao`, `aviso`, `tabela`
+    (região rolável com `tabindex`), `campo` (texto, senha, select, textarea, dica), `acao`
+    (`<details>` com formulário), `paginacao`, `vazio`, `badge`, `cartao`, `progresso` e `selo`
+    (tarja de `--tarja` no tom, texto do resultado); raiz de cada um com `data-componente`.
+    `componentes.css` ganha os estilos, só com tokens, e usa peso 600 (a face carregada).
+    Testes: `docker compose exec -T front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/telas/test_padrao.py`. Vermelho: 4 failed (sem sessão, catálogo, selo,
+    badge); os 4 casos de 404 já passavam por falta da rota. Verde: 8 passed; unit e telas 410
+    passed, cobertura 100%.
+- [x] **T11.4** Teste de conformidade com lista de telas pendentes. RF-VIS-01, RF-VIS-04. Fase 1; D5.
+  - Vermelho: `intranet/web/tests/unit/test_conformidade_templates.py::test_css_de_tela_nao_tem_cor_nem_fonte_literal` e `::test_templates_de_tela_usam_componentes` falham para `base.css` e `componentes.css`, que não estão na lista de pendentes.
+  - Verde: os dois CSS só com `var(--…)`; a lista de pendentes começa com os grupos das fases 2 a 6.
+  - Limpeza: nenhuma.
+  - Entregue: `PENDENTES` com os grupos `acesso`, `processos`, `dossie`, `chat` e `gestao`
+    (templates e CSS de cada fase); caso extra `test_pendentes_citam_arquivos_que_existem`.
+    Testes: `docker compose exec -T front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/unit/test_conformidade_templates.py`. Vermelho: como a T11.1 já tirou os
+    tokens de `base.css` e a T11.3 deixou `componentes.css` só com tokens, o vermelho foi tirado
+    rodando o teste sobre a árvore de `ee33894` (antes da fase 11): CSS 1 failed, 42 ocorrências
+    em `base.css`; o de templates já passava (`base.html` sem marcação própria). Verde: 3 passed;
+    unit e telas 413 passed, cobertura 100%.
+- [x] **T11.5** Telas de acesso no padrão (login, TOTP, troca de senha, erros, acesso negado). RF-VIS-04. Fase 2; P3.
+  - Vermelho: grupo "acesso" sai da lista de pendentes e `test_conformidade_templates.py` falha.
+  - Verde: templates de `acesso/`, `erros/` e `login.css` com componentes e tokens; testes de tela existentes continuam verdes.
+  - Limpeza: nenhuma.
+  - Entregue: login, código e troca de senha com `componentes/botao.html` (o botão ganha o
+    parâmetro `formulario`, para o "Sair" da troca); `login.css` sem cor literal nem sombra, tarja
+    superior em `--tarja` e `--primaria`, botão no verde primário, peso 700 virou 600. As
+    páginas de erro já não tinham marcação própria. Testes: `docker compose exec -T front python
+    -m pytest -c intranet/web/pyproject.toml intranet/web/tests/unit/test_conformidade_templates.py`.
+    Vermelho: 2 failed (`acesso/_troca.html`, `login.css`). Verde: unit e telas 413 passed,
+    cobertura 100%.
+- [x] **T11.6** Início, processos, processo e envio no padrão; estado de ingestão no badge. RF-VIS-04. Fase 3; P3, D7.
+  - Vermelho: `intranet/web/tests/telas/test_processos.py::test_estado_de_ingestao_aparece_no_badge`; grupo "processos" sai da lista de pendentes.
+  - Verde: `inicio.html`, `processos/`, `componentes/envio.html`, `inicio.css`, `processos.css`, `processo.css`.
+  - Limpeza: nenhuma.
+  - Entregue: `componentes/tabela.html` aceita `corpo` (template das linhas), e as tabelas de
+    processos, arquivos e alertas passam por ele (`_linhas_processos.html`,
+    `_linhas_arquivos.html`, `_linhas_alertas.html`; colunas em `COLUNAS_*` das views);
+    `componentes/badge.html` aceita `testid` e `estado`, e a situação da lista e o estado do arquivo
+    vão no badge (o `.selo` de `processos.css` saiu); botões pelo `botao.html`, inclusive no
+    `envio.html`; cores literais e sombras de `inicio.css` e `processos.css` trocadas por tokens,
+    peso 700 virou 600. Testes: `docker compose exec -T front python -m pytest -c
+    intranet/web/pyproject.toml intranet/web/tests/unit/test_conformidade_templates.py
+    intranet/web/tests/telas/test_processos.py`. Vermelho: 3 failed (CSS, templates, badge).
+    Verde: unit e telas 420 passed, cobertura 100%; ruff e mypy limpos.
+- [x] **T11.7** Dossiê, validações e visualizador no padrão; resultados no selo. RF-VIS-03, RF-VIS-04. Fase 4; P2, P3, D7.
+  - Vermelho: `intranet/web/tests/telas/test_validacoes.py::test_resultado_tempestivo_aparece_no_selo_de_sucesso` e `::test_atencao_e_falha_usam_selo_do_seu_tom`; grupo "dossiê" sai da lista de pendentes.
+  - Verde: templates de dossiê, validações e visualizador; `dossie.css`, `validacoes.css`, `visualizador.css`.
+  - Limpeza: nenhuma.
+  - Entregue: resultado do achado no `selo.html` (novo parâmetro `testid`) nas validações e no
+    dossiê, pelo `rotulos.TOM_DO_RESULTADO`: `conforme` em sucesso, `verificar` em atenção,
+    `atencao` em falha (mantém os tons que cada resultado já tinha: verde, âmbar e vermelho);
+    status de fato, "substituído", sinais da peça e status do evento no badge; índice de peças e
+    histórico de achados pelo `tabela.html` com `corpo` (`_linhas_pecas.html`,
+    `_linhas_historico.html`); botões pelo `botao.html`; `.selo`/`.resultado` próprios saíram de
+    `dossie.css` e `validacoes.css`; `visualizador.css` com `--superficie-suave`, `--fundo` e
+    `--atencao` (preenchimento com `fill-opacity`) no lugar das cores literais; peso 700 virou 600.
+    Testes: `docker compose exec -T front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/unit/test_conformidade_templates.py intranet/web/tests/telas/test_validacoes.py`.
+    Vermelho: 4 failed (CSS, templates e os dois do selo). Verde: unit e telas 426 passed,
+    cobertura 100%; ruff e mypy limpos.
+- [x] **T11.8** Chat no padrão. RF-VIS-04. Fase 5; P3.
+  - Vermelho: grupo "chat" sai da lista de pendentes e o teste de conformidade falha.
+  - Verde: templates de `chat/` e `chat.css`; rótulo de IA e citações (RF-INT-05) intactos nos testes existentes.
+  - Limpeza: nenhuma.
+  - Entregue: o aviso de mensagem do chat passa pelo `aviso.html` (novos parâmetros `testid` e
+    `status`, que mantêm `data-testid="mensagem"` e `data-status`); "Perguntar" pelo `botao.html`
+    com `desabilitado`; a classe `aviso-msg` (nota discreta, não um aviso) virou `observacao-msg`;
+    peso 700 de `chat.css` virou 600. Rótulo de IA e citações sem mudança. Testes: `docker compose
+    exec -T front python -m pytest -c intranet/web/pyproject.toml
+    intranet/web/tests/unit/test_conformidade_templates.py`. Vermelho: 1 failed (templates de
+    `chat/`; o CSS já não tinha cor literal). Verde: unit e telas 426 passed, cobertura 100%.
+- [x] **T11.9** Auditoria e usuários no padrão; lista de pendentes eliminada. RF-VIS-01, RF-VIS-04. Fase 6; P1, P3, D5.
+  - Vermelho: grupo "gestão" sai da lista de pendentes e o teste de conformidade falha.
+  - Verde: templates de `auditoria/` e `usuarios/`, `auditoria.css`, `usuarios.css`; a lista de pendentes sai do teste.
+  - Limpeza: remover regras CSS que ficaram sem uso.
+  - Entregue: as tabelas de eventos, contagem, chamadas ao modelo e usuários passam pelo
+    `tabela.html` com `corpo` (`auditoria/_linhas_*.html`, `usuarios/_linhas_usuarios.html`;
+    colunas em `COLUNAS_*` das views); botões pelo `botao.html`, que ganha `rotulo_acessivel`
+    (`aria-label` de "Reativar", "Resetar senha" e "Resetar autenticador"). `PENDENTES`,
+    `_pendente` e `test_pendentes_citam_arquivos_que_existem` saíram do teste: a regra vale para
+    todos os templates e CSS. Limpeza: a varredura de classes dos CSS contra templates, JS e
+    views só achou classes montadas em tempo de execução (`selo-*`, `zoom-*`); nenhuma regra
+    removida. Testes: `docker compose exec -T front python -m pytest -c
+    intranet/web/pyproject.toml intranet/web/tests/unit/test_conformidade_templates.py`.
+    Vermelho: 1 failed (templates de `auditoria/` e `usuarios/`). Verde: unit e telas 433
+    passed, cobertura 100%; ruff e mypy limpos.
+- [x] **T11.10** Axe com todas as regras, tabela a 375 px e capturas da `/padrao`; guias regerados. RF-VIS-04, RF-VIS-06, RNF-09. Fase 7; P4, D10.
+  - Revisão manual (E2E): `intranet/web/tests/e2e/test_acessibilidade.py::test_axe_sem_violacoes_em_toda_tela` (sem filtro de tags, dois temas, inclui `/padrao`), `::test_tabela_larga_rola_sozinha_em_375px`, `test_capturas.py::test_capturas_do_padrao_nos_tres_formatos`; violações achadas corrigidas em commit próprio; `docs/imagens/` regerado por `capturas.sh`.
+  - Pronto quando: `bash intranet/web/scripts/e2e.sh` verde e capturas conferidas pelo usuário.
+  - Entregue: `varrer` sem `runOnly` e o teste renomeado para `test_axe_sem_violacoes_em_toda_tela`,
+    que falha em qualquer violação (antes só sérias e críticas das tags WCAG A/AA) e inclui a
+    `/padrao`; `test_tabela_larga_rola_sozinha_em_375px` (auditoria a 375 px: a página não rola de
+    lado e a `.tabela-rolavel` rola); `test_capturas_do_padrao_nos_tres_formatos`. A `/padrao`
+    roda no E2E pela D11 (`LUPA_AMBIENTE=desenvolvimento` só no `front`). Correções achadas: a
+    regra `.cartao h3` da T11.3 vazava para o `h3` das telas (agora
+    `.cartao[data-componente="cartao"] h3`); as legendas das tabelas do relatório de uso
+    ("... por ação/versão") colidiam com `get_by_label("Por")` e viraram "Contagem de eventos" e
+    "Chamadas ao modelo em cada versão". `docs/imagens/` regerado por `capturas.sh`; capturas de
+    toda tela (claro/escuro, 1200 e 375 px) e da `/padrao` geradas fora do repositório. Testes:
+    `bash intranet/web/scripts/e2e.sh`. Vermelho: a varredura nova já veio sem violação do axe;
+    o vermelho foi 1 failed em `test_chat_auditoria.py::test_relatorio_por_usuario_traz_o_custo_estimado`
+    (modo estrito do `get_by_label("Por")`). Verde: E2E 37 passed em 85 s; `capturas.sh` 3
+    passed; unit e telas 433 passed, cobertura 100%. Pendente: conferência das capturas pelo
+    usuário.
+- [x] **T11.11** Documentação. RF-VIS-04. Fase 8.
+  - Revisão manual: `docs/sistema/padrao-visual.md` (tokens, componentes com exemplo de `include`, SHA-256 das fontes), `docs/sistema/front.md`, `docs/README.md`, `CHANGELOG.md` em "Não publicado".
+  - Pronto quando: `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` verde.
+  - Entregue: `docs/sistema/padrao-visual.md` (tokens, componentes e parâmetros com exemplo de
+    `include`, badge e selo, `/padrao`, axe e capturas, SHA-256 das fontes), parágrafo em
+    `docs/sistema/front.md`, linha em `docs/README.md` e entrada em `CHANGELOG.md` ("Não
+    publicado"). Comando: `LUPA_EXIGIR_CABECALHOS=1 bash scripts/verificar.sh` e `bash
+    intranet/web/scripts/e2e.sh`. Verde: pipeline 702 passed (95,25%), intranet 266 passed
+    (98,23%), integração 6, injeção 2, web 436 passed (100%), cabeçalhos ok em 4 rotas, agente
+    11; E2E 37 passed em 85 s.

@@ -22,6 +22,7 @@ from lupa_web.telas.sessao import (
     tem,
 )
 
+COLUNAS_USUARIOS = ("Usuário", "Papel", "Situação", "Autenticador", "Ações")
 AVISOS = {
     "desativar": "desativado",
     "reativar": "reativado",
@@ -99,6 +100,7 @@ async def _pagina(
     aviso = aviso_da_acao(request.GET.get("aviso", ""), usuarios, request.GET.get("usuario", ""))
     contexto = contexto_da_moldura(request, sessao) | {
         "usuarios": [linha_do_usuario(sessao, u) for u in usuarios],
+        "colunas_usuarios": COLUNAS_USUARIOS,
         "aviso": aviso,
         **mensagens,
     }

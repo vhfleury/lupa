@@ -18,6 +18,12 @@ O formato segue o [Keep a Changelog 1.1.0](https://keepachangelog.com/pt-BR/1.1.
 
 ### Alterado
 
+- A intranet adota o padrão visual: paleta verde (primária `#00613b`, `#4cc489` no tema escuro),
+  fontes Source servidas pelo próprio front, botões, tabelas, avisos e etiquetas iguais em todas
+  as telas. O estado do processamento aparece numa etiqueta neutra, e o resultado de cada
+  validação num selo com tarja no tom do resultado. Em telas estreitas a tabela rola sozinha.
+  O serviço `front` passa a receber `LUPA_AMBIENTE`; a página de catálogo `/padrao` só abre em
+  `desenvolvimento`. Ação: `docker compose up -d --build --wait`.
 - A intranet passa a ser renderizada no servidor por um front Django (`lupa_web`) com HTMX, com o
   mesmo visual. O navegador só fala com o front, e o proxy deixa de expor `/api`. O pacote da API
   passa a se chamar `lupa_api`, e as linhas novas de auditoria usam o prefixo `api.`; as antigas

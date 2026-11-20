@@ -25,10 +25,7 @@
   <h2 id="titulo-alertas">Alertas</h2>
   {% if resumo_alertas %}<dl>{% for rotulo, texto in resumo_alertas %}<dt>{{ rotulo }}</dt><dd>{{ texto }}</dd>{% endfor %}</dl>{% endif %}
   {% if paginas_alertas %}
-  <table data-testid="alertas-paginas">
-    <thead><tr><th scope="col">Página</th><th scope="col">Sinais</th></tr></thead>
-    <tbody>{% for p in paginas_alertas %}<tr><td>{{ p.numero }}</td><td>{{ p.flags }}</td></tr>{% endfor %}</tbody>
-  </table>
+  {% include "componentes/tabela.html" with legenda="Páginas com sinal de injeção" colunas=colunas_alertas testid="alertas-paginas" corpo="processos/_linhas_alertas.html" %}
   {% else %}
   <p class="dica">Nenhuma página com sinal de injeção.</p>
   {% endif %}

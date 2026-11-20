@@ -22,7 +22,7 @@
       <label for="senha">Senha</label>
       <input id="senha" name="senha" type="password" autocomplete="current-password" placeholder="Digite sua senha" required maxlength="256">
     </div>
-    <button type="submit">Continuar <span aria-hidden="true">→</span></button>
+    {% include "componentes/botao.html" with rotulo="Continuar" variante="" href="" %}
   </form>
   <p class="login-seguranca">Acesso protegido por verificação em duas etapas</p>
 </div>

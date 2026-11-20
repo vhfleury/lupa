@@ -14,7 +14,7 @@
 .sobretitulo {
   color: var(--texto-suave);
   font-size: 0.65rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.13em;
 }
 h1 {
@@ -28,9 +28,9 @@ h1 {
   font-size: 0.9rem;
 }
 .novo-botao {
-  background: #063453;
-  border: 1px solid #22707e;
-  color: white;
+  background: var(--primaria);
+  border: 1px solid var(--primaria);
+  color: var(--primaria-texto);
   border-radius: 10px;
   min-height: 46px;
   padding: 0.6rem 1.1rem;
@@ -39,7 +39,7 @@ h1 {
 .acervo {
   background: var(--superficie);
   border: 1px solid var(--borda);
-  border-top: 3px solid #008e87;
+  border-top: var(--tarja) solid var(--primaria);
   border-radius: 16px;
   overflow: hidden;
 }
@@ -196,28 +196,6 @@ td {
     margin-bottom: 0.35rem;
   }
 }
-.selo {
-  display: inline-block;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  border: 1px solid var(--borda);
-  font-size: 0.85rem;
-}
-.selo.concluido {
-  background: var(--sucesso-fundo);
-  color: var(--sucesso);
-}
-.selo.quarentena,
-.selo.falho {
-  background: var(--perigo-fundo);
-  color: var(--perigo);
-}
-.selo.processando,
-.selo.pendencias {
-  background: var(--aviso-fundo);
-  color: var(--aviso-texto);
-}
-
 .cadastro {
   margin-bottom: 1.5rem;
 }

@@ -140,3 +140,15 @@ def test_novo_processo_abre_e_fecha_o_cadastro_sem_javascript(
     assert "Fechar cadastro" in cadastro
     assert 'hx-post="/processos/envio"' in cadastro
     assert 'href="#cadastro-processo"' not in html
+
+
+def test_estado_de_ingestao_aparece_no_badge(logado: respx.MockRouter, navegador: Client) -> None:
+    """RF-VIS-04 (D7): o estado de ingestão vai no badge neutro, sem selo de resultado."""
+    logado.get("/processos").respond(200, json=LISTA)
+    html = navegador.get("/processos").content.decode()
+    assert (
+        '<span class="badge" data-componente="badge" data-testid="situacao"'
+        ' data-estado="concluido">Concluído</span>'
+    ) in html
+    assert 'data-componente="selo"' not in html
+    assert 'class="selo' not in html

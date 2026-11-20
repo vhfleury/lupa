@@ -102,7 +102,7 @@
 
 .mensagem .desfecho {
   margin: 0 0 0.4rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--perigo);
 }
 
@@ -117,7 +117,7 @@
 }
 
 .mensagem .descartes,
-.mensagem .aviso-msg {
+.mensagem .observacao-msg {
   margin: 0.4rem 0 0;
   font-size: 0.9rem;
   color: var(--texto-suave);

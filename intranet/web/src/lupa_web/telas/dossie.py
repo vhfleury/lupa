@@ -21,6 +21,7 @@ from lupa_web.telas.sessao import (
     tem,
 )
 
+COLUNAS_PECAS = ("#", "Tipo", "Origem", "Páginas", "Data", "Confiança", "Flags")
 AVISOS = {"reclassificada": "Peça reclassificada. Os fatos e as validações foram atualizados."}
 
 
@@ -149,6 +150,7 @@ def _achados(processo_id: str, achados: list[dict[str, Any]]) -> list[dict[str, 
         | {
             "validacao_rotulo": rotulos.legivel(achado["validacao"]),
             "resultado_rotulo": rotulos.RESULTADO.get(achado["resultado"], achado["resultado"]),
+            "resultado_tom": rotulos.TOM_DO_RESULTADO.get(achado["resultado"], "atencao"),
             "links": [link_da_evidencia(processo_id, f["evidencia_id"]) for f in achado["fontes"]],
         }
         for achado in achados
@@ -194,6 +196,7 @@ def contexto_do_dossie(
         "responsaveis": ", ".join(r["nome_usuario"] for r in ficha["responsaveis"]),
         "situacao_rotulo": rotulos.SITUACAO.get(situacao, situacao),
         "linha_do_tempo": _linha_do_tempo(processo_id, dossie["linha_do_tempo"]),
+        "colunas_pecas": COLUNAS_PECAS,
         "pecas": [
             linha_da_peca(processo_id, peca, resumos.get(peca["id"])) for peca in indice["pecas"]
         ],

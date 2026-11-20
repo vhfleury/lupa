@@ -9,6 +9,10 @@ estáticos (CSS, HTMX e os scripts de tema, envio e visualizador) saem pelo Whit
 inline. O proxy acrescenta os cabeçalhos de segurança e a API valida a sessão e a permissão em
 toda rota.
 
+O visual segue o [padrão visual](padrao-visual.md): cores e fontes só em `tokens.css`, botão,
+tabela, aviso, badge, selo e demais peças pelos templates de `templates/componentes/`, e o
+catálogo na página `/padrao`, aberta só com `LUPA_AMBIENTE=desenvolvimento`.
+
 Quando a API responde 401, a tela leva ao login; se o navegador ainda tinha o cookie de sessão, o
 login mostra o aviso de sessão expirada (`/login?motivo=expirada`). Um 403 vira a página "Acesso
 negado", e a API fora do ar vira "Serviço indisponível" (502). As ações que salvam e redirecionam

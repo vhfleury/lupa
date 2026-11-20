@@ -11,7 +11,7 @@
     <input type="hidden" name="{{ campo_alvo }}" value="{{ alvo }}">
     <label for="nota-{{ chave_nota }}">Anotação</label>
     <textarea id="nota-{{ chave_nota }}" name="texto" maxlength="2000" rows="2" required></textarea>
-    <button type="submit">Salvar anotação</button>
+    {% include "componentes/botao.html" with rotulo="Salvar anotação" variante="" href="" %}
   </form>
 </details>
 {% endif %}

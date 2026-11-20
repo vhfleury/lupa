@@ -41,8 +41,8 @@
       <input id="codigo" name="codigo" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus>
     </div>
     <div class="acoes">
-      <button type="submit">{% if etapa.etapa == "configurar_mfa" %}Confirmar autenticador{% else %}Entrar{% endif %}</button>
-      <a class="botao secundario" href="/login">Voltar</a>
+      {% if etapa.etapa == "configurar_mfa" %}{% include "componentes/botao.html" with rotulo="Confirmar autenticador" variante="" href="" %}{% else %}{% include "componentes/botao.html" with rotulo="Entrar" variante="" href="" %}{% endif %}
+      {% include "componentes/botao.html" with rotulo="Voltar" variante="secundario" href="/login" %}
     </div>
   </form>
   <p class="login-seguranca">Acesso protegido por verificação em duas etapas</p>

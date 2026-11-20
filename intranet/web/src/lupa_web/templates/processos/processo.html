@@ -21,7 +21,7 @@
           {% for valor, rotulo in classes %}<option value="{{ valor }}"{% if valor == processo.classe %} selected{% endif %}>{{ rotulo }}</option>{% endfor %}
         </select>
       </div>
-      <div class="acoes"><button type="submit">Salvar classe</button></div>
+      <div class="acoes">{% include "componentes/botao.html" with rotulo="Salvar classe" variante="" href="" %}</div>
     </form>
   </details>
   {% endif %}
@@ -65,7 +65,7 @@
       <legend>Responsáveis pelo processo</legend>
       {% for usuario in disponiveis %}<label class="opcao"><input type="checkbox" name="usuarios" value="{{ usuario.id }}"{% if usuario.marcado %} checked{% endif %}>{{ usuario.nome_usuario }}</label>{% empty %}<p class="dica">Cadastre ou reative um assessor do gabinete para atribuir este processo.</p>{% endfor %}
     </fieldset>
-    <button type="submit">Salvar responsáveis</button>
+    {% include "componentes/botao.html" with rotulo="Salvar responsáveis" variante="" href="" %}
   </form>
   {% endif %}
 </section>

@@ -26,6 +26,7 @@ from lupa_web.telas.sessao import (
 DATA_ISO = re.compile(r"\d{4}-\d{2}-\d{2}")
 ID_PUBLICO = re.compile(r"[0-9a-fA-F]{64}")
 TAMANHO_ID_CURTO = 8
+COLUNAS_HISTORICO = ("Validação", "Resultado", "Explicação", "Gravado em")
 MENSAGEM_FONTE = "Informe a página, o intervalo e o trecho da correção."
 AVISOS = {"confirmado": "Fato confirmado.", "anotacao": "Anotação registrada."}
 
@@ -196,6 +197,7 @@ def cartao_do_achado(
     return achado | {
         "validacao_rotulo": rotulos.legivel(achado["validacao"]),
         "resultado_rotulo": rotulos.RESULTADO.get(achado["resultado"], achado["resultado"]),
+        "resultado_tom": rotulos.TOM_DO_RESULTADO.get(achado["resultado"], "atencao"),
         "valores_exibidos": [
             (rotulos.legivel(chave), no_do_valor(indices, achado, chave, valor))
             for chave, valor in achado["valores"].items()
@@ -228,7 +230,11 @@ def _historico(achados: list[dict[str, Any]], fatos: list[Fato]) -> dict[str, An
         for f in fatos
         if not f["vigente"]
     ]
-    return {"antigos": antigos, "substituidos": substituidos}
+    return {
+        "antigos": antigos,
+        "substituidos": substituidos,
+        "colunas_historico": COLUNAS_HISTORICO,
+    }
 
 
 def aviso_da_tela(consulta: QueryDict) -> str:

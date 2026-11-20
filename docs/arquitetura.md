@@ -7,7 +7,7 @@ O Lupa atende um gabinete cível de segundo grau. O assessor e o desembargador c
 | Componente | Trabalho | Armazenamento ou conexão |
 | --- | --- | --- |
 | Caddy | HTTPS, cabeçalhos de segurança e encaminhamento de tudo ao front | `/api` não é exposto: o navegador só fala com o front. |
-| Front Django (`lupa_web`) | Renderiza as telas no servidor, com HTMX, e chama a API pela rede interna | Sem banco nem sessão própria; repassa o cookie de sessão e o IP do cliente à API e guarda o envio pendente de complemento no volume `envios-pendentes`. |
+| Front Django (`lupa_web`) | Renderiza as telas no servidor, com HTMX, e chama a API pela rede interna | Sem banco nem sessão própria; repassa o cookie de sessão e o IP do cliente à API e guarda o envio pendente de complemento no volume `envios-pendentes`. Recebe `LUPA_AMBIENTE`, que só abre a página `/padrao` em `desenvolvimento`. |
 | API FastAPI (`lupa_api`) | Autenticação, cadastro, recebimento, dossiê, chat, revisão e auditoria | A API importa o pacote da pipeline e acessa PostgreSQL, MinIO e a API do modelo quando solicitada. |
 | Worker Python | Inventário, extração, OCR, saneamento, identificação de peças e fatos e cálculo de achados | A rede de ingestão é interna. O worker consulta o PostgreSQL e usa MinIO dentro da implantação. |
 | PostgreSQL | Hubs, vínculos, satélites versionados, fila e cadeia de auditoria | A aplicação usa o papel `lupa_app`. As consultas leem as views e as escritas passam pelas funções de gravação. |

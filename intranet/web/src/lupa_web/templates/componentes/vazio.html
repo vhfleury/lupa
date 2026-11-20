@@ -1,0 +1,5 @@
+<div class="vazio" data-componente="vazio">
+  <p class="vazio-mensagem">{{ mensagem }}</p>
+  {% if dica %}<p class="dica">{{ dica }}</p>{% endif %}
+  {% if acao_href %}{% include "componentes/botao.html" with rotulo=acao_rotulo href=acao_href variante="secundario" %}{% endif %}
+</div>

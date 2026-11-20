@@ -1,0 +1,25 @@
+{% for usuario in usuarios %}
+<tr data-testid="linha-usuario" data-usuario="{{ usuario.nome_usuario }}">
+  <th scope="row">{{ usuario.nome_usuario }}</th>
+  <td>{{ usuario.papel_rotulo }}</td>
+  <td data-testid="situacao">{{ usuario.situacao }}</td>
+  <td>{{ usuario.autenticador }}</td>
+  <td>
+    <div class="acoes">
+      {% if usuario.acoes.gerir %}
+      {% if usuario.ativo %}
+      <a class="botao perigo" href="/usuarios/{{ usuario.id }}/desativar" aria-label="Desativar {{ usuario.nome_usuario }}">Desativar</a>
+      {% else %}
+      <form method="post" action="/usuarios/{{ usuario.id }}/reativar">{% csrf_token %}{% include "componentes/botao.html" with rotulo="Reativar" variante="secundario" href="" rotulo_acessivel="Reativar "|add:usuario.nome_usuario %}</form>
+      {% endif %}
+      {% endif %}
+      {% if usuario.acoes.resetar %}
+      <form method="post" action="/usuarios/{{ usuario.id }}/resetar-senha">{% csrf_token %}{% include "componentes/botao.html" with rotulo="Resetar senha" variante="secundario" href="" rotulo_acessivel="Resetar senha de "|add:usuario.nome_usuario %}</form>
+      <form method="post" action="/usuarios/{{ usuario.id }}/resetar-mfa">{% csrf_token %}{% include "componentes/botao.html" with rotulo="Resetar autenticador" variante="secundario" href="" rotulo_acessivel="Resetar autenticador de "|add:usuario.nome_usuario %}</form>
+      {% endif %}
+    </div>
+  </td>
+</tr>
+{% empty %}
+<tr><td colspan="5">Nenhum usuário.</td></tr>
+{% endfor %}

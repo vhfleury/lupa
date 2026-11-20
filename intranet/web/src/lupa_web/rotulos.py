@@ -28,6 +28,8 @@ SITUACAO = {
 
 RESULTADO = {"conforme": "Conforme", "atencao": "Atenção", "verificar": "Verificar"}
 
+TOM_DO_RESULTADO = {"conforme": "sucesso", "verificar": "atencao", "atencao": "falha"}
+
 STATUS_FATO = {"automatico": "Automático", "confirmado": "Confirmado", "corrigido": "Corrigido"}
 
 TIPOS_PECA = (

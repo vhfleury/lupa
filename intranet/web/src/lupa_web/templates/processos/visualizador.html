@@ -15,7 +15,7 @@
     {% for item in legiveis %}<option value="{{ item.arquivo_id }}"{% if item.arquivo_id == arquivo_id %} selected{% endif %}>{{ item.nome }}</option>{% endfor %}
   </select>
   <input type="hidden" name="zoom" value="{{ zoom }}">
-  <button type="submit" class="secundario">Abrir</button>
+  {% include "componentes/botao.html" with rotulo="Abrir" variante="secundario" href="" %}
 </form>
 {% endif %}
 

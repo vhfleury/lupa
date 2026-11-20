@@ -161,6 +161,24 @@ def test_html_sem_script_nem_estilo_inline(browser: Browser) -> None:
     contexto.close()
 
 
+def test_fontes_vem_da_propria_origem(browser: Browser) -> None:
+    """RF-VIS-02: as fontes Source saem do próprio front e a CSP só admite `font-src 'self'`."""
+    contexto = browser.new_context(**ARGUMENTOS_DO_CONTEXTO)
+    page = contexto.new_page()
+    fontes: list[str] = []
+    page.on("request", lambda p: fontes.append(p.url) if p.resource_type == "font" else None)
+    resposta = page.goto("/login")
+    assert resposta is not None
+    page.evaluate("document.fonts.ready.then(() => true)")
+    origem = urlparse(page.url).netloc
+    assert any(urlparse(url).path.endswith(".woff2") for url in fontes), fontes
+    assert [url for url in fontes if urlparse(url).netloc != origem] == []
+    assert page.evaluate("document.fonts.check('16px \"Source Sans 3\"')")
+    csp = ler_csp(resposta.headers.get("content-security-policy", ""))
+    assert csp.get("font-src") == ["'self'"]
+    contexto.close()
+
+
 def test_texto_hostil_dos_autos_sai_como_texto(browser: Browser, desembargador: Conta) -> None:
     """RF-INT-01: marcação dos autos citada no chat vira texto, sem script nem link externo."""
     processo = variavel("LUPA_E2E_HOSTIL_PROCESSO")

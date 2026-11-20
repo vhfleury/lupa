@@ -10,6 +10,7 @@ from lupa_web.telas import (
     dossie,
     envio,
     inicio,
+    padrao,
     processo,
     processos,
     usuarios,
@@ -69,6 +70,7 @@ urlpatterns = [
     path(
         "processos/<str:processo_id>/visualizador", visualizador.visualizador, name="visualizador"
     ),
+    path("padrao", padrao.padrao, name="padrao"),
     path("auditoria", auditoria.lista, name="auditoria"),
     path("auditoria/exportar", auditoria.exportar, name="auditoria_exportar"),
     path("auditoria/relatorio-uso", auditoria.relatorio_uso, name="relatorio_uso"),

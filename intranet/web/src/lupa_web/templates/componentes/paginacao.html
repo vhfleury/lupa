@@ -1,0 +1,5 @@
+<nav class="paginacao" data-componente="paginacao" aria-label="Paginação">
+  {% if anterior_href %}<a href="{{ anterior_href }}" rel="prev">Anterior</a>{% else %}<span class="inativo">Anterior</span>{% endif %}
+  <span class="posicao">Página {{ pagina }} de {{ total_paginas }}</span>
+  {% if proxima_href %}<a href="{{ proxima_href }}" rel="next">Próxima</a>{% else %}<span class="inativo">Próxima</span>{% endif %}
+</nav>

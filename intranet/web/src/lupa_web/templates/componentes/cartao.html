@@ -1,0 +1,4 @@
+<section class="cartao{% if destaque %} destaque{% endif %}" data-componente="cartao"{% if titulo %} aria-labelledby="{{ id_cartao }}-titulo"{% endif %}>
+  {% if titulo %}<h3 id="{{ id_cartao }}-titulo">{{ titulo }}</h3>{% endif %}
+  <p>{{ texto }}</p>
+</section>

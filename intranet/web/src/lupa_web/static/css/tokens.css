@@ -1,0 +1,132 @@
+/* Tokens do padrão visual (RF-VIS-01, RF-VIS-02; plano_padrao_visual D1): única folha com cor,
+   fonte, espaço e raio literais. O tema escuro vale pelo sistema ou escolhido à mão (tema.js). */
+@font-face {
+  font-family: 'Source Serif 4';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('../fontes/SourceSerif4-Semibold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Source Sans 3';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('../fontes/SourceSans3-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Source Sans 3';
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+  src: url('../fontes/SourceSans3-It.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Source Sans 3';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('../fontes/SourceSans3-Semibold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Source Code Pro';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('../fontes/SourceCodePro-Regular.woff2') format('woff2');
+}
+
+:root {
+  --fundo: #ffffff;
+  --superficie: #ffffff;
+  --superficie-suave: #f3f6f4;
+  --texto: #1a1f1c;
+  --texto-suave: #4b5650;
+  --borda: #d3dad6;
+  --borda-campo: #7a857f;
+  --primaria: #00613b;
+  --primaria-texto: #ffffff;
+  --perigo: #a3231f;
+  --perigo-fundo: #fdecea;
+  --sucesso: #1d6b35;
+  --sucesso-fundo: #e8f4eb;
+  --atencao: #7a5200;
+  --atencao-fundo: #fff4d6;
+  --aviso-fundo: #fff6dc;
+  --aviso-texto: #5c4300;
+  --foco: #b36b00;
+  --badge-fundo: #eef1ef;
+  --badge-texto: #2f3833;
+  --badge-borda: #b9c2bd;
+  --raio: 6px;
+  --raio-pilula: 999px;
+  --tarja: 4px;
+  --espaco-1: 0.25rem;
+  --espaco-2: 0.5rem;
+  --espaco-3: 0.75rem;
+  --espaco-4: 1rem;
+  --espaco-5: 1.5rem;
+  --fonte-titulo: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --fonte: 'Source Sans 3', system-ui, 'Segoe UI', Roboto, Arial, sans-serif;
+  --mono: 'Source Code Pro', ui-monospace, Consolas, monospace;
+}
+
+:root[data-tema='escuro'] {
+  color-scheme: dark;
+  --fundo: #121614;
+  --superficie: #1a201d;
+  --superficie-suave: #222a26;
+  --texto: #e8ece9;
+  --texto-suave: #aab5af;
+  --borda: #36403b;
+  --borda-campo: #7d8a84;
+  --primaria: #4cc489;
+  --primaria-texto: #0b1a12;
+  --perigo: #ff9c95;
+  --perigo-fundo: #3a1a19;
+  --sucesso: #8fdca6;
+  --sucesso-fundo: #15301e;
+  --atencao: #ffd27a;
+  --atencao-fundo: #3a3016;
+  --aviso-fundo: #3a3016;
+  --aviso-texto: #ffe08a;
+  --foco: #ffc24d;
+  --badge-fundo: #2a332e;
+  --badge-texto: #dfe6e2;
+  --badge-borda: #5c6a63;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) {
+    color-scheme: dark;
+    --fundo: #121614;
+    --superficie: #1a201d;
+    --superficie-suave: #222a26;
+    --texto: #e8ece9;
+    --texto-suave: #aab5af;
+    --borda: #36403b;
+    --borda-campo: #7d8a84;
+    --primaria: #4cc489;
+    --primaria-texto: #0b1a12;
+    --perigo: #ff9c95;
+    --perigo-fundo: #3a1a19;
+    --sucesso: #8fdca6;
+    --sucesso-fundo: #15301e;
+    --atencao: #ffd27a;
+    --atencao-fundo: #3a3016;
+    --aviso-fundo: #3a3016;
+    --aviso-texto: #ffe08a;
+    --foco: #ffc24d;
+    --badge-fundo: #2a332e;
+    --badge-texto: #dfe6e2;
+    --badge-borda: #5c6a63;
+  }
+}
+
+:root[data-tema='claro'] {
+  color-scheme: light;
+}

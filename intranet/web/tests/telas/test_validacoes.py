@@ -179,3 +179,33 @@ def test_visualizador_de_processo_inexistente_mostra_nao_encontrado(
     """RF-INT-02: 404 da API nos arquivos vira a página "não encontrado"."""
     logado.get(f"{BASE}/arquivos").respond(404, json={"detail": "processo não encontrado"})
     assert navegador.get(f"{BASE}/visualizador").status_code == 404
+
+
+def _selo(tom: str, texto: str) -> str:
+    return (
+        f'<span class="selo selo-{tom}" data-componente="selo" data-testid="resultado">'
+        f"{texto}</span>"
+    )
+
+
+def test_resultado_tempestivo_aparece_no_selo_de_sucesso(
+    logado: respx.MockRouter, navegador: Client
+) -> None:
+    """RF-VIS-03 (D7): o resultado conforme vai no selo de sucesso, com o texto do resultado."""
+    _simular_analise(logado)
+    html = navegador.get(f"{BASE}/validacoes").content.decode()
+    assert _selo("sucesso", "Conforme") in html
+
+
+def test_atencao_e_falha_usam_selo_do_seu_tom(logado: respx.MockRouter, navegador: Client) -> None:
+    """RF-VIS-03 (D7): "verificar" vai no selo de atenção e "atenção" no de falha."""
+    _simular_analise(logado)
+    achados = [
+        ACHADO_VIGENTE | {"id": "e1" * 32, "resultado": "verificar"},
+        ACHADO_VIGENTE | {"id": "e2" * 32, "resultado": "atencao", "validacao": "preparo"},
+    ]
+    logado.get(f"{BASE}/achados").respond(200, json={"processo_id": PROCESSO, "achados": achados})
+    html = navegador.get(f"{BASE}/validacoes").content.decode()
+    assert _selo("atencao", "Verificar") in html
+    assert _selo("falha", "Atenção") in html
+    assert 'class="resultado' not in html

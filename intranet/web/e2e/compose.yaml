@@ -9,6 +9,9 @@ services:
     env_file: !override
       - ${LUPA_E2E_ENV:?}
     volumes: !reset []
+  front:
+    environment:
+      LUPA_AMBIENTE: desenvolvimento
   minio:
     ports: !reset []
   proxy:
