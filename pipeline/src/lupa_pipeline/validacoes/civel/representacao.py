@@ -7,7 +7,7 @@ from datetime import date
 from typing import Any
 
 from lupa_pipeline.dominio.enums import QualidadeParte, ResultadoAchado
-from lupa_pipeline.validacoes.apoio import Coleta
+from lupa_pipeline.validacoes.apoio import Coleta, regra
 from lupa_pipeline.validacoes.dados import dispensas_padrao
 from lupa_pipeline.validacoes.modelo import AchadoValidacao, Fato, ModeloProcesso, valor_de
 
@@ -62,6 +62,7 @@ def _cadeia(modelo: ModeloProcesso, assinante: tuple[str, str], mandatos: list[F
     return []
 
 
+@regra
 def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     """Verifica se o subscritor recebeu poderes diretamente ou por substabelecimento."""
     coleta = Coleta(modelo, NOME, BASE_LEGAL)

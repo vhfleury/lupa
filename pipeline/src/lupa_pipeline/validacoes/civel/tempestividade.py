@@ -3,7 +3,7 @@
 from datetime import date
 
 from lupa_pipeline.dominio.enums import QualidadeParte, ResultadoAchado
-from lupa_pipeline.validacoes.apoio import Coleta, data_de
+from lupa_pipeline.validacoes.apoio import Coleta, data_de, regra
 from lupa_pipeline.validacoes.calendario import contar_prazo_util, dias_uteis_entre
 from lupa_pipeline.validacoes.dados import calendario_padrao, prazos_recursos_padrao
 from lupa_pipeline.validacoes.modelo import AchadoValidacao, ModeloProcesso, valor_de
@@ -12,6 +12,7 @@ NOME = "tempestividade_recurso"
 BASE_LEGAL = "arts. 180, 183, 186, 219, 220, 224, 1.003 § 5º e 1.023 do CPC"
 
 
+@regra
 def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     """Compara as datas provadas da intimação e da interposição com o vencimento do recurso."""
     coleta = Coleta(modelo, NOME, BASE_LEGAL)

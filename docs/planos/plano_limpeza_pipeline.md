@@ -55,7 +55,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
 | `validacoes/civel/tempestividade.py` | conta dias úteis e monta os descartados à mão | `calendario.dias_uteis_entre` |
 | `validacoes/dados/dispensas.yaml` (arquivo) | `preparo.yaml` com `qualidade → rótulo` | renomeado; `qualidade → {rotulo, preparo, mandato}` com os mesmos valores, versão 0.3.0 (D8) |
 | `validacoes/dados.TabelaPreparo`, `preparo_padrao()` | tabela do preparo, lida também por `eventos/partes.py` | `TabelaDispensas` e `dispensas_padrao()`; `partes.py` lê dela (D8) |
-| `validacoes/apoio.Coleta.unico` | anota o conflito e cada regra checa `coleta.conflitos` | levanta `FatoPendenteError`; o motor converte em `coleta.verificar()` (D8) |
+| `validacoes/apoio.Coleta.unico` | anota o conflito e cada regra checa `coleta.conflitos` | em fato opcional, levanta `FatoPendenteError`; o decorador `@regra` converte em `coleta.verificar()` (D8) |
 | `validacoes/apoio.Coleta.pendente`, `Coleta.qualidade()` | `pendente` sem uso; qualidade lida em duas regras | sai `pendente`; entra `qualidade()` |
 | `validacoes/apoio.PECAS` | dicionário central com `KeyError` para tipo novo | `peca_procurada` em cada regra, consultada pela `Coleta` |
 | `validacoes/modelo.ModeloProcesso.fato`, `recorrentes` | serializa a cada consulta e refaz o índice | resultado memorizado por instância |
@@ -135,7 +135,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
 - **D7.** `contar_prazo_corrido` sai com o teste; `feriados` e `fontes` viram um só
   `Mapping[date, Feriado]`; o especialista-validacoes revisa.
 - **D8.** `preparo.yaml` vira `dispensas.yaml`, tabela própria com os mesmos valores, lida pelas regras e por `eventos/partes.py`; as versões de fatos e catálogo do reprocessamento passam a citar `dispensas=`, e fatos e achados são regravados uma vez (decisão do usuário na T12.6); `Coleta.unico` interrompe a
-  regra em conflito; o especialista-validacoes revisa. A troca de arquivo de dados muda
+  regra em conflito de fato opcional (decisão do usuário na T12.8; o obrigatório já cai em conferência coletando os demais); o especialista-validacoes revisa. A troca de arquivo de dados muda
   `versoes_dados` do achado, então `VERSAO_CATALOGO` sobe e o reprocessamento (RF-ING-08)
   regrava os achados com o mesmo resultado e texto.
 - **D9.** Código sem uso sai junto com os testes dele, no mesmo commit, citando a tarefa.
@@ -191,10 +191,11 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
 
 ### Regra com conflito (fase 4)
 
-1. Entrada: `ModeloProcesso`, regra. Ação: a regra chama `coleta.unico(tipo)`.
-2. Dois valores para o tipo: `unico` registra o conflito e levanta `FatoPendenteError`.
-3. O motor captura `FatoPendenteError` e devolve `coleta.verificar()`. Saída: achado "verificar" com os conflitos, igual ao atual.
-4. Sem conflito: a regra segue e devolve o achado. Outras exceções sobem como hoje.
+1. Entrada: `ModeloProcesso`, regra decorada com `@regra`. Ação: a regra chama `coleta.unico(tipo)`.
+2. Fato obrigatório com dois valores: `unico` registra o conflito e devolve `None`; a regra segue coletando os demais e devolve `coleta.verificar()` com todas as faltas e divergências.
+3. Fato opcional (`obrigatorio=False`) com dois valores: `unico` registra o conflito e levanta `FatoPendenteError(coleta)`.
+4. `@regra` captura `FatoPendenteError` e devolve `coleta.verificar()`. Saída: achado "verificar" com os conflitos, igual ao atual.
+5. Sem conflito: a regra segue e devolve o achado. Outras exceções sobem como hoje.
 
 ### Leitura do fato (fase 5)
 

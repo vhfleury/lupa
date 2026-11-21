@@ -1181,11 +1181,25 @@ suíte existente; o Vermelho de cada tarefa é o teste novo que só passa com o 
     scripts/verificar.sh` (stack inteira, saída 0): pipeline 712 passed (95,29%), intranet 266
     passed (98,23%), integração 6, injeção 2, web 436 passed (100%), cabeçalhos e isolamento
     ok, agente 11.
-- [ ] **T12.8** Conflito interrompe a regra. RF-FAT-02, RF-VAL-01. Fase 4; P7, D8.
+- [x] **T12.8** Conflito interrompe a regra. RF-FAT-02, RF-VAL-01. Fase 4; P7, D8.
   - Vermelho: `pipeline/tests/validacoes/test_motor_e_regras.py::test_conflito_interrompe_a_regra_e_vira_verificar`.
   - Verde: `FatoPendenteError` em `apoio.py`, levantada por `Coleta.unico`; o motor captura e devolve `coleta.verificar()`; saem as checagens `if coleta.conflitos` das regras e `Coleta.pendente`.
   - Limpeza: nenhuma.
   - Revisão: especialista-validacoes.
+  - Decisão nova (usuário, 21/11/2026): só o conflito em fato opcional interrompe a regra; o
+    obrigatório continua registrando e devolvendo `None`, para o "verificar" listar todas as
+    faltas e divergências. A conversão fica no decorador `@regra` das quatro regras, não no
+    motor, para as regras chamadas direto (testes e linha de comando) manterem o contrato. O
+    plano (tabela, D8 e "Regra com conflito") foi atualizado.
+  - Entregue: `FatoPendenteError(coleta)` e `regra` em `apoio.py`; `unico(...,
+    obrigatorio=False)` em conflito levanta; `@regra` em `preparo`, `representacao`,
+    `tempestividade` e `cabimento`; saem as três checagens de `preparo.py` e `Coleta.pendente`.
+    Especialista-validacoes: aprovado, achados idênticos (só o preparo usa fato opcional).
+    Testes: `docker compose exec -T worker python -m pytest -c pipeline/pyproject.toml
+    pipeline/tests/validacoes --no-cov` e `bash scripts/verificar.sh` (stack inteira).
+    Vermelho: erro de coleta (`cannot import name 'FatoPendenteError'`). Verde: saída 0;
+    pipeline 713 passed (95,35%), intranet 266 passed (98,23%), integração 6, injeção 2, web
+    436 passed (100%), cabeçalhos e isolamento ok, agente 11.
 - [ ] **T12.9** `peca_procurada` por regra, modelo memorizado e fim de `para_modelo`. RF-VAL-01, RF-VAL-05. Fase 4; P7.
   - Vermelho: `pipeline/tests/validacoes/test_motor_e_regras.py::test_tipo_de_fato_novo_usa_a_peca_procurada_da_regra`.
   - Verde: `peca_procurada` em cada módulo de `civel/`, lida pela `Coleta`; sai `PECAS`; `ModeloProcesso.fato` e `recorrentes` memorizados; chamadores de `para_modelo` usam `ModeloProcesso`.

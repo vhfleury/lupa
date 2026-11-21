@@ -13,6 +13,7 @@ from lupa_pipeline.dominio.esquemas import Fato
 from lupa_pipeline.logging import configurar_logging
 from lupa_pipeline.validacoes import catalogo
 from lupa_pipeline.validacoes.__main__ import main
+from lupa_pipeline.validacoes.apoio import Coleta, FatoPendenteError
 from lupa_pipeline.validacoes.calendario import (
     FeriadoCalendario,
     Periodo,
@@ -294,3 +295,22 @@ def test_dispensa_por_qualidade_le_a_tabela_de_dispensas() -> None:
         achado = regra.executar(modelo, date(2026, 11, 1))
         assert achado.resultado == "conforme"
         assert achado.valores["versao_dados"] == tabela.versao
+
+
+def test_conflito_interrompe_a_regra_e_vira_verificar() -> None:
+    """RF-FAT-02, RF-VAL-01. Conflito num fato opcional interrompe a regra e vira conferência."""
+    modelo = modelo_de(
+        criar_fato("tipo_recurso", "apelacao_civel"),
+        criar_fato("qualidade_recorrente", "particular"),
+        criar_fato("gratuidade_decisao", "deferida", fato_id=id_sintetico("gratuidade-deferida")),
+        criar_fato(
+            "gratuidade_decisao", "indeferida", fato_id=id_sintetico("gratuidade-indeferida")
+        ),
+    )
+    coleta = Coleta(modelo, "teste", "base")
+    with pytest.raises(FatoPendenteError) as erro:
+        coleta.unico("gratuidade_decisao", obrigatorio=False)
+    assert erro.value.coleta is coleta
+    achado = validacoes_de("apelacao_civel")[1].executar(modelo, date(2026, 11, 1))
+    assert achado.resultado == "verificar"
+    assert [c["tipo"] for c in achado.valores["conflitos"]] == ["gratuidade_decisao"]

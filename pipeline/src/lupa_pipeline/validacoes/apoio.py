@@ -1,8 +1,8 @@
 """Coleta fatos e evidências, localiza conflitos e preenche os modelos de frase."""
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import date, datetime
-from functools import cache
+from functools import cache, wraps
 from importlib.resources import files
 from typing import Any
 
@@ -51,6 +51,41 @@ def renderizar(nome: str, **campos: object) -> str:
     return _modelo_de_frase(nome).format(**campos)
 
 
+class FatoPendenteError(Exception):
+    """Conflito num fato opcional que interrompe a regra para conferência."""
+
+    def __init__(self, coleta: "Coleta") -> None:
+        """Guarda a coleta com o conflito registrado.
+
+        Args:
+            coleta: Coleta da regra interrompida.
+        """
+        super().__init__("fato opcional em conflito")
+        self.coleta = coleta
+
+
+def regra(
+    executar: Callable[[ModeloProcesso, date], AchadoValidacao],
+) -> Callable[[ModeloProcesso, date], AchadoValidacao]:
+    """Converte a interrupção por conflito num achado de conferência.
+
+    Args:
+        executar: Função da regra.
+
+    Returns:
+        A mesma regra, que devolve ``coleta.verificar()`` quando um fato opcional diverge.
+    """
+
+    @wraps(executar)
+    def executar_com_conferencia(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
+        try:
+            return executar(modelo, referencia)
+        except FatoPendenteError as erro:
+            return erro.coleta.verificar()
+
+    return executar_com_conferencia
+
+
 class Coleta:
     """Valores considerados numa validação e evidência de cada um."""
 
@@ -73,12 +108,18 @@ class Coleta:
         return None if fato is None else str(valor_de(fato))
 
     def unico(self, tipo: str, *, obrigatorio: bool = True) -> Fato | None:
-        """Seleciona o valor único ou registra sua ausência ou divergência."""
+        """Seleciona o valor único ou registra sua ausência ou divergência.
+
+        Divergência num fato opcional levanta `FatoPendenteError`, que `regra` converte em
+        conferência.
+        """
         try:
             fato = self.modelo.fato(tipo)
         except ConflitoDeFatosError as erro:
             self.conflitos.append({"tipo": tipo, "fato_ids": erro.fato_ids})
             self.registrar(self.modelo.fatos(tipo))
+            if not obrigatorio:
+                raise FatoPendenteError(self) from erro
             return None
         if fato is not None:
             self.registrar([fato])
@@ -133,8 +174,3 @@ class Coleta:
         if conflitos:
             razoes.append("Os fatos divergem em " + ", ".join(conflitos) + ".")
         return self.concluir(ResultadoAchado.VERIFICAR, " ".join(razoes))
-
-    @property
-    def pendente(self) -> bool:
-        """Indica falta ou conflito em um dos valores necessários."""
-        return bool(self.faltantes or self.conflitos)

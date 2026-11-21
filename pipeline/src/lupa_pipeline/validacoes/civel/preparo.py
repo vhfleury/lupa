@@ -3,7 +3,7 @@
 from datetime import date
 
 from lupa_pipeline.dominio.enums import QualidadeParte, ResultadoAchado
-from lupa_pipeline.validacoes.apoio import Coleta, data_de
+from lupa_pipeline.validacoes.apoio import Coleta, data_de, regra
 from lupa_pipeline.validacoes.dados import dispensas_padrao
 from lupa_pipeline.validacoes.modelo import AchadoValidacao, ModeloProcesso, valor_de
 
@@ -11,6 +11,7 @@ NOME = "preparo_recurso"
 BASE_LEGAL = "arts. 98, 99 § 7º e 1.007 do CPC"
 
 
+@regra
 def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     """Confere a dispensa, a gratuidade ou a data do recolhimento provado."""
     coleta = Coleta(modelo, NOME, BASE_LEGAL)
@@ -30,8 +31,6 @@ def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
             versao_dados=tabela.versao,
         )
     decisao = coleta.unico("gratuidade_decisao", obrigatorio=False)
-    if coleta.conflitos:
-        return coleta.verificar()
     if decisao and valor_de(decisao) == "deferida":
         return coleta.concluir(
             ResultadoAchado.CONFORME, "Há decisão de gratuidade deferida.", dispensa="gratuidade"
@@ -39,14 +38,10 @@ def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     if decisao and valor_de(decisao) != "indeferida":
         return coleta.verificar("O resultado da decisão sobre gratuidade exige conferência.")
     pedido = coleta.unico("gratuidade_pedido", obrigatorio=False)
-    if coleta.conflitos:
-        return coleta.verificar()
     if pedido and valor_de(pedido) and decisao is None:
         coleta.unico("gratuidade_decisao")
         return coleta.verificar("Há pedido de gratuidade sem decisão localizada.")
     comprovante = coleta.unico("comprovante_preparo", obrigatorio=False)
-    if coleta.conflitos:
-        return coleta.verificar()
     if comprovante is None:
         return coleta.concluir(ResultadoAchado.ATENCAO, "Não se localizou comprovante de preparo.")
     interposicao = coleta.unico("data_interposicao")
