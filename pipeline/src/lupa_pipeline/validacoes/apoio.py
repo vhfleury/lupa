@@ -12,14 +12,13 @@ from lupa_pipeline.validacoes.modelo import (
     ConflitoDeFatosError,
     Fato,
     ModeloProcesso,
-    valor_de,
 )
 from lupa_pipeline.validacoes.versao import VERSAO_CATALOGO
 
 
 def data_de(fato: Fato) -> date:
     """Lê uma data civil ISO, sem truncar um instante para data."""
-    valor = valor_de(fato)
+    valor = fato.valor
     if isinstance(valor, str):
         return date.fromisoformat(valor)
     if isinstance(valor, date) and not isinstance(valor, datetime):
@@ -107,7 +106,7 @@ class Coleta:
     def qualidade(self) -> str | None:
         """Qualidade do recorrente provada, ou ``None`` quando falta ou diverge."""
         fato = self.unico("qualidade_recorrente")
-        return None if fato is None else str(valor_de(fato))
+        return None if fato is None else str(fato.valor)
 
     def unico(self, tipo: str, *, obrigatorio: bool = True) -> Fato | None:
         """Seleciona o valor único ou registra sua ausência ou divergência.

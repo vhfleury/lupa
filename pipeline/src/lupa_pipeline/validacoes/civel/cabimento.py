@@ -5,7 +5,7 @@ from datetime import date
 from lupa_pipeline.dominio.enums import ResultadoAchado
 from lupa_pipeline.validacoes.apoio import Coleta, regra
 from lupa_pipeline.validacoes.dados import cabimento_padrao
-from lupa_pipeline.validacoes.modelo import AchadoValidacao, ModeloProcesso, valor_de
+from lupa_pipeline.validacoes.modelo import AchadoValidacao, ModeloProcesso
 
 NOME = "cabimento_agravo"
 BASE_LEGAL = "art. 1.015 do CPC"
@@ -21,7 +21,7 @@ def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     fato = coleta.unico("hipotese_decisao_agravada")
     if fato is None:
         return coleta.verificar()
-    inciso = str(valor_de(fato)).strip().upper()
+    inciso = str(fato.valor).strip().upper()
     tabela = cabimento_padrao()
     hipotese = tabela.incisos.get(inciso)
     if not hipotese:

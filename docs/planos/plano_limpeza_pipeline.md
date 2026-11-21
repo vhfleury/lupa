@@ -147,7 +147,8 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
   (decisão do usuário, 21/11/2026).
 - **D11.** Despachos viram registros declarativos: extratores por espécie, formatos por mime,
   etapas em lista ordenada.
-- **D12.** `Fato.valor` passa a ser sempre o escalar. Sem migration: `Fato.de_registro` converte
+- **D12.** `Fato.valor` passa a ser o valor sem o envoltório `{"valor": ...}` (a procuração
+  continua um objeto). Sem migration: `Fato.de_registro` converte
   `{"valor": x}` em `x` ao ler da view; fatos novos já saem normalizados.
 - **D13.** O fato de procuração não muda: o id do fato é `chave_hash([processo, tipo, sujeito,
   evidência])`, e gravar o outorgante como sujeito mudaria o id a que correções e notas do
@@ -260,7 +261,13 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
 - Verde: `Fato.de_registro` converte `{"valor": x}`; extratores gravam o escalar; sai `valor_de`.
   Guarda: `intranet/api/tests/ingestao/test_validacoes_api.py::test_resposta_de_fatos_nao_muda_com_valor_antigo`
   (D16).
-- Entregue:
+- Entregue: Fato.de_registro desembrulha o valor antigo {"valor": x} (mesma regra de valor_de),
+  aplicado em ModeloProcesso, no dossiê do agente e na calibração; a rota de fatos devolve o gravado
+  (D16, guarda test_resposta_de_fatos_nao_muda_com_valor_antigo); sai valor_de. Especialista-
+  validacoes e especialista-intranet: aprovado com ressalvas, as pendentes viraram dívida em
+  docs/dividas/todo.md. Vermelho: 1 failed (AssertionError, de_registro sem conversão). Verde:
+  verificar.sh na stack inteira com F10 e F15: saída 0; pipeline 726 passed (95,39%), intranet 267
+  (98,23%), integração 6, injeção 2, web 436 (100%), cabeçalhos e isolamento ok, agente 11.
 
 ### F11 — Nome do outorgante num lugar só
 

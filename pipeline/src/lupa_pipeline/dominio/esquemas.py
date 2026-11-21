@@ -4,6 +4,7 @@
 """
 
 import hashlib
+from collections.abc import Mapping
 from datetime import UTC, date, datetime
 from typing import Annotated, Any, Self
 
@@ -173,6 +174,14 @@ class Fato(EsquemaBase):
     confianca: Confianca
     status: StatusFato = StatusFato.AUTOMATICO
     criado_em: datetime = Field(default_factory=_agora)
+
+    @classmethod
+    def de_registro(cls, registro: Mapping[str, Any]) -> Self:
+        """Valida o fato lido do banco, trocando o valor antigo `{"valor": x, ...}` por `x`."""
+        valor = registro.get("valor")
+        if isinstance(valor, dict) and "valor" in valor:
+            return cls.model_validate({**registro, "valor": valor["valor"]})
+        return cls.model_validate(registro)
 
 
 class Achado(EsquemaBase):

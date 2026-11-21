@@ -15,7 +15,6 @@ __all__ = [
     "Evidencia",
     "Fato",
     "ModeloProcesso",
-    "valor_de",
 ]
 
 
@@ -42,20 +41,15 @@ class ConflitoDeFatosError(ValueError):
         self.fato_ids = fato_ids
 
 
-def valor_de(fato: Fato) -> Any:
-    """Extrai o valor do fato, inclusive quando vem no campo valor do JSON."""
-    if isinstance(fato.valor, dict) and "valor" in fato.valor:
-        return fato.valor["valor"]
-    return fato.valor
-
-
 class ModeloProcesso:
     """Índice de fatos vigentes por tipo e sujeito, com `fato` e `recorrentes` memorizados."""
 
     def __init__(self, fatos: Iterable[Fato], *, sujeito: str = "") -> None:
-        """Indexa os fatos com ordem estável para consulta e gravação dos resultados."""
+        """Indexa os fatos, com o valor lido por `Fato.de_registro`, em ordem estável."""
         self.sujeito = sujeito
-        self._fatos = tuple(sorted(fatos, key=lambda f: f.id))
+        self._fatos = tuple(
+            sorted((Fato.de_registro(f.model_dump()) for f in fatos), key=lambda f: f.id)
+        )
         self._indice: dict[str, list[Fato]] = {}
         for fato in self._fatos:
             self._indice.setdefault(fato.tipo, []).append(fato)
@@ -78,7 +72,7 @@ class ModeloProcesso:
             raise ConflitoDeFatosError(tipo, list(self._conflitos[tipo]))
         if tipo not in self._unicos:
             lista = self.fatos(tipo)
-            if len({json.dumps(valor_de(f), sort_keys=True, default=str) for f in lista}) > 1:
+            if len({json.dumps(f.valor, sort_keys=True, default=str) for f in lista}) > 1:
                 self._conflitos[tipo] = [str(f.id) for f in lista]
                 raise ConflitoDeFatosError(tipo, list(self._conflitos[tipo]))
             self._unicos[tipo] = lista[0] if lista else None
@@ -92,7 +86,7 @@ class ModeloProcesso:
 
     def _recortar(self, classe: str) -> list["ModeloProcesso"]:
         identificados = self.fatos("tipo_recurso")
-        sujeitos = sorted({f.sujeito for f in identificados if valor_de(f) == classe})
+        sujeitos = sorted({f.sujeito for f in identificados if f.valor == classe})
         if identificados and not sujeitos:
             return []
         if not sujeitos:

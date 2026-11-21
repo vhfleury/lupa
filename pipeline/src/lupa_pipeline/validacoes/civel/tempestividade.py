@@ -6,7 +6,7 @@ from lupa_pipeline.dominio.enums import QualidadeParte, ResultadoAchado
 from lupa_pipeline.validacoes.apoio import Coleta, data_de, regra
 from lupa_pipeline.validacoes.calendario import contar_prazo_util, dias_uteis_entre
 from lupa_pipeline.validacoes.dados import calendario_padrao, prazos_recursos_padrao
-from lupa_pipeline.validacoes.modelo import AchadoValidacao, ModeloProcesso, valor_de
+from lupa_pipeline.validacoes.modelo import AchadoValidacao, ModeloProcesso
 
 NOME = "tempestividade_recurso"
 BASE_LEGAL = "arts. 180, 183, 186, 219, 220, 224, 1.003 § 5º e 1.023 do CPC"
@@ -29,8 +29,8 @@ def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     if not (tipo and intimacao and interposicao and qualidade):
         return coleta.verificar()
     tabela = prazos_recursos_padrao()
-    regra = tabela.recursos.get(str(valor_de(tipo)))
-    entidade = str(valor_de(qualidade))
+    regra = tabela.recursos.get(str(tipo.valor))
+    entidade = str(qualidade.valor)
     if regra is None or entidade not in QualidadeParte:
         return coleta.verificar("Tipo de recurso ou qualidade do recorrente não reconhecidos.")
     try:

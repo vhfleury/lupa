@@ -5,7 +5,6 @@ from collections.abc import Iterable, Mapping
 from lupa_pipeline.dominio.enums import TipoFato
 from lupa_pipeline.dominio.esquemas import Fato
 from lupa_pipeline.sinteticos.saida_pipeline import EventoSaida, RefPagina
-from lupa_pipeline.validacoes.modelo import valor_de
 
 
 def eventos_saida(
@@ -24,7 +23,7 @@ def eventos_saida(
     eventos = []
     for fato in fatos:
         ref = paginas[fato.evidencias[0].pagina_id]
-        valor = valor_de(fato)
+        valor = fato.valor
         if nomes and fato.tipo is TipoFato.PROCURACAO and isinstance(valor, dict):
             outorgante = valor.get("outorgante")
             if isinstance(outorgante, str):

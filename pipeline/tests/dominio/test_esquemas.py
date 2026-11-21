@@ -208,6 +208,17 @@ def test_sujeito_e_ids_dos_fatos_exigem_hash_publico(fabrica_fato: FabricaFato) 
             Fato(**(dados | alteracao))
 
 
+def test_fato_le_valor_no_formato_antigo(fabrica_fato: FabricaFato) -> None:
+    """RF-FAT-01, D12: dict com a chave `valor` vira esse valor, como `valor_de`; outros não."""
+    dados = fabrica_fato().model_dump()
+    assert Fato.de_registro(dados | {"valor": {"valor": "2025-03-04"}}).valor == "2025-03-04"
+    assert Fato.de_registro(dados | {"valor": "2025-03-04"}).valor == "2025-03-04"
+    composto = {"valor": "x", "fonte": "capa"}
+    assert Fato.de_registro(dados | {"valor": composto}).valor == "x"
+    procuracao = {"tipo": "procuracao", "outorgante": calcular_hash("parte")}
+    assert Fato.de_registro(dados | {"valor": procuracao}).valor == procuracao
+
+
 def test_arquivo_exige_hks_nos_identificadores() -> None:
     """RF-ING-01, D12: aceita a identidade do hub e rejeita UUID na referência ao processo."""
     dados = {
