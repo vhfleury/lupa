@@ -230,11 +230,23 @@ DATA_ISO = re.compile(r"\d{4}-\d{2}-\d{2}")
 PREFIXO_DO_IDENTIFICADOR = 8
 
 
+def abreviar_identificador(valor: str) -> str:
+    """Prefixo de um identificador seguido de reticências.
+
+    Args:
+        valor: Identificador público.
+
+    Returns:
+        Os primeiros `PREFIXO_DO_IDENTIFICADOR` caracteres e "…".
+    """
+    return valor[:PREFIXO_DO_IDENTIFICADOR] + "…"
+
+
 def _texto_de_codigo(valor: str) -> str:
     if DATA_ISO.fullmatch(valor):
         return formatar_data(valor)
     if IDENTIFICADOR.fullmatch(valor):
-        return valor[:PREFIXO_DO_IDENTIFICADOR] + "…"
+        return abreviar_identificador(valor)
     return ROTULOS.get(valor) or CLASSES.get(valor) or valor
 
 

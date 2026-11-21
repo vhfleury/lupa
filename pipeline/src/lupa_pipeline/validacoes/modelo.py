@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import Iterable
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -15,11 +15,8 @@ __all__ = [
     "Evidencia",
     "Fato",
     "ModeloProcesso",
-    "ResultadoAchado",
     "valor_de",
 ]
-
-ResultadoAchado = Literal["conforme", "atencao", "verificar"]
 
 
 class AchadoValidacao(BaseModel):

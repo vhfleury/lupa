@@ -2,21 +2,17 @@
 
 import re
 from functools import cache
-from importlib.resources import files
 from typing import Any
 
-import yaml
-
 from lupa_pipeline.dominio.enums import TipoFato
+from lupa_pipeline.ingestao.deteccao import ler_yaml
 from lupa_pipeline.ingestao.texto import dobrar
 
 
 @cache
 def padroes() -> dict[str, Any]:
     """Carrega os gatilhos do pacote instalado."""
-    arquivo = files("lupa_pipeline.ingestao").joinpath("dados", "eventos.yaml")
-    dados: dict[str, Any] = yaml.safe_load(arquivo.read_text(encoding="utf-8"))
-    return dados
+    return ler_yaml("eventos.yaml")
 
 
 @cache

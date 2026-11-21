@@ -63,7 +63,15 @@ PADRAO_PALAVRA = re.compile(r"[a-z]+")
 PADRAO_FRASE = re.compile(r"[^.!?]+[.!?]*")
 
 
-def _ler_yaml(nome: str) -> dict[str, Any]:
+def ler_yaml(nome: str) -> dict[str, Any]:
+    """Lê um YAML versionado em `lupa_pipeline/ingestao/dados/`.
+
+    Args:
+        nome: Nome do arquivo dentro de `dados/`.
+
+    Returns:
+        Conteúdo do YAML.
+    """
     texto = files("lupa_pipeline.ingestao").joinpath("dados").joinpath(nome).read_text("utf-8")
     dados: dict[str, Any] = yaml.safe_load(texto)
     return dados
@@ -106,7 +114,7 @@ def padroes_padrao() -> Padroes:
     Returns:
         Padrões compilados.
     """
-    dados = _ler_yaml("padroes_instrucao.yaml")
+    dados = ler_yaml("padroes_instrucao.yaml")
     regras = tuple(
         (str(categoria), str(item["id"]), re.compile(str(item["regex"])))
         for categoria, itens in dados["categorias"].items()
@@ -269,7 +277,7 @@ def idiomas_padrao() -> Idiomas:
     Returns:
         Parâmetros versionados.
     """
-    dados = _ler_yaml("idiomas.yaml")
+    dados = ler_yaml("idiomas.yaml")
     return Idiomas(
         versao=str(dados["versao"]),
         esperado=str(dados["esperado"]),
@@ -349,7 +357,7 @@ def densidade_padrao() -> Densidade:
     Returns:
         Limites versionados.
     """
-    dados = _ler_yaml("densidade.yaml")
+    dados = ler_yaml("densidade.yaml")
     return Densidade(
         str(dados["versao"]), {str(k): int(v) for k, v in dados["max_caracteres"].items()}
     )

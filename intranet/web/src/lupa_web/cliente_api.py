@@ -197,13 +197,25 @@ def redirecionar(request: HttpRequest, caminho: str) -> HttpResponse:
     Returns:
         Resposta de redirecionamento.
     """
-    if request.headers.get("HX-Request") == "true":
+    if e_htmx(request):
         resposta = HttpResponse()
         resposta["HX-Redirect"] = caminho
         return resposta
     resposta = HttpResponseRedirect(caminho)
     resposta.status_code = 303
     return resposta
+
+
+def e_htmx(request: HttpRequest) -> bool:
+    """Diz se o pedido veio do HTMX.
+
+    Args:
+        request: Pedido do navegador.
+
+    Returns:
+        Verdadeiro quando o cabeçalho `HX-Request` vale `true`.
+    """
+    return request.headers.get("HX-Request") == "true"
 
 
 def redirecionar_para_login(request: HttpRequest) -> HttpResponse:

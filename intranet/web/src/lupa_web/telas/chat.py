@@ -12,6 +12,7 @@ from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
 from lupa_web import cliente_api, rotulos
+from lupa_web.telas.dossie import link_da_pagina
 from lupa_web.telas.sessao import (
     Sessao,
     contexto_da_moldura,
@@ -68,9 +69,7 @@ def link_da_citacao(processo_id: str, citacao: dict[str, Any]) -> str:
     numero = citacao.get("pagina_numero")
     if numero is None:
         return ""
-    arquivo = citacao.get("arquivo_id")
-    prefixo = f"arquivo={arquivo}&" if arquivo else ""
-    return f"/processos/{processo_id}/visualizador?{prefixo}pagina={numero}"
+    return link_da_pagina(processo_id, citacao.get("arquivo_id"), numero)
 
 
 def mensagem_da_tela(
@@ -253,7 +252,7 @@ async def chat(request: HttpRequest, sessao: Sessao, processo_id: str) -> HttpRe
     pergunta = request.POST.get("pergunta", "").strip()
     if not pergunta:
         return _fragmento(request, processo_id, {})
-    if request.headers.get("HX-Request") == "true":
+    if cliente_api.e_htmx(request):
         return await _perguntar(request, sessao, processo_id, pergunta)
     caminho = f"/processos/{processo_id}/chat"
     await cliente_api.chamar(request, "POST", caminho, longo=True, json={"pergunta": pergunta})

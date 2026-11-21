@@ -112,6 +112,6 @@ async def lista(request: HttpRequest, sessao: Sessao) -> HttpResponse:
         "endereco": request.get_full_path(),
         "limite_envio": formatar_bytes(limite_de_envio()),
     }
-    if request.headers.get("HX-Request") == "true":
+    if cliente_api.e_htmx(request):
         return render(request, "processos/_tabela.html", contexto)
     return render(request, "processos/lista.html", contexto)
