@@ -2,7 +2,7 @@
   {
     "validacao": "tempestividade_recurso",
     "sujeito": "000000000000000000000000000000000000000000000000000000000000002a",
-    "versao_catalogo": "0.2.0",
+    "versao_catalogo": "0.3.0",
     "resultado": "atencao",
     "fatos_usados": [
       "0000000000000000000000000000000000000000000000000000000000000001",
@@ -112,7 +112,7 @@
   {
     "validacao": "preparo_recurso",
     "sujeito": "000000000000000000000000000000000000000000000000000000000000002a",
-    "versao_catalogo": "0.2.0",
+    "versao_catalogo": "0.3.0",
     "resultado": "conforme",
     "fatos_usados": [
       "0000000000000000000000000000000000000000000000000000000000000001",
@@ -180,7 +180,7 @@
   {
     "validacao": "representacao_recurso",
     "sujeito": "000000000000000000000000000000000000000000000000000000000000002a",
-    "versao_catalogo": "0.2.0",
+    "versao_catalogo": "0.3.0",
     "resultado": "conforme",
     "fatos_usados": [
       "0000000000000000000000000000000000000000000000000000000000000004",

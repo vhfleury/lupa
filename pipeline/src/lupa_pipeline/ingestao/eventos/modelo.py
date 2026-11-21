@@ -1,22 +1,38 @@
 """Textos e candidatos com posição verificável na página de origem (A6)."""
 
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any
 
 from lupa_pipeline.dominio.chaves import chave_hash
 from lupa_pipeline.dominio.enums import TipoFato, TipoPeca
 from lupa_pipeline.dominio.esquemas import Evidencia
+from lupa_pipeline.ingestao.datas import OcorrenciaData, datas_no_dobrado
+from lupa_pipeline.ingestao.texto import dobrar
 
 
 @dataclass(frozen=True)
 class PaginaTexto:
-    """Página de peça e versões original e normalizada de seu texto."""
+    """Página de peça e versões original e normalizada de seu texto.
+
+    O texto dobrado e as datas do normalizado são calculados no primeiro acesso e guardados.
+    """
 
     id: str
     numero: int
     texto: str
     normalizado: str
     suspeitos: tuple[tuple[int, int], ...] = ()
+
+    @cached_property
+    def dobrado(self) -> str:
+        """Normalizado em minúsculas sem acento, com o mesmo comprimento."""
+        return dobrar(self.normalizado)
+
+    @cached_property
+    def datas(self) -> tuple[OcorrenciaData, ...]:
+        """Datas do normalizado, com offsets no texto dobrado."""
+        return tuple(datas_no_dobrado(self.dobrado, self.normalizado))
 
 
 @dataclass(frozen=True)

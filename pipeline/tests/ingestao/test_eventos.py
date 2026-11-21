@@ -1,10 +1,20 @@
 """A6. Valores, offsets e sujeitos dos sete extratores cíveis."""
 
+from collections.abc import Callable
 from dataclasses import replace
 
 import pytest
 
 from lupa_pipeline.dominio.enums import Polo, QualidadeParte, TipoFato, TipoPeca
+from lupa_pipeline.ingestao.eventos import (
+    base,
+    capa,
+    decisao_agravada,
+    fatos,
+    modelo,
+    preparo,
+    recurso,
+)
 from lupa_pipeline.ingestao.eventos.fatos import candidatos_da_peca, confirmar
 from lupa_pipeline.ingestao.eventos.modelo import PaginaTexto, PecaTexto, evidencia_de
 from lupa_pipeline.ingestao.eventos.partes import chave_nome, extrair_partes
@@ -144,3 +154,35 @@ def test_trecho_depois_de_bloco_codificado_aponta_para_o_original() -> None:
     assert fato and pagina.texto.index("Citação") == fato.evidencias[0].inicio
     protegida = replace(pagina, suspeitos=((0, len(pagina.texto)),))
     assert evidencia_de(protegida, candidato.inicio, candidato.fim, candidato.trecho) is None
+
+
+def test_candidatos_iguais_com_texto_da_pagina_guardado(monkeypatch: pytest.MonkeyPatch) -> None:
+    """RF-FAT-01. Cada página da peça é dobrada uma vez, com os mesmos candidatos de antes."""
+    texto = (
+        "APELAÇÃO\nRecorrente: Ré de Teste\nInterposição em 08/06/2026.\n"
+        "Requer a gratuidade da justiça.\nPreparo recolhido em 05/06/2026."
+    )
+    pagina = _pagina(texto)
+    peca = PecaTexto(TipoPeca.APELACAO, (pagina,))
+    partes = {chave_nome("Ré de Teste"): "e" * 64}
+    dobragens: list[str] = []
+
+    def contar(original: Callable[[str], str]) -> Callable[[str], str]:
+        def dobrar_contando(valor: str) -> str:
+            if valor == pagina.normalizado:
+                dobragens.append(valor)
+            return original(valor)
+
+        return dobrar_contando
+
+    for modulo in (base, capa, decisao_agravada, fatos, modelo, preparo, recurso):
+        if hasattr(modulo, "dobrar"):
+            monkeypatch.setattr(modulo, "dobrar", contar(modulo.dobrar))
+    candidatos = {(c.tipo, str(c.valor), c.inicio, c.fim) for c in candidatos_da_peca(peca, partes)}
+    assert candidatos == {
+        (TipoFato.TIPO_RECURSO, "apelacao_civel", 0, 8),
+        (TipoFato.QUALIDADE_RECORRENTE, "particular", 9, 32),
+        (TipoFato.DATA_INTERPOSICAO, "2026-06-08", 33, 59),
+        (TipoFato.GRATUIDADE_PEDIDO, "True", 61, 91),
+    }
+    assert len(dobragens) == 1

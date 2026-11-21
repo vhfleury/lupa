@@ -13,7 +13,7 @@ from importlib.resources import files
 
 import yaml
 
-from lupa_pipeline.ingestao.deteccao import dobrar
+from lupa_pipeline.ingestao.texto import dobrar
 
 
 @dataclass(frozen=True)

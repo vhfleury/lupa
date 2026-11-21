@@ -13,12 +13,12 @@ tem similaridade baixa. A distância somada sobre os caracteres comparados é ta
 estimativa de CER do OCR da página.
 """
 
-import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from lupa_pipeline.ingestao.ocr import LinhaOcr
+from lupa_pipeline.ingestao.texto import colapsar_espacos, levenshtein
 from lupa_pipeline.ingestao.texto_nativo import Linha
 
 COBERTURA_DUPLICADA = 0.5
@@ -59,31 +59,6 @@ class Divergencia:
     def divergente(self) -> bool:
         """Verdadeiro se alguma linha nativa diverge do OCR."""
         return self.linhas_divergentes > 0
-
-
-def levenshtein(a: str, b: str) -> int:
-    """Distância de edição entre dois textos.
-
-    Args:
-        a: Primeiro texto.
-        b: Segundo texto.
-
-    Returns:
-        Número mínimo de inserções, remoções e substituições.
-    """
-    if len(a) < len(b):
-        a, b = b, a
-    anterior = list(range(len(b) + 1))
-    for i, ca in enumerate(a, start=1):
-        atual = [i]
-        for j, cb in enumerate(b, start=1):
-            atual.append(min(anterior[j] + 1, atual[j - 1] + 1, anterior[j - 1] + (ca != cb)))
-        anterior = atual
-    return anterior[-1]
-
-
-def _normalizar(texto: str) -> str:
-    return " ".join(unicodedata.normalize("NFC", texto).split())
 
 
 def _area(caixa: Sequence[float]) -> float:
@@ -177,12 +152,12 @@ def comparar(
     comparadas = divergentes = caracteres = distancia = 0
     trechos: list[list[float]] = []
     for linha in nativas:
-        nativo = _normalizar(linha.texto)
+        nativo = colapsar_espacos(linha.texto)
         if len(nativo) < min_caracteres:
             continue
         x0, y0, x1, y1 = linha.bbox
         regiao = (x0 - FOLGA_PONTOS, y0 - FOLGA_PONTOS, x1 + FOLGA_PONTOS, y1 + FOLGA_PONTOS)
-        lido = _normalizar(_palavras_na_regiao(ocr, regiao))
+        lido = colapsar_espacos(_palavras_na_regiao(ocr, regiao))
         d = levenshtein(nativo, lido)
         comparadas += 1
         caracteres += len(nativo)

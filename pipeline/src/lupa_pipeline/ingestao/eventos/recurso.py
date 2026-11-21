@@ -4,7 +4,6 @@ import re
 from collections.abc import Iterator
 
 from lupa_pipeline.dominio.enums import ClasseProcessual, TipoFato, TipoPeca
-from lupa_pipeline.ingestao.datas import dobrar
 from lupa_pipeline.ingestao.eventos import preparo
 from lupa_pipeline.ingestao.eventos.base import Fonte
 from lupa_pipeline.ingestao.eventos.modelo import Candidato
@@ -34,7 +33,7 @@ ROTULO_SUJEITO = re.compile(
 def extrair(fonte: Fonte, tipo: TipoPeca, qualidade_explicita: bool) -> Iterator[Candidato]:
     """Extrai os elementos formais declarados no recurso."""
     texto = fonte.pagina.normalizado
-    simples = dobrar(texto)
+    simples = fonte.pagina.dobrado
     for m in TITULOS.finditer(simples):
         yield fonte.candidato(TipoFato.TIPO_RECURSO, RECURSOS[tipo].value, *m.span())
     for m in ASSINATURA.finditer(texto):

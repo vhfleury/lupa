@@ -4,7 +4,7 @@ from datetime import date
 
 from lupa_pipeline.dominio.enums import QualidadeParte, ResultadoAchado
 from lupa_pipeline.validacoes.apoio import Coleta, data_de
-from lupa_pipeline.validacoes.dados import preparo_padrao
+from lupa_pipeline.validacoes.dados import dispensas_padrao
 from lupa_pipeline.validacoes.modelo import AchadoValidacao, ModeloProcesso, valor_de
 
 NOME = "preparo_recurso"
@@ -15,17 +15,17 @@ def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     """Confere a dispensa, a gratuidade ou a data do recolhimento provado."""
     coleta = Coleta(modelo, NOME, BASE_LEGAL)
     tipo = coleta.unico("tipo_recurso")
-    qualidade = coleta.unico("qualidade_recorrente")
-    if not (tipo and qualidade):
+    entidade = coleta.qualidade()
+    if not (tipo and entidade):
         return coleta.verificar()
-    entidade = str(valor_de(qualidade))
-    tabela = preparo_padrao()
+    tabela = dispensas_padrao()
     if entidade not in QualidadeParte:
         return coleta.verificar("A qualidade do recorrente exige conferência.")
-    if entidade in tabela.dispensas:
+    dispensa = tabela.dispensas.get(entidade)
+    if dispensa is not None and dispensa.preparo:
         return coleta.concluir(
             ResultadoAchado.CONFORME,
-            f"Dispensa de preparo pela qualidade do recorrente ({tabela.dispensas[entidade]}).",
+            f"Dispensa de preparo pela qualidade do recorrente ({dispensa.rotulo}).",
             dispensa=entidade,
             versao_dados=tabela.versao,
         )

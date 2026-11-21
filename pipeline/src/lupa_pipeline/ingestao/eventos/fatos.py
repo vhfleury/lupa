@@ -6,7 +6,6 @@ from lupa_pipeline.config import PAGINAS_IDENTIFICACAO_PADRAO
 from lupa_pipeline.dominio.chaves import chave_hash
 from lupa_pipeline.dominio.enums import TipoPeca
 from lupa_pipeline.dominio.esquemas import Fato
-from lupa_pipeline.ingestao.datas import dobrar
 from lupa_pipeline.ingestao.eventos import (
     capa,
     certidao,
@@ -47,7 +46,7 @@ def candidatos_da_peca(
     }
     sujeito = sujeitos.get(next(iter(nomes)), "") if len(nomes) == 1 else ""
     tipo = peca.tipo
-    explicita = any(recurso.QUALIDADE.search(dobrar(p.normalizado)) for p in peca.paginas)
+    explicita = any(recurso.QUALIDADE.search(p.dobrado) for p in peca.paginas)
     for pagina in peca.paginas:
         fonte = Fonte(pagina, sujeito)
         if pagina.numero <= identificacao_paginas:

@@ -15,7 +15,6 @@ from lupa_pipeline.dominio.cnj import (
     validar_numero_cnj,
 )
 from lupa_pipeline.dominio.enums import ClasseProcessual, MotivoFalha, MotivoQuarentena
-from lupa_pipeline.ingestao.datas import dobrar
 from lupa_pipeline.ingestao.eventos.padroes import campo_capa, padroes, rotulos_capa
 from lupa_pipeline.ingestao.extracao import Executor, FontePaginas, Tarefa, executar_tarefa
 from lupa_pipeline.ingestao.inventario import LimitesZip, ZipRecusadoError
@@ -28,6 +27,7 @@ from lupa_pipeline.ingestao.sandbox import (
     inspecionar_pdf,
     inventariar_zip,
 )
+from lupa_pipeline.ingestao.texto import dobrar
 from lupa_pipeline.logging import get_logger
 
 NUMERO = re.compile(

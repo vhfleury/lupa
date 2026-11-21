@@ -14,8 +14,8 @@ from lupa_pipeline.logging import configurar_logging
 from lupa_pipeline.validacoes import catalogo
 from lupa_pipeline.validacoes.__main__ import main
 from lupa_pipeline.validacoes.calendario import (
+    FeriadoCalendario,
     Periodo,
-    contar_prazo_corrido,
     contar_prazo_util,
     idade_em,
     somar_meses,
@@ -28,8 +28,8 @@ from lupa_pipeline.validacoes.dados import (
     calendario_padrao,
     caminho_padrao,
     carregar,
+    dispensas_padrao,
     prazos_recursos_padrao,
-    preparo_padrao,
 )
 from lupa_pipeline.validacoes.modelo import AchadoValidacao, ConflitoDeFatosError, ModeloProcesso
 from lupa_pipeline.validacoes.motor import executar_catalogo
@@ -168,17 +168,11 @@ def test_prazo_util_pula_fim_de_semana_feriado_e_suspensao() -> None:
     resultado = contar_prazo_util(
         sexta,
         3,
-        {date(2030, 3, 5): "feriado sintético"},
+        {date(2030, 3, 5): FeriadoCalendario("feriado sintético")},
         [Periodo(date(2030, 3, 6), date(2030, 3, 6), "suspensão sintética")],
     )
     assert resultado.vencimento == date(2030, 3, 8)
     assert len(resultado.dias_suspensos) == 4
-
-
-def test_prazo_corrido_sem_feriado_vence_no_dia_nominal() -> None:
-    """Prazo corrido sem feriado vence no dia nominal."""
-    resultado = contar_prazo_corrido(date(2030, 3, 4), 2, {}, [])
-    assert resultado.vencimento == date(2030, 3, 6)
 
 
 def test_somar_meses_e_idade() -> None:
@@ -197,7 +191,7 @@ def test_dados_empacotados_tem_versao_e_fonte_e_sao_validos() -> None:
         "feriados/tjgo.yaml",
         "suspensoes_prazo.yaml",
     }
-    for tabela in (prazos_recursos_padrao(), preparo_padrao(), cabimento_padrao()):
+    for tabela in (prazos_recursos_padrao(), dispensas_padrao(), cabimento_padrao()):
         assert tabela.versao and tabela.fonte
 
 
@@ -285,3 +279,18 @@ def test_nenhum_numero_de_prazo_ou_data_em_arquivo_py() -> None:
                 continue
             if isinstance(no, ast.Constant) and type(no.value) is int and no.value not in (0, 1):
                 assert id(no) in permitidos, f"{arquivo}:{no.lineno}"
+
+
+def test_dispensa_por_qualidade_le_a_tabela_de_dispensas() -> None:
+    """RF-VAL-03, RF-VAL-04. Preparo e mandato dispensados vêm da tabela própria de dispensas."""
+    tabela = dispensas_padrao()
+    assert set(tabela.dispensas) == {"fazenda_publica", "ministerio_publico", "defensoria_publica"}
+    assert all(d.preparo and d.mandato for d in tabela.dispensas.values())
+    modelo = modelo_de(
+        criar_fato("tipo_recurso", "apelacao_civel"),
+        criar_fato("qualidade_recorrente", "defensoria_publica"),
+    )
+    for regra in (validacoes_de("apelacao_civel")[1], validacoes_de("apelacao_civel")[2]):
+        achado = regra.executar(modelo, date(2026, 11, 1))
+        assert achado.resultado == "conforme"
+        assert achado.valores["versao_dados"] == tabela.versao

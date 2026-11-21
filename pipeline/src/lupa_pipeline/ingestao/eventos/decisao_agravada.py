@@ -4,7 +4,6 @@ import re
 from collections.abc import Iterator
 
 from lupa_pipeline.dominio.enums import TipoFato
-from lupa_pipeline.ingestao.datas import dobrar
 from lupa_pipeline.ingestao.eventos import sentenca
 from lupa_pipeline.ingestao.eventos.base import Fonte
 from lupa_pipeline.ingestao.eventos.modelo import Candidato
@@ -18,5 +17,5 @@ HIPOTESE = re.compile(
 def extrair(fonte: Fonte) -> Iterator[Candidato]:
     """Preserva a hipótese e os marcos que a decisão documenta."""
     yield from sentenca.extrair(fonte)
-    for m in HIPOTESE.finditer(dobrar(fonte.pagina.normalizado)):
+    for m in HIPOTESE.finditer(fonte.pagina.dobrado):
         yield fonte.candidato(TipoFato.HIPOTESE_DECISAO_AGRAVADA, m[1].upper(), *m.span())

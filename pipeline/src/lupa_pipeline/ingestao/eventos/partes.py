@@ -4,9 +4,9 @@ import re
 from dataclasses import dataclass
 
 from lupa_pipeline.dominio.enums import Polo, QualidadeParte, TipoPeca
-from lupa_pipeline.ingestao.datas import dobrar
 from lupa_pipeline.ingestao.eventos.modelo import PaginaTexto, PecaTexto
-from lupa_pipeline.validacoes.dados import preparo_padrao
+from lupa_pipeline.ingestao.texto import dobrar
+from lupa_pipeline.validacoes.dados import dispensas_padrao
 
 QUALIFICACAO = re.compile(
     r"(?im)^[ \t]*(autor(?:a)?|r[ée]u|r[ée]|apelante|apelad[oa]|agravante|agravad[oa]|"
@@ -59,8 +59,8 @@ def chave_nome(nome: str) -> str:
 def qualidade(nome: str) -> QualidadeParte:
     """Classifica apenas entidades identificadas pelo nome ou por qualificação inequívoca."""
     simples = chave_nome(nome).replace("_", " ")
-    for codigo, rotulo in preparo_padrao().dispensas.items():
-        if chave_nome(rotulo) in simples:
+    for codigo, dispensa in dispensas_padrao().dispensas.items():
+        if chave_nome(dispensa.rotulo) in simples:
             return QualidadeParte(codigo)
     if re.match(r"^(?:municipio de |estado (?:de|do|da) |uniao(?: federal)?$)", simples):
         return QualidadeParte.FAZENDA_PUBLICA

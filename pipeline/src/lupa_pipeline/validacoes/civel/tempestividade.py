@@ -1,10 +1,10 @@
 """Conferência da tempestividade em dias úteis (A7; RF-VAL-02)."""
 
-from datetime import date, timedelta
+from datetime import date
 
 from lupa_pipeline.dominio.enums import QualidadeParte, ResultadoAchado
 from lupa_pipeline.validacoes.apoio import Coleta, data_de
-from lupa_pipeline.validacoes.calendario import contar_prazo_util, motivo_sem_expediente
+from lupa_pipeline.validacoes.calendario import contar_prazo_util, dias_uteis_entre
 from lupa_pipeline.validacoes.dados import calendario_padrao, prazos_recursos_padrao
 from lupa_pipeline.validacoes.modelo import AchadoValidacao, ModeloProcesso, valor_de
 
@@ -34,21 +34,13 @@ def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     dias = regra.dias * (tabela.multiplicador_dobro if dobro else 1)
     calendario, versoes = calendario_padrao()
     prazo = contar_prazo_util(inicio, dias, calendario.feriados, calendario.suspensoes)
+    atraso, depois_do_vencimento = dias_uteis_entre(
+        prazo.vencimento, protocolo, calendario.feriados, calendario.suspensoes
+    )
     descartados = [
         {"data": d.data.isoformat(), "motivo": d.motivo, "fonte": calendario.fonte_em(d.data)}
-        for d in prazo.dias_suspensos
+        for d in (*prazo.dias_suspensos, *depois_do_vencimento)
     ]
-    atraso = 0
-    dia = prazo.vencimento
-    while dia < protocolo:
-        dia += timedelta(days=1)
-        motivo = motivo_sem_expediente(dia, calendario.feriados, calendario.suspensoes)
-        if motivo is None:
-            atraso += 1
-        else:
-            descartados.append(
-                {"data": dia.isoformat(), "motivo": motivo, "fonte": calendario.fonte_em(dia)}
-            )
     resultado = (
         ResultadoAchado.CONFORME if protocolo <= prazo.vencimento else ResultadoAchado.ATENCAO
     )

@@ -15,7 +15,6 @@ from lupa_pipeline.ingestao.deteccao import (
     densidade_anomala,
     detectar_blocos,
     detectar_idioma,
-    dobrar,
     encontrar_padroes,
     idioma_do_segmento,
 )
@@ -28,6 +27,7 @@ from lupa_pipeline.ingestao.saneamento import (
     normalizar,
 )
 from lupa_pipeline.ingestao.saneamento_pagina import categorias_de, sanear, versoes
+from lupa_pipeline.ingestao.texto import dobrar
 from lupa_pipeline.ingestao.texto_nativo import extrair_texto_nativo
 
 LEGITIMAS = (

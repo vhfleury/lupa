@@ -20,10 +20,10 @@ from lupa_pipeline.ingestao.deteccao import ler_yaml
 from lupa_pipeline.ingestao.sinais_fronteira import (
     ListaTitulos,
     e_assinatura,
-    normalizar,
     reconhecer_titulo,
     titulos_padrao,
 )
+from lupa_pipeline.ingestao.texto import maiusculas_sem_acento
 
 LINHAS_ASSINATURA = 12
 
@@ -95,7 +95,7 @@ def regras_classificacao_padrao() -> RegrasClassificacao:
 
 
 def _normalizadas(linhas: Sequence[str]) -> str:
-    return "\n".join(normalizar(linha).lower() for linha in linhas)
+    return "\n".join(maiusculas_sem_acento(linha).lower() for linha in linhas)
 
 
 def _titulo_da_peca(linhas: Sequence[str], lista: ListaTitulos) -> tuple[str | None, str | None]:
@@ -118,9 +118,11 @@ def _pontos_tipo(
         soma = float(dados["peso_formula"]) * sum(
             1 for p in regras.formulas[candidato] if p.search(texto)
         )
-        if titulo is not None and titulo in {normalizar(t) for t in config["titulos"]}:
+        if titulo is not None and titulo in {maiusculas_sem_acento(t) for t in config["titulos"]}:
             unico = sum(
-                1 for c in dados["tipos"].values() if titulo in map(normalizar, c["titulos"])
+                1
+                for c in dados["tipos"].values()
+                if titulo in map(maiusculas_sem_acento, c["titulos"])
             )
             soma += float(dados["peso_titulo"] if unico == 1 else dados["peso_titulo_indefinido"])
         if soma:
@@ -179,7 +181,9 @@ def assinatura_da_peca(
     finais = list(linhas_corpo[-LINHAS_ASSINATURA:])
     for posicao in range(len(finais) - 1, -1, -1):
         if e_assinatura(finais[posicao]):
-            return " ".join(normalizar(linha).lower() for linha in finais[posicao : posicao + 2])
+            return " ".join(
+                maiusculas_sem_acento(linha).lower() for linha in finais[posicao : posicao + 2]
+            )
     return None
 
 

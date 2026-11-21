@@ -5,8 +5,8 @@ from functools import cache
 from typing import Any
 
 from lupa_pipeline.dominio.enums import TipoFato
-from lupa_pipeline.ingestao.datas import dobrar
 from lupa_pipeline.ingestao.deteccao import ler_yaml
+from lupa_pipeline.ingestao.texto import dobrar
 
 
 @cache

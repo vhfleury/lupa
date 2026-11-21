@@ -26,8 +26,8 @@ from lupa_pipeline.config import Settings, get_settings
 from lupa_pipeline.dominio.repositorios import listar_fatos_por_processo
 from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoPagina
 from lupa_pipeline.ingestao import repositorio_eventos, repositorio_pecas
-from lupa_pipeline.ingestao.deteccao import dobrar
 from lupa_pipeline.ingestao.saneamento import normalizar
+from lupa_pipeline.ingestao.texto import dobrar
 
 MAX_RESULTADOS_BUSCA = 20
 PAGINAS_POR_BLOCO_BUSCA = 200
