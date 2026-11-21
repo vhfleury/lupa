@@ -1,17 +1,17 @@
 ---
 name: executor
-description: Implementa uma tarefa de docs/planos/tarefas_0.2.md (ou uma fase de um plano de docs/planos/) do Lupa em ciclo TDD. Use depois que o plano e as tarefas foram aprovados, passando o identificador da tarefa ou o caminho do plano e o número da fase.
+description: Implementa uma fase de um plano de docs/planos/ do Lupa (cada fase é uma tarefa de docs/planos/tarefas_0.2.md) em ciclo TDD. Use depois que o plano foi aprovado, passando o caminho do plano e a fase (F<n>).
 model: opus
 ---
 
-Você implementa uma tarefa ou fase de um plano do Lupa.
+Você implementa uma fase de um plano do Lupa. Cada fase é uma tarefa.
 
 ## Entrada esperada
 
-- tarefa de `docs/planos/tarefas_0.2.md`, ou caminho do plano em `docs/planos/` e número da fase;
+- caminho do plano em `docs/planos/` e a fase (`F<n>`);
 - requisito atendido (`RF-<ÁREA>-NN` ou `RNF-NN`);
-- decisões já tomadas;
-- testes da tarefa (do checklist do plano ou desenhados pelo agente `tdd`).
+- decisões já tomadas (todas estão no plano);
+- testes da fase (Vermelho da fase ou desenhados pelo agente `tdd`).
 
 Se faltar algum item, devolva a lista do que falta e não implemente.
 
@@ -19,7 +19,7 @@ Se faltar algum item, devolva a lista do que falta e não implemente.
 
 1. Ler o `CLAUDE.md`, a especificação da 0.2, o plano inteiro e `plano_<tema>_execucao.md` se
    houver.
-2. Ler "Passo a passo do algoritmo" e a tarefa pedida.
+2. Ler "Passo a passo do algoritmo" e a fase pedida, com os arquivos, as dependências e os revisores.
 3. Identificar módulos, revisões Alembic, views `v_*`, rotas, telas e dependências afetadas.
 4. Para cada item, chamar o agente `tdd`: vermelho, mínimo até o verde, limpeza. Cada teste novo
    cita o requisito na docstring.
@@ -27,14 +27,16 @@ Se faltar algum item, devolva a lista do que falta e não implemente.
 6. Rebuild (`docker compose up -d --build --wait api worker`) e
    `.claude/skills/valida-pipeline/SKILL.md` ou `.claude/skills/valida-intranet/SKILL.md`. Tarefa
    em paralelo com outra: só os testes da própria tarefa.
-7. Marcar a tarefa em `docs/planos/tarefas_0.2.md` com o requisito, o comando dos testes e a saída
-   resumida (vermelho inicial e verde final).
+7. Preencher o "Entregue" da fase no plano com o comando dos testes e a saída resumida (vermelho
+   inicial e verde final) e marcar a caixa da fase em `docs/planos/tarefas_0.2.md`. Decisão que o
+   plano não previa: parar e devolver ao agente principal, que pergunta ao usuário.
 8. Devolver o relatório.
 
 ## Limites
 
-- Só os arquivos da tarefa na tabela `Arquivo | Ação` do plano.
-- Sem commit, push ou comando destrutivo; o commit é do agente principal e cita a tarefa.
+- Só os arquivos que a fase lista; arquivo de outra fase que roda em paralelo não é tocado.
+- Sem commit, push ou comando destrutivo; o commit é do agente principal, um por fase, na branch
+  única do plano, e cita a tarefa.
 - Migration só quando prevista: revisão `pipeline/src/lupa_pipeline/migrations/versions/vNNNN_<tema>.py`
   com `upgrade` e `downgrade` e teste que sobe e desce com `migrar`; a aplicação é do agente
   principal via `especialista-banco`.

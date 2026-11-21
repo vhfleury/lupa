@@ -878,6 +878,19 @@ decisão anterior.
 | 61 | Merge | squash em `develop`; merge commit de `release/x.y.z` em `main`, com tag anotada |
 | 62 | Proteção | push direto em `main` e `develop` proibido; só por PR |
 
+### Um PR por plano — 21/11/2026
+
+Substitui, na decisão 59, a branch `tipo/Tnn-descricao` por tarefa e a quebra do plano em
+tarefas feita depois do plano. Motivo imediato: a limpeza da pipeline saiu num PR por tarefa,
+empilhados (#20 a #26), e o merge da pilha reintroduziu código (#27).
+
+| Decisão | Tema | Resposta |
+| --- | --- | --- |
+| 63 | PR | um PR por plano, da branch `<tipo>/<tema-do-plano>`, com um commit por fase; sem PR por fase nem empilhado |
+| 64 | Tarefas | cada tarefa é uma fase `F<n>` do plano; `tarefas_0.2.md` guarda só as caixas que apontam para as fases |
+| 65 | Decisões | todas antes do plano, inclusive as que só apareceriam numa fase; o plano diz o que fazer em cada risco |
+| 66 | Distribuição | cada fase nomeia agente que implementa, revisores, arquivos, dependências e fases paralelas; seção "Distribuição" no plano |
+
 ## Resultado das revisões
 
 | Revisão | Resultado |
