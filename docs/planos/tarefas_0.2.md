@@ -1109,11 +1109,24 @@ suíte existente; o Vermelho de cada tarefa é o teste novo que só passa com o 
     1`, cinco dobragens da mesma página). Verde: saída 0; pipeline 707 passed (95,24%),
     intranet 266 passed (98,23%), integração 6, injeção 2, web 436 passed (100%), cabeçalhos e
     isolamento ok, agente 11.
-- [ ] **T12.4** Contagem única no calendário e `dias_uteis_entre`. RF-VAL-02. Fase 3; P6, D7.
+- [x] **T12.4** Contagem única no calendário e `dias_uteis_entre`. RF-VAL-02. Fase 3; P6, D7.
   - Vermelho: `pipeline/tests/validacoes/test_calendario.py::test_dias_uteis_entre_registra_feriado_com_fonte`.
   - Verde: `_contar` e `dias_uteis_entre` em `calendario.py`; `contar_prazo_util`, `_prorrogar` e `fonte_em` sobre eles; sai `contar_prazo_corrido` com o teste dele, no mesmo commit (D9).
   - Limpeza: nenhuma.
   - Revisão: especialista-validacoes.
+  - Entregue: o laço único é o gerador `_dias_seguintes`, usado por `contar_prazo_util` e pelo
+    novo `dias_uteis_entre` (dias úteis em `(inicio, fim]` e os dias pulados); saem
+    `contar_prazo_corrido` e `_prorrogar` (só ela usava) com
+    `test_prazo_corrido_sem_feriado_vence_no_dia_nominal`. `fonte_em` fica para a T12.5, que
+    funde feriados e fontes. Os testes novos são
+    `test_dias_uteis_entre_registra_feriado_e_fim_de_semana` e
+    `test_dias_uteis_entre_sem_intervalo_e_zero` (a fonte do feriado entra na T12.5).
+    Especialista-validacoes: aprovado, mesmo vencimento e dias pulados, regra dos arts. 219 e
+    224 do CPC sem mudança. Testes: `docker compose exec -T worker python -m pytest -c
+    pipeline/pyproject.toml pipeline/tests/validacoes --no-cov` e `bash scripts/verificar.sh`
+    (stack inteira). Vermelho: 2 failed (`assert -1 == 3`, `(-1, ()) == (0, ())`, com função
+    provisória). Verde: saída 0; pipeline 708 passed (95,29%), intranet 266 passed (98,23%),
+    integração 6, injeção 2, web 436 passed (100%), cabeçalhos e isolamento ok, agente 11.
 - [ ] **T12.5** `Calendario.feriados` com descrição e fonte; tempestividade pelo calendário. RF-VAL-02. Fase 3; P6, D7.
   - Vermelho: `pipeline/tests/validacoes/test_motor_e_regras.py::test_tempestividade_com_atraso_mantem_o_texto`.
   - Verde: `Feriado` e `Mapping[date, Feriado]` em `calendario.py` e `dados.montar_calendario`; sai `fontes`; `tempestividade.py` usa `dias_uteis_entre`.

@@ -1,7 +1,7 @@
-"""Contagem de prazos em dias corridos e úteis, com feriados e suspensões vindos de dados."""
+"""Contagem de prazos em dias úteis, com feriados e suspensões vindos de dados."""
 
 import calendar
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -119,45 +119,13 @@ def motivo_sem_expediente(
     return None
 
 
-def _prorrogar(
-    dia: date, feriados: Mapping[date, str], suspensoes: Sequence[Periodo]
-) -> tuple[date, tuple[DiaDesconsiderado, ...]]:
-    deslocamentos: list[DiaDesconsiderado] = []
-    while (motivo := motivo_sem_expediente(dia, feriados, suspensoes)) is not None:
-        deslocamentos.append(DiaDesconsiderado(dia, motivo))
+def _dias_seguintes(
+    inicio: date, feriados: Mapping[date, str], suspensoes: Sequence[Periodo]
+) -> Iterator[tuple[date, str | None]]:
+    dia = inicio
+    while True:
         dia += _UM_DIA
-    return dia, tuple(deslocamentos)
-
-
-def contar_prazo_corrido(
-    data_base: date, dias: int, feriados: Mapping[date, str], suspensoes: Sequence[Periodo]
-) -> ResultadoPrazo:
-    """Conta prazo em dias corridos (art. 798 CPP).
-
-    Exclui o dia do começo e inclui o do vencimento. Dias em período de suspensão não são
-    contados. Vencimento em dia sem expediente prorroga para o próximo dia útil (art. 798, §3º).
-
-    Args:
-        data_base: Dia do começo (ex.: data da intimação).
-        dias: Tamanho do prazo.
-        feriados: Feriados por data.
-        suspensoes: Períodos de suspensão.
-
-    Returns:
-        Vencimento nominal, vencimento efetivo e os dias que interferiram.
-    """
-    atual = data_base
-    contados = 0
-    suspensos: list[DiaDesconsiderado] = []
-    while contados < dias:
-        atual += _UM_DIA
-        motivo = motivo_suspensao(atual, suspensoes)
-        if motivo is not None:
-            suspensos.append(DiaDesconsiderado(atual, motivo))
-            continue
-        contados += 1
-    vencimento, deslocamentos = _prorrogar(atual, feriados, suspensoes)
-    return ResultadoPrazo(data_base, dias, atual, vencimento, deslocamentos, tuple(suspensos))
+        yield dia, motivo_sem_expediente(dia, feriados, suspensoes)
 
 
 def contar_prazo_util(
@@ -174,17 +142,47 @@ def contar_prazo_util(
     Returns:
         Resultado com os dias não úteis pulados em ``dias_suspensos``.
     """
-    atual = data_base
     contados = 0
+    atual = data_base
     pulados: list[DiaDesconsiderado] = []
-    while contados < dias:
-        atual += _UM_DIA
-        motivo = motivo_sem_expediente(atual, feriados, suspensoes)
+    if dias <= 0:
+        return ResultadoPrazo(data_base, dias, atual, atual, (), ())
+    for atual, motivo in _dias_seguintes(data_base, feriados, suspensoes):
         if motivo is not None:
             pulados.append(DiaDesconsiderado(atual, motivo))
             continue
         contados += 1
+        if contados == dias:
+            break
     return ResultadoPrazo(data_base, dias, atual, atual, (), tuple(pulados))
+
+
+def dias_uteis_entre(
+    inicio: date, fim: date, feriados: Mapping[date, str], suspensoes: Sequence[Periodo]
+) -> tuple[int, tuple[DiaDesconsiderado, ...]]:
+    """Conta os dias úteis depois de ``inicio`` até ``fim``, inclusive.
+
+    Args:
+        inicio: Dia anterior ao primeiro contado.
+        fim: Último dia contado.
+        feriados: Feriados por data.
+        suspensoes: Períodos de suspensão.
+
+    Returns:
+        Quantidade de dias úteis e os dias sem expediente pulados, em ordem.
+    """
+    contados = 0
+    pulados: list[DiaDesconsiderado] = []
+    if fim <= inicio:
+        return contados, ()
+    for dia, motivo in _dias_seguintes(inicio, feriados, suspensoes):
+        if motivo is None:
+            contados += 1
+        else:
+            pulados.append(DiaDesconsiderado(dia, motivo))
+        if dia == fim:
+            break
+    return contados, tuple(pulados)
 
 
 def somar_meses(dia: date, meses: int) -> date:
