@@ -1208,7 +1208,7 @@ no "Entregue" de cada fase.
 - [x] **T12.15** Formatos por mime e nomes internos no diagnóstico — RF-ING-07. [fase F15](plano_limpeza_pipeline.md)
 - [x] **T12.16** Extração paralela sem gabinete — RF-ING-04, RF-ING-07. [fase F16](plano_limpeza_pipeline.md)
 - [x] **T12.17** Gravação de páginas em lote — RF-ING-03. [fase F17](plano_limpeza_pipeline.md)
-- [ ] **T12.18** MinIO para arquivo e PDF aberto pelo caminho — RF-ING-04. [fase F18](plano_limpeza_pipeline.md)
+- [x] **T12.18** MinIO para arquivo e PDF aberto pelo caminho — RF-ING-04. [fase F18](plano_limpeza_pipeline.md)
 - [ ] **T12.19** Leituras repetidas na fila e nos repositórios — RF-ING-07. [fase F19](plano_limpeza_pipeline.md)
 - [x] **T12.20** Remoção do código sem uso — RNF-08. [fase F20](plano_limpeza_pipeline.md)
 - [x] **T12.21** Duplicações menores da ingestão — RNF-08, RF-ING-03. [fase F21](plano_limpeza_pipeline.md)

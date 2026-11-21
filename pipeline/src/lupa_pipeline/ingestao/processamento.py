@@ -194,7 +194,7 @@ def _fontes_do_manifesto(
         caminho = diretorio / f"fonte-{item['ordem']}.pdf"
         chave = chave_objeto(arquivo.hk_processo, item["sha256"])
         caminho.touch(mode=0o600, exist_ok=False)
-        caminho.write_bytes(storage.ler(chave))
+        storage.baixar_para(chave, caminho)
         fontes.append(FontePaginas(caminho, item["nome"], item["paginas"], total))
         total += item["paginas"]
     return fontes, DiagnosticoArquivo.model_validate(
@@ -221,7 +221,7 @@ def _fontes_do_original(
     formato = _formato(arquivo)
     original = diretorio / "original"
     original.touch(mode=0o600, exist_ok=False)
-    original.write_bytes(storage.ler(arquivo.chave_storage or ""))
+    storage.baixar_para(arquivo.chave_storage or "", original)
     entradas = formato.inventariar(arquivo, original, settings, limites)
     inspecoes = _inspecionar(entradas, limites)
     fontes = []

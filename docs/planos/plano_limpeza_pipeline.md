@@ -410,7 +410,14 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
 - Vermelho: `tests/ingestao/test_storage.py::test_baixar_para_grava_o_objeto_no_caminho`
   (integração).
 - Verde: `storage.baixar_para` com `download_fileobj`; `fitz.open(caminho)`.
-- Entregue:
+- Entregue: storage.baixar_para (download_fileobj no arquivo aberto; memória com write_bytes) no
+  lugar de ler + write_bytes; extrair_intervalo e desenhar abrem o PDF pelo caminho no filho sandbox
+  (bytes continuam aceitos). test_pdf_aberto_pelo_caminho_rende_o_mesmo_que_pelos_bytes confirma
+  páginas, texto, imagens e PNG iguais, salvo o tempo de extração (segundos). Especialista-ingestao:
+  aprovado com condições, atendidas. Vermelho: 2 failed (AttributeError: baixar_para ausente).
+  Verde: verificar.sh na stack inteira com F18 e F22: saída 0; pipeline 763 passed (95,91%),
+  intranet 267 (98,23%), integração 6, injeção 2, web 436 (100%), cabeçalhos e isolamento ok, agente
+  11.
 
 ### F19 — Leituras repetidas na fila e nos repositórios
 

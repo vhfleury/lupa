@@ -54,11 +54,11 @@ class PaginaRenderizada:
     altura: float
 
 
-def desenhar(dados: bytes, numero: int, zoom: float) -> dict[str, Any]:
+def desenhar(origem: bytes | Path, numero: int, zoom: float) -> dict[str, Any]:
     """Desenha a página `numero` (1-based) sem camadas opcionais, recortada à `CropBox`.
 
     Args:
-        dados: Bytes do PDF.
+        origem: Bytes do PDF ou caminho do arquivo, aberto sem copiar para a memória.
         numero: Página, a partir de 1.
         zoom: Escala (1.0 = 72 dpi).
 
@@ -69,7 +69,11 @@ def desenhar(dados: bytes, numero: int, zoom: float) -> dict[str, Any]:
     import fitz
 
     try:
-        documento = fitz.open(stream=dados, filetype="pdf")
+        documento = (
+            fitz.open(origem, filetype="pdf")
+            if isinstance(origem, Path)
+            else fitz.open(stream=origem, filetype="pdf")
+        )
     except Exception:
         return {"ok": False, "erro": "abertura"}
     if documento.needs_pass or not 1 <= numero <= documento.page_count:
@@ -102,7 +106,7 @@ def main(argv: list[str] | None = None) -> None:  # pragma: no cover (roda no pr
     bloquear_rede()
     caminho, numero, zoom = argv or sys.argv[1:]
     try:
-        resultado = desenhar(Path(caminho).read_bytes(), int(numero), float(zoom))
+        resultado = desenhar(Path(caminho), int(numero), float(zoom))
     except MemoryError:
         sys.exit(EXIT_MEMORIA)
     sys.stdout.write(json.dumps(resultado))
