@@ -1,7 +1,7 @@
 """Validação, diagnóstico e extração de um arquivo da fila do PostgreSQL (A5)."""
 
 from collections import Counter
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -91,25 +91,6 @@ class Trabalho:
             atualizar_status_processo(session, self.arquivo.hk_processo)
 
 
-def _entradas(
-    arquivo: VisaoArquivo, original: Path, settings: Settings, sandbox: LimitesSandbox
-) -> list[EntradaExtraida]:
-    if arquivo.mime == TipoArquivo.PDF.value:
-        entrada = EntradaManifesto(
-            ordem=1,
-            nome=arquivo.nome_original or "autos.pdf",
-            tamanho_bytes=original.stat().st_size,
-            sha256=arquivo.sha256,
-        )
-        return [EntradaExtraida(entrada, original)]
-    if arquivo.mime != TipoArquivo.ZIP.value:
-        raise ZipRecusadoError(MotivoQuarentena.TIPO_INVALIDO, "tipo inválido")
-    limites = LimitesZip(
-        settings.zip_max_entradas, settings.zip_max_razao, settings.zip_max_descomprimido_bytes
-    )
-    return inventariar_zip(original, original.parent, limites, sandbox)
-
-
 def _inspecionar(entradas: list[EntradaExtraida], limites: LimitesSandbox) -> list[dict[str, Any]]:
     inspecoes: list[dict[str, Any]] = []
     for inicio in range(0, len(entradas), 32):
@@ -124,6 +105,151 @@ def _inspecionar(entradas: list[EntradaExtraida], limites: LimitesSandbox) -> li
     return inspecoes
 
 
+Inventariar = Callable[[VisaoArquivo, Path, Settings, LimitesSandbox], list[EntradaExtraida]]
+Diagnosticar = Callable[
+    [str, Sequence[tuple[str, dict[str, Any]]], Mapping[str, str]], DiagnosticoArquivo
+]
+Persistir = Callable[[ObjectStorage, bytes, Sequence[EntradaExtraida]], None]
+
+
+@dataclass(frozen=True)
+class Formato:
+    """Como cada tipo de arquivo lacrado é inventariado, diagnosticado e persistido.
+
+    Attributes:
+        inventariar: Entradas do arquivo baixado (um PDF é uma entrada).
+        diagnosticar: Diagnóstico das entradas inspecionadas, com os nomes internos.
+        persistir: Grava no storage as entradas que ainda não estão lá.
+    """
+
+    inventariar: Inventariar
+    diagnosticar: Diagnosticar
+    persistir: Persistir
+
+
+def _inventariar_pdf(
+    arquivo: VisaoArquivo, original: Path, settings: Settings, sandbox: LimitesSandbox
+) -> list[EntradaExtraida]:
+    entrada = EntradaManifesto(
+        ordem=1,
+        nome=arquivo.nome_original or "autos.pdf",
+        tamanho_bytes=original.stat().st_size,
+        sha256=arquivo.sha256,
+    )
+    return [EntradaExtraida(entrada, original)]
+
+
+def _inventariar_zip(
+    arquivo: VisaoArquivo, original: Path, settings: Settings, sandbox: LimitesSandbox
+) -> list[EntradaExtraida]:
+    limites = LimitesZip(
+        settings.zip_max_entradas, settings.zip_max_razao, settings.zip_max_descomprimido_bytes
+    )
+    return inventariar_zip(original, original.parent, limites, sandbox)
+
+
+def _diagnosticar_pdf(
+    arquivo_id: str, entradas: Sequence[tuple[str, dict[str, Any]]], nomes: Mapping[str, str]
+) -> DiagnosticoArquivo:
+    nome, inspecao = entradas[0]
+    return diagnosticar_pdf(arquivo_id, nome, inspecao, nomes)
+
+
+def _persistir_nada(
+    storage: ObjectStorage, hk_processo: bytes, entradas: Sequence[EntradaExtraida]
+) -> None:
+    return None
+
+
+def _persistir_entradas(
+    storage: ObjectStorage, hk_processo: bytes, entradas: Sequence[EntradaExtraida]
+) -> None:
+    for entrada in entradas:
+        chave = chave_objeto(hk_processo, entrada.manifesto.sha256)
+        with entrada.caminho.open("rb") as origem:
+            storage.gravar(chave, origem)
+
+
+FORMATOS: dict[str, Formato] = {
+    TipoArquivo.PDF.value: Formato(_inventariar_pdf, _diagnosticar_pdf, _persistir_nada),
+    TipoArquivo.ZIP.value: Formato(_inventariar_zip, diagnosticar_zip, _persistir_entradas),
+}
+
+
+def _formato(arquivo: VisaoArquivo) -> Formato:
+    formato = FORMATOS.get(arquivo.mime or "")
+    if formato is None:
+        raise ZipRecusadoError(MotivoQuarentena.TIPO_INVALIDO, "tipo inválido")
+    return formato
+
+
+def _fontes_do_manifesto(
+    arquivo: VisaoArquivo, storage: ObjectStorage, diretorio: Path
+) -> tuple[list[FontePaginas], DiagnosticoArquivo]:
+    fontes = []
+    total = 0
+    for item in arquivo.manifesto or []:
+        caminho = diretorio / f"fonte-{item['ordem']}.pdf"
+        chave = chave_objeto(arquivo.hk_processo, item["sha256"])
+        caminho.touch(mode=0o600, exist_ok=False)
+        caminho.write_bytes(storage.ler(chave))
+        fontes.append(FontePaginas(caminho, item["nome"], item["paginas"], total))
+        total += item["paginas"]
+    return fontes, DiagnosticoArquivo.model_validate(
+        {
+            "arquivo_id": arquivo.id,
+            "cenario": arquivo.cenario,
+            "total_paginas": total,
+            "tem_indice": arquivo.tem_indice,
+            "sinais": arquivo.sinais,
+            "fronteiras_origem": arquivo.fronteiras_origem,
+            "metadados_descartados": arquivo.metadados_descartados,
+        }
+    )
+
+
+def _fontes_do_original(
+    trabalho: Trabalho,
+    storage: ObjectStorage,
+    diretorio: Path,
+    settings: Settings,
+    limites: LimitesSandbox,
+) -> tuple[list[FontePaginas], DiagnosticoArquivo]:
+    arquivo = trabalho.arquivo
+    formato = _formato(arquivo)
+    original = diretorio / "original"
+    original.touch(mode=0o600, exist_ok=False)
+    original.write_bytes(storage.ler(arquivo.chave_storage or ""))
+    entradas = formato.inventariar(arquivo, original, settings, limites)
+    inspecoes = _inspecionar(entradas, limites)
+    fontes = []
+    manifesto = []
+    nomes: dict[str, str] = {}
+    total = 0
+    for entrada, dados in zip(entradas, inspecoes, strict=True):
+        item = entrada.manifesto
+        quantidade = int(dados["paginas"])
+        nome = f"entrada-{item.ordem}.pdf"
+        nomes[item.nome] = nome
+        fontes.append(FontePaginas(entrada.caminho, nome, quantidade, total))
+        manifesto.append(item.model_dump() | {"nome": nome, "paginas": quantidade})
+        total += quantidade
+    diagnostico = formato.diagnosticar(
+        arquivo.id, [(e.manifesto.nome, i) for e, i in zip(entradas, inspecoes, strict=True)], nomes
+    )
+    if arquivo.estado == EstadoJob.RECEBIDO:
+        with trabalho.transacao() as session:
+            formato.persistir(storage, arquivo.hk_processo, entradas)
+            mudar_estado(
+                session,
+                arquivo.hk_arquivo,
+                EstadoJob.VALIDADO,
+                manifesto=manifesto,
+                total_paginas=total,
+            )
+    return fontes, diagnostico
+
+
 def _preparar(
     trabalho: Trabalho,
     storage: ObjectStorage,
@@ -135,75 +261,8 @@ def _preparar(
     if not arquivo.chave_storage:
         raise ObjetoAusenteError("objeto indisponível")
     if arquivo.estado == EstadoJob.EM_EXTRACAO and arquivo.cenario and arquivo.manifesto:
-        fontes = []
-        total = 0
-        for item in arquivo.manifesto:
-            caminho = diretorio / f"fonte-{item['ordem']}.pdf"
-            chave = chave_objeto(arquivo.hk_processo, item["sha256"])
-            caminho.touch(mode=0o600, exist_ok=False)
-            caminho.write_bytes(storage.ler(chave))
-            fontes.append(FontePaginas(caminho, item["nome"], item["paginas"], total))
-            total += item["paginas"]
-        return fontes, DiagnosticoArquivo.model_validate(
-            {
-                "arquivo_id": arquivo.id,
-                "cenario": arquivo.cenario,
-                "total_paginas": total,
-                "tem_indice": arquivo.tem_indice,
-                "sinais": arquivo.sinais,
-                "fronteiras_origem": arquivo.fronteiras_origem,
-                "metadados_descartados": arquivo.metadados_descartados,
-            }
-        )
-    original = diretorio / "original"
-    original.touch(mode=0o600, exist_ok=False)
-    original.write_bytes(storage.ler(arquivo.chave_storage))
-    entradas = _entradas(arquivo, original, settings, limites)
-    inspecoes = _inspecionar(entradas, limites)
-    fontes = []
-    manifesto = []
-    total = 0
-    for entrada, dados in zip(entradas, inspecoes, strict=True):
-        item = entrada.manifesto
-        quantidade = int(dados["paginas"])
-        nome = f"entrada-{item.ordem}.pdf"
-        fontes.append(FontePaginas(entrada.caminho, nome, quantidade, total))
-        manifesto.append(item.model_dump() | {"nome": nome, "paginas": quantidade})
-        total += quantidade
-    if arquivo.mime == TipoArquivo.ZIP.value:
-        diagnostico = diagnosticar_zip(
-            arquivo.id, [(e.manifesto.nome, i) for e, i in zip(entradas, inspecoes, strict=True)]
-        )
-    else:
-        diagnostico = diagnosticar_pdf(arquivo.id, entradas[0].manifesto.nome, inspecoes[0])
-    nomes = {e.manifesto.nome: f.nome for e, f in zip(entradas, fontes, strict=True)}
-    diagnostico = diagnostico.model_copy(
-        update={
-            "fronteiras_origem": [
-                {k: v for k, v in f.items() if k not in {"arquivo", "titulo"}}
-                | {"arquivo": nomes.get(f.get("arquivo", ""), "entrada-1.pdf")}
-                for f in diagnostico.fronteiras_origem
-            ],
-            "metadados_descartados": [
-                m | {"entrada": nomes.get(m.get("entrada", ""), "entrada-1.pdf")}
-                for m in diagnostico.metadados_descartados
-            ],
-        }
-    )
-    if arquivo.estado == EstadoJob.RECEBIDO:
-        with trabalho.transacao() as session:
-            if arquivo.mime == TipoArquivo.ZIP.value:
-                for entrada in entradas:
-                    chave = chave_objeto(arquivo.hk_processo, entrada.manifesto.sha256)
-                    with entrada.caminho.open("rb") as origem:
-                        storage.gravar(chave, origem)
-            mudar_estado(
-                session,
-                arquivo.hk_arquivo,
-                EstadoJob.VALIDADO,
-                manifesto=manifesto,
-                total_paginas=total,
-            )
+        return _fontes_do_manifesto(arquivo, storage, diretorio)
+    fontes, diagnostico = _fontes_do_original(trabalho, storage, diretorio, settings, limites)
     with trabalho.transacao() as session:
         gravar_satelite(
             session,

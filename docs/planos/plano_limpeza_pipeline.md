@@ -331,7 +331,14 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
 - Vermelho: `tests/ingestao/test_processamento.py::test_diagnostico_de_zip_ja_sai_com_os_nomes_internos`.
 - Verde: `FORMATOS: mime → Formato(inventariar, diagnosticar, persistir)`; `diagnosticar_*`
   recebe o mapa de nomes; `_preparar` dividida em `_fontes_do_manifesto` e `_fontes_do_original`.
-- Entregue:
+- Entregue: FORMATOS por mime escolhido uma vez (inventariar, diagnosticar, persistir);
+  diagnosticar_pdf e diagnosticar_zip recebem o mapa de nomes internos; sai o remapeamento tardio e
+  o padrão entrada-1.pdf (NomeInternoAusenteError); _preparar dividida em _fontes_do_manifesto e
+  _fontes_do_original. Mime fora do mapa vai à quarentena antes de ler o storage, como o plano
+  previa. Especialista-ingestao: aprovado com condições, atendidas. Vermelho: 2 failed
+  (AttributeError: FORMATOS ausente). Verde: verificar.sh na stack inteira com F10 e F15: saída 0;
+  pipeline 726 passed (95,39%), intranet 267 (98,23%), integração 6, injeção 2, web 436 (100%),
+  cabeçalhos e isolamento ok, agente 11.
 
 ### F16 — Extração paralela sem gabinete
 

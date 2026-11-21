@@ -16,9 +16,12 @@ from lupa_pipeline.dominio.tabelas import sat_arquivo_lote, sat_pagina_extracao
 from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoPagina, VisaoPeca
 from lupa_pipeline.ingestao import processamento
 from lupa_pipeline.ingestao.cache import copiar_do_cache
+from lupa_pipeline.ingestao.diagnostico import NomeInternoAusenteError
 from lupa_pipeline.ingestao.extracao import ResultadoTarefa, Tarefa, executar_tarefa
 from lupa_pipeline.ingestao.inventario import EntradaExtraida
+from lupa_pipeline.ingestao.parser_pdf import inspecionar as inspecionar_pdf
 from lupa_pipeline.ingestao.processamento import processar_arquivo
+from lupa_pipeline.ingestao.recepcao import TipoArquivo
 from lupa_pipeline.ingestao.sandbox import LimitesSandbox
 from lupa_pipeline.ingestao.storage import ObjectStorage
 
@@ -217,3 +220,24 @@ def test_etapas_executam_a_partir_da_primeira_agendada(
         "catalogo",
     )
     assert tuple(nome for nome, _ in processamento.etapas_desde(primeira)) == esperadas
+
+
+def test_diagnostico_de_zip_ja_sai_com_os_nomes_internos() -> None:
+    """RF-ING-07: o formato ZIP diagnostica com os nomes internos, sem remapeamento posterior."""
+    nomes_originais = ["02-peca.pdf", "01-peca.pdf"]
+    entradas = [(nome, inspecionar_pdf(pdf_texto([nome]))) for nome in nomes_originais]
+    nomes = {nome: f"entrada-{ordem}.pdf" for ordem, nome in enumerate(nomes_originais, 1)}
+    formato = processamento.FORMATOS[TipoArquivo.ZIP.value]
+    diagnostico = formato.diagnosticar("0" * 64, entradas, nomes)
+    fronteiras = diagnostico.fronteiras_origem
+    assert [f["arquivo"] for f in fronteiras] == ["entrada-1.pdf", "entrada-2.pdf"]
+    assert all("titulo" not in f for f in fronteiras)
+    assert [f["pagina_continua"] for f in fronteiras] == [1, 2]
+
+
+def test_nome_sem_entrada_interna_e_erro_de_integridade() -> None:
+    """RF-ING-07: nome de entrada fora do mapa de nomes internos é erro, sem padrão fixo."""
+    entradas = [("autos.pdf", inspecionar_pdf(pdf_texto(["DENÚNCIA"])))]
+    formato = processamento.FORMATOS[TipoArquivo.PDF.value]
+    with pytest.raises(NomeInternoAusenteError):
+        formato.diagnosticar("0" * 64, entradas, {})

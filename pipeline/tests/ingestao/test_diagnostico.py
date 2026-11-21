@@ -2,6 +2,7 @@
 
 from hashlib import sha256
 from pathlib import Path
+from typing import Any
 
 import fitz
 import pytest
@@ -89,15 +90,24 @@ def test_bookmark_sem_destino_ou_de_segundo_nivel_nao_vira_fronteira() -> None:
     assert [(f["pagina"], f["data"]) for f in fronteiras] == [(2, "2024-03-05")]
 
 
+def _nomes_internos(entradas: list[tuple[str, dict[str, Any]]]) -> dict[str, str]:
+    return {nome: f"entrada-{ordem}.pdf" for ordem, (nome, _) in enumerate(entradas, start=1)}
+
+
 def _diagnostico_do_cenario(autos: AutosSinteticos, cenario: Cenario, pasta: Path) -> str:
     caminho = autos.arquivos[cenario]
     if cenario is Cenario.ZIP_POR_PECA:
         extraidas = inventariar(caminho, pasta, LimitesZip())
         entradas = [(e.manifesto.nome, inspecionar(e.caminho.read_bytes())) for e in extraidas]
-        return diagnosticar_zip(sha256(b"arquivo de teste").hexdigest(), entradas).cenario.value
+        return diagnosticar_zip(
+            sha256(b"arquivo de teste").hexdigest(), entradas, _nomes_internos(entradas)
+        ).cenario.value
     inspecao = inspecionar(caminho.read_bytes())
     return diagnosticar_pdf(
-        sha256(b"arquivo de teste").hexdigest(), caminho.name, inspecao
+        sha256(b"arquivo de teste").hexdigest(),
+        caminho.name,
+        inspecao,
+        {caminho.name: "entrada-1.pdf"},
     ).cenario.value
 
 
@@ -117,7 +127,12 @@ def test_fronteiras_do_indice_batem_com_as_pecas_do_gabarito(
     """Página física do índice = página inicial da peça + páginas de índice."""
     gabarito = autos_sinteticos.gabaritos[Cenario.PDF_INDICE]
     inspecao = inspecionar(autos_sinteticos.arquivos[Cenario.PDF_INDICE].read_bytes())
-    diagnostico = diagnosticar_pdf(sha256(b"arquivo de teste").hexdigest(), "autos.pdf", inspecao)
+    diagnostico = diagnosticar_pdf(
+        sha256(b"arquivo de teste").hexdigest(),
+        "autos.pdf",
+        inspecao,
+        {"autos.pdf": "entrada-1.pdf"},
+    )
     deslocamento = gabarito.arquivos[0].folhas.count(None)
     esperadas = [p.pagina_inicial + deslocamento for p in gabarito.pecas]
     for fonte in ("indice", "bookmark"):
@@ -135,7 +150,9 @@ def test_zip_por_peca_tem_uma_fronteira_por_entrada_em_numeracao_continua(
     gabarito = autos_sinteticos.gabaritos[Cenario.ZIP_POR_PECA]
     extraidas = inventariar(autos_sinteticos.arquivos[Cenario.ZIP_POR_PECA], tmp_path, LimitesZip())
     entradas = [(e.manifesto.nome, inspecionar(e.caminho.read_bytes())) for e in extraidas]
-    diagnostico = diagnosticar_zip(sha256(b"arquivo de teste").hexdigest(), entradas)
+    diagnostico = diagnosticar_zip(
+        sha256(b"arquivo de teste").hexdigest(), entradas, _nomes_internos(entradas)
+    )
     continuas = [f["pagina_continua"] for f in diagnostico.fronteiras_origem]
     assert continuas == [p.pagina_inicial for p in gabarito.pecas]
     assert diagnostico.sinais["nomes_datados"] == len(gabarito.pecas)
@@ -146,7 +163,9 @@ def test_zip_com_um_unico_pdf_e_diagnosticado_pelo_pdf() -> None:
     """Uma entrada só: o cenário é o do PDF dentro."""
     inspecao = inspecionar(pdf_texto(["DENÚNCIA"]))
     diagnostico = diagnosticar_zip(
-        sha256(b"arquivo de teste").hexdigest(), [("autos.pdf", inspecao)]
+        sha256(b"arquivo de teste").hexdigest(),
+        [("autos.pdf", inspecao)],
+        {"autos.pdf": "entrada-1.pdf"},
     )
     assert diagnostico.cenario is CenarioArquivo.PDF_LISO
     assert diagnostico.sinais["zip_com_um_pdf"] is True
