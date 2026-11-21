@@ -1167,10 +1167,20 @@ suíte existente; o Vermelho de cada tarefa é o teste novo que só passa com o 
     (stack inteira). Vermelho: erro de coleta (`cannot import name 'dispensas_padrao'`).
     Verde: saída 0; pipeline 711 passed (95,29%), intranet 266 passed (98,23%), integração 6,
     injeção 2, web 436 passed (100%), cabeçalhos e isolamento ok, agente 11.
-- [ ] **T12.7** Reprocessamento pela versão nova do catálogo. RF-ING-08. Fase 4; D8.
+- [x] **T12.7** Reprocessamento pela versão nova do catálogo. RF-ING-08. Fase 4; D8.
   - Vermelho: `pipeline/tests/ingestao/test_reprocessamento.py::test_nova_versao_do_catalogo_regrava_achados_com_o_mesmo_texto` (integração).
   - Verde: nenhuma mudança além da T12.6 se o mecanismo atual já regravar; senão, a menor correção em `reprocessamento.py`.
   - Limpeza: nenhuma.
+  - Entregue: só o teste. O worker processa uma apelação sintética da Defensoria com
+    `VERSAO_CATALOGO` 0.2.0 (em `apoio`, `motor` e `reprocessamento`) e reinicia com a versão
+    atual; os achados passam a 0.3.0 com o mesmo resultado e explicação. Sem vermelho: o
+    mecanismo da T12.6 já regrava, como a tarefa previa; o teste exige achados no primeiro
+    processamento e versões distintas antes e depois. Testes: `docker compose run --rm -e
+    LUPA_EXIGIR_INTEGRACAO=1 worker python -m pytest -c pipeline/pyproject.toml
+    pipeline/tests/ingestao/test_reprocessamento.py --no-cov -k catalogo` (1 passed) e `bash
+    scripts/verificar.sh` (stack inteira, saída 0): pipeline 712 passed (95,29%), intranet 266
+    passed (98,23%), integração 6, injeção 2, web 436 passed (100%), cabeçalhos e isolamento
+    ok, agente 11.
 - [ ] **T12.8** Conflito interrompe a regra. RF-FAT-02, RF-VAL-01. Fase 4; P7, D8.
   - Vermelho: `pipeline/tests/validacoes/test_motor_e_regras.py::test_conflito_interrompe_a_regra_e_vira_verificar`.
   - Verde: `FatoPendenteError` em `apoio.py`, levantada por `Coleta.unico`; o motor captura e devolve `coleta.verificar()`; saem as checagens `if coleta.conflitos` das regras e `Coleta.pendente`.
