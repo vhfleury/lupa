@@ -254,18 +254,21 @@ def _registrar_gravacoes(
     monkeypatch: pytest.MonkeyPatch, falhar_em: int | None = None
 ) -> list[tuple[int, int, int]]:
     gravacoes: list[tuple[int, int, int]] = []
-    original = paginas.gravar_pagina
+    original = paginas.gravar_paginas
 
-    def gravar(session: Session, arquivo: VisaoArquivo, linha: dict[str, Any]) -> bytes:
-        numero = int(linha["numero"])
-        if numero == falhar_em and all(gravada != numero for gravada, _, _ in gravacoes):
-            gravacoes.append((numero, threading.get_ident(), 0))
+    def gravar(
+        session: Session, arquivo: VisaoArquivo, linhas: list[dict[str, Any]]
+    ) -> list[bytes]:
+        numeros = [int(linha["numero"]) for linha in linhas]
+        ja_falhou = any(gravada == falhar_em for gravada, _, _ in gravacoes)
+        if falhar_em in numeros and not ja_falhou:
+            gravacoes.append((falhar_em, threading.get_ident(), 0))
             raise FalhaDeGravacaoError
-        pid = session.scalar(select(func.pg_backend_pid()))
-        gravacoes.append((numero, threading.get_ident(), int(pid or 0)))
-        return original(session, arquivo, linha)
+        pid = int(session.scalar(select(func.pg_backend_pid())) or 0)
+        gravacoes.extend((numero, threading.get_ident(), pid) for numero in numeros)
+        return original(session, arquivo, linhas)
 
-    monkeypatch.setattr(paginas, "gravar_pagina", gravar)
+    monkeypatch.setattr(paginas, "gravar_paginas", gravar)
     return gravacoes
 
 

@@ -389,7 +389,16 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
 - Vermelho: `tests/ingestao/test_paginas.py::test_gravacao_em_lote_igual_a_gravacao_por_pagina`
   (integração).
 - Verde: hubs e links com `executemany`; `hash_diff` correntes lidos uma vez por lote.
-- Entregue:
+- Teste existente: o auxiliar `_registrar_gravacoes` de `tests/ingestao/test_processamento.py`
+  passa a envolver `paginas.gravar_paginas` em vez de `gravar_pagina`, porque a gravação passa a
+  ser por lote; as asserções dos dois testes da F16 não mudam.
+- Entregue: gravacao.gravar_hubs, gravar_links e gravar_satelites (INSERT ON CONFLICT DO NOTHING e
+  satélites novos em executemany, hash_diff correntes por um SELECT DISTINCT ON antes do laço);
+  paginas.gravar_paginas usado por _gravar_lote e copiar_do_cache; gravar_pagina fica para a
+  calibração. Especialista-banco: aprovado com ressalvas leves; especialista-ingestao: aprovado com
+  condições, atendidas. Vermelho: ImportError (gravar_paginas ausente). Verde: verificar.sh na stack
+  inteira com F17: saída 0; pipeline 729 passed (95,39%), intranet 267 (98,23%), integração 6,
+  injeção 2, web 436 (100%), cabeçalhos e isolamento ok, agente 11.
 
 ### F18 — MinIO para arquivo e PDF aberto pelo caminho
 

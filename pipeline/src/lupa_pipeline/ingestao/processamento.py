@@ -324,15 +324,15 @@ def _gravar_lote(
 ) -> None:
     faltam = set(lote.tarefa.numeros) - prontas
     motivo = resultados[-1].motivo_falha if resultados else None
+    linhas = []
+    for resultado in resultados:
+        for pagina in resultado.paginas:
+            if "erro" in pagina or pagina["numero"] not in faltam:
+                continue
+            linhas.append(linha_pagina(pagina, trabalho.versoes["paginas"]))
+            faltam.discard(int(pagina["numero"]))
     with trabalho.transacao() as session:
-        for resultado in resultados:
-            for pagina in resultado.paginas:
-                if "erro" in pagina or pagina["numero"] not in faltam:
-                    continue
-                paginas.gravar_pagina(
-                    session, trabalho.arquivo, linha_pagina(pagina, trabalho.versoes["paginas"])
-                )
-                faltam.discard(int(pagina["numero"]))
+        paginas.gravar_paginas(session, trabalho.arquivo, linhas)
         if faltam:
             falhas[(motivo or MotivoFalha.ERRO_PARSER).value] += len(faltam)
         atributos = {

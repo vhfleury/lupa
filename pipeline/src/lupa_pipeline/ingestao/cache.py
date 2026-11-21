@@ -10,7 +10,7 @@ from lupa_pipeline.dominio.tabelas import (
     sat_pagina_saneamento,
 )
 from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoPagina, VisaoProcesso
-from lupa_pipeline.ingestao.paginas import gravar_pagina
+from lupa_pipeline.ingestao.paginas import gravar_paginas
 
 
 def copiar_do_cache(
@@ -51,9 +51,9 @@ def copiar_do_cache(
         )
         .order_by(VisaoPagina.numero)
     )
-    copiadas = set()
-    for pagina in linhas:
-        linha = {campo: getattr(pagina, campo) for campo in campos}
-        gravar_pagina(session, destino, linha | {"numero": pagina.numero})
-        copiadas.add(pagina.numero)
-    return copiadas
+    copias = [
+        {campo: getattr(pagina, campo) for campo in campos} | {"numero": pagina.numero}
+        for pagina in linhas
+    ]
+    gravar_paginas(session, destino, copias)
+    return {int(copia["numero"]) for copia in copias}
