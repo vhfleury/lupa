@@ -7,6 +7,7 @@ from lupa_pipeline.dominio.enums import TipoFato
 from lupa_pipeline.ingestao.eventos import sentenca
 from lupa_pipeline.ingestao.eventos.base import Fonte
 from lupa_pipeline.ingestao.eventos.modelo import Candidato
+from lupa_pipeline.ingestao.texto import dobrar
 
 HIPOTESE = re.compile(
     r"art(?:igo|\.)?\s*1[.]?015(?:\s+do cpc)?[\s,–-]*(?:inciso\s+)?"

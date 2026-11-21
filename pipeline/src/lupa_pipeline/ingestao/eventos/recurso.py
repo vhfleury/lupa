@@ -9,6 +9,7 @@ from lupa_pipeline.ingestao.eventos.base import Fonte
 from lupa_pipeline.ingestao.eventos.modelo import Candidato
 from lupa_pipeline.ingestao.eventos.partes import qualidade
 from lupa_pipeline.ingestao.eventos.procuracao import ADVOGADO, advogado
+from lupa_pipeline.ingestao.texto import dobrar
 
 RECURSOS = {
     TipoPeca.APELACAO: ClasseProcessual.APELACAO_CIVEL,
