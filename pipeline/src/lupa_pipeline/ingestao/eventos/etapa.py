@@ -122,10 +122,26 @@ def _gravar_partes(
 
 
 def achados_do_processo(
-    session: Session, processo_id: bytes, classe: str, referencia: date
+    session: Session,
+    processo_id: bytes,
+    classe: str,
+    referencia: date,
+    *,
+    processo: VisaoProcesso | None = None,
 ) -> list[Achado]:
-    """Executa as regras para cada recorrente, usando somente as versões atuais dos fatos."""
-    processo = session.get_one(VisaoProcesso, processo_id)
+    """Executa as regras para cada recorrente, usando somente as versões atuais dos fatos.
+
+    Args:
+        session: Sessão com transação aberta.
+        processo_id: Processo.
+        classe: Classe processual que escolhe as regras do catálogo.
+        referencia: Data de referência das regras.
+        processo: Linha de `v_processo` já lida; sem ela, o processo é lido pela sessão.
+
+    Returns:
+        Os achados calculados, sem gravar.
+    """
+    processo = processo or session.get_one(VisaoProcesso, processo_id)
     modelo = ModeloProcesso(listar_fatos_por_processo(session, processo_id))
     resultado = []
     for calculo in executar_catalogo(modelo, classe, referencia):
@@ -138,10 +154,32 @@ def achados_do_processo(
     return resultado
 
 
-def atualizar_achados(session: Session, processo_id: bytes, referencia: date) -> dict[str, Any]:
-    """Aplica o catálogo aos fatos vigentes e resume os achados persistidos."""
-    processo = processo_para_gravar(session, processo_id)
-    achados = achados_do_processo(session, processo_id, processo.classe or "", referencia)
+def atualizar_achados(
+    session: Session,
+    processo_id: bytes,
+    referencia: date,
+    *,
+    processo: VisaoProcesso | None = None,
+) -> dict[str, Any]:
+    """Aplica o catálogo aos fatos vigentes e resume os achados persistidos.
+
+    Args:
+        session: Sessão com transação aberta.
+        processo_id: Processo.
+        referencia: Data de referência das regras.
+        processo: Linha de `v_processo` já travada por `processo_para_gravar` na transação;
+            sem ela, o processo é travado e lido aqui.
+
+    Returns:
+        Quantos achados foram gravados e a contagem por resultado.
+
+    Raises:
+        ProcessoNaoEncontradoError: Processo inexistente ou descartado.
+    """
+    processo = processo or processo_para_gravar(session, processo_id)
+    achados = achados_do_processo(
+        session, processo_id, processo.classe or "", referencia, processo=processo
+    )
     return {
         "achados_gravados": gravar_achados(session, processo_id, achados),
         "achados": dict(Counter(a.resultado.value for a in achados)),
@@ -187,5 +225,5 @@ def processar_eventos(
         "partes": len(sujeitos),
         "fatos": len(gravados),
         "sem_trecho": rejeitados,
-        **atualizar_achados(session, processo_id, referencia),
+        **atualizar_achados(session, processo_id, referencia, processo=processo),
     }

@@ -1,5 +1,6 @@
 """Índice de peças e histórico das classificações no Data Vault (A5, A12)."""
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,7 +11,6 @@ from lupa_pipeline.dominio.enums import MetodoClassificacao, OrigemPeca, TipoPec
 from lupa_pipeline.dominio.esquemas import calcular_hash
 from lupa_pipeline.dominio.gravacao import gravar_hub, gravar_link, gravar_satelite
 from lupa_pipeline.dominio.tabelas import (
-    atributos_do_satelite,
     hub_evidencia,
     hub_peca,
     link_arquivo_peca,
@@ -27,7 +27,7 @@ from lupa_pipeline.dominio.visoes import (
     atual,
 )
 from lupa_pipeline.ingestao.indice import ResultadoIndice
-from lupa_pipeline.ingestao.repositorio import ORIGEM
+from lupa_pipeline.ingestao.repositorio import ORIGEM, atributos
 
 
 class ReclassificacaoInvalidaError(ValueError):
@@ -62,10 +62,6 @@ def _hub(session: Session, arquivo: VisaoArquivo, inicio: int) -> bytes:
         session, link_arquivo_peca, {"hk_arquivo": arquivo.hk_arquivo, "hk_peca": hk}, ORIGEM
     )
     return hk
-
-
-def _atributos(peca: VisaoPeca) -> dict[str, Any]:
-    return {c: getattr(peca, c) for c in atributos_do_satelite(sat_peca_classificacao)}
 
 
 def gravar_indice(
@@ -141,7 +137,7 @@ def gravar_indice(
                 session,
                 sat_peca_classificacao,
                 antiga.hk_peca,
-                _atributos(antiga) | {"vigente": False},
+                atributos(antiga, sat_peca_classificacao) | {"vigente": False},
                 ORIGEM,
             )
     return inseridas
@@ -157,12 +153,22 @@ def resumo_flags(flags: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _evidencias(
+    session: Session, pecas: Sequence[VisaoPeca | VisaoPecaHistorico]
+) -> dict[bytes, VisaoEvidencia]:
+    chaves = {p.hk_evidencia_data for p in pecas if p.hk_evidencia_data}
+    if not chaves:
+        return {}
+    consulta = select(VisaoEvidencia).where(VisaoEvidencia.hk_evidencia.in_(chaves))
+    return {evidencia.hk_evidencia: evidencia for evidencia in session.scalars(consulta)}
+
+
 def _serializar(
-    session: Session, peca: VisaoPeca | VisaoPecaHistorico, arquivo_id: str
+    peca: VisaoPeca | VisaoPecaHistorico,
+    arquivo_id: str,
+    evidencias: Mapping[bytes, VisaoEvidencia],
 ) -> dict[str, Any]:
-    evidencia = (
-        session.get(VisaoEvidencia, peca.hk_evidencia_data) if peca.hk_evidencia_data else None
-    )
+    evidencia = evidencias.get(peca.hk_evidencia_data) if peca.hk_evidencia_data else None
     campos = (
         "tipo",
         "origem",
@@ -199,10 +205,9 @@ def indice_processo(session: Session, processo_id: bytes) -> list[dict[str, Any]
         .where(VisaoPeca.hk_processo == processo_id, VisaoPeca.vigente.is_(True))
         .order_by(VisaoArquivo.criado_em, VisaoArquivo.id, VisaoPeca.pagina_inicial)
     )
-    return [
-        _serializar(session, p, p.arquivo_id) | {"ordem": n}
-        for n, p in enumerate(session.scalars(atual(consulta)), 1)
-    ]
+    pecas = list(session.scalars(atual(consulta)))
+    evidencias = _evidencias(session, pecas)
+    return [_serializar(p, p.arquivo_id, evidencias) | {"ordem": n} for n, p in enumerate(pecas, 1)]
 
 
 def obter_peca(session: Session, processo_id: bytes, peca_id: str) -> VisaoPeca | None:
@@ -224,12 +229,14 @@ def detalhar_peca(session: Session, peca: VisaoPeca) -> dict[str, Any]:
         .where(VisaoPecaHistorico.hk_peca.in_(chaves))
         .order_by(VisaoPecaHistorico.load_dts.desc())
     )
-    historico = [
-        _serializar(session, p, peca.arquivo_id)
+    anteriores = [
+        p
         for p in session.scalars(consulta)
         if p.load_dts != peca.classificada_em or p.hk_peca != peca.hk_peca
     ]
-    return _serializar(session, peca, peca.arquivo_id) | {"historico": historico}
+    evidencias = _evidencias(session, [peca, *anteriores])
+    historico = [_serializar(p, peca.arquivo_id, evidencias) for p in anteriores]
+    return _serializar(peca, peca.arquivo_id, evidencias) | {"historico": historico}
 
 
 @dataclass(frozen=True)
@@ -252,7 +259,7 @@ def reclassificar(
     if not peca.vigente or not fim or not 1 <= inicio <= fim <= (arquivo.total_paginas or 0):
         raise ReclassificacaoInvalidaError("peça sem vigência ou intervalo fora do arquivo")
     hk = _hub(session, arquivo, inicio)
-    dados = _atributos(peca) | {
+    dados = atributos(peca, sat_peca_classificacao) | {
         "metodo": MetodoClassificacao.MANUAL.value,
         "hk_usuario": usuario,
         "pagina_final": fim,
@@ -271,7 +278,8 @@ def reclassificar(
             session,
             sat_peca_classificacao,
             peca.hk_peca,
-            _atributos(peca) | {"vigente": False, "hk_usuario": usuario, "metodo": "manual"},
+            atributos(peca, sat_peca_classificacao)
+            | {"vigente": False, "hk_usuario": usuario, "metodo": "manual"},
             ORIGEM,
         )
         anteriores = (peca.classificacao or {}).get("anteriores", [])

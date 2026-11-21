@@ -10,11 +10,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from lupa_pipeline.config import Settings, get_settings
-from lupa_pipeline.dominio.enums import EstadoJob, MotivoFalha, StatusProcesso
-from lupa_pipeline.dominio.gravacao import travar_processo
+from lupa_pipeline.dominio.enums import EstadoJob, MotivoFalha
 from lupa_pipeline.dominio.sessao import PAPEL_APLICACAO
 from lupa_pipeline.dominio.visoes import VisaoFilaIngestao
-from lupa_pipeline.ingestao.repositorio import atualizar_status_processo, mudar_estado
+from lupa_pipeline.ingestao.repositorio import (
+    atualizar_status_processo,
+    mudar_estado,
+    processo_ativo,
+)
 from lupa_pipeline.ingestao.reprocessamento import reagendar_desatualizados
 from lupa_pipeline.ingestao.storage import ObjectStorage, criar_storage
 from lupa_pipeline.logging import configurar_logging, get_logger
@@ -45,8 +48,7 @@ def _processar_proximo(
         if arquivo is None:
             return False
         hk, hk_processo = arquivo.hk_arquivo, arquivo.hk_processo
-        processo = travar_processo(sessao, hk_processo)
-        if processo is None or processo.status == StatusProcesso.DESCARTADO:
+        if processo_ativo(sessao, hk_processo) is None:
             return True
         if arquivo.tentativas >= settings.max_tentativas:
             mudar_estado(sessao, hk, EstadoJob.FALHO, motivo_falha=MotivoFalha.ERRO_INTERNO)

@@ -431,7 +431,15 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
   e `::test_indice_do_processo_le_evidencias_numa_consulta` (integração).
 - Verde: `processo_ativo` nos três pontos da fila; `mudar_estado` sem releitura; uma consulta de
   evidências no índice; `atributos(visao, satelite)`; `processar_eventos` repassa o processo.
-- Entregue:
+- Entregue: repositorio.processo_ativo nos três pontos da fila (Trabalho.transacao, worker,
+  reprocessamento), cada um com o tratamento de antes; mudar_estado sem a releitura (devolve a linha
+  lida com os atributos novos; estado_em fica o anterior, e nenhum chamador de produção usa o
+  retorno); indice_processo e detalhar_peca leem as evidências numa consulta; atributos(visao,
+  satelite) no lugar dos dois helpers; processar_eventos repassa o processo travado. Especialista-
+  ingestao e especialista-banco: aprovado com ressalvas. Vermelho: 2 failed (AttributeError:
+  processo_ativo; assert 3 == 1 consultas a v_evidencia). Verde: verificar.sh na stack inteira com
+  F19: saída 0; pipeline 765 passed (95,90%), intranet 267 (98,23%), integração 6, injeção 2, web
+  436 (100%), cabeçalhos e isolamento ok, agente 11.
 
 ### F20 — Remoção do código sem uso
 

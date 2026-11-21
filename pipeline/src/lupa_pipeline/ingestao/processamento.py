@@ -20,10 +20,9 @@ from lupa_pipeline.dominio.enums import (
     EstadoLote,
     MotivoFalha,
     MotivoQuarentena,
-    StatusProcesso,
 )
 from lupa_pipeline.dominio.esquemas import DiagnosticoArquivo, EntradaManifesto
-from lupa_pipeline.dominio.gravacao import gravar_satelite, travar_processo
+from lupa_pipeline.dominio.gravacao import gravar_satelite
 from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao
 from lupa_pipeline.dominio.tabelas import sat_arquivo_diagnostico, sat_arquivo_lote
 from lupa_pipeline.dominio.visoes import VisaoArquivo
@@ -50,6 +49,7 @@ from lupa_pipeline.ingestao.repositorio import (
     ORIGEM,
     atualizar_status_processo,
     mudar_estado,
+    processo_ativo,
 )
 from lupa_pipeline.ingestao.repositorio_pecas import gravar_indice
 from lupa_pipeline.ingestao.sandbox import (
@@ -81,8 +81,7 @@ class Trabalho:
         """Serializa cada gravação com o descarte do processo."""
         with self.fabrica.begin() as session:
             assumir_papel_aplicacao(session)
-            processo = travar_processo(session, self.arquivo.hk_processo)
-            if processo is None or processo.status == StatusProcesso.DESCARTADO:
+            if processo_ativo(session, self.arquivo.hk_processo) is None:
                 raise ProcessoDescartadoError
             yield session
 
