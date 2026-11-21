@@ -28,6 +28,7 @@
 - [Plano da remoção do Vault e da cifra](planos/plano_remocao_vault.md).
 - [Plano do front em Django](planos/plano_front_django.md) e [ADR 0019 sobre o front renderizado no servidor](adr/0019-front-django-renderizado-no-servidor.md).
 - [Plano do padrão visual](planos/plano_padrao_visual.md).
+- [Plano da limpeza da pipeline](planos/plano_limpeza_pipeline.md).
 - [ADRs](adr/README.md) e [registro das decisões](decisoes/registro.md).
 - [Pendências](dividas/todo.md).
 - [Defesas contra instruções presentes nos autos](especificacao/prompt-injection.md) e [decisão sobre o object storage](decisoes/object-storage.md).
