@@ -8,6 +8,7 @@ from lupa_pipeline.ingestao.datas import datas_no_dobrado
 from lupa_pipeline.ingestao.eventos.base import Fonte
 from lupa_pipeline.ingestao.eventos.modelo import Candidato
 from lupa_pipeline.ingestao.eventos.padroes import campo_capa
+from lupa_pipeline.ingestao.texto import dobrar
 
 TIPOS_CAPA = (
     TipoFato.RELATOR,
