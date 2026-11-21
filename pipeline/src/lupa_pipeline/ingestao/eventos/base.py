@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from lupa_pipeline.dominio.enums import TipoFato
-from lupa_pipeline.ingestao.datas import datas_no_dobrado
 from lupa_pipeline.ingestao.eventos.modelo import Candidato, PaginaTexto
 from lupa_pipeline.ingestao.eventos.padroes import gatilho
 from lupa_pipeline.ingestao.texto import dobrar
@@ -26,9 +25,8 @@ class Fonte:
 
     def datas(self, *tipos: TipoFato) -> Iterator[Candidato]:
         """Vincula uma data válida ao marco explícito mais próximo."""
-        texto = self.pagina.normalizado
-        simples = dobrar(texto)
-        for data in datas_no_dobrado(simples, texto):
+        simples = self.pagina.dobrado
+        for data in self.pagina.datas:
             inicio = max(0, data.inicio - 110)
             prefixo = simples[inicio : data.inicio]
             for tipo in tipos:

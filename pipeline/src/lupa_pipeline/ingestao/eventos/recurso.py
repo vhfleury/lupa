@@ -34,7 +34,7 @@ ROTULO_SUJEITO = re.compile(
 def extrair(fonte: Fonte, tipo: TipoPeca, qualidade_explicita: bool) -> Iterator[Candidato]:
     """Extrai os elementos formais declarados no recurso."""
     texto = fonte.pagina.normalizado
-    simples = dobrar(texto)
+    simples = fonte.pagina.dobrado
     for m in TITULOS.finditer(simples):
         yield fonte.candidato(TipoFato.TIPO_RECURSO, RECURSOS[tipo].value, *m.span())
     for m in ASSINATURA.finditer(texto):

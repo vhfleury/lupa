@@ -47,7 +47,7 @@ def candidatos_da_peca(
     }
     sujeito = sujeitos.get(next(iter(nomes)), "") if len(nomes) == 1 else ""
     tipo = peca.tipo
-    explicita = any(recurso.QUALIDADE.search(dobrar(p.normalizado)) for p in peca.paginas)
+    explicita = any(recurso.QUALIDADE.search(p.dobrado) for p in peca.paginas)
     for pagina in peca.paginas:
         fonte = Fonte(pagina, sujeito)
         if pagina.numero <= identificacao_paginas:

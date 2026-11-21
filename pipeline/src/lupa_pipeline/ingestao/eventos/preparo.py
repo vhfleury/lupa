@@ -19,13 +19,13 @@ PEDIDO = re.compile(
 
 def pedido(fonte: Fonte) -> Iterator[Candidato]:
     """Reconhece os pedidos expressos da parte."""
-    for m in PEDIDO.finditer(dobrar(fonte.pagina.normalizado)):
+    for m in PEDIDO.finditer(fonte.pagina.dobrado):
         yield fonte.candidato(TipoFato.GRATUIDADE_PEDIDO, True, *m.span())
 
 
 def decisao(fonte: Fonte) -> Iterator[Candidato]:
     """Reconhece deferimento e indeferimento expressos."""
-    for m in DECISAO.finditer(dobrar(fonte.pagina.normalizado)):
+    for m in DECISAO.finditer(fonte.pagina.dobrado):
         yield fonte.candidato(
             TipoFato.GRATUIDADE_DECISAO, "indeferida" if any(m.groups()) else "deferida", *m.span()
         )
