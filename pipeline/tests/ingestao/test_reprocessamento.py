@@ -18,15 +18,16 @@ from lupa_pipeline.dominio.esquemas import Evidencia
 from lupa_pipeline.dominio.gravacao import gravar_satelite
 from lupa_pipeline.dominio.repositorios import listar_fatos_por_processo
 from lupa_pipeline.dominio.tabelas import sat_fato_anotacao
-from lupa_pipeline.dominio.visoes import VisaoAnotacao, VisaoArquivo, VisaoPagina
-from lupa_pipeline.ingestao import indice, processamento
+from lupa_pipeline.dominio.visoes import VisaoAchado, VisaoAnotacao, VisaoArquivo, VisaoPagina
+from lupa_pipeline.ingestao import indice, processamento, reprocessamento
 from lupa_pipeline.ingestao.classificacao import classificar_tipo
 from lupa_pipeline.ingestao.eventos import capa, fatos, recurso
 from lupa_pipeline.ingestao.extracao import executar_tarefa
 from lupa_pipeline.ingestao.storage import ObjectStorage
 from lupa_pipeline.ingestao.worker import executar_worker
-from lupa_pipeline.validacoes import motor
+from lupa_pipeline.validacoes import apoio, motor
 from lupa_pipeline.validacoes.catalogo import validacoes_de
+from lupa_pipeline.validacoes.versao import VERSAO_CATALOGO
 
 pytestmark = pytest.mark.integracao
 
@@ -197,3 +198,58 @@ def test_reinicio_executa_so_as_etapas_afetadas_e_preserva_a_revisao(
                 processo.hk_usuario,
             )
         assert reiniciar() == set()
+
+
+def test_nova_versao_do_catalogo_regrava_achados_com_o_mesmo_texto(
+    banco_reprocessamento: Engine,
+    settings_ficticias: Settings,
+    storage_memoria: ObjectStorage,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """RF-ING-08. Subir a versão do catálogo regrava os achados, com o mesmo resultado e texto."""
+    engine = banco_reprocessamento
+    processo = semear_processo(engine)
+    caminho = tmp_path / "apelacao.pdf"
+    caminho.write_bytes(
+        pdf_texto(
+            [
+                "APELAÇÃO\nRecorrente: Defensoria Pública\n"
+                "Intimação em 03/08/2026.\nRecurso interposto em 10/08/2026."
+            ]
+        )
+    )
+    lacrar_bytes(engine, storage_memoria, processo, caminho)
+
+    def reiniciar() -> None:
+        assert (
+            executar_worker(
+                engine,
+                settings_ficticias,
+                storage_memoria,
+                PararAoEsvaziar(),
+                processamento.processar_arquivo,
+            )
+            == 0
+        )
+
+    def achados() -> dict[str, tuple[str | None, str | None, str | None]]:
+        with Session(engine) as session:
+            linhas = session.scalars(
+                select(VisaoAchado).where(VisaoAchado.hk_processo == processo.hk_processo)
+            )
+            return {a.validacao: (a.versao_catalogo, a.resultado, a.explicacao) for a in linhas}
+
+    with monkeypatch.context() as anterior:
+        for modulo in (apoio, motor, reprocessamento):
+            anterior.setattr(modulo, "VERSAO_CATALOGO", "0.2.0")
+        reiniciar()
+        antes = achados()
+    reiniciar()
+    depois = achados()
+    assert antes and set(depois) == set(antes)
+    assert {versao for versao, _, _ in antes.values()} == {"0.2.0"}
+    assert {versao for versao, _, _ in depois.values()} == {VERSAO_CATALOGO}
+    assert {v: (r, e) for v, (_, r, e) in depois.items()} == {
+        v: (r, e) for v, (_, r, e) in antes.items()
+    }
