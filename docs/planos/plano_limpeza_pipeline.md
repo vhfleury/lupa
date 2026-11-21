@@ -301,7 +301,11 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
 - Vermelho: `tests/ingestao/test_eventos.py::test_ids_de_fato_e_evidencia_iguais_aos_atuais`.
 - Verde: `chave_do_hub(hub_fato, ...)` e `chave_do_hub(hub_evidencia, ...)`. Se o teste falhar: a
   fase é revertida e vira dívida (D10).
-- Entregue:
+- Entregue: saiu do plano (D10). O id da evidência é `chave_hash([hk_pagina, inicio, fim])` e o
+  do fato `chave_hash([hk_processo, tipo, sujeito, evidência])`, enquanto as chaves de
+  `hub_evidencia` e `hub_fato` usam `numero_cnj`, `sha256` e `numero` do arquivo: nenhuma entrada
+  dá o mesmo id, e `PaginaTexto` nem carrega esses campos. Nenhum arquivo mudou; dívida em
+  `docs/dividas/todo.md`.
 
 ### F13 — Registro de extratores por espécie
 

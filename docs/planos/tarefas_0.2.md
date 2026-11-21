@@ -1202,7 +1202,7 @@ no "Entregue" de cada fase.
 - [x] **T12.9** Peça procurada por regra, modelo memorizado, fim de `para_modelo` — RF-VAL-01, RF-VAL-05. [fase F9](plano_limpeza_pipeline.md)
 - [x] **T12.10** `Fato.valor` escalar com leitura do formato antigo — RF-FAT-01. [fase F10](plano_limpeza_pipeline.md)
 - [x] **T12.11** Outorgante da procuração como sujeito — RF-VAL-04. [fase F11](plano_limpeza_pipeline.md)
-- [ ] **T12.12** Ids de fato e evidência pelo hub — RF-FAT-01. [fase F12](plano_limpeza_pipeline.md)
+- [x] **T12.12** (saiu do plano, D10; dívida registrada) Ids de fato e evidência pelo hub — RF-FAT-01. [fase F12](plano_limpeza_pipeline.md)
 - [ ] **T12.13** Registro de extratores por espécie — RF-FAT-01. [fase F13](plano_limpeza_pipeline.md)
 - [x] **T12.14** Etapas em lista ordenada no worker — RF-ING-08. [fase F14](plano_limpeza_pipeline.md)
 - [x] **T12.15** Formatos por mime e nomes internos no diagnóstico — RF-ING-07. [fase F15](plano_limpeza_pipeline.md)

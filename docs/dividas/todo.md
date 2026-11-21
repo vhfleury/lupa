@@ -21,3 +21,10 @@
   agente (`agente/ferramentas/leitura.py`) ainda mostra o valor cru. Contar as linhas com o
   especialista-banco e, se houver, alinhar a leitura do agente.
   Local: `docs/planos/plano_limpeza_pipeline.md::D16`
+- [ ] **Ids de fato e evidência diferentes das chaves dos hubs** `divida` — a pipeline calcula o
+  id da evidência por `chave_hash([hk_pagina, inicio, fim])` e o do fato por
+  `chave_hash([hk_processo, tipo, sujeito, evidência])`, mas `hub_evidencia` e `hub_fato` usam
+  `numero_cnj`, `sha256` e `numero` do arquivo. Unificar exige levar esses campos a
+  `PaginaTexto`, mudar as chaves e regravar os ids, com correções e notas religadas
+  (especialista-banco, especialista-ingestao).
+  Local: `docs/planos/plano_limpeza_pipeline.md::F12`
