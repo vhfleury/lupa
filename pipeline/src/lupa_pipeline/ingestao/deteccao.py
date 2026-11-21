@@ -26,7 +26,6 @@ Tudo é determinístico e nada bloqueia o processamento: cada detector devolve t
 import base64
 import binascii
 import re
-import unicodedata
 import urllib.parse
 from dataclasses import dataclass
 from functools import cache
@@ -34,6 +33,8 @@ from importlib.resources import files
 from typing import Any
 
 import yaml
+
+from lupa_pipeline.ingestao.texto import dobrar
 
 MARCADOR_BLOCO = "[bloco codificado removido]"
 CATEGORIA_BLOCO = "bloco_codificado"
@@ -66,18 +67,6 @@ def _ler_yaml(nome: str) -> dict[str, Any]:
     texto = files("lupa_pipeline.ingestao").joinpath("dados").joinpath(nome).read_text("utf-8")
     dados: dict[str, Any] = yaml.safe_load(texto)
     return dados
-
-
-def dobrar(texto: str) -> str:
-    """Minúsculas sem acentos, com o mesmo tamanho do texto (offsets preservados).
-
-    Args:
-        texto: Texto (normalizado).
-
-    Returns:
-        Texto dobrado, caractere a caractere.
-    """
-    return "".join(unicodedata.normalize("NFD", c)[0].lower()[:1] or c for c in texto)
 
 
 @dataclass(frozen=True)

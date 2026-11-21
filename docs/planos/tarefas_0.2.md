@@ -1058,3 +1058,116 @@ Execução do [plano do padrão visual](plano_padrao_visual.md). Um único PR da
     intranet/web/scripts/e2e.sh`. Verde: pipeline 702 passed (95,25%), intranet 266 passed
     (98,23%), integração 6, injeção 2, web 436 passed (100%), cabeçalhos ok em 4 rotas, agente
     11; E2E 37 passed em 85 s.
+
+## Fase 12 — Limpeza da pipeline
+
+Execução do [plano da limpeza da pipeline](plano_limpeza_pipeline.md). Um PR por fase do plano,
+da branch `refactor/T12.<n>-<fase>` para a `develop`. "Pronto quando", salvo indicação: depois do
+rebuild, suíte da pipeline verde no `worker` e da intranet no `api`, com cobertura mínima de 90%
+em cada, `ruff check`, `ruff format --check` e `mypy --strict` limpos. Tarefa que toca ingestão
+ou validação roda também `bash scripts/verificar.sh`. Comportamento sem mudança é fixado pela
+suíte existente; o Vermelho de cada tarefa é o teste novo que só passa com o código novo.
+
+- [x] **T12.1** `ingestao/texto.py` com `dobrar` único. RNF-08, RF-ING-03. Fase 1; P1, D1, D2.
+  - Vermelho: `pipeline/tests/ingestao/test_texto.py::test_dobrar_preserva_o_comprimento_com_caractere_que_muda_de_tamanho` (falha na importação).
+  - Verde: `texto.dobrar` com a regra de `datas.py`; `datas.py`, `deteccao.py`, `eventos/*`, `identificacao.py`, `lupa_api/agente/ferramentas/leitura.py` e `recusa.py` importam de `texto`; saem as duas cópias.
+  - Limpeza: nenhuma.
+  - Entregue: `texto.dobrar` e `_dobrar_caractere` (regra de `datas.py`); saem as cópias de
+    `datas.py` e `deteccao.py`; 12 módulos e `test_saneamento.py` importam de `texto`. As duas
+    regras coincidem nos casos conferidos (o NFD decompõe antes do `lower()`). Testes: `docker
+    compose exec -T worker python -m pytest -c pipeline/pyproject.toml
+    pipeline/tests/ingestao/test_texto.py --no-cov` e `bash scripts/verificar.sh`. Vermelho: 1
+    failed (`assert '' == 'istanbul acao'`, com `dobrar` provisório). Verde: pipeline 703 passed
+    (95,25%), intranet 266 passed (98,23%), integração 6, injeção 2; ruff e mypy limpos.
+- [ ] **T12.2** `levenshtein` e normalizações em `texto.py`. RNF-08. Fase 1; P3, D2.
+  - Vermelho: `pipeline/tests/ingestao/test_texto.py::test_levenshtein_com_prefixo_e_sufixo_comuns`, `::test_colapsar_espacos_aplica_nfc`, `::test_maiusculas_sem_acento_remove_pontuacao`.
+  - Verde: `texto.levenshtein` (versão de `medicao`), `colapsar_espacos`, `maiusculas_sem_acento`; `hibridas`, `sinais_fronteira` e `sinteticos/medicao` passam a importá-las; saem as cópias e os três `normalizar`/`_normalizar`.
+  - Limpeza: nenhuma.
+- [ ] **T12.3** `PaginaTexto` guarda o texto dobrado e as datas. RF-FAT-01. Fase 2; P2, D3.
+  - Vermelho: `pipeline/tests/ingestao/eventos/test_fatos.py::test_candidatos_iguais_com_texto_da_pagina_guardado` (compara com os candidatos dos sintéticos e conta uma dobragem por página).
+  - Verde: `cached_property` `dobrado` e `datas` em `eventos/modelo.PaginaTexto`; `fatos`, `capa`, `base`, `recurso`, `preparo` e `decisao_agravada` leem delas; `capa._valor` recorta o dobrado.
+  - Limpeza: `CONVERSORES_CAPA` no lugar dos ifs de `capa._valor`.
+- [ ] **T12.4** Contagem única no calendário e `dias_uteis_entre`. RF-VAL-02. Fase 3; P6, D7.
+  - Vermelho: `pipeline/tests/validacoes/test_calendario.py::test_dias_uteis_entre_registra_feriado_com_fonte`.
+  - Verde: `_contar` e `dias_uteis_entre` em `calendario.py`; `contar_prazo_util`, `_prorrogar` e `fonte_em` sobre eles; sai `contar_prazo_corrido` com o teste dele, no mesmo commit (D9).
+  - Limpeza: nenhuma.
+  - Revisão: especialista-validacoes.
+- [ ] **T12.5** `Calendario.feriados` com descrição e fonte; tempestividade pelo calendário. RF-VAL-02. Fase 3; P6, D7.
+  - Vermelho: `pipeline/tests/validacoes/test_motor_e_regras.py::test_tempestividade_com_atraso_mantem_o_texto`.
+  - Verde: `Feriado` e `Mapping[date, Feriado]` em `calendario.py` e `dados.montar_calendario`; sai `fontes`; `tempestividade.py` usa `dias_uteis_entre`.
+  - Limpeza: nenhuma.
+  - Revisão: especialista-validacoes.
+- [ ] **T12.6** Tabela de dispensas própria e `Coleta.qualidade()`. RF-VAL-03, RF-VAL-04. Fase 4; P7, D8.
+  - Vermelho: `pipeline/tests/validacoes/test_motor_e_regras.py::test_dispensa_por_qualidade_le_a_tabela_de_dispensas`.
+  - Verde: `validacoes/dados/dispensas.yaml`, `TabelaDispensas` e `dispensas_padrao()` em `dados.py`; sai `dispensas` de `preparo.yaml`; `preparo` e `representacao` usam `coleta.qualidade()`; `VERSAO_CATALOGO` sobe.
+  - Limpeza: nenhuma.
+  - Revisão: especialista-validacoes.
+- [ ] **T12.7** Reprocessamento pela versão nova do catálogo. RF-ING-08. Fase 4; D8.
+  - Vermelho: `pipeline/tests/ingestao/test_reprocessamento.py::test_nova_versao_do_catalogo_regrava_achados_com_o_mesmo_texto` (integração).
+  - Verde: nenhuma mudança além da T12.6 se o mecanismo atual já regravar; senão, a menor correção em `reprocessamento.py`.
+  - Limpeza: nenhuma.
+- [ ] **T12.8** Conflito interrompe a regra. RF-FAT-02, RF-VAL-01. Fase 4; P7, D8.
+  - Vermelho: `pipeline/tests/validacoes/test_motor_e_regras.py::test_conflito_interrompe_a_regra_e_vira_verificar`.
+  - Verde: `FatoPendenteError` em `apoio.py`, levantada por `Coleta.unico`; o motor captura e devolve `coleta.verificar()`; saem as checagens `if coleta.conflitos` das regras e `Coleta.pendente`.
+  - Limpeza: nenhuma.
+  - Revisão: especialista-validacoes.
+- [ ] **T12.9** `peca_procurada` por regra, modelo memorizado e fim de `para_modelo`. RF-VAL-01, RF-VAL-05. Fase 4; P7.
+  - Vermelho: `pipeline/tests/validacoes/test_motor_e_regras.py::test_tipo_de_fato_novo_usa_a_peca_procurada_da_regra`.
+  - Verde: `peca_procurada` em cada módulo de `civel/`, lida pela `Coleta`; sai `PECAS`; `ModeloProcesso.fato` e `recorrentes` memorizados; chamadores de `para_modelo` usam `ModeloProcesso`.
+  - Limpeza: nenhuma.
+- [ ] **T12.10** `Fato.valor` escalar com leitura do formato antigo. RF-FAT-01. Fase 5; P8, D12.
+  - Vermelho: `pipeline/tests/dominio/test_esquemas.py::test_fato_le_valor_no_formato_antigo`.
+  - Verde: `Fato.de_registro` converte `{"valor": x}`; extratores gravam o escalar; sai `valor_de` de `validacoes/modelo.py`, `apoio.py`, `civel/*`, `calibracao.py`, `eventos/saida.py` e `lupa_api/agente/dossie.py`.
+  - Limpeza: nenhuma.
+- [ ] **T12.11** Outorgante da procuração como sujeito. RF-VAL-04. Fase 5; P8, D12.
+  - Vermelho: `pipeline/tests/ingestao/eventos/test_partes.py::test_procuracao_traz_o_outorgante_como_sujeito`.
+  - Verde: resolução em `eventos/partes.py`; saem os casos `PROCURACAO` de `eventos/saida.py` e `sinteticos/gerador.py`; `representacao.py` compara pelo sujeito.
+  - Limpeza: nenhuma.
+  - Revisão: especialista-validacoes.
+- [ ] **T12.12** Ids de fato e evidência pelo hub. RF-FAT-01. Fase 6; P10, D10.
+  - Vermelho: `pipeline/tests/ingestao/eventos/test_modelo.py::test_ids_de_fato_e_evidencia_iguais_aos_atuais` (fixa os ids atuais de casos sintéticos e chama `chave_do_hub`).
+  - Verde: `eventos/fatos.py` e `eventos/modelo.py` usam `chave_do_hub(hub_fato, ...)` e `chave_do_hub(hub_evidencia, ...)`. Id diferente para a tarefa e volta ao usuário.
+  - Limpeza: nenhuma.
+- [ ] **T12.13** Registro de extratores por espécie. RF-FAT-01. Fase 7; P9, D11.
+  - Vermelho: `pipeline/tests/ingestao/eventos/test_fatos.py::test_toda_especie_com_extrator_esta_no_registro`.
+  - Verde: `EXTRATORES: TipoPeca → extratores` em `eventos/fatos.py`, capa como extrator com filtro de página; `candidatos_da_peca` vira um laço.
+  - Limpeza: nenhuma.
+- [ ] **T12.14** Etapas em lista ordenada no worker. RF-ING-08. Fase 7; P9, D11.
+  - Vermelho: `pipeline/tests/ingestao/test_processamento.py::test_etapas_executam_a_partir_da_primeira_agendada`.
+  - Verde: `ETAPAS` em `processamento.py`, executada a partir de `reprocessamento.primeira_etapa`; sai a cadeia `if/elif`.
+  - Limpeza: nenhuma.
+- [ ] **T12.15** Formatos por mime e nomes internos no diagnóstico. RF-ING-07. Fase 7; P9, D11.
+  - Vermelho: `pipeline/tests/ingestao/test_processamento.py::test_diagnostico_de_zip_ja_sai_com_os_nomes_internos`.
+  - Verde: `FORMATOS: mime → Formato(inventariar, diagnosticar, persistir)`; `diagnosticar_zip` e `diagnosticar_pdf` recebem o mapa de nomes; sai o remapeamento e o padrão `"entrada-1.pdf"` de `_preparar`, dividida em `_fontes_do_manifesto` e `_fontes_do_original`.
+  - Limpeza: nenhuma.
+- [ ] **T12.16** Extração paralela sem gabinete. RF-ING-04, RF-ING-07. Fase 8; P4, D4, D5.
+  - Vermelho: `pipeline/tests/ingestao/test_processamento.py::test_lotes_em_paralelo_gravam_na_conexao_do_lock` e `::test_falha_de_gravacao_cancela_lotes_e_retoma_so_os_faltantes` (integração).
+  - Verde: `_processar_lotes` chama `executar_em_paralelo` com `extracao_lotes_por_job`; um `copiar_do_cache` antes do laço; um caminho de gravação; retentativa simplificada em `_extrair_lote`; saem `LimitadorGabinete`, `lotes_por_gabinete` e `config.extracao_lotes_por_gabinete`; `config.py` e `.env.example` com padrão `2`.
+  - Limpeza: nenhuma.
+  - Revisão: especialista-ingestao e especialista-infra.
+- [ ] **T12.17** Gravação de páginas em lote. RF-ING-03. Fase 8; P5, D6.
+  - Vermelho: `pipeline/tests/ingestao/test_paginas.py::test_gravacao_em_lote_igual_a_gravacao_por_pagina` (integração).
+  - Verde: `paginas.py` grava hubs e links com `executemany`; `gravacao.py` lê os `hash_diff` correntes uma vez por lote; `cache.copiar_do_cache` usa o mesmo caminho.
+  - Limpeza: nenhuma.
+- [ ] **T12.18** MinIO para arquivo e PDF aberto pelo caminho. RF-ING-04. Fase 8; P5.
+  - Vermelho: `pipeline/tests/ingestao/test_storage.py::test_baixar_para_grava_o_objeto_no_caminho` (integração).
+  - Verde: `storage.baixar_para` com `download_fileobj`; `processamento.py` usa no lugar de `ler` e `write_bytes`; `extrator_paginas.py` e `renderizacao.py` com `fitz.open(caminho)`.
+  - Limpeza: nenhuma.
+- [ ] **T12.19** Leituras repetidas na fila e nos repositórios. RF-ING-07. Fase 8; P5, P11.
+  - Vermelho: `pipeline/tests/ingestao/test_repositorio.py::test_processo_ativo_devolve_none_para_descartado` e `test_repositorio_pecas.py::test_indice_do_processo_le_evidencias_numa_consulta` (integração).
+  - Verde: `repositorio.processo_ativo` usado por `processamento`, `worker` e `reprocessamento`; `mudar_estado` sem releitura; `indice_processo` com uma consulta de evidências; `atributos(visao, satelite)` no lugar dos dois helpers; `processar_eventos` repassa o processo lido.
+  - Limpeza: nenhuma.
+- [ ] **T12.20** Remoção do código sem uso. RNF-08. Fase 9; P11, D9.
+  - Revisão manual: remoção sem comportamento novo. Saem `datas.TextoAnalise`, `encontrar_datas`, os esquemas `Anotacao`, `Usuario`, `JobIngestao`, `LoteIngestao` e `Peca`, e `tabelas.HUBS`, `LINKS`, `SATELITES` (calculadas em `test_migracao_0001.py`), com os testes deles no mesmo commit; grep em `pipeline/` e `intranet/` sem referência.
+  - Pronto quando: suítes verdes com a cobertura mínima.
+- [ ] **T12.21** Duplicações menores da ingestão. RNF-08, RF-ING-03. Fase 9; P11.
+  - Vermelho: `pipeline/tests/ingestao/test_data_peca.py::test_regra_declara_a_direcao_da_busca` e `pipeline/tests/dominio/test_esquemas.py::test_sha256_arquivo_igual_ao_da_recepcao`.
+  - Verde: `data_peca` com `datas.MESES`, `construir_data` e `REGRAS` com direção; `sha256_arquivo` em `dominio/esquemas.py`; `datas.UNIDADES` montada das tuplas de escrita.
+  - Limpeza: nenhuma.
+- [ ] **T12.22** Sintéticos sem repetição. RNF-04. Fase 9; P11.
+  - Vermelho: `pipeline/tests/sinteticos/test_gabarito.py::test_diagnostico_esperado_deriva_do_cenario` e `test_roteiro.py::test_pecas_do_roteiro_seguem_o_catalogo_da_classe`.
+  - Verde: `diagnostico_esperado` como `computed_field`; `gerador._ler_marcas` com `_parte`, `_evento` e `_injecao`; `roteiro.py` deriva as peças de `validacoes_de(classe)` e `peca_procurada`.
+  - Limpeza: nenhuma.
+- [ ] **T12.23** Documentação. RNF-08. Fase 10.
+  - Revisão manual: `docs/sistema/ingestao.md`, `validacoes.md` e `modelo-de-dados.md`; `docs/arquitetura.md` (extração paralela); `CHANGELOG.md` em "Não publicado" (paralelismo e variável removida); `docs/decisoes/registro.md` (D4, D7, D8, D12).
+  - Pronto quando: `bash scripts/verificar.sh` verde e links conferidos.

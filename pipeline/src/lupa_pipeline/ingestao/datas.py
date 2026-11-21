@@ -21,11 +21,11 @@ trecho, escreve a data em todas as formas aceitas e procura alguma delas literal
 """
 
 import re
-import unicodedata
 from dataclasses import dataclass
 from datetime import date
 
 from lupa_pipeline.ingestao.saneamento import TextoNormalizado, normalizar
+from lupa_pipeline.ingestao.texto import dobrar
 
 ANO_MINIMO = 1900
 ANO_MAXIMO = 2100
@@ -145,24 +145,6 @@ class OcorrenciaData:
     def iso(self) -> str:
         """A data em ISO ``AAAA-MM-DD``."""
         return self.data.isoformat()
-
-
-def dobrar(texto: str) -> str:
-    """Minúsculas sem acento, preservando o comprimento (um caractere por caractere).
-
-    Args:
-        texto: Texto (normalmente o normalizado).
-
-    Returns:
-        Texto dobrado do mesmo tamanho.
-    """
-    return "".join(_dobrar_caractere(c) for c in texto)
-
-
-def _dobrar_caractere(caractere: str) -> str:
-    base = unicodedata.normalize("NFD", caractere)[:1] or caractere
-    minuscula = base.lower()
-    return minuscula if len(minuscula) == 1 else base
 
 
 def numero_por_extenso(palavras: str) -> int | None:

@@ -4,8 +4,8 @@ import re
 from dataclasses import dataclass
 
 from lupa_pipeline.dominio.enums import Polo, QualidadeParte, TipoPeca
-from lupa_pipeline.ingestao.datas import dobrar
 from lupa_pipeline.ingestao.eventos.modelo import PaginaTexto, PecaTexto
+from lupa_pipeline.ingestao.texto import dobrar
 from lupa_pipeline.validacoes.dados import preparo_padrao
 
 QUALIFICACAO = re.compile(
