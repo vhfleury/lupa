@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable
 from datetime import date, datetime
+from functools import cache
 from importlib.resources import files
 from typing import Any
 
@@ -39,10 +40,15 @@ def data_de(fato: Fato) -> date:
     raise ValueError(f"fato {fato.tipo} sem data válida")
 
 
+@cache
+def _modelo_de_frase(nome: str) -> str:
+    arquivo = files("lupa_pipeline.validacoes").joinpath("templates", f"{nome}.txt")
+    return arquivo.read_text(encoding="utf-8").strip()
+
+
 def renderizar(nome: str, **campos: object) -> str:
     """Preenche o modelo de frase versionado do achado."""
-    arquivo = files("lupa_pipeline.validacoes").joinpath("templates", f"{nome}.txt")
-    return arquivo.read_text(encoding="utf-8").strip().format(**campos)
+    return _modelo_de_frase(nome).format(**campos)
 
 
 class Coleta:
