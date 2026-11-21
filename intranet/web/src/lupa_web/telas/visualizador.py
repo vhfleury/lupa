@@ -4,7 +4,6 @@ A imagem é repassada da API pelo front (A6, D2). O destaque é um SVG sobre a i
 retângulos em fração da página nos atributos `x`, `y`, `width` e `height`, sem estilo inline.
 """
 
-import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,7 +12,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
 
-from lupa_web import cliente_api
+from lupa_web import cliente_api, rotulos
 from lupa_web.telas.sessao import (
     Sessao,
     contexto_da_moldura,
@@ -22,7 +21,6 @@ from lupa_web.telas.sessao import (
     tela_autenticada,
 )
 
-ID_PUBLICO = re.compile(r"[0-9a-f]{64}")
 ZOOM_MINIMO = 50
 ZOOM_MAXIMO = 300
 PASSO_ZOOM = 25
@@ -155,14 +153,14 @@ async def visualizador(request: HttpRequest, sessao: Sessao, processo_id: str) -
     legiveis = _legiveis(arquivos)
     evidencia = request.GET.get("evidencia", "")
     destaque, erro = (None, "")
-    if ID_PUBLICO.fullmatch(evidencia):
+    if rotulos.IDENTIFICADOR.fullmatch(evidencia):
         destaque, erro = await _destaque(request, base, evidencia)
     if destaque:
         arquivo_id, pagina = destaque["arquivo_id"], int(destaque["pagina"])
     else:
         pedido = request.GET.get("arquivo", "")
         padrao = legiveis[0]["arquivo_id"] if legiveis else ""
-        arquivo_id = pedido if ID_PUBLICO.fullmatch(pedido) else padrao
+        arquivo_id = pedido if rotulos.IDENTIFICADOR.fullmatch(pedido) else padrao
         pagina = _pagina_pedida(request.GET.get("pagina"))
     arquivo = next((a for a in arquivos if a["arquivo_id"] == arquivo_id), None)
     total = arquivo.get("total_paginas") if arquivo else None

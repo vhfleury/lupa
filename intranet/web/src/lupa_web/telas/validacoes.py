@@ -25,7 +25,6 @@ from lupa_web.telas.sessao import (
 
 DATA_ISO = re.compile(r"\d{4}-\d{2}-\d{2}")
 ID_PUBLICO = re.compile(r"[0-9a-fA-F]{64}")
-TAMANHO_ID_CURTO = 8
 COLUNAS_HISTORICO = ("Validação", "Resultado", "Explicação", "Gravado em")
 MENSAGEM_FONTE = "Informe a página, o intervalo e o trecho da correção."
 AVISOS = {"confirmado": "Fato confirmado.", "anotacao": "Anotação registrada."}
@@ -91,7 +90,11 @@ def _no_do_identificador(indices: Indices, valor: str) -> dict[str, Any]:
     if fonte:
         link = link_da_evidencia(indices.processo_id, fonte["id"])
         return {"tipo": "link", "texto": f"Folha {fonte['pagina'] or '?'}", "link": link}
-    return {"tipo": "abreviado", "texto": f"{valor[:TAMANHO_ID_CURTO]}…", "titulo": valor}
+    return {
+        "tipo": "abreviado",
+        "texto": f"{valor[:rotulos.PREFIXO_DO_IDENTIFICADOR]}…",
+        "titulo": valor,
+    }
 
 
 def no_do_valor(

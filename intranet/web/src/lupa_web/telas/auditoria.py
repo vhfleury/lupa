@@ -25,11 +25,10 @@ COLUNAS_CONTAGEM = ("Ação", "Total")
 COLUNAS_CHAMADAS = ("Modelo", "Prompt", "Total")
 CAMPOS_DE_TEXTO = ("usuario_id", "processo_id", "acao", "ip")
 CAMPOS_DE_ID = (("usuario_id", "usuário"), ("processo_id", "processo"))
-TIPOS_DE_RELATORIO = {"processo": "processo", "usuario": "usuario"}
+TIPOS_DE_RELATORIO = frozenset({"processo", "usuario"})
 SIMBOLOS = {"BRL": "R$", "USD": "US$"}
 CASAS_MINIMAS = 2
 CASAS_MAXIMAS = 4
-TAMANHO_ID_CURTO = 8
 MENSAGEM_DATA = "Informe data e hora válidas."
 MENSAGEM_INTERVALO = "O início do intervalo deve ser anterior ao fim."
 MENSAGEM_IDENTIFICADOR = "Informe o identificador."
@@ -174,7 +173,11 @@ def _linha_do_evento(consulta: QueryDict, evento: dict[str, Any]) -> dict[str, A
         if not identificador:
             return None
         link = "/auditoria?" + _com(consulta, relatorio_tipo=tipo, relatorio_id=identificador)
-        return {"id": identificador, "curto": identificador[:TAMANHO_ID_CURTO], "link": link}
+        return {
+            "id": identificador,
+            "curto": identificador[: rotulos.PREFIXO_DO_IDENTIFICADOR],
+            "link": link,
+        }
 
     return evento | {
         "quando": rotulos.formatar_data(evento["ocorrido_em"]),
@@ -221,8 +224,8 @@ async def _verificacao(request: HttpRequest) -> dict[str, Any]:
 
 
 async def _relatorio(request: HttpRequest, intervalo: dict[str, str]) -> dict[str, Any]:
-    tipo = TIPOS_DE_RELATORIO.get(request.GET.get("relatorio_tipo", ""))
-    if tipo is None:
+    tipo = request.GET.get("relatorio_tipo", "")
+    if tipo not in TIPOS_DE_RELATORIO:
         return {}
     identificador = request.GET.get("relatorio_id", "").strip()
     if not ID_PUBLICO.fullmatch(identificador):
