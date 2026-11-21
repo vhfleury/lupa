@@ -41,17 +41,25 @@ class Periodo:
 
 
 @dataclass(frozen=True)
+class FeriadoCalendario:
+    """Feriado indexado no calendário, com a fonte que o declara."""
+
+    descricao: str
+    fonte: str = ""
+
+
+@dataclass(frozen=True)
 class Calendario:
     """Feriados e suspensões usados na contagem."""
 
-    feriados: Mapping[date, str] = field(default_factory=dict)
+    feriados: Mapping[date, FeriadoCalendario] = field(default_factory=dict)
     suspensoes: Sequence[Periodo] = ()
-    fontes: Mapping[date, str] = field(default_factory=dict)
 
     def fonte_em(self, dia: date) -> str:
         """Identifica a origem da exclusão de um dia da contagem."""
         if dia in self.feriados:
-            return self.fontes.get(dia, self.feriados[dia])
+            feriado = self.feriados[dia]
+            return feriado.fonte or feriado.descricao
         for periodo in self.suspensoes:
             if periodo.contem(dia):
                 return periodo.fonte or periodo.descricao
@@ -95,7 +103,7 @@ def motivo_suspensao(dia: date, suspensoes: Sequence[Periodo]) -> str | None:
 
 
 def motivo_sem_expediente(
-    dia: date, feriados: Mapping[date, str], suspensoes: Sequence[Periodo]
+    dia: date, feriados: Mapping[date, FeriadoCalendario], suspensoes: Sequence[Periodo]
 ) -> str | None:
     """Diz por que o dia não tem expediente forense, ou ``None`` se tem.
 
@@ -108,7 +116,7 @@ def motivo_sem_expediente(
         Motivo (feriado, suspensão, sábado, domingo) ou ``None``.
     """
     if dia in feriados:
-        return f"feriado: {feriados[dia]}"
+        return f"feriado: {feriados[dia].descricao}"
     suspenso = motivo_suspensao(dia, suspensoes)
     if suspenso is not None:
         return suspenso
@@ -120,7 +128,7 @@ def motivo_sem_expediente(
 
 
 def _dias_seguintes(
-    inicio: date, feriados: Mapping[date, str], suspensoes: Sequence[Periodo]
+    inicio: date, feriados: Mapping[date, FeriadoCalendario], suspensoes: Sequence[Periodo]
 ) -> Iterator[tuple[date, str | None]]:
     dia = inicio
     while True:
@@ -129,7 +137,10 @@ def _dias_seguintes(
 
 
 def contar_prazo_util(
-    data_base: date, dias: int, feriados: Mapping[date, str], suspensoes: Sequence[Periodo]
+    data_base: date,
+    dias: int,
+    feriados: Mapping[date, FeriadoCalendario],
+    suspensoes: Sequence[Periodo],
 ) -> ResultadoPrazo:
     """Conta prazo em dias úteis (para o módulo cível), excluindo o dia do começo.
 
@@ -158,7 +169,10 @@ def contar_prazo_util(
 
 
 def dias_uteis_entre(
-    inicio: date, fim: date, feriados: Mapping[date, str], suspensoes: Sequence[Periodo]
+    inicio: date,
+    fim: date,
+    feriados: Mapping[date, FeriadoCalendario],
+    suspensoes: Sequence[Periodo],
 ) -> tuple[int, tuple[DiaDesconsiderado, ...]]:
     """Conta os dias úteis depois de ``inicio`` até ``fim``, inclusive.
 

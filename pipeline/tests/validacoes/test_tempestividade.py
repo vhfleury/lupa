@@ -85,3 +85,23 @@ def test_recesso_do_cpc_repete_anualmente_inclusive_nas_duas_pontas() -> None:
     assert achado.valores["vencimento"] == "2031-01-27"
     fontes = {d["data"]: d["fonte"] for d in achado.valores["dias_nao_contados"]}
     assert fontes["2030-12-20"] == fontes["2031-01-20"] == "art. 220 do CPC"
+
+
+def test_tempestividade_com_atraso_mantem_o_texto() -> None:
+    """RF-VAL-02: atraso depois do vencimento conta só dias úteis e lista o fim de semana."""
+    achado = executar(
+        _modelo("apelacao_civel", "2026-08-03", "2026-08-31", "particular"), REFERENCIA
+    )
+    assert achado.resultado == "atencao"
+    assert achado.explicacao == (
+        "O recurso foi interposto depois do vencimento. Apelação cível com prazo de 15 dias úteis. "
+        "O prazo venceu em 24/08/2026 e a interposição ocorreu em 31/08/2026. O atraso foi de 5 "
+        "dias úteis. A conferência observa os dispositivos do CPC indicados em art. 1.003, § 5º, "
+        "do CPC, arts. 219, 220 e 224 do CPC."
+    )
+    depois = [d for d in achado.valores["dias_nao_contados"] if d["data"] > "2026-08-24"]
+    assert depois == [
+        {"data": "2026-08-29", "motivo": "sábado", "fonte": "art. 216 do CPC"},
+        {"data": "2026-08-30", "motivo": "domingo", "fonte": "art. 216 do CPC"},
+    ]
+    assert achado.valores["atraso_dias_uteis"] == 5
