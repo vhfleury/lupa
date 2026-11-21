@@ -1,7 +1,7 @@
 """Validação, diagnóstico e extração de um arquivo da fila do PostgreSQL (A5)."""
 
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -312,9 +312,30 @@ def _processar_lotes(
     return falhas
 
 
-def _extrair_paginas(
-    trabalho: Trabalho, settings: Settings, storage: ObjectStorage, parar: Event
-) -> dict[str, Any] | None:
+@dataclass(frozen=True)
+class Extracao:
+    """Resultado da extração de páginas que a indexação consome."""
+
+    inicio: float
+    falhas: Counter[str]
+    diagnostico: DiagnosticoArquivo
+
+
+@dataclass
+class Execucao:
+    """Estado compartilhado pelas etapas de uma execução do arquivo."""
+
+    trabalho: Trabalho
+    settings: Settings
+    storage: ObjectStorage
+    parar: Event
+    relatorio: dict[str, Any]
+    extracao: Extracao | None = None
+    eventos_recalculados: bool = False
+
+
+def _etapa_paginas(execucao: Execucao, session: Session | None) -> bool:
+    trabalho, settings = execucao.trabalho, execucao.settings
     limites = LimitesSandbox(
         settings.sandbox_memoria_mb, settings.sandbox_cpu_segundos, settings.sandbox_tempo_segundos
     )
@@ -322,23 +343,88 @@ def _extrair_paginas(
     with TemporaryDirectory(
         prefix="lupa-extracao-", dir=settings.ingestao_dir_temporario
     ) as diretorio:
-        fontes, diagnostico = _preparar(trabalho, storage, Path(diretorio), settings, limites)
-        falhas = _processar_lotes(trabalho, fontes, settings, limites, parar)
-    if parar.is_set():
-        return None
-    versao = trabalho.versoes["paginas"]
-    with trabalho.transacao() as session:
-        linhas = paginas.paginas_para_indice(session, trabalho.arquivo.hk_arquivo, versao)
-        relatorio = relatorio_qualidade(
-            linhas,
-            total_paginas=diagnostico.total_paginas,
-            tempo_parede_segundos=monotonic() - inicio,
-            falhas=falhas,
-            versao_extrator=versao,
-            metadados=diagnostico.metadados_descartados,
+        fontes, diagnostico = _preparar(
+            trabalho, execucao.storage, Path(diretorio), settings, limites
         )
-        _indexar(session, trabalho, linhas, diagnostico.model_dump(mode="json"), relatorio)
-        return relatorio
+        falhas = _processar_lotes(trabalho, fontes, settings, limites, execucao.parar)
+    if execucao.parar.is_set():
+        return False
+    execucao.extracao = Extracao(inicio, falhas, diagnostico)
+    return True
+
+
+def _etapa_pecas(execucao: Execucao, session: Session | None) -> bool:
+    trabalho = execucao.trabalho
+    versao = trabalho.versoes["paginas"]
+    with trabalho.transacao() as transacao:
+        linhas = paginas.paginas_para_indice(transacao, trabalho.arquivo.hk_arquivo, versao)
+        extracao = execucao.extracao
+        if extracao is None:
+            diagnostico = {
+                "sinais": trabalho.arquivo.sinais,
+                "fronteiras_origem": trabalho.arquivo.fronteiras_origem,
+            }
+        else:
+            execucao.relatorio = relatorio_qualidade(
+                linhas,
+                total_paginas=extracao.diagnostico.total_paginas,
+                tempo_parede_segundos=monotonic() - extracao.inicio,
+                falhas=extracao.falhas,
+                versao_extrator=versao,
+                metadados=extracao.diagnostico.metadados_descartados,
+            )
+            diagnostico = extracao.diagnostico.model_dump(mode="json")
+        _indexar(transacao, trabalho, linhas, diagnostico, execucao.relatorio)
+    return True
+
+
+def _etapa_fatos(execucao: Execucao, session: Session | None) -> bool:
+    if session is None:
+        raise ValueError("a etapa de fatos exige a transação final")
+    execucao.relatorio["eventos"] = processar_eventos(
+        session,
+        execucao.trabalho.arquivo.hk_processo,
+        datetime.now(UTC).date(),
+        identificacao_paginas=execucao.settings.identificacao_paginas,
+    )
+    execucao.eventos_recalculados = True
+    return True
+
+
+def _etapa_catalogo(execucao: Execucao, session: Session | None) -> bool:
+    if session is None:
+        raise ValueError("a etapa de catálogo exige a transação final")
+    if execucao.eventos_recalculados:
+        return True
+    execucao.relatorio["eventos"] |= atualizar_achados(
+        session, execucao.trabalho.arquivo.hk_processo, datetime.now(UTC).date()
+    )
+    return True
+
+
+Etapa = Callable[[Execucao, Session | None], bool]
+
+ETAPAS: tuple[tuple[str, Etapa], ...] = (
+    ("paginas", _etapa_paginas),
+    ("pecas", _etapa_pecas),
+    ("fatos", _etapa_fatos),
+    ("catalogo", _etapa_catalogo),
+)
+
+ETAPAS_DA_TRANSACAO_FINAL = frozenset({"fatos", "catalogo"})
+
+
+def etapas_desde(primeira: str) -> tuple[tuple[str, Etapa], ...]:
+    """Devolve as etapas de `ETAPAS` a partir de `primeira`, na ordem de execução.
+
+    Args:
+        primeira: Nome da primeira etapa a refazer.
+
+    Returns:
+        As etapas de `primeira` até o fim de `ETAPAS`.
+    """
+    nomes = [nome for nome, _ in ETAPAS]
+    return ETAPAS[nomes.index(primeira) :]
 
 
 def _indexar(
@@ -364,35 +450,22 @@ def _processar(
     arquivo = trabalho.arquivo
     relatorio = dict(arquivo.relatorio or {})
     agendada = relatorio.pop("reprocessar_desde", None)
-    etapa = (
+    primeira = (
         (reprocessamento.primeira_etapa(arquivo, trabalho.versoes) or agendada)
         if agendada
         else "paginas"
     )
-    if etapa == "paginas":
-        qualidade = _extrair_paginas(trabalho, settings, storage, parar)
-        if qualidade is None:
+    execucao = Execucao(trabalho, settings, storage, parar, relatorio)
+    etapas = etapas_desde(primeira)
+    for nome, etapa in etapas:
+        if nome not in ETAPAS_DA_TRANSACAO_FINAL and not etapa(execucao, None):
             return
-        relatorio = qualidade
-    elif etapa == "pecas":
-        with trabalho.transacao() as session:
-            linhas = paginas.paginas_para_indice(
-                session, arquivo.hk_arquivo, trabalho.versoes["paginas"]
-            )
-            diagnostico = {"sinais": arquivo.sinais, "fronteiras_origem": arquivo.fronteiras_origem}
-            _indexar(session, trabalho, linhas, diagnostico, relatorio)
 
     with trabalho.transacao() as session:
-        referencia = datetime.now(UTC).date()
-        if etapa == "catalogo":
-            relatorio["eventos"] |= atualizar_achados(session, arquivo.hk_processo, referencia)
-        else:
-            relatorio["eventos"] = processar_eventos(
-                session,
-                arquivo.hk_processo,
-                referencia,
-                identificacao_paginas=settings.identificacao_paginas,
-            )
+        for nome, etapa in etapas:
+            if nome in ETAPAS_DA_TRANSACAO_FINAL:
+                etapa(execucao, session)
+        relatorio = execucao.relatorio
         relatorio["versoes_processamento"] = trabalho.versoes
         estado = EstadoJob.PARCIAL if relatorio["paginas_faltando"] else EstadoJob.CONCLUIDO
         mudar_estado(

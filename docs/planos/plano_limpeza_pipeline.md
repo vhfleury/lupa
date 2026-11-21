@@ -307,7 +307,12 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
 - Depende de: F8. Paralela com: F9, F10.
 - Vermelho: `tests/ingestao/test_processamento.py::test_etapas_executam_a_partir_da_primeira_agendada`.
 - Verde: `ETAPAS` executada a partir de `reprocessamento.primeira_etapa`; sai a cadeia `if/elif`.
-- Entregue:
+- Entregue: `ETAPAS` ordenada e `etapas_desde(primeira)`; `fatos` e `catalogo` na
+  transação final com `mudar_estado`; sai a cadeia `if/elif`. Especialista-ingestao:
+  aprovado, sem veto. Vermelho: 4 failed (`AttributeError`: `ETAPAS` ausente). Verde:
+  ingestão 25 passed; `bash scripts/verificar.sh` na stack inteira, junto com F14 e F9 (grupo 1): saída 0;
+  pipeline 723 passed (95,35%), intranet 266 passed (98,23%), integração 6, injeção 2, web
+  436 passed (100%), cabeçalhos e isolamento ok, agente 11.
 
 ### F15 — Formatos por mime e nomes internos no diagnóstico
 
@@ -510,13 +515,15 @@ Grupos, cada um fechado por `verificar.sh` na stack inteira antes do seguinte:
 
 1. Entrada: arquivo travado e `versoes_atuais()`. Ação: `primeira_etapa(arquivo, versoes)`.
    Saída: nome da primeira etapa a refazer, ou `None`.
-2. `None` com arquivo novo: começar em `paginas`. `None` com arquivo já processado: encerrar sem
-   refazer nada.
+2. `None` com arquivo novo: começar em `paginas`. `None` com arquivo já processado: começar na
+   etapa agendada em `reprocessar_desde`, como hoje.
 3. Entrada: nome da etapa. Ação: localizar sua posição em `ETAPAS` (`paginas`, `pecas`, `fatos`,
    `catalogo`). Saída: as etapas dali até o fim, na ordem.
 4. Para cada etapa: executar a função dela na conexão do lock. Saída: a parte do relatório da
    etapa.
-5. Etapa `catalogo`: juntar a parte dela ao relatório existente em vez de substituí-lo, como hoje.
+5. Etapa `catalogo`: juntar a parte dela ao relatório existente em vez de substituí-lo, como hoje;
+   quando `fatos` rodou na mesma execução, ela não roda de novo, porque `processar_eventos` já
+   atualiza os achados.
 6. Erro numa etapa: o erro sobe, as etapas seguintes não rodam e a retomada (RF-ING-07) recomeça
    pela primeira etapa sem versão gravada.
 7. Saída: relatório com `versoes_processamento` iguais a `versoes_atuais()`.
