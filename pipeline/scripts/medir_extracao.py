@@ -64,11 +64,12 @@ from lupa_pipeline.ingestao.sandbox import (
 )
 from lupa_pipeline.ingestao.saneamento_pagina import mapa_saneado
 from lupa_pipeline.ingestao.sinais import medir_sinais
+from lupa_pipeline.ingestao.texto import colapsar_espacos, levenshtein
 from lupa_pipeline.ingestao.texto_nativo import extrair_texto_nativo
 from lupa_pipeline.sinteticos.achados import comparar as comparar_achados
 from lupa_pipeline.sinteticos.achados import referencias_de_paginas, referencias_do_gabarito
 from lupa_pipeline.sinteticos.gabarito import Cenario, Gabarito
-from lupa_pipeline.sinteticos.medicao import levenshtein, mapa_folhas, medir, normalizar
+from lupa_pipeline.sinteticos.medicao import mapa_folhas, medir
 from lupa_pipeline.sinteticos.saida_pipeline import PaginaSaida, RefPagina, SaidaPipeline
 from lupa_pipeline.validacoes.adaptador import para_modelo
 from lupa_pipeline.validacoes.motor import executar_catalogo
@@ -234,8 +235,8 @@ def comando_ocr(args: argparse.Namespace) -> dict[str, Any]:
                 inicio = time.perf_counter()
                 resultado = ocr_pagina(documento[pagina.numero - 1])
                 segundos = time.perf_counter() - inicio
-                esperado = normalizar(pagina.texto)
-                lido = normalizar(resultado.texto)
+                esperado = colapsar_espacos(pagina.texto)
+                lido = colapsar_espacos(resultado.texto)
                 datas = DATA.findall(pagina.texto)
                 a = acumulado[nivel]
                 a[0] += 1

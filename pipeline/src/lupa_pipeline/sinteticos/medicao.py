@@ -25,6 +25,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from lupa_pipeline.ingestao.texto import colapsar_espacos, levenshtein
 from lupa_pipeline.sinteticos.gabarito import Gabarito
 from lupa_pipeline.sinteticos.saida_pipeline import (
     EventoSaida,
@@ -79,47 +80,6 @@ class Relatorio(BaseModel):
     cer_por_composicao: dict[str, Cer]
     cer_por_degradacao: dict[str, Cer]
     tempo_por_mil_paginas: float | None
-
-
-def levenshtein(a: str, b: str) -> int:
-    """Distância de edição (inserção, remoção, substituição), em Python puro.
-
-    Prefixo e sufixo comuns são descartados antes da programação dinâmica.
-
-    Args:
-        a: Primeiro texto.
-        b: Segundo texto.
-
-    Returns:
-        Número mínimo de edições.
-    """
-    inicio = 0
-    while inicio < min(len(a), len(b)) and a[inicio] == b[inicio]:
-        inicio += 1
-    a, b = a[inicio:], b[inicio:]
-    while a and b and a[-1] == b[-1]:
-        a, b = a[:-1], b[:-1]
-    if len(a) < len(b):
-        a, b = b, a
-    anterior = list(range(len(b) + 1))
-    for i, ca in enumerate(a, start=1):
-        atual = [i]
-        for j, cb in enumerate(b, start=1):
-            atual.append(min(anterior[j] + 1, atual[j - 1] + 1, anterior[j - 1] + (ca != cb)))
-        anterior = atual
-    return anterior[-1]
-
-
-def normalizar(texto: str) -> str:
-    """Colapsa espaços e quebras de linha em um espaço.
-
-    Args:
-        texto: Texto.
-
-    Returns:
-        Texto normalizado.
-    """
-    return " ".join(texto.split())
 
 
 def mapa_folhas(gabarito: Gabarito) -> dict[tuple[str, int], int | None]:
@@ -212,8 +172,8 @@ class _Medidor:
         grupos: dict[str, list[int]] = {}
         niveis: dict[str, list[int]] = {}
         for pagina in self.gabarito.paginas:
-            esperado = normalizar(pagina.texto)
-            distancia = levenshtein(esperado, normalizar(textos.get(pagina.numero, "")))
+            esperado = colapsar_espacos(pagina.texto)
+            distancia = levenshtein(esperado, colapsar_espacos(textos.get(pagina.numero, "")))
             for destino, chave in ((grupos, pagina.composicao.value), (niveis, pagina.degradacao)):
                 if chave is None:
                     continue

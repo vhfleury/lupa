@@ -6,12 +6,11 @@ from pathlib import Path
 import pytest
 
 from lupa_pipeline.dominio.enums import TipoPagina, TipoPeca
+from lupa_pipeline.ingestao.texto import colapsar_espacos, levenshtein
 from lupa_pipeline.sinteticos import cli
 from lupa_pipeline.sinteticos.gabarito import Cenario, Gabarito
 from lupa_pipeline.sinteticos.medicao import (
-    levenshtein,
     medir,
-    normalizar,
     para_markdown,
     saida_perfeita,
 )
@@ -31,7 +30,7 @@ def test_levenshtein(a: str, b: str, distancia: int) -> None:
 
 def test_normalizar_colapsa_espacos() -> None:
     """Normalizar colapsa espacos."""
-    assert normalizar(" a\n b  c\n") == "a b c"
+    assert colapsar_espacos(" a\n b  c\n") == "a b c"
 
 
 @pytest.mark.parametrize("cenario", list(Cenario))
@@ -60,9 +59,12 @@ def _com_erros(gabarito: Gabarito) -> SaidaPipeline:
     eventos[0] = eventos[0].model_copy(update={"valor": "1900-01-01"})
     eventos.append(eventos[1].model_copy(update={"ref": RefPagina(arquivo="nada.pdf", pagina=1)}))
     paginas = list(perfeita.paginas)
-    alvo = next(i for i, p in enumerate(paginas) if i and len(normalizar(p.texto)) > 100)
+    alvo = next(i for i, p in enumerate(paginas) if i and len(colapsar_espacos(p.texto)) > 100)
     paginas[alvo] = paginas[alvo].model_copy(
-        update={"texto": "X" * 10 + normalizar(paginas[alvo].texto)[10:], "tipo": TipoPagina.VAZIA}
+        update={
+            "texto": "X" * 10 + colapsar_espacos(paginas[alvo].texto)[10:],
+            "tipo": TipoPagina.VAZIA,
+        }
     )
     paginas.pop(0)
     return SaidaPipeline(pecas=tuple(pecas), paginas=tuple(paginas), eventos=tuple(eventos))
