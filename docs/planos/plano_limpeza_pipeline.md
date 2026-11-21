@@ -162,6 +162,17 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
   worktree; o agente principal junta os commits na branch do plano e roda
   `bash scripts/verificar.sh` na stack inteira ao fim de cada grupo (decisão do usuário,
   21/11/2026).
+- **D16.** A resposta da API para os fatos não muda com a F10: um teste fixa o JSON de fatos
+  com valor no formato `{"valor": x}`. Se ele mudar, a F10 converte só para as validações
+  (dentro de `ModeloProcesso`) e a API continua devolvendo o valor gravado (decisão do usuário,
+  21/11/2026).
+- **D17.** A derivação do roteiro sintético a partir do catálogo (F22) só entra se os gabaritos
+  gerados forem iguais aos atuais, fixados por teste; se divergirem, essa parte da F22 sai e
+  vira dívida, e o restante da fase segue (decisão do usuário, 21/11/2026).
+- **D18.** Regra geral das fases de refatoração: se uma fase mudar o comportamento fixado pelos
+  testes existentes ou pelo teste de igualdade dela, a fase é revertida, vira dívida em
+  `docs/dividas/todo.md` e a execução segue para a próxima fase que não dependa dela, sem parar
+  (decisão do usuário, 21/11/2026). D10, D13 e D17 são casos dessa regra.
 
 ## Fases
 
@@ -236,10 +247,12 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
 - Arquivos: `dominio/esquemas.py`, `validacoes/modelo.py`, `validacoes/apoio.py`,
   `validacoes/civel/*.py`, `ingestao/calibracao.py`, `ingestao/eventos/saida.py`,
   `ingestao/eventos/fatos.py`, `intranet/api/src/lupa_api/agente/dossie.py`,
-  `tests/dominio/test_esquemas.py`.
+  `tests/dominio/test_esquemas.py`, `intranet/api/tests/ingestao/test_validacoes_api.py`.
 - Depende de: F9. Paralela com: F14, F15.
 - Vermelho: `tests/dominio/test_esquemas.py::test_fato_le_valor_no_formato_antigo`.
 - Verde: `Fato.de_registro` converte `{"valor": x}`; extratores gravam o escalar; sai `valor_de`.
+  Guarda: `intranet/api/tests/ingestao/test_validacoes_api.py::test_resposta_de_fatos_nao_muda_com_valor_antigo`
+  (D16).
 - Entregue:
 
 ### F11 — Nome do outorgante num lugar só
@@ -391,6 +404,8 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
   `tests/sinteticos/test_roteiro.py::test_pecas_do_roteiro_seguem_o_catalogo_da_classe`.
 - Verde: `diagnostico_esperado` como `computed_field`; `_ler_marcas` com `_parte`, `_evento` e
   `_injecao`; peças do roteiro derivadas de `validacoes_de(classe)` e `PECA_PROCURADA`.
+  Guarda: `tests/sinteticos/test_roteiro.py::test_gabaritos_gerados_iguais_aos_atuais`
+  (D17).
 - Entregue:
 
 ### F23 — Documentação
