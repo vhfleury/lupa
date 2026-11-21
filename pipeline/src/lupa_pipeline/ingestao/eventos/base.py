@@ -7,7 +7,6 @@ from typing import Any
 from lupa_pipeline.dominio.enums import TipoFato
 from lupa_pipeline.ingestao.eventos.modelo import Candidato, PaginaTexto
 from lupa_pipeline.ingestao.eventos.padroes import gatilho
-from lupa_pipeline.ingestao.texto import dobrar
 
 
 @dataclass(frozen=True)
