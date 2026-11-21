@@ -232,13 +232,20 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
 - Revisores: especialista-validacoes.
 - Arquivos: `validacoes/apoio.py`, `validacoes/civel/*.py`, `validacoes/modelo.py`,
   `validacoes/adaptador.py`, `validacoes/__main__.py`, `pipeline/scripts/medir_extracao.py`,
-  `tests/validacoes/`.
+  `tests/validacoes/` e os outros chamadores de `para_modelo`: `ingestao/eventos/etapa.py`,
+  `sinteticos/gerador.py`, `intranet/api/src/lupa_api/agente/ferramentas/calculo.py`.
 - Depende de: F8. Paralela com: F14, F15.
 - Vermelho: `tests/validacoes/test_motor_e_regras.py::test_tipo_de_fato_novo_usa_a_peca_procurada_da_regra`.
 - Verde: `PECA_PROCURADA` em cada módulo de `civel/`, lida pela `Coleta`; sai `PECAS`;
   `ModeloProcesso.fato` e `recorrentes` memorizados; chamadores de `para_modelo` usam
   `ModeloProcesso`.
-- Entregue:
+- Entregue: `PECA_PROCURADA` nas quatro regras, passado à `Coleta` (sai `PECAS`);
+  `ModeloProcesso.fato` e `recorrentes` memorizados; sai `para_modelo`, e os seis chamadores
+  montam `ModeloProcesso`. Especialista-validacoes: aprovado com duas condições, atendidas
+  (docstring da `Coleta` e teste de cobertura por regra). Vermelho: 1 failed (`TypeError`:
+  `Coleta` sem o mapa da regra). Verde: validações 72 passed; `bash scripts/verificar.sh` na stack inteira, junto com F14 e F9 (grupo 1): saída 0;
+  pipeline 723 passed (95,35%), intranet 266 passed (98,23%), integração 6, injeção 2, web
+  436 passed (100%), cabeçalhos e isolamento ok, agente 11.
 
 ### F10 — `Fato.valor` escalar com leitura do formato antigo
 

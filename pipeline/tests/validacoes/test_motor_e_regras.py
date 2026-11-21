@@ -22,6 +22,7 @@ from lupa_pipeline.validacoes.calendario import (
     somar_meses,
 )
 from lupa_pipeline.validacoes.catalogo import Validacao, validacoes_de
+from lupa_pipeline.validacoes.civel import cabimento
 from lupa_pipeline.validacoes.dados import (
     ArquivoFeriados,
     ArquivoSuspensoes,
@@ -314,3 +315,54 @@ def test_conflito_interrompe_a_regra_e_vira_verificar() -> None:
     achado = validacoes_de("apelacao_civel")[1].executar(modelo, date(2026, 11, 1))
     assert achado.resultado == "verificar"
     assert [c["tipo"] for c in achado.valores["conflitos"]] == ["gratuidade_decisao"]
+
+
+def test_tipo_de_fato_novo_usa_a_peca_procurada_da_regra() -> None:
+    """RF-VAL-01, RF-VAL-05. A peça procurada de um fato ausente vem do mapa da própria regra."""
+    pecas = {"hipotese_nova": "peça procurada pela regra"}
+    coleta = Coleta(modelo_de(), cabimento.NOME, cabimento.BASE_LEGAL, pecas)
+    assert coleta.unico("hipotese_nova") is None
+    achado = coleta.verificar()
+    assert achado.valores["pecas_procuradas"] == pecas
+    assert "hipotese_nova (peça procurada pela regra)" in achado.valores["motivo"]
+
+
+@pytest.mark.parametrize(
+    ("classe", "posicao", "procuradas"),
+    [
+        (
+            "apelacao_civel",
+            0,
+            ["tipo_recurso", "data_intimacao", "data_interposicao", "qualidade_recorrente"],
+        ),
+        ("apelacao_civel", 1, ["tipo_recurso", "qualidade_recorrente"]),
+        ("apelacao_civel", 2, ["qualidade_recorrente"]),
+        ("agravo_instrumento", 3, ["hipotese_decisao_agravada"]),
+    ],
+)
+def test_regra_sem_fatos_procura_as_pecas_do_proprio_mapa(
+    classe: str, posicao: int, procuradas: list[str]
+) -> None:
+    """RF-VAL-01, RF-VAL-05. Cada regra sem fatos aponta as peças do seu `PECA_PROCURADA`."""
+    achado = validacoes_de(classe)[posicao].executar(modelo_de(), date(2026, 11, 1))
+    assert achado.resultado == "verificar"
+    assert list(achado.valores["pecas_procuradas"]) == procuradas
+
+
+def test_modelo_memoriza_fato_conflito_e_recorte_por_classe() -> None:
+    """RF-VAL-01. Consultas repetidas ao modelo devolvem o mesmo resultado sem recalcular."""
+    modelo = modelo_de(
+        criar_fato("tipo_recurso", "apelacao_civel"),
+        criar_fato("data_intimacao", "2026-08-03", fato_id=id_sintetico("intimacao-a")),
+        criar_fato("data_intimacao", "2026-08-04", fato_id=id_sintetico("intimacao-b")),
+    )
+    assert modelo.fato("tipo_recurso") is modelo.fato("tipo_recurso")
+    assert modelo.fato("data_interposicao") is None
+    for _ in range(2):
+        with pytest.raises(ConflitoDeFatosError) as erro:
+            modelo.fato("data_intimacao")
+        assert len(erro.value.fato_ids) == 2
+    primeiro = modelo.recorrentes("apelacao_civel")
+    segundo = modelo.recorrentes("apelacao_civel")
+    assert primeiro == segundo and primeiro is not segundo
+    assert modelo.recorrentes("agravo_instrumento") == []

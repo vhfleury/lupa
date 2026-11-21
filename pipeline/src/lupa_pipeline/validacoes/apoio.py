@@ -1,6 +1,6 @@
 """Coleta fatos e evidências, localiza conflitos e preenche os modelos de frase."""
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from datetime import date, datetime
 from functools import cache, wraps
 from importlib.resources import files
@@ -15,19 +15,6 @@ from lupa_pipeline.validacoes.modelo import (
     valor_de,
 )
 from lupa_pipeline.validacoes.versao import VERSAO_CATALOGO
-
-PECAS = {
-    "tipo_recurso": "petição de recurso",
-    "data_intimacao": "certidão de intimação",
-    "data_interposicao": "protocolo da petição de recurso",
-    "qualidade_recorrente": "qualificação das partes na petição do recurso",
-    "comprovante_preparo": "comprovante de preparo",
-    "gratuidade_pedido": "petição do recorrente",
-    "gratuidade_decisao": "decisão sobre a gratuidade",
-    "advogado_subscritor": "assinatura da petição de recurso",
-    "procuracao": "procuração ou substabelecimento",
-    "hipotese_decisao_agravada": "decisão interlocutória agravada",
-}
 
 
 def data_de(fato: Fato) -> date:
@@ -89,9 +76,24 @@ def regra(
 class Coleta:
     """Valores considerados numa validação e evidência de cada um."""
 
-    def __init__(self, modelo: ModeloProcesso, validacao: str, base_legal: str) -> None:
-        """Inicia a coleta do recorrente sem fatos utilizados."""
+    def __init__(
+        self,
+        modelo: ModeloProcesso,
+        validacao: str,
+        base_legal: str,
+        pecas: Mapping[str, str] | None = None,
+    ) -> None:
+        """Inicia a coleta do recorrente sem fatos utilizados.
+
+        Args:
+            modelo: Fatos do recorrente.
+            validacao: Nome da regra.
+            base_legal: Dispositivos citados no achado.
+            pecas: Peça procurada por tipo de fato, a ``PECA_PROCURADA`` da regra; todo tipo
+                lido como obrigatório precisa ter entrada.
+        """
         self.modelo = modelo
+        self.pecas: Mapping[str, str] = pecas or {}
         self.validacao = validacao
         self.base_legal = base_legal
         self.usados: dict[str, Fato] = {}
@@ -139,7 +141,7 @@ class Coleta:
             }
             for _, fato in sorted(self.usados.items())
         ]
-        pecas = {tipo: PECAS[tipo] for tipo in self.faltantes}
+        pecas = {tipo: self.pecas[tipo] for tipo in self.faltantes}
         return AchadoValidacao(
             validacao=self.validacao,
             sujeito=self.modelo.sujeito,
@@ -164,7 +166,7 @@ class Coleta:
 
     def verificar(self, motivo: str = "") -> AchadoValidacao:
         """Explica uma ausência ou cita os fatos incompatíveis na saída de conferência."""
-        faltas = [f"{tipo} ({PECAS[tipo]})" for tipo in self.faltantes]
+        faltas = [f"{tipo} ({self.pecas[tipo]})" for tipo in self.faltantes]
         conflitos = [f"{c['tipo']} ({', '.join(c['fato_ids'])})" for c in self.conflitos]
         razoes = [motivo] if motivo else []
         if faltas:

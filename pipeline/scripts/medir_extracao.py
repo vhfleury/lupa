@@ -71,7 +71,7 @@ from lupa_pipeline.sinteticos.achados import referencias_de_paginas, referencias
 from lupa_pipeline.sinteticos.gabarito import Cenario, Gabarito
 from lupa_pipeline.sinteticos.medicao import mapa_folhas, medir
 from lupa_pipeline.sinteticos.saida_pipeline import PaginaSaida, RefPagina, SaidaPipeline
-from lupa_pipeline.validacoes.adaptador import para_modelo
+from lupa_pipeline.validacoes.modelo import ModeloProcesso
 from lupa_pipeline.validacoes.motor import executar_catalogo
 
 RAIZ = Path("/app/.sinteticos/referencia")
@@ -587,7 +587,7 @@ def _eventos_cenario(
     fatos = [f for c in candidatos if (f := confirmar(c, processo)) is not None]
     segundos = time.perf_counter() - inicio
     achados = executar_catalogo(
-        para_modelo(fatos), gabarito.processo.classe, gabarito.processo.data_referencia
+        ModeloProcesso(fatos), gabarito.processo.classe, gabarito.processo.data_referencia
     )
     saida = SaidaPipeline(
         pecas=pecas_saida(resultado.pecas, paginas, "autos.pdf"),

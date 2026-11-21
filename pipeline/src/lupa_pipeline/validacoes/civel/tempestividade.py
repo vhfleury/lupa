@@ -10,12 +10,18 @@ from lupa_pipeline.validacoes.modelo import AchadoValidacao, ModeloProcesso, val
 
 NOME = "tempestividade_recurso"
 BASE_LEGAL = "arts. 180, 183, 186, 219, 220, 224, 1.003 § 5º e 1.023 do CPC"
+PECA_PROCURADA = {
+    "tipo_recurso": "petição de recurso",
+    "data_intimacao": "certidão de intimação",
+    "data_interposicao": "protocolo da petição de recurso",
+    "qualidade_recorrente": "qualificação das partes na petição do recurso",
+}
 
 
 @regra
 def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     """Compara as datas provadas da intimação e da interposição com o vencimento do recurso."""
-    coleta = Coleta(modelo, NOME, BASE_LEGAL)
+    coleta = Coleta(modelo, NOME, BASE_LEGAL, PECA_PROCURADA)
     tipo = coleta.unico("tipo_recurso")
     intimacao = coleta.unico("data_intimacao")
     interposicao = coleta.unico("data_interposicao")

@@ -50,7 +50,7 @@ def valor_de(fato: Fato) -> Any:
 
 
 class ModeloProcesso:
-    """Índice de fatos vigentes por tipo e sujeito."""
+    """Índice de fatos vigentes por tipo e sujeito, com `fato` e `recorrentes` memorizados."""
 
     def __init__(self, fatos: Iterable[Fato], *, sujeito: str = "") -> None:
         """Indexa os fatos com ordem estável para consulta e gravação dos resultados."""
@@ -59,6 +59,9 @@ class ModeloProcesso:
         self._indice: dict[str, list[Fato]] = {}
         for fato in self._fatos:
             self._indice.setdefault(fato.tipo, []).append(fato)
+        self._unicos: dict[str, Fato | None] = {}
+        self._conflitos: dict[str, list[str]] = {}
+        self._recortes: dict[str, list[ModeloProcesso]] = {}
 
     @property
     def todos(self) -> tuple[Fato, ...]:
@@ -71,15 +74,23 @@ class ModeloProcesso:
 
     def fato(self, tipo: str) -> Fato | None:
         """Lê um valor único ou levanta conflito com referências aos fatos divergentes."""
-        lista = self.fatos(tipo)
-        if not lista:
-            return None
-        if len({json.dumps(valor_de(f), sort_keys=True, default=str) for f in lista}) > 1:
-            raise ConflitoDeFatosError(tipo, [str(f.id) for f in lista])
-        return lista[0]
+        if tipo in self._conflitos:
+            raise ConflitoDeFatosError(tipo, list(self._conflitos[tipo]))
+        if tipo not in self._unicos:
+            lista = self.fatos(tipo)
+            if len({json.dumps(valor_de(f), sort_keys=True, default=str) for f in lista}) > 1:
+                self._conflitos[tipo] = [str(f.id) for f in lista]
+                raise ConflitoDeFatosError(tipo, list(self._conflitos[tipo]))
+            self._unicos[tipo] = lista[0] if lista else None
+        return self._unicos[tipo]
 
     def recorrentes(self, classe: str) -> list["ModeloProcesso"]:
         """Recorta os fatos do recurso da classe por recorrente, incluindo os fatos comuns."""
+        if classe not in self._recortes:
+            self._recortes[classe] = self._recortar(classe)
+        return list(self._recortes[classe])
+
+    def _recortar(self, classe: str) -> list["ModeloProcesso"]:
         identificados = self.fatos("tipo_recurso")
         sujeitos = sorted({f.sujeito for f in identificados if valor_de(f) == classe})
         if identificados and not sujeitos:

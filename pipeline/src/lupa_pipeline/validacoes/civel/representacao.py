@@ -13,6 +13,10 @@ from lupa_pipeline.validacoes.modelo import AchadoValidacao, Fato, ModeloProcess
 
 NOME = "representacao_recurso"
 BASE_LEGAL = "arts. 75, 103 e 104 do CPC"
+PECA_PROCURADA = {
+    "qualidade_recorrente": "qualificação das partes na petição do recurso",
+    "advogado_subscritor": "assinatura da petição de recurso",
+}
 
 
 def _nome(texto: str) -> str:
@@ -65,7 +69,7 @@ def _cadeia(modelo: ModeloProcesso, assinante: tuple[str, str], mandatos: list[F
 @regra
 def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     """Verifica se o subscritor recebeu poderes diretamente ou por substabelecimento."""
-    coleta = Coleta(modelo, NOME, BASE_LEGAL)
+    coleta = Coleta(modelo, NOME, BASE_LEGAL, PECA_PROCURADA)
     entidade = coleta.qualidade()
     if entidade is None:
         return coleta.verificar()

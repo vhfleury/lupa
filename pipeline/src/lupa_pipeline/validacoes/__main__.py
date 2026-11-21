@@ -11,7 +11,7 @@ from pydantic import TypeAdapter, ValidationError
 
 from lupa_pipeline.dominio.enums import ClasseProcessual
 from lupa_pipeline.dominio.esquemas import Fato
-from lupa_pipeline.validacoes.adaptador import para_modelo
+from lupa_pipeline.validacoes.modelo import ModeloProcesso
 from lupa_pipeline.validacoes.motor import executar_catalogo
 
 
@@ -28,7 +28,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("não foi possível ler o arquivo de fatos ou validar o seu formato")
     if len({f.processo_id for f in fatos}) > 1:
         parser.error("o arquivo deve conter fatos de um único processo")
-    achados = executar_catalogo(para_modelo(fatos), args.classe, args.referencia or date.today())
+    achados = executar_catalogo(ModeloProcesso(fatos), args.classe, args.referencia or date.today())
     sys.stdout.write(
         json.dumps([a.model_dump(mode="json") for a in achados], ensure_ascii=False, indent=2)
         + "\n"
