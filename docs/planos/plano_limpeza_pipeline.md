@@ -1,6 +1,7 @@
 # Plano — limpeza da pipeline
 
-20 de novembro de 2026 · Estado: **aprovado** · Atende a
+20 de novembro de 2026, reescrito em 21/11/2026 no formato de um PR por plano · Estado:
+**aprovado** · Branch e PR únicos: `refactor/limpeza-pipeline` · Atende a
 [especificação da 0.2](../especificacao/0.2/especificacao.md): RNF-08, RF-ING-03, RF-ING-04,
 RF-ING-07, RF-ING-08, RF-FAT-01, RF-FAT-02, RF-VAL-01 a RF-VAL-05. Nenhum requisito muda; o
 resultado de ingestão, fatos e achados é o mesmo, fixado pelos testes existentes e pelos novos
@@ -139,31 +140,299 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
   `versoes_dados` do achado, então `VERSAO_CATALOGO` sobe e o reprocessamento (RF-ING-08)
   regrava os achados com o mesmo resultado e texto.
 - **D9.** Código sem uso sai junto com os testes dele, no mesmo commit, citando a tarefa.
-- **D10.** A troca por `chave_do_hub` só entra com teste de igualdade dos ids atuais; divergência
-  para a fase e volta ao usuário.
+- **D10.** A troca por `chave_do_hub` só entra com teste de igualdade dos ids atuais; se o teste
+  mostrar id diferente, a fase sai do plano e vira dívida em `docs/dividas/todo.md`, sem parar
+  (decisão do usuário, 21/11/2026).
 - **D11.** Despachos viram registros declarativos: extratores por espécie, formatos por mime,
   etapas em lista ordenada.
 - **D12.** `Fato.valor` passa a ser sempre o escalar. Sem migration: `Fato.de_registro` converte
   `{"valor": x}` em `x` ao ler da view; fatos novos já saem normalizados. O outorgante da
   procuração vira o sujeito do fato, resolvido em `eventos/partes.py` e usado por extração,
   saída e gerador.
+- **D13.** O outorgante como sujeito (F11) só entra se o id dos fatos de procuração não mudar,
+  fixado por teste; se mudar, a fase sai do plano e vira dívida, sem parar (decisão do usuário,
+  21/11/2026). Correções e notas do gabinete apontam para esse id.
+- **D14.** Um PR para o plano inteiro, da branch `refactor/limpeza-pipeline`, com um commit por
+  fase. F1 a F7 já entraram na `develop` pelos PRs #20 a #26 e #27, antes desta regra; a branch
+  parte da `develop` com F8.
+- **D15.** Fases sem arquivo em comum e sem dependência rodam em paralelo, cada agente na própria
+  worktree; o agente principal junta os commits na branch do plano e roda
+  `bash scripts/verificar.sh` na stack inteira ao fim de cada grupo (decisão do usuário,
+  21/11/2026).
 
 ## Fases
 
-1. Texto: `ingestao/texto.py`, `dobrar` único, `levenshtein`, normalizações. P1, P3; D1, D2. RNF-08, RF-ING-03.
-2. Texto da página guardado: `PaginaTexto.dobrado` e `datas`, extratores e `capa` sobre o recorte. P2; D3. RF-FAT-01.
-3. Calendário e tempestividade. P6; D7. RF-VAL-01, RF-VAL-02.
-4. Validações: dispensas, conflito por exceção, `qualidade()`, `peca_procurada`, memorização do modelo, `para_modelo`. P7; D8. RF-VAL-01, RF-VAL-03, RF-VAL-04, RF-VAL-05, RF-FAT-02.
-5. Contrato do fato: `Fato.valor` escalar, leitura do formato antigo, outorgante como sujeito, fim de `valor_de`. P8; D12. RF-FAT-01, RF-VAL-04.
-6. Ids pelo hub, com teste de igualdade. P10; D10. RF-FAT-01.
-7. Despachos declarativos na extração e no worker. P9; D11. RF-FAT-01, RF-ING-07, RF-ING-08.
-8. Desempenho do worker: extração paralela, gravação em lote, MinIO para arquivo, `fitz.open(caminho)`, `processo_ativo`, `mudar_estado`, índice de peças. P4, P5; D4, D5, D6. RF-ING-03, RF-ING-04, RF-ING-07.
-9. Código sem uso e duplicações menores, inclusive sintéticos. P11; D9. RNF-08.
-10. Documentação: `docs/sistema/`, `docs/arquitetura.md`, `CHANGELOG.md`, `docs/decisoes/registro.md`. RNF-08.
+Campos de cada fase: requisito e P/D; revisores; arquivos (código em `pipeline/src/lupa_pipeline/`
+e testes em `pipeline/tests/`, salvo indicação); depende de; paralela com; Vermelho; Verde;
+Entregue. Implementa o `executor`, que chama o `tdd`; revisa sempre também o `revisor-codigo`.
+Pronto quando, salvo indicação: rebuild, suítes da pipeline (`worker`) e da intranet (`api`)
+verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestão ou validação,
+`bash scripts/verificar.sh` na stack inteira com saída 0. A evidência de F1 a F8 está em
+`tarefas_0.2.md` (T12.1 a T12.8).
+
+### F1 — `dobrar` único em `ingestao/texto.py`
+
+- Requisito: RNF-08, RF-ING-03 · P1 · D1, D2.
+- Entregue: PR #20.
+
+### F2 — `levenshtein` e normalizações em `texto.py`
+
+- Requisito: RNF-08 · P3 · D2.
+- Entregue: PR #21.
+
+### F3 — Texto da página guardado
+
+- Requisito: RF-FAT-01 · P2 · D3.
+- Entregue: PR #22.
+
+### F4 — Contagem única do calendário
+
+- Requisito: RF-VAL-02 · P6 · D7.
+- Entregue: PR #23.
+
+### F5 — Feriado com fonte e tempestividade pelo calendário
+
+- Requisito: RF-VAL-02 · P6 · D7.
+- Entregue: PR #24.
+
+### F6 — Tabela de dispensas
+
+- Requisito: RF-VAL-03, RF-VAL-04 · P7 · D8.
+- Entregue: PR #25.
+
+### F7 — Reprocessamento pela versão do catálogo
+
+- Requisito: RF-ING-08 · D8.
+- Entregue: PR #26.
+
+### F8 — Conflito em fato opcional interrompe a regra
+
+- Requisito: RF-FAT-02, RF-VAL-01 · P7 · D8.
+- Revisores: especialista-validacoes (aprovado).
+- Entregue: primeiro commit da branch do plano; `verificar.sh` com saída 0 (pipeline 713 passed,
+  95,35%).
+
+### F9 — Peça procurada por regra, modelo memorizado, fim de `para_modelo`
+
+- Requisito: RF-VAL-01, RF-VAL-05 · P7.
+- Revisores: especialista-validacoes.
+- Arquivos: `validacoes/apoio.py`, `validacoes/civel/*.py`, `validacoes/modelo.py`,
+  `validacoes/adaptador.py`, `validacoes/__main__.py`, `pipeline/scripts/medir_extracao.py`,
+  `tests/validacoes/`.
+- Depende de: F8. Paralela com: F14, F15.
+- Vermelho: `tests/validacoes/test_motor_e_regras.py::test_tipo_de_fato_novo_usa_a_peca_procurada_da_regra`.
+- Verde: `PECA_PROCURADA` em cada módulo de `civel/`, lida pela `Coleta`; sai `PECAS`;
+  `ModeloProcesso.fato` e `recorrentes` memorizados; chamadores de `para_modelo` usam
+  `ModeloProcesso`.
+- Entregue:
+
+### F10 — `Fato.valor` escalar com leitura do formato antigo
+
+- Requisito: RF-FAT-01 · P8 · D12.
+- Revisores: especialista-validacoes, especialista-intranet (`agente/dossie.py`).
+- Arquivos: `dominio/esquemas.py`, `validacoes/modelo.py`, `validacoes/apoio.py`,
+  `validacoes/civel/*.py`, `ingestao/calibracao.py`, `ingestao/eventos/saida.py`,
+  `ingestao/eventos/fatos.py`, `intranet/api/src/lupa_api/agente/dossie.py`,
+  `tests/dominio/test_esquemas.py`.
+- Depende de: F9. Paralela com: F14, F15.
+- Vermelho: `tests/dominio/test_esquemas.py::test_fato_le_valor_no_formato_antigo`.
+- Verde: `Fato.de_registro` converte `{"valor": x}`; extratores gravam o escalar; sai `valor_de`.
+- Entregue:
+
+### F11 — Outorgante da procuração como sujeito
+
+- Requisito: RF-VAL-04 · P8 · D12, D13.
+- Revisores: especialista-validacoes, especialista-ingestao.
+- Arquivos: `ingestao/eventos/partes.py`, `ingestao/eventos/procuracao.py`,
+  `ingestao/eventos/saida.py`, `sinteticos/gerador.py`, `validacoes/civel/representacao.py`,
+  `tests/ingestao/test_eventos.py`.
+- Depende de: F10. Paralela com: F16.
+- Vermelho: `tests/ingestao/test_eventos.py::test_procuracao_traz_o_outorgante_como_sujeito` e
+  `::test_id_da_procuracao_nao_muda_com_o_sujeito`.
+- Verde: resolução em `partes.py`; saem os casos `PROCURACAO` de `saida.py` e `gerador.py`. Se o
+  teste do id falhar: a fase é revertida e vira dívida (D13).
+- Entregue:
+
+### F12 — Ids de fato e evidência pelo hub
+
+- Requisito: RF-FAT-01 · P10 · D10.
+- Revisores: especialista-banco, especialista-ingestao.
+- Arquivos: `ingestao/eventos/fatos.py`, `ingestao/eventos/modelo.py`,
+  `tests/ingestao/test_eventos.py`.
+- Depende de: F11. Paralela com: F16, F17.
+- Vermelho: `tests/ingestao/test_eventos.py::test_ids_de_fato_e_evidencia_iguais_aos_atuais`.
+- Verde: `chave_do_hub(hub_fato, ...)` e `chave_do_hub(hub_evidencia, ...)`. Se o teste falhar: a
+  fase é revertida e vira dívida (D10).
+- Entregue:
+
+### F13 — Registro de extratores por espécie
+
+- Requisito: RF-FAT-01 · P9 · D11.
+- Revisores: especialista-ingestao.
+- Arquivos: `ingestao/eventos/fatos.py`, `tests/ingestao/test_eventos.py`.
+- Depende de: F12. Paralela com: F17, F18.
+- Vermelho: `tests/ingestao/test_eventos.py::test_toda_especie_com_extrator_esta_no_registro`.
+- Verde: `EXTRATORES: TipoPeca → extratores`, capa como extrator com filtro de página;
+  `candidatos_da_peca` vira um laço.
+- Entregue:
+
+### F14 — Etapas em lista ordenada no worker
+
+- Requisito: RF-ING-08 · P9 · D11.
+- Revisores: especialista-ingestao.
+- Arquivos: `ingestao/processamento.py`, `tests/ingestao/test_processamento.py`.
+- Depende de: F8. Paralela com: F9, F10.
+- Vermelho: `tests/ingestao/test_processamento.py::test_etapas_executam_a_partir_da_primeira_agendada`.
+- Verde: `ETAPAS` executada a partir de `reprocessamento.primeira_etapa`; sai a cadeia `if/elif`.
+- Entregue:
+
+### F15 — Formatos por mime e nomes internos no diagnóstico
+
+- Requisito: RF-ING-07 · P9 · D11.
+- Revisores: especialista-ingestao.
+- Arquivos: `ingestao/processamento.py`, `ingestao/diagnostico.py`,
+  `tests/ingestao/test_processamento.py`, `tests/ingestao/test_diagnostico.py`.
+- Depende de: F14. Paralela com: F9, F10.
+- Vermelho: `tests/ingestao/test_processamento.py::test_diagnostico_de_zip_ja_sai_com_os_nomes_internos`.
+- Verde: `FORMATOS: mime → Formato(inventariar, diagnosticar, persistir)`; `diagnosticar_*`
+  recebe o mapa de nomes; `_preparar` dividida em `_fontes_do_manifesto` e `_fontes_do_original`.
+- Entregue:
+
+### F16 — Extração paralela sem gabinete
+
+- Requisito: RF-ING-04, RF-ING-07 · P4 · D4, D5.
+- Revisores: especialista-ingestao, especialista-infra (`.env.example`).
+- Arquivos: `ingestao/processamento.py`, `ingestao/extracao.py`, `config.py`, `.env.example`,
+  `tests/ingestao/test_processamento.py`, `tests/ingestao/test_extracao.py`.
+- Depende de: F15. Paralela com: F11, F12.
+- Vermelho: `tests/ingestao/test_processamento.py::test_lotes_em_paralelo_gravam_na_conexao_do_lock`
+  e `::test_falha_de_gravacao_cancela_lotes_e_retoma_so_os_faltantes` (integração).
+- Verde: `_processar_lotes` com `executar_em_paralelo` e `extracao_lotes_por_job` (padrão 2); um
+  `copiar_do_cache` antes do laço; um caminho de gravação; retentativa simplificada; saem
+  `LimitadorGabinete`, `lotes_por_gabinete` e `extracao_lotes_por_gabinete`.
+- Entregue:
+
+### F17 — Gravação de páginas em lote
+
+- Requisito: RF-ING-03 · P5 · D6.
+- Revisores: especialista-banco, especialista-ingestao.
+- Arquivos: `ingestao/paginas.py`, `dominio/gravacao.py`, `ingestao/cache.py`,
+  `tests/ingestao/test_paginas.py`, `tests/dominio/test_gravacao.py`.
+- Depende de: F16. Paralela com: F12, F13.
+- Vermelho: `tests/ingestao/test_paginas.py::test_gravacao_em_lote_igual_a_gravacao_por_pagina`
+  (integração).
+- Verde: hubs e links com `executemany`; `hash_diff` correntes lidos uma vez por lote.
+- Entregue:
+
+### F18 — MinIO para arquivo e PDF aberto pelo caminho
+
+- Requisito: RF-ING-04 · P5.
+- Revisores: especialista-ingestao.
+- Arquivos: `ingestao/storage.py`, `ingestao/processamento.py`, `ingestao/extrator_paginas.py`,
+  `ingestao/renderizacao.py`, `tests/ingestao/test_storage.py`.
+- Depende de: F16. Paralela com: F13.
+- Vermelho: `tests/ingestao/test_storage.py::test_baixar_para_grava_o_objeto_no_caminho`
+  (integração).
+- Verde: `storage.baixar_para` com `download_fileobj`; `fitz.open(caminho)`.
+- Entregue:
+
+### F19 — Leituras repetidas na fila e nos repositórios
+
+- Requisito: RF-ING-07 · P5, P11.
+- Revisores: especialista-ingestao, especialista-banco.
+- Arquivos: `ingestao/repositorio.py`, `ingestao/repositorio_pecas.py`,
+  `ingestao/processamento.py`, `ingestao/worker.py`, `ingestao/reprocessamento.py`,
+  `ingestao/eventos/etapa.py`, `tests/ingestao/test_repositorio.py`.
+- Depende de: F13, F18. Paralela com: nenhuma.
+- Vermelho: `tests/ingestao/test_repositorio.py::test_processo_ativo_devolve_none_para_descartado`
+  e `::test_indice_do_processo_le_evidencias_numa_consulta` (integração).
+- Verde: `processo_ativo` nos três pontos da fila; `mudar_estado` sem releitura; uma consulta de
+  evidências no índice; `atributos(visao, satelite)`; `processar_eventos` repassa o processo.
+- Entregue:
+
+### F20 — Remoção do código sem uso
+
+- Requisito: RNF-08 · P11 · D9.
+- Revisores: arquiteto.
+- Arquivos: `ingestao/datas.py`, `dominio/esquemas.py`, `dominio/tabelas.py`,
+  `tests/ingestao/test_datas.py`, `tests/dominio/test_esquemas.py`,
+  `tests/ingestao/test_estados.py`, `tests/dominio/test_migracao_0001.py`.
+- Depende de: F10. Paralela com: F14 a F18.
+- Revisão manual: saem `TextoAnalise`, `encontrar_datas`, os esquemas `Anotacao`, `Usuario`,
+  `JobIngestao`, `LoteIngestao` e `Peca`, e `HUBS`, `LINKS`, `SATELITES` (calculadas no teste),
+  com os testes deles no mesmo commit; grep em `pipeline/` e `intranet/` sem referência.
+- Entregue:
+
+### F21 — Duplicações menores da ingestão
+
+- Requisito: RNF-08, RF-ING-03 · P11.
+- Revisores: especialista-ingestao.
+- Arquivos: `ingestao/data_peca.py`, `ingestao/datas.py`, `dominio/esquemas.py`,
+  `ingestao/calibracao.py`, `tests/ingestao/test_data_peca.py`, `tests/dominio/test_esquemas.py`.
+- Depende de: F20. Paralela com: F14 a F18.
+- Vermelho: `tests/ingestao/test_data_peca.py::test_regra_declara_a_direcao_da_busca` e
+  `tests/dominio/test_esquemas.py::test_sha256_arquivo_igual_ao_da_recepcao`.
+- Verde: `data_peca` com `datas.MESES`, `construir_data` e direção em `REGRAS`; `sha256_arquivo`
+  em `dominio/esquemas.py`; `datas.UNIDADES` das tuplas de escrita.
+- Entregue:
+
+### F22 — Sintéticos sem repetição
+
+- Requisito: RNF-04 · P11.
+- Revisores: especialista-validacoes (roteiro e catálogo).
+- Arquivos: `sinteticos/gabarito.py`, `sinteticos/gerador.py`, `sinteticos/roteiro.py`,
+  `sinteticos/empacotamento.py`, `tests/sinteticos/test_gabarito.py`,
+  `tests/sinteticos/test_roteiro.py`.
+- Depende de: F9, F11. Paralela com: F14 a F19.
+- Vermelho: `tests/sinteticos/test_gabarito.py::test_diagnostico_esperado_deriva_do_cenario` e
+  `tests/sinteticos/test_roteiro.py::test_pecas_do_roteiro_seguem_o_catalogo_da_classe`.
+- Verde: `diagnostico_esperado` como `computed_field`; `_ler_marcas` com `_parte`, `_evento` e
+  `_injecao`; peças do roteiro derivadas de `validacoes_de(classe)` e `PECA_PROCURADA`.
+- Entregue:
+
+### F23 — Documentação
+
+- Requisito: RNF-08.
+- Implementa: documentador. Revisores: conferente-links.
+- Arquivos: `docs/sistema/ingestao.md`, `docs/sistema/validacoes.md`,
+  `docs/sistema/modelo-de-dados.md`, `docs/arquitetura.md`, `CHANGELOG.md`,
+  `docs/decisoes/registro.md`.
+- Depende de: todas. Paralela com: nenhuma.
+- Revisão manual: extração paralela e variável removida no `CHANGELOG.md`; D4, D7, D8, D12 e
+  D13 no registro.
+- Pronto quando: `bash scripts/verificar.sh` na stack inteira com saída 0 e links conferidos.
+- Entregue:
+
+## Distribuição
+
+| Fase | Agente | Revisores | Depende de | Paralela com |
+| --- | --- | --- | --- | --- |
+| F9 | executor | especialista-validacoes | F8 | F14, F15 |
+| F10 | executor | especialista-validacoes, especialista-intranet | F9 | F14, F15 |
+| F11 | executor | especialista-validacoes, especialista-ingestao | F10 | F16 |
+| F12 | executor | especialista-banco, especialista-ingestao | F11 | F16, F17 |
+| F13 | executor | especialista-ingestao | F12 | F17, F18 |
+| F14 | executor | especialista-ingestao | F8 | F9, F10 |
+| F15 | executor | especialista-ingestao | F14 | F9, F10 |
+| F16 | executor | especialista-ingestao, especialista-infra | F15 | F11, F12 |
+| F17 | executor | especialista-banco, especialista-ingestao | F16 | F12, F13 |
+| F18 | executor | especialista-ingestao | F16 | F13 |
+| F19 | executor | especialista-ingestao, especialista-banco | F13, F18 | — |
+| F20 | executor | arquiteto | F10 | F14 a F18 |
+| F21 | executor | especialista-ingestao | F20 | F14 a F18 |
+| F22 | executor | especialista-validacoes | F9, F11 | F14 a F19 |
+| F23 | documentador | conferente-links | todas | — |
+
+Grupos, cada um fechado por `verificar.sh` na stack inteira antes do seguinte:
+
+1. F9 e F14 em paralelo; depois F10 e F15.
+2. F11 e F16 em paralelo; depois F12 com F17, e F20.
+3. F13 com F18 e F21; depois F19 com F22.
+4. F23.
 
 ## Passo a passo do algoritmo
 
-### Extração paralela dos lotes (fase 8)
+### Extração paralela dos lotes (F16)
 
 1. Entrada: arquivo travado, conexão do lock, `prontas` (páginas já gravadas). Ação: calcular as páginas faltantes. Saída: `faltantes`.
 2. Entrada: `faltantes`. Ação: uma chamada a `copiar_do_cache` numa transação. Saída: páginas copiadas e `restantes`.
@@ -175,21 +444,21 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
 8. Erro de gravação: a transação do lote é desfeita, as threads pendentes são canceladas e o erro sobe; a retomada (RF-ING-07) refaz só os lotes sem satélite.
 9. Saída: relatório da etapa `paginas`.
 
-### Texto da página guardado (fase 2)
+### Texto da página guardado (F3)
 
 1. Entrada: `PaginaTexto.normalizado`. Ação: primeiro acesso a `dobrado` chama `texto.dobrar`. Saída: texto dobrado com o mesmo comprimento.
 2. Entrada: `dobrado`. Ação: primeiro acesso a `datas` chama `datas_no_dobrado`. Saída: datas com offsets.
 3. Extratores (`recurso`, `marcos`, `preparo`, `capa`, `decisao_agravada`, `Fonte.datas`) leem `pagina.dobrado` e `pagina.datas`; `capa._valor` recorta `dobrado[inicio:fim]`.
 4. Saída: os mesmos candidatos de fato, conferidos pelo teste de igualdade sobre os sintéticos.
 
-### Contagem de prazo (fase 3)
+### Contagem de prazo (F4 e F5)
 
 1. Entrada: data base, dias, calendário. Ação: `_contar` avança um dia por vez, pulando os dias com `motivo_sem_expediente`. Saída: termo final e dias descartados com descrição e fonte.
 2. Termo final sem expediente: prorrogar ao próximo dia útil (`_prorrogar`) e registrar os dias pulados.
 3. Entrada: início e fim. Ação: `dias_uteis_entre` usa o mesmo laço. Saída: contagem e descartados.
 4. Tempestividade: atraso igual a `dias_uteis_entre(termo, protocolo)`; texto do achado igual ao atual.
 
-### Regra com conflito (fase 4)
+### Regra com conflito (F8)
 
 1. Entrada: `ModeloProcesso`, regra decorada com `@regra`. Ação: a regra chama `coleta.unico(tipo)`.
 2. Fato obrigatório com dois valores: `unico` registra o conflito e devolve `None`; a regra segue coletando os demais e devolve `coleta.verificar()` com todas as faltas e divergências.
@@ -197,42 +466,15 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
 4. `@regra` captura `FatoPendenteError` e devolve `coleta.verificar()`. Saída: achado "verificar" com os conflitos, igual ao atual.
 5. Sem conflito: a regra segue e devolve o achado. Outras exceções sobem como hoje.
 
-### Leitura do fato (fase 5)
+### Leitura do fato (F10 e F11)
 
 1. Entrada: linha de `v_fato`. Ação: `Fato.de_registro`. Saída: `Fato`.
 2. Valor `dict` com só a chave `valor`: substituir pelo escalar.
 3. Fato novo: o extrator grava o escalar; procuração grava o outorgante como sujeito.
 4. Consumidores (validações, saída, gerador, `agente/dossie.py`) leem `fato.valor`.
 
-## Checklist de testes
-
-- RNF-08: `pipeline/tests/ingestao/test_texto.py::test_dobrar_preserva_o_comprimento_com_caractere_que_muda_de_tamanho` — regra única de D1.
-- RNF-08: `pipeline/tests/ingestao/test_texto.py::test_levenshtein_com_prefixo_e_sufixo_comuns` — mesma distância da versão atual.
-- RF-FAT-01: `pipeline/tests/ingestao/eventos/test_fatos.py::test_candidatos_iguais_com_texto_da_pagina_guardado` — candidatos idênticos aos atuais nos sintéticos.
-- RF-VAL-02: `pipeline/tests/validacoes/test_calendario.py::test_dias_uteis_entre_registra_feriado_com_fonte` — contagem e descartados.
-- RF-VAL-02: `pipeline/tests/validacoes/test_motor_e_regras.py::test_tempestividade_com_atraso_mantem_o_texto` — texto do achado igual.
-- RF-VAL-03, RF-VAL-04: `pipeline/tests/validacoes/test_motor_e_regras.py::test_dispensa_por_qualidade_le_a_tabela_de_dispensas` — mesmo resultado.
-- RF-FAT-02: `pipeline/tests/validacoes/test_motor_e_regras.py::test_conflito_interrompe_a_regra_e_vira_verificar` — achado com os conflitos.
-- RF-FAT-01: `pipeline/tests/dominio/test_esquemas.py::test_fato_le_valor_no_formato_antigo` — `{"valor": x}` vira `x`.
-- RF-VAL-04: `pipeline/tests/ingestao/eventos/test_partes.py::test_procuracao_traz_o_outorgante_como_sujeito`.
-- RF-FAT-01: `pipeline/tests/ingestao/eventos/test_modelo.py::test_ids_de_fato_e_evidencia_iguais_aos_atuais` — D10.
-- RF-ING-07: `pipeline/tests/ingestao/test_processamento.py::test_lotes_em_paralelo_gravam_na_conexao_do_lock` (integração).
-- RF-ING-07: `pipeline/tests/ingestao/test_processamento.py::test_falha_de_gravacao_cancela_lotes_e_retoma_so_os_faltantes` (integração).
-- RF-ING-03: `pipeline/tests/ingestao/test_paginas.py::test_gravacao_em_lote_igual_a_gravacao_por_pagina` (integração).
-- RF-ING-08: `pipeline/tests/ingestao/test_reprocessamento.py::test_nova_versao_do_catalogo_regrava_achados_com_o_mesmo_texto` (integração).
-- RNF-08: `pipeline/tests/ingestao/test_texto.py::test_colapsar_espacos_aplica_nfc` e `::test_maiusculas_sem_acento_remove_pontuacao`.
-- RF-VAL-01, RF-VAL-05: `pipeline/tests/validacoes/test_motor_e_regras.py::test_tipo_de_fato_novo_usa_a_peca_procurada_da_regra`.
-- RF-FAT-01: `pipeline/tests/ingestao/eventos/test_fatos.py::test_toda_especie_com_extrator_esta_no_registro`.
-- RF-ING-08: `pipeline/tests/ingestao/test_processamento.py::test_etapas_executam_a_partir_da_primeira_agendada`.
-- RF-ING-07: `pipeline/tests/ingestao/test_processamento.py::test_diagnostico_de_zip_ja_sai_com_os_nomes_internos`.
-- RF-ING-04: `pipeline/tests/ingestao/test_storage.py::test_baixar_para_grava_o_objeto_no_caminho` (integração).
-- RF-ING-07: `pipeline/tests/ingestao/test_repositorio.py::test_processo_ativo_devolve_none_para_descartado` e `test_repositorio_pecas.py::test_indice_do_processo_le_evidencias_numa_consulta` (integração).
-- RF-ING-03: `pipeline/tests/ingestao/test_data_peca.py::test_regra_declara_a_direcao_da_busca` e `pipeline/tests/dominio/test_esquemas.py::test_sha256_arquivo_igual_ao_da_recepcao`.
-- RNF-04: `pipeline/tests/sinteticos/test_gabarito.py::test_diagnostico_esperado_deriva_do_cenario` e `test_roteiro.py::test_pecas_do_roteiro_seguem_o_catalogo_da_classe`.
-- RNF-04: suíte de regressão com os sintéticos de cada classe, corpus de injeção e `bash scripts/verificar.sh`.
-
 ## Execução
 
-1. Commit e PR por fase, da branch `refactor/T12.<n>-<fase>` para a `develop`.
+1. Merge do PR único da branch `refactor/limpeza-pipeline` na `develop`, com F23 concluída.
 2. `docker compose up -d --build --wait`.
 3. Sem migration; o reprocessamento dos achados pela versão nova do catálogo (D8) roda pelo worker, sem passo manual.
