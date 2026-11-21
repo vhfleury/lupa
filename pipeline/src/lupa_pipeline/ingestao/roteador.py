@@ -10,12 +10,10 @@ imagem opaca (digitalização em branco vai ao OCR, que confirma a ausência de 
 
 from dataclasses import dataclass
 from functools import cache
-from importlib.resources import files
 from typing import Any
 
-import yaml
-
 from lupa_pipeline.dominio.enums import TipoPagina
+from lupa_pipeline.ingestao.deteccao import ler_yaml
 
 
 @dataclass(frozen=True)
@@ -78,13 +76,7 @@ def limiares_padrao() -> Limiares:
     Returns:
         Limiares versionados.
     """
-    texto = (
-        files("lupa_pipeline.ingestao")
-        .joinpath("dados")
-        .joinpath("roteador.yaml")
-        .read_text("utf-8")
-    )
-    return limiares_de(yaml.safe_load(texto))
+    return limiares_de(ler_yaml("roteador.yaml"))
 
 
 def _camada_confiavel(sinais: dict[str, Any], limiares: Limiares) -> bool:

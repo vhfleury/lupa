@@ -13,12 +13,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from functools import cache
-from importlib.resources import files
 from typing import Any
 
-import yaml
-
 from lupa_pipeline.dominio.enums import OrigemPeca, TipoPeca
+from lupa_pipeline.ingestao.deteccao import ler_yaml
 from lupa_pipeline.ingestao.sinais_fronteira import (
     ListaTitulos,
     e_assinatura,
@@ -93,8 +91,7 @@ def regras_classificacao_de(dados: dict[str, Any]) -> RegrasClassificacao:
 @cache
 def regras_classificacao_padrao() -> RegrasClassificacao:
     """Regras versionadas em `dados/classificacao.yaml`."""
-    texto = files("lupa_pipeline.ingestao").joinpath("dados/classificacao.yaml").read_text("utf-8")
-    return regras_classificacao_de(yaml.safe_load(texto))
+    return regras_classificacao_de(ler_yaml("classificacao.yaml"))
 
 
 def _normalizadas(linhas: Sequence[str]) -> str:

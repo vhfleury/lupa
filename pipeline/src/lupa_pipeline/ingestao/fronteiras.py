@@ -15,10 +15,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from functools import cache
-from importlib.resources import files
 from typing import Any
 
-import yaml
+from lupa_pipeline.ingestao.deteccao import ler_yaml
 
 FORTE = "forte"
 FRACA = "fraca"
@@ -68,8 +67,7 @@ def regras_de(dados: dict[str, Any]) -> Regras:
 @cache
 def regras_padrao() -> Regras:
     """Regras versionadas em `dados/fronteiras.yaml`."""
-    texto = files("lupa_pipeline.ingestao").joinpath("dados/fronteiras.yaml").read_text("utf-8")
-    return regras_de(yaml.safe_load(texto))
+    return regras_de(ler_yaml("fronteiras.yaml"))
 
 
 def _cabecalho_novo(anterior: dict[str, Any], atual: dict[str, Any], regras: Regras) -> bool:
