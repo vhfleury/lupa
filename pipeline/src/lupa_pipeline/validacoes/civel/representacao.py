@@ -8,7 +8,7 @@ from typing import Any
 
 from lupa_pipeline.dominio.enums import QualidadeParte, ResultadoAchado
 from lupa_pipeline.validacoes.apoio import Coleta
-from lupa_pipeline.validacoes.dados import preparo_padrao
+from lupa_pipeline.validacoes.dados import dispensas_padrao
 from lupa_pipeline.validacoes.modelo import AchadoValidacao, Fato, ModeloProcesso, valor_de
 
 NOME = "representacao_recurso"
@@ -65,17 +65,17 @@ def _cadeia(modelo: ModeloProcesso, assinante: tuple[str, str], mandatos: list[F
 def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     """Verifica se o subscritor recebeu poderes diretamente ou por substabelecimento."""
     coleta = Coleta(modelo, NOME, BASE_LEGAL)
-    qualidade = coleta.unico("qualidade_recorrente")
-    if qualidade is None:
+    entidade = coleta.qualidade()
+    if entidade is None:
         return coleta.verificar()
-    entidade = str(valor_de(qualidade))
-    tabela = preparo_padrao()
+    tabela = dispensas_padrao()
     if entidade not in QualidadeParte:
         return coleta.verificar("A qualidade do recorrente exige conferência.")
-    if entidade in tabela.dispensas:
+    dispensa = tabela.dispensas.get(entidade)
+    if dispensa is not None and dispensa.mandato:
         return coleta.concluir(
             ResultadoAchado.CONFORME,
-            f"Dispensa de mandato pela qualidade do recorrente ({tabela.dispensas[entidade]}).",
+            f"Dispensa de mandato pela qualidade do recorrente ({dispensa.rotulo}).",
             dispensa=entidade,
             versao_dados=tabela.versao,
         )

@@ -75,10 +75,19 @@ class TabelaPrazosRecursos(ArquivoVersionado):
     recursos: dict[str, RegraRecurso]
 
 
-class TabelaPreparo(ArquivoVersionado):
-    """Qualidades do recorrente dispensadas, na especificação, de preparo e mandato."""
+class Dispensa(BaseModel):
+    """Exigências de que uma qualidade do recorrente é dispensada."""
 
-    dispensas: dict[str, str]
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    rotulo: str = Field(min_length=1)
+    preparo: bool
+    mandato: bool
+
+
+class TabelaDispensas(ArquivoVersionado):
+    """Qualidades do recorrente e as exigências de preparo e mandato de que são dispensadas."""
+
+    dispensas: dict[str, Dispensa]
 
 
 class TabelaCabimento(ArquivoVersionado):
@@ -131,9 +140,9 @@ def prazos_recursos_padrao() -> TabelaPrazosRecursos:
 
 
 @lru_cache(maxsize=1)
-def preparo_padrao() -> TabelaPreparo:
-    """Tabela das dispensas previstas para o gabinete."""
-    return carregar(caminho_padrao("preparo.yaml"), TabelaPreparo)
+def dispensas_padrao() -> TabelaDispensas:
+    """Tabela das dispensas de preparo e mandato por qualidade do recorrente."""
+    return carregar(caminho_padrao("dispensas.yaml"), TabelaDispensas)
 
 
 @lru_cache(maxsize=1)
