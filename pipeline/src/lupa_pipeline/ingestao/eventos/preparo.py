@@ -6,7 +6,6 @@ from collections.abc import Iterator
 from lupa_pipeline.dominio.enums import TipoFato
 from lupa_pipeline.ingestao.eventos.base import Fonte
 from lupa_pipeline.ingestao.eventos.modelo import Candidato
-from lupa_pipeline.ingestao.texto import dobrar
 
 DECISAO = re.compile(
     r"(?:gratuidade(?: da justica)? (in)?deferida|"
@@ -19,13 +18,13 @@ PEDIDO = re.compile(
 
 def pedido(fonte: Fonte) -> Iterator[Candidato]:
     """Reconhece os pedidos expressos da parte."""
-    for m in PEDIDO.finditer(dobrar(fonte.pagina.normalizado)):
+    for m in PEDIDO.finditer(fonte.pagina.dobrado):
         yield fonte.candidato(TipoFato.GRATUIDADE_PEDIDO, True, *m.span())
 
 
 def decisao(fonte: Fonte) -> Iterator[Candidato]:
     """Reconhece deferimento e indeferimento expressos."""
-    for m in DECISAO.finditer(dobrar(fonte.pagina.normalizado)):
+    for m in DECISAO.finditer(fonte.pagina.dobrado):
         yield fonte.candidato(
             TipoFato.GRATUIDADE_DECISAO, "indeferida" if any(m.groups()) else "deferida", *m.span()
         )

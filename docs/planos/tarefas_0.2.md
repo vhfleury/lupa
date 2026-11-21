@@ -1094,10 +1094,21 @@ suíte existente; o Vermelho de cada tarefa é o teste novo que só passa com o 
     Verde: saída 0; pipeline 706 passed (95,24%), intranet 266 passed (98,23%), integração 6,
     injeção 2, web 436 passed (100%), cabeçalhos e isolamento ok, agente 11. Na T12.1 o script
     tinha parado na suíte web por falta do contêiner `proxy`; esta execução cobre as duas.
-- [ ] **T12.3** `PaginaTexto` guarda o texto dobrado e as datas. RF-FAT-01. Fase 2; P2, D3.
+- [x] **T12.3** `PaginaTexto` guarda o texto dobrado e as datas. RF-FAT-01. Fase 2; P2, D3.
   - Vermelho: `pipeline/tests/ingestao/eventos/test_fatos.py::test_candidatos_iguais_com_texto_da_pagina_guardado` (compara com os candidatos dos sintéticos e conta uma dobragem por página).
   - Verde: `cached_property` `dobrado` e `datas` em `eventos/modelo.PaginaTexto`; `fatos`, `capa`, `base`, `recurso`, `preparo` e `decisao_agravada` leem delas; `capa._valor` recorta o dobrado.
   - Limpeza: `CONVERSORES_CAPA` no lugar dos ifs de `capa._valor`.
+  - Entregue: `PaginaTexto.dobrado` e `PaginaTexto.datas` (`cached_property`); os seis
+    extratores leem delas; `capa` com `CONVERSORES_CAPA` (`_valor_da_causa`,
+    `_data_de_distribuicao`, `_literal` como padrão) sobre o recorte do dobrado. O teste ficou em
+    `pipeline/tests/ingestao/test_eventos.py`, onde estão os testes dos extratores (não existe
+    `tests/ingestao/eventos/`); os candidatos esperados são os que o código anterior produzia
+    para uma petição de apelação sintética. Testes: `docker compose exec -T worker python -m
+    pytest -c pipeline/pyproject.toml pipeline/tests/ingestao/test_eventos.py --no-cov -k
+    guardado` e `bash scripts/verificar.sh` (stack inteira). Vermelho: 1 failed (`assert 5 ==
+    1`, cinco dobragens da mesma página). Verde: saída 0; pipeline 707 passed (95,24%),
+    intranet 266 passed (98,23%), integração 6, injeção 2, web 436 passed (100%), cabeçalhos e
+    isolamento ok, agente 11.
 - [ ] **T12.4** Contagem única no calendário e `dias_uteis_entre`. RF-VAL-02. Fase 3; P6, D7.
   - Vermelho: `pipeline/tests/validacoes/test_calendario.py::test_dias_uteis_entre_registra_feriado_com_fonte`.
   - Verde: `_contar` e `dias_uteis_entre` em `calendario.py`; `contar_prazo_util`, `_prorrogar` e `fonte_em` sobre eles; sai `contar_prazo_corrido` com o teste dele, no mesmo commit (D9).
