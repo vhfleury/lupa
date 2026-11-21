@@ -1147,11 +1147,26 @@ suíte existente; o Vermelho de cada tarefa é o teste novo que só passa com o 
     Vermelho: 1 failed (`isinstance('Dia do Servidor Público…', FeriadoCalendario)` falso).
     Verde: saída 0; pipeline 710 passed (95,28%), intranet 266 passed (98,23%), integração 6,
     injeção 2, web 436 passed (100%), cabeçalhos e isolamento ok, agente 11.
-- [ ] **T12.6** Tabela de dispensas própria e `Coleta.qualidade()`. RF-VAL-03, RF-VAL-04. Fase 4; P7, D8.
+- [x] **T12.6** Tabela de dispensas própria e `Coleta.qualidade()`. RF-VAL-03, RF-VAL-04. Fase 4; P7, D8.
   - Vermelho: `pipeline/tests/validacoes/test_motor_e_regras.py::test_dispensa_por_qualidade_le_a_tabela_de_dispensas`.
   - Verde: `validacoes/dados/dispensas.yaml`, `TabelaDispensas` e `dispensas_padrao()` em `dados.py`; sai `dispensas` de `preparo.yaml`; `preparo` e `representacao` usam `coleta.qualidade()`; `VERSAO_CATALOGO` sobe.
   - Limpeza: nenhuma.
   - Revisão: especialista-validacoes.
+  - Decisão nova (usuário, 21/11/2026): sem as dispensas, `preparo.yaml` ficaria vazio, e
+    `eventos/partes.py` e a versão `fatos` do reprocessamento também o liam; o arquivo é
+    renomeado para `dispensas.yaml`, `partes.py` lê dele e o reprocessamento passa a citar
+    `dispensas=`, regravando fatos e achados uma vez. O plano (tabelas e D8) foi atualizado.
+  - Entregue: `dispensas.yaml` 0.3.0 (`rotulo`, `preparo`, `mandato` por qualidade, mesmos
+    valores); `Dispensa`, `TabelaDispensas` e `dispensas_padrao()`, saem `TabelaPreparo` e
+    `preparo_padrao`; `Coleta.qualidade()`; `preparo.py` e `representacao.py` testam
+    `dispensa.preparo`/`dispensa.mandato` e citam `dispensa.rotulo`; `VERSAO_CATALOGO` 0.3.0;
+    `achados_exemplo.json` só troca `versao_catalogo` (rule D8, mesmo commit).
+    Especialista-validacoes: aprovado, achados iguais salvo `versao_dados` e
+    `versao_catalogo`. Testes: `docker compose exec -T worker python -m pytest -c
+    pipeline/pyproject.toml pipeline/tests/validacoes --no-cov` e `bash scripts/verificar.sh`
+    (stack inteira). Vermelho: erro de coleta (`cannot import name 'dispensas_padrao'`).
+    Verde: saída 0; pipeline 711 passed (95,29%), intranet 266 passed (98,23%), integração 6,
+    injeção 2, web 436 passed (100%), cabeçalhos e isolamento ok, agente 11.
 - [ ] **T12.7** Reprocessamento pela versão nova do catálogo. RF-ING-08. Fase 4; D8.
   - Vermelho: `pipeline/tests/ingestao/test_reprocessamento.py::test_nova_versao_do_catalogo_regrava_achados_com_o_mesmo_texto` (integração).
   - Verde: nenhuma mudança além da T12.6 se o mecanismo atual já regravar; senão, a menor correção em `reprocessamento.py`.

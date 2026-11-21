@@ -21,8 +21,8 @@ from lupa_pipeline.ingestao.repositorio import (
 from lupa_pipeline.validacoes.dados import (
     cabimento_padrao,
     calendario_padrao,
+    dispensas_padrao,
     prazos_recursos_padrao,
-    preparo_padrao,
 )
 from lupa_pipeline.validacoes.versao import VERSAO_CATALOGO
 
@@ -33,13 +33,13 @@ def versoes_atuais() -> dict[str, Any]:
     fontes = {
         **calendario,
         "prazos": prazos_recursos_padrao().versao,
-        "preparo": preparo_padrao().versao,
+        "dispensas": dispensas_padrao().versao,
         "cabimento": cabimento_padrao().versao,
     }
     return {
         "paginas": extrator_paginas.VERSAO_EXTRATOR,
         "pecas": indice.versoes(),
-        "fatos": f"{fatos.VERSAO}/preparo={preparo_padrao().versao}",
+        "fatos": f"{fatos.VERSAO}/dispensas={dispensas_padrao().versao}",
         "catalogo": "/".join([VERSAO_CATALOGO, *(f"{k}={v}" for k, v in sorted(fontes.items()))]),
     }
 

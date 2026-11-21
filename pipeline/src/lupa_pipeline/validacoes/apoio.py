@@ -61,6 +61,11 @@ class Coleta:
         """Inclui as fontes que sustentam a conclusão."""
         self.usados.update({str(f.id): f for f in fatos})
 
+    def qualidade(self) -> str | None:
+        """Qualidade do recorrente provada, ou ``None`` quando falta ou diverge."""
+        fato = self.unico("qualidade_recorrente")
+        return None if fato is None else str(valor_de(fato))
+
     def unico(self, tipo: str, *, obrigatorio: bool = True) -> Fato | None:
         """Seleciona o valor único ou registra sua ausência ou divergência."""
         try:

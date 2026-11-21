@@ -53,8 +53,8 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
 | `validacoes/calendario.contar_prazo_corrido` | só usada em teste | removida com o teste (D7) |
 | `validacoes/calendario.contar_prazo_util`, `fonte_em`, `_prorrogar` | laços copiados | `_contar(base, dias, sem_contagem)` e `dias_uteis_entre(inicio, fim)` (D7) |
 | `validacoes/civel/tempestividade.py` | conta dias úteis e monta os descartados à mão | `calendario.dias_uteis_entre` |
-| `validacoes/dados/dispensas.yaml` (arquivo) | não existe; dispensas em `preparo.yaml` | `qualidade → {preparo, mandato}` com os mesmos valores (D8) |
-| `validacoes/dados.TabelaPreparo.dispensas`, `dispensas_padrao()` | dentro do preparo | `TabelaDispensas`, carregada à parte (D8) |
+| `validacoes/dados/dispensas.yaml` (arquivo) | `preparo.yaml` com `qualidade → rótulo` | renomeado; `qualidade → {rotulo, preparo, mandato}` com os mesmos valores, versão 0.3.0 (D8) |
+| `validacoes/dados.TabelaPreparo`, `preparo_padrao()` | tabela do preparo, lida também por `eventos/partes.py` | `TabelaDispensas` e `dispensas_padrao()`; `partes.py` lê dela (D8) |
 | `validacoes/apoio.Coleta.unico` | anota o conflito e cada regra checa `coleta.conflitos` | levanta `FatoPendenteError`; o motor converte em `coleta.verificar()` (D8) |
 | `validacoes/apoio.Coleta.pendente`, `Coleta.qualidade()` | `pendente` sem uso; qualidade lida em duas regras | sai `pendente`; entra `qualidade()` |
 | `validacoes/apoio.PECAS` | dicionário central com `KeyError` para tipo novo | `peca_procurada` em cada regra, consultada pela `Coleta` |
@@ -75,8 +75,8 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
 | `pipeline/src/lupa_pipeline/ingestao/eventos/{modelo,fatos,capa,base,recurso,preparo,decisao_agravada,partes,saida,etapa}.py` | alterar |
 | `pipeline/src/lupa_pipeline/dominio/{esquemas,tabelas,gravacao}.py` | alterar |
 | `pipeline/src/lupa_pipeline/validacoes/{calendario,dados,apoio,modelo,motor,adaptador,versao}.py`, `civel/*.py` | alterar |
-| `pipeline/src/lupa_pipeline/validacoes/dados/dispensas.yaml` | criar |
-| `pipeline/src/lupa_pipeline/validacoes/dados/preparo.yaml` | sai `dispensas` |
+| `pipeline/src/lupa_pipeline/validacoes/dados/preparo.yaml` | renomear para `dispensas.yaml` (D8) |
+| `pipeline/src/lupa_pipeline/ingestao/reprocessamento.py` | chave `dispensas=` nas versões de fatos e catálogo (D8) |
 | `pipeline/src/lupa_pipeline/sinteticos/{medicao,gerador,gabarito,roteiro,empacotamento}.py` | alterar |
 | `pipeline/src/lupa_pipeline/config.py`, `.env.example` | `extracao_lotes_por_job=2`; sai `extracao_lotes_por_gabinete` |
 | `intranet/api/src/lupa_api/agente/ferramentas/leitura.py`, `recusa.py`, `agente/dossie.py` | importam `texto.dobrar`; `dossie.py` lê `fato.valor` |
@@ -134,7 +134,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
 - **D6.** Gravação em lote só dentro da transação que já existe; o `hash_diff` continua por linha.
 - **D7.** `contar_prazo_corrido` sai com o teste; `feriados` e `fontes` viram um só
   `Mapping[date, Feriado]`; o especialista-validacoes revisa.
-- **D8.** Tabela própria `dispensas.yaml` com os mesmos valores; `Coleta.unico` interrompe a
+- **D8.** `preparo.yaml` vira `dispensas.yaml`, tabela própria com os mesmos valores, lida pelas regras e por `eventos/partes.py`; as versões de fatos e catálogo do reprocessamento passam a citar `dispensas=`, e fatos e achados são regravados uma vez (decisão do usuário na T12.6); `Coleta.unico` interrompe a
   regra em conflito; o especialista-validacoes revisa. A troca de arquivo de dados muda
   `versoes_dados` do achado, então `VERSAO_CATALOGO` sobe e o reprocessamento (RF-ING-08)
   regrava os achados com o mesmo resultado e texto.
