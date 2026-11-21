@@ -14,6 +14,7 @@ Gera os autos em pasta temporária quando a referência cível não está instal
 import json
 import os
 from dataclasses import dataclass, field, replace
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -22,8 +23,8 @@ import pytest
 from lupa_pipeline.dominio.enums import FlagPagina
 from lupa_pipeline.ingestao.extracao import (
     FontePaginas,
-    Paralelismo,
     executar_em_paralelo,
+    executar_tarefa,
     planejar,
 )
 from lupa_pipeline.ingestao.parser_pdf import inspecionar
@@ -84,7 +85,7 @@ def _extrair(pdf: Path, numeros: set[int]) -> dict[int, dict[str, Any]]:
     fonte = FontePaginas(pdf, pdf.name, max(numeros), 0)
     tarefas = [t for t in planejar([fonte], 1) if t.inicio in numeros]
     paginas: dict[int, dict[str, Any]] = {}
-    for resultado in executar_em_paralelo(tarefas, LIMITES, Paralelismo(1, 4, 4), "regressao"):
+    for resultado in executar_em_paralelo(tarefas, partial(executar_tarefa, limites=LIMITES), 4):
         assert resultado.motivo_falha is None
         paginas.update({int(p["numero"]): p for p in resultado.paginas})
     return paginas
@@ -183,7 +184,7 @@ def _falso_positivo(semente: Path) -> tuple[int, int, list[int]]:
     fonte = FontePaginas(semente, semente.name, total, 0)
     sinalizadas = []
     for resultado in executar_em_paralelo(
-        planejar([fonte], 8), LIMITES, Paralelismo(8, 4, 4), "regressao"
+        planejar([fonte], 8), partial(executar_tarefa, limites=LIMITES), 4
     ):
         assert resultado.motivo_falha is None
         sinalizadas += [

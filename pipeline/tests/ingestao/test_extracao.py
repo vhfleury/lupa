@@ -2,6 +2,7 @@
 
 import threading
 import time
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -10,8 +11,6 @@ from lupa_pipeline.dominio.enums import MotivoFalha
 from lupa_pipeline.ingestao.extracao import (
     MODULO_EXTRATOR,
     FontePaginas,
-    LimitadorGabinete,
-    Paralelismo,
     Tarefa,
     executar_em_paralelo,
     executar_tarefa,
@@ -86,13 +85,13 @@ def test_tarefa_converte_numeracao_e_falhas_do_filho() -> None:
     assert executar_tarefa(tarefa, LIMITES, _recusa).motivo_falha is MotivoFalha.ERRO_PARSER
 
 
-def test_paralelismo_respeita_o_teto_do_gabinete() -> None:
-    """Dois jobs do mesmo gabinete em paralelo nunca passam do teto somado."""
+def test_paralelismo_respeita_o_teto_por_job() -> None:
+    """RF-ING-04: nunca roda mais itens ao mesmo tempo que `lotes_por_job`."""
     ativos = 0
     pico = 0
     trava = threading.Lock()
 
-    def _lento(*_args: Any) -> ResultadoSandbox:
+    def _lento(numero: int) -> int:
         nonlocal ativos, pico
         with trava:
             ativos += 1
@@ -100,25 +99,21 @@ def test_paralelismo_respeita_o_teto_do_gabinete() -> None:
         time.sleep(0.05)
         with trava:
             ativos -= 1
-        return ResultadoSandbox(dados={"ok": True, "paginas": []})
+        return numero
 
-    limitador = LimitadorGabinete()
-    paralelismo = Paralelismo(paginas_por_lote=1, lotes_por_job=4, lotes_por_gabinete=2)
-    tarefas = planejar([FontePaginas(Path("a.pdf"), "a.pdf", 6, 0)], 1)
-
-    def _job() -> None:
-        list(
-            executar_em_paralelo(
-                tarefas, LIMITES, paralelismo, "g1", limitador=limitador, executor=_lento
-            )
-        )
-
-    threads = [threading.Thread(target=_job) for _ in range(2)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
+    assert sorted(executar_em_paralelo(range(6), _lento, 2)) == list(range(6))
     assert pico == 2
+
+
+def test_parada_deixa_terminar_os_itens_em_curso_e_nao_submete_outros() -> None:
+    """RF-ING-07: com `parar` marcado, só os itens já em curso devolvem resultado."""
+    parar = threading.Event()
+
+    def _rodar(numero: int) -> int:
+        parar.set()
+        return numero
+
+    assert list(executar_em_paralelo(range(5), _rodar, 1, parar)) == [0]
 
 
 def test_lotes_reais_rodam_em_processos_filhos(tmp_path: Path) -> None:
@@ -128,11 +123,7 @@ def test_lotes_reais_rodam_em_processos_filhos(tmp_path: Path) -> None:
         pdf_texto([f"Folha nativa {n} com texto suficiente aqui" for n in range(5)])
     )
     tarefas = planejar([FontePaginas(caminho, "a.pdf", 5, 0)], 3)
-    resultados = list(
-        executar_em_paralelo(
-            tarefas, LIMITES, Paralelismo(3, 2, 2), "g", limitador=LimitadorGabinete()
-        )
-    )
+    resultados = list(executar_em_paralelo(tarefas, partial(executar_tarefa, limites=LIMITES), 2))
     numeros = sorted(p["numero"] for r in resultados for p in r.paginas)
     assert numeros == [1, 2, 3, 4, 5]
 

@@ -1206,7 +1206,7 @@ no "Entregue" de cada fase.
 - [ ] **T12.13** Registro de extratores por espécie — RF-FAT-01. [fase F13](plano_limpeza_pipeline.md)
 - [x] **T12.14** Etapas em lista ordenada no worker — RF-ING-08. [fase F14](plano_limpeza_pipeline.md)
 - [x] **T12.15** Formatos por mime e nomes internos no diagnóstico — RF-ING-07. [fase F15](plano_limpeza_pipeline.md)
-- [ ] **T12.16** Extração paralela sem gabinete — RF-ING-04, RF-ING-07. [fase F16](plano_limpeza_pipeline.md)
+- [x] **T12.16** Extração paralela sem gabinete — RF-ING-04, RF-ING-07. [fase F16](plano_limpeza_pipeline.md)
 - [ ] **T12.17** Gravação de páginas em lote — RF-ING-03. [fase F17](plano_limpeza_pipeline.md)
 - [ ] **T12.18** MinIO para arquivo e PDF aberto pelo caminho — RF-ING-04. [fase F18](plano_limpeza_pipeline.md)
 - [ ] **T12.19** Leituras repetidas na fila e nos repositórios — RF-ING-07. [fase F19](plano_limpeza_pipeline.md)

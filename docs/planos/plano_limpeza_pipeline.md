@@ -360,7 +360,15 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
 - Verde: `_processar_lotes` com `executar_em_paralelo` e `extracao_lotes_por_job` (padrão 2); um
   `copiar_do_cache` antes do laço; um caminho de gravação; retentativa simplificada; saem
   `LimitadorGabinete`, `lotes_por_gabinete` e `extracao_lotes_por_gabinete`.
-- Entregue:
+- Entregue: _processar_lotes com executar_em_paralelo e extracao_lotes_por_job (padrão 2; 1 =
+  série); gravação na thread do worker, na conexão do lock (_gravar_lote); um copiar_do_cache antes
+  do laço; closing() cancela o resto em erro; saem LimitadorGabinete, lotes_por_gabinete e
+  extracao_lotes_por_gabinete; .env.example cita LUPA_EXTRACAO_LOTES_POR_JOB.
+  test_interrupcao_retoma_sem_reextrair_pagina_gravada fixa extracao_lotes_por_job=1 (condição do
+  especialista-ingestao). Especialista-ingestao: aprovado com condição, atendida; especialista-
+  infra: aprovado. Vermelho: 2 failed (BrokenBarrierError: lotes em série). Verde: verificar.sh na
+  stack inteira com F11 e F16: saída 0; pipeline 732 passed (95,40%), intranet 267 (98,23%),
+  integração 6, injeção 2, web 436 (100%), cabeçalhos e isolamento ok, agente 11.
 
 ### F17 — Gravação de páginas em lote
 

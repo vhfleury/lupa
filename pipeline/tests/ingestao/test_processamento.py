@@ -1,12 +1,13 @@
 """Integração de A5 com PostgreSQL, cifra e parsers isolados."""
 
+import threading
 import zipfile
 from pathlib import Path
 from threading import Event
 from typing import Any
 
 import pytest
-from sqlalchemy import func, select, text
+from sqlalchemy import Engine, func, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from apoio_arquivos import pdf_com_senha, pdf_minimo, pdf_texto, zip_por_peca
@@ -14,7 +15,7 @@ from apoio_ingestao import SemearArquivo
 from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.tabelas import sat_arquivo_lote, sat_pagina_extracao
 from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoPagina, VisaoPeca
-from lupa_pipeline.ingestao import processamento
+from lupa_pipeline.ingestao import paginas, processamento
 from lupa_pipeline.ingestao.cache import copiar_do_cache
 from lupa_pipeline.ingestao.diagnostico import NomeInternoAusenteError
 from lupa_pipeline.ingestao.extracao import ResultadoTarefa, Tarefa, executar_tarefa
@@ -97,7 +98,9 @@ def test_interrupcao_retoma_sem_reextrair_pagina_gravada(
 ) -> None:
     """RF-ING-07: ao parar após o primeiro lote, a segunda execução só extrai o segundo."""
     hk = semear_arquivo(pdf_texto(["retomada um", "retomada dois"])).hk_arquivo
-    settings = settings_ficticias.model_copy(update={"extracao_paginas_por_lote": 1})
+    settings = settings_ficticias.model_copy(
+        update={"extracao_paginas_por_lote": 1, "extracao_lotes_por_job": 1}
+    )
     parada = Event()
     chamadas: list[int] = []
     original = executar_tarefa
@@ -241,3 +244,102 @@ def test_nome_sem_entrada_interna_e_erro_de_integridade() -> None:
     formato = processamento.FORMATOS[TipoArquivo.PDF.value]
     with pytest.raises(NomeInternoAusenteError):
         formato.diagnosticar("0" * 64, entradas, {})
+
+
+class FalhaDeGravacaoError(Exception):
+    """Falha simulada na gravação de uma página."""
+
+
+def _registrar_gravacoes(
+    monkeypatch: pytest.MonkeyPatch, falhar_em: int | None = None
+) -> list[tuple[int, int, int]]:
+    gravacoes: list[tuple[int, int, int]] = []
+    original = paginas.gravar_pagina
+
+    def gravar(session: Session, arquivo: VisaoArquivo, linha: dict[str, Any]) -> bytes:
+        numero = int(linha["numero"])
+        if numero == falhar_em and all(gravada != numero for gravada, _, _ in gravacoes):
+            gravacoes.append((numero, threading.get_ident(), 0))
+            raise FalhaDeGravacaoError
+        pid = session.scalar(select(func.pg_backend_pid()))
+        gravacoes.append((numero, threading.get_ident(), int(pid or 0)))
+        return original(session, arquivo, linha)
+
+    monkeypatch.setattr(paginas, "gravar_pagina", gravar)
+    return gravacoes
+
+
+def _extracao_em_par(monkeypatch: pytest.MonkeyPatch, emparelhadas: set[int]) -> list[int]:
+    chamadas: list[int] = []
+    encontro = threading.Barrier(2, timeout=10)
+
+    def executar(tarefa: Tarefa, limites: LimitesSandbox) -> ResultadoTarefa:
+        chamadas.append(tarefa.inicio)
+        if tarefa.inicio in emparelhadas:
+            encontro.wait()
+        return executar_tarefa(tarefa, limites)
+
+    monkeypatch.setattr(processamento, "executar_tarefa", executar)
+    return chamadas
+
+
+def test_lotes_em_paralelo_gravam_na_conexao_do_lock(
+    engine_teste: Engine,
+    settings_ficticias: Settings,
+    semear_arquivo: SemearArquivo,
+    storage_memoria: ObjectStorage,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """RF-ING-04: dois filhos rodam juntos e toda página é gravada na thread e conexão do lock."""
+    hk = semear_arquivo(pdf_texto([f"paralelo {n}" for n in range(4)])).hk_arquivo
+    settings = settings_ficticias.model_copy(
+        update={"extracao_paginas_por_lote": 1, "extracao_lotes_por_job": 2}
+    )
+    _extracao_em_par(monkeypatch, {1, 2, 3, 4})
+    gravacoes = _registrar_gravacoes(monkeypatch)
+    with engine_teste.connect() as conexao:
+        pid_do_lock = conexao.scalar(select(func.pg_backend_pid()))
+        conexao.commit()
+        fabrica = sessionmaker(conexao, expire_on_commit=False)
+        processar_arquivo(fabrica, settings, storage_memoria, hk, Event())
+    assert sorted(numero for numero, _, _ in gravacoes) == [1, 2, 3, 4]
+    assert {(thread, pid) for _, thread, pid in gravacoes} == {(threading.get_ident(), pid_do_lock)}
+    with Session(engine_teste) as sessao:
+        assert sessao.get_one(VisaoArquivo, hk).estado == "concluido"
+
+
+def test_falha_de_gravacao_cancela_lotes_e_retoma_so_os_faltantes(
+    fabrica_sessao: sessionmaker[Session],
+    settings_ficticias: Settings,
+    semear_arquivo: SemearArquivo,
+    storage_memoria: ObjectStorage,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """RF-ING-04, RF-ING-07: erro ao gravar um lote para a extração; a retomada faz o resto."""
+    total = 6
+    hk = semear_arquivo(pdf_texto([f"retomada {n}" for n in range(total)])).hk_arquivo
+    settings = settings_ficticias.model_copy(
+        update={"extracao_paginas_por_lote": 1, "extracao_lotes_por_job": 2}
+    )
+    primeira = _extracao_em_par(monkeypatch, {1, 2})
+    gravacoes = _registrar_gravacoes(monkeypatch, falhar_em=2)
+    with pytest.raises(FalhaDeGravacaoError):
+        processar_arquivo(fabrica_sessao, settings, storage_memoria, hk, Event())
+    assert len(primeira) < total
+    with fabrica_sessao() as sessao:
+        gravadas = set(
+            sessao.scalars(select(VisaoPagina.numero).where(VisaoPagina.hk_arquivo == hk))
+        )
+        lotes = set(
+            sessao.scalars(
+                select(sat_arquivo_lote.c.numero).where(sat_arquivo_lote.c.hk_arquivo == hk)
+            )
+        )
+    assert 2 not in gravadas
+    assert lotes == gravadas
+    segunda = _extracao_em_par(monkeypatch, set())
+    processar_arquivo(fabrica_sessao, settings, storage_memoria, hk, Event())
+    assert sorted(segunda) == sorted(set(range(1, total + 1)) - gravadas)
+    assert sorted({numero for numero, _, pid in gravacoes if pid}) == list(range(1, total + 1))
+    with fabrica_sessao() as sessao:
+        assert sessao.get_one(VisaoArquivo, hk).estado == "concluido"

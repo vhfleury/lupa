@@ -2,9 +2,10 @@
 
 from collections import Counter
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event
@@ -34,6 +35,7 @@ from lupa_pipeline.ingestao.extracao import (
     FontePaginas,
     ResultadoTarefa,
     Tarefa,
+    executar_em_paralelo,
     executar_tarefa,
     linha_pagina,
     pendentes,
@@ -281,15 +283,90 @@ def _preparar(
     return fontes, diagnostico
 
 
+RETENTAVEIS = (MotivoFalha.TEMPO_ESGOTADO, MotivoFalha.ERRO_PARSER)
+LIMITES_DUROS = (MotivoFalha.LIMITE_MEMORIA, MotivoFalha.LIMITE_CPU)
+
+
+@dataclass(frozen=True)
+class LotePlanejado:
+    """Lote do plano com os intervalos que ainda exigem extração."""
+
+    numero: int
+    tarefa: Tarefa
+    restantes: list[Tarefa]
+
+
 def _extrair_lote(tarefa: Tarefa, limites: LimitesSandbox, retentativas: int) -> ResultadoTarefa:
-    for tentativa in range(retentativas + 1):
+    for _ in range(retentativas):
         resultado = executar_tarefa(tarefa, limites)
-        if (
-            resultado.motivo_falha not in (MotivoFalha.TEMPO_ESGOTADO, MotivoFalha.ERRO_PARSER)
-            or tentativa == retentativas
-        ):
+        if resultado.motivo_falha not in RETENTAVEIS:
             return resultado
-    raise ValueError("quantidade inválida de retentativas")
+    return executar_tarefa(tarefa, limites)
+
+
+def _extrair_restantes(
+    lote: LotePlanejado, limites: LimitesSandbox, retentativas: int
+) -> tuple[LotePlanejado, list[ResultadoTarefa]]:
+    resultados = []
+    for tarefa in lote.restantes:
+        resultados.append(_extrair_lote(tarefa, limites, retentativas))
+        if resultados[-1].motivo_falha in LIMITES_DUROS:
+            break
+    return lote, resultados
+
+
+def _gravar_lote(
+    trabalho: Trabalho,
+    lote: LotePlanejado,
+    resultados: list[ResultadoTarefa],
+    prontas: set[int],
+    falhas: Counter[str],
+) -> None:
+    faltam = set(lote.tarefa.numeros) - prontas
+    motivo = resultados[-1].motivo_falha if resultados else None
+    with trabalho.transacao() as session:
+        for resultado in resultados:
+            for pagina in resultado.paginas:
+                if "erro" in pagina or pagina["numero"] not in faltam:
+                    continue
+                paginas.gravar_pagina(
+                    session, trabalho.arquivo, linha_pagina(pagina, trabalho.versoes["paginas"])
+                )
+                faltam.discard(int(pagina["numero"]))
+        if faltam:
+            falhas[(motivo or MotivoFalha.ERRO_PARSER).value] += len(faltam)
+        atributos = {
+            "numero": lote.numero,
+            "estado": EstadoLote.FALHO.value if faltam else EstadoLote.CONCLUIDO.value,
+            "resultado": {
+                "paginas": list(lote.tarefa.numeros),
+                "faltantes": sorted(faltam),
+                "motivo": motivo.value if motivo else None,
+            },
+        }
+        gravar_satelite(session, sat_arquivo_lote, trabalho.arquivo.hk_arquivo, atributos, ORIGEM)
+    log.info(
+        "lote_gravado",
+        arquivo_id=trabalho.arquivo.hk_arquivo.hex(),
+        lote=lote.numero,
+        faltantes=len(faltam),
+    )
+
+
+def _planejar_lotes(
+    trabalho: Trabalho, fontes: list[FontePaginas], paginas_por_lote: int
+) -> tuple[list[LotePlanejado], set[int]]:
+    versao = trabalho.versoes["paginas"]
+    total = sum(fonte.paginas for fonte in fontes)
+    with trabalho.transacao() as session:
+        prontas = paginas.prontas(session, trabalho.arquivo.hk_arquivo, versao)
+        faltantes = set(range(1, total + 1)) - prontas
+        prontas |= copiar_do_cache(session, trabalho.arquivo, versao, total, faltantes)
+    lotes = [
+        LotePlanejado(numero, tarefa, pendentes([tarefa], prontas))
+        for numero, tarefa in enumerate(planejar(fontes, paginas_por_lote), 1)
+    ]
+    return lotes, prontas
 
 
 def _processar_lotes(
@@ -299,75 +376,24 @@ def _processar_lotes(
     limites: LimitesSandbox,
     parar: Event,
 ) -> Counter[str]:
-    hk = trabalho.arquivo.hk_arquivo
-    with trabalho.transacao() as session:
-        prontas = paginas.prontas(session, hk, trabalho.versoes["paginas"])
+    lotes, prontas = _planejar_lotes(trabalho, fontes, settings.extracao_paginas_por_lote)
     falhas: Counter[str] = Counter()
-    for numero, lote in enumerate(planejar(fontes, settings.extracao_paginas_por_lote), 1):
-        if parar.is_set():
-            break
-        faltam = set(lote.numeros) - prontas
-        if faltam:
-            with trabalho.transacao() as session:
-                prontas.update(
-                    copiar_do_cache(
-                        session,
-                        trabalho.arquivo,
-                        trabalho.versoes["paginas"],
-                        sum(f.paginas for f in fontes),
-                        faltam,
-                    )
-                )
-        restantes = pendentes([lote], prontas)
-        if not restantes:
-            with trabalho.transacao() as session:
-                gravar_satelite(
-                    session,
-                    sat_arquivo_lote,
-                    hk,
-                    {
-                        "numero": numero,
-                        "estado": "concluido",
-                        "resultado": {
-                            "paginas": list(lote.numeros),
-                            "faltantes": [],
-                            "motivo": None,
-                        },
-                    },
-                    ORIGEM,
-                )
-            log.info("lote_gravado", arquivo_id=hk.hex(), lote=numero, faltantes=0)
-            continue
-        faltam = set(lote.numeros) - prontas
-        motivo = None
-        extraidas: list[dict[str, Any]] = []
-        for tarefa in restantes:
-            resultado = _extrair_lote(tarefa, limites, settings.max_retentativas)
-            motivo = resultado.motivo_falha
-            if motivo in (MotivoFalha.LIMITE_MEMORIA, MotivoFalha.LIMITE_CPU):
+    for lote in lotes:
+        if not lote.restantes:
+            _gravar_lote(trabalho, lote, [], prontas, falhas)
+    a_extrair = [lote for lote in lotes if lote.restantes]
+    extracoes = executar_em_paralelo(
+        a_extrair,
+        partial(_extrair_restantes, limites=limites, retentativas=settings.max_retentativas),
+        settings.extracao_lotes_por_job,
+        parar,
+    )
+    with closing(extracoes):
+        for lote, resultados in extracoes:
+            motivo = resultados[-1].motivo_falha
+            if motivo is not None and motivo in LIMITES_DUROS:
                 raise FalhaSandboxError(motivo)
-            extraidas.extend(
-                p for p in resultado.paginas if "erro" not in p and p["numero"] in faltam
-            )
-        with trabalho.transacao() as session:
-            for pagina in extraidas:
-                paginas.gravar_pagina(
-                    session, trabalho.arquivo, linha_pagina(pagina, trabalho.versoes["paginas"])
-                )
-                faltam.discard(int(pagina["numero"]))
-            if faltam:
-                falhas[(motivo or MotivoFalha.ERRO_PARSER).value] += len(faltam)
-            atributos = {
-                "numero": numero,
-                "estado": EstadoLote.FALHO.value if faltam else EstadoLote.CONCLUIDO.value,
-                "resultado": {
-                    "paginas": list(lote.numeros),
-                    "faltantes": sorted(faltam),
-                    "motivo": motivo.value if motivo else None,
-                },
-            }
-            gravar_satelite(session, sat_arquivo_lote, hk, atributos, ORIGEM)
-        log.info("lote_gravado", arquivo_id=hk.hex(), lote=numero, faltantes=len(faltam))
+            _gravar_lote(trabalho, lote, resultados, prontas, falhas)
     return falhas
 
 
