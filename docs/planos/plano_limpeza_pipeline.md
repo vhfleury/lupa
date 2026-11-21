@@ -316,7 +316,12 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
 - Vermelho: `tests/ingestao/test_eventos.py::test_toda_especie_com_extrator_esta_no_registro`.
 - Verde: `EXTRATORES: TipoPeca → extratores`, capa como extrator com filtro de página;
   `candidatos_da_peca` vira um laço.
-- Entregue:
+- Entregue: EXTRATORES: TipoPeca → tupla de extratores, com a capa como extrator com filtro de
+  página (capa_inicial) e Contexto com tipo, qualidade explícita e páginas de identificação;
+  candidatos_da_peca vira um laço, com a mesma ordem por página. Especialista-ingestao: aprovado.
+  Vermelho: 1 failed (AssertionError: registro sem as espécies). Verde: verificar.sh na stack
+  inteira com F13 e F20: saída 0; pipeline 727 passed (95,35%), intranet 267 (98,23%), integração 6,
+  injeção 2, web 436 (100%), cabeçalhos e isolamento ok, agente 11.
 
 ### F14 — Etapas em lista ordenada no worker
 

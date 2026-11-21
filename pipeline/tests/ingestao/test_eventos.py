@@ -11,6 +11,7 @@ from lupa_pipeline.ingestao.eventos import (
     capa,
     decisao_agravada,
     fatos,
+    marcos,
     modelo,
     partes,
     preparo,
@@ -229,3 +230,26 @@ def test_codigo_do_outorgante_resolve_o_nome() -> None:
     assert partes.codigo_do_outorgante(substabelecimento, codigos.__getitem__) == (
         substabelecimento
     )
+
+
+def test_toda_especie_com_extrator_esta_no_registro() -> None:
+    """RF-FAT-01: o registro declara, por espécie, a capa e os extratores próprios dela."""
+    proprios = {tipo: 1 for tipo in recurso.RECURSOS}
+    proprios |= {tipo: 1 for tipo in marcos.MARCOS}
+    proprios |= {
+        TipoPeca.PETICAO_INICIAL: 2,
+        TipoPeca.ACORDAO: 2,
+        TipoPeca.CERTIDAO: 1,
+        TipoPeca.SENTENCA: 1,
+        TipoPeca.DECISAO_INTERLOCUTORIA: 1,
+        TipoPeca.PROCURACAO: 1,
+        TipoPeca.COMPROVANTE_PREPARO: 1,
+    }
+    assert not set(recurso.RECURSOS) & set(marcos.MARCOS)
+    assert set(fatos.EXTRATORES) == set(TipoPeca)
+    assert all(extratores[0] is fatos.capa_inicial for extratores in fatos.EXTRATORES.values())
+    assert {
+        tipo: len(extratores) - 1
+        for tipo, extratores in fatos.EXTRATORES.items()
+        if len(extratores) > 1
+    } == proprios
