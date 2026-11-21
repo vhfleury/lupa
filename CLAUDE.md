@@ -5,7 +5,7 @@ Regras que valem para todo código do repositório. As seções de "Linguagem e 
 ## Versão 0.2
 
 - A fonte da verdade é [a especificação da 0.2](docs/especificacao/0.2/especificacao.md); o código deriva dela. Divergência entre código e especificação é bug do código ou mudança de especificação aprovada antes.
-- Ordem fixa, cada fase só começa com a anterior aprovada pelo usuário: especificação, plano (`docs/planos/`), tarefas (`docs/planos/tarefas_0.2.md`), implementação tarefa por tarefa com TDD.
+- Ordem fixa, cada fase só começa com a anterior aprovada pelo usuário: especificação, plano (`docs/planos/`, uma fase por tarefa), lista de tarefas (`docs/planos/tarefas_0.2.md`), implementação fase por fase com TDD, num único PR por plano.
 - Cada tarefa cita o requisito que atende (`RF-<ÁREA>-NN` ou `RNF-NN`). Cada teste novo cita o requisito na docstring. Commit e PR citam a tarefa.
 - Escopo: um único gabinete de desembargador, área cível. Não há `gabinete_id`, RLS por gabinete, papel administrador, pseudonimização, bloqueio de sigiloso, Redis, monitoramento nem backup; nada disso é reintroduzido sem mudança de especificação.
 - Tudo do frontend e do back que o atende (API, acesso, auditoria, agente) fica em `intranet/`. Tudo da pipeline de dados (worker, ingestão, eventos, validações, modelo e migrations do Data Vault, sintéticos) fica em `pipeline/`.
@@ -38,8 +38,8 @@ Regras que valem para todo código do repositório. As seções de "Linguagem e 
 
 ## Entrega de cada tarefa
 
-- Marque a tarefa em `docs/planos/tarefas_0.2.md` com o requisito atendido, o comando para rodar os testes e a saída resumida (vermelho inicial e verde final).
-- Decisão que o plano não previa para a tarefa e volta ao usuário antes de seguir.
+- Cada tarefa é uma fase do plano. Ao concluir, preencha o "Entregue" da fase no plano com o comando para rodar os testes e a saída resumida (vermelho inicial e verde final), e marque a caixa da tarefa em `docs/planos/tarefas_0.2.md`.
+- Decisão que o plano não previa para a fase volta ao usuário antes de seguir e entra no plano, na seção de decisões.
 - `docs/etapas/ETAPAS.md` é o histórico da v1 e não recebe entregas novas.
 
 ## Desenvolvimento
@@ -91,22 +91,33 @@ docs/
 
 ### Conteúdo obrigatório de um plano
 
-- Antes de escrever o plano, levante todas as decisões e pergunte todas ao usuário. O plano não
-  sai com decisão "pendente: usuário (fase N)"; adiamento só por decisão explícita dele,
-  registrada.
+- Antes de escrever o plano, levante todas as decisões e pergunte todas ao usuário, inclusive
+  as que só apareceriam durante uma fase (efeito em dados gravados, versões, ids, contratos entre
+  pacotes). O plano não sai com decisão "pendente: usuário (fase N)"; adiamento só por decisão
+  explícita dele, registrada. Para cada risco que uma fase pode revelar, o plano já diz o que
+  fazer (por exemplo: "se o teste de igualdade falhar, a fase sai do plano e vira dívida").
+- Cada tarefa é uma fase do plano, numerada `F<n>` na ordem de execução. Não há quebra posterior
+  em tarefas: `docs/planos/tarefas_0.2.md` recebe só a lista de caixas que aponta para as fases.
+- O plano é montado para distribuir as fases entre agentes. Cada fase traz, numa linha cada:
+  requisito; agente que implementa (`executor`, `tdd` ou especialista) e agentes que revisam;
+  arquivos que toca; fases de que depende; fases com que pode rodar em paralelo (sem arquivo em
+  comum e sem depender do resultado); Vermelho (`<arquivo>::<teste>`); Verde; Pronto quando; e
+  "Entregue", preenchido ao concluir.
 - O plano abre com a seção "O que muda": tabela `Objeto | Antes | Depois` (cada tabela, coluna,
   índice, função ou view do banco, com o tipo), tabela `Arquivo | Ação` e lista "O que
   não muda". No plano que recria o banco do zero a tabela é `Objeto | Depois`, e o que existia na
   0.1 entra numa lista única de objetos removidos.
-- Cada fase do plano cita os requisitos da especificação que atende.
-- Cada fato aparece uma vez. Problemas e decisões numerados; fases de uma linha que citam P/D.
+- Cada fato aparece uma vez. Problemas e decisões numerados; cada fase cita os P/D e os
+  requisitos que atende.
   Sem seção de motivação, história, justificativa ou resultado previsto.
 - Seção "Passo a passo do algoritmo": passos numerados, na ordem de execução, um por linha; cada
   passo informa entrada, ação e saída; desvios, condições de parada e tratamento de erro aparecem
   como passos próprios; um bloco por algoritmo. Fica no plano ou em
   `docs/planos/plano_<tema>_execucao.md`, junto com a lista de arquivos e o checklist de testes.
 - Se o algoritmo mudar durante a implementação, atualize a seção.
-- Execução (subida no servidor do piloto) em no máximo 3 etapas, por exemplo: commit e PR;
+- Um plano, um PR: a branch do plano reúne um commit por fase e o PR para a `develop` é aberto
+  na primeira fase e atualizado a cada uma.
+- Execução (subida no servidor do piloto) em no máximo 3 etapas, por exemplo: merge do PR do plano;
   `docker compose up -d --build --wait`; `alembic -c pipeline/src/lupa_pipeline/migrations/alembic.ini
   upgrade head` no contêiner `api`, na ordem de
   `docs/operacao/operacao.md` (Atualização de versão). Sem passo de conferência manual no banco;
@@ -191,13 +202,15 @@ docs/
 
 - Branches: `main` (versões publicadas) e `develop` (integração). Nenhum commit nem push direto
   em nenhuma das duas; tudo entra por PR.
-- Branch de trabalho sai de `develop`, no formato `<tipo>/T<nn>-<descricao-curta>` (exemplo:
-  `feat/T10.3-tela-processos`). Tipos: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
+- Branch de trabalho sai de `develop`. A de um plano é uma só, no formato `<tipo>/<tema-do-plano>`
+  (exemplo: `refactor/limpeza-pipeline`); fora de plano, `<tipo>/<descricao-curta>`. Tipos:
+  `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
 - Commit em Conventional Commits, em português: `<tipo>(<escopo>): <resumo no imperativo>`, até
-  72 caracteres na primeira linha; corpo com o porquê; rodapé `Tarefa: T<nn>` e, quando houver,
-  `BREAKING CHANGE: <o que quebra>`.
-- PR de um assunto só, com a tarefa e os requisitos atendidos na descrição. Merge em `develop`
-  por squash, com a mensagem do squash em Conventional Commits.
+  72 caracteres na primeira linha; corpo com o porquê; rodapé `Tarefa: T<nn>` (a fase do plano)
+  e, quando houver, `BREAKING CHANGE: <o que quebra>`.
+- Um PR por plano, com o plano, as fases concluídas e os requisitos atendidos na descrição; sem
+  PR por fase nem PRs empilhados. Mudança fora de plano é um PR de um assunto só. Merge em
+  `develop` por squash, com a mensagem do squash em Conventional Commits.
 - Versão: `release/x.y.z` sai de `develop`, atualiza o `CHANGELOG.md` e entra na `main` por merge
   commit; a `main` recebe a tag anotada `vx.y.z` (SemVer) e a `release` volta para `develop`.
 - Sem force-push em `main`, `develop` ou branch com PR aberto de outra pessoa; sem reescrever

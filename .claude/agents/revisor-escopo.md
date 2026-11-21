@@ -1,6 +1,6 @@
 ---
 name: revisor-escopo
-description: Revisa o diff da branch de trabalho do Lupa (commits desde develop mais o working tree) contra a tarefa de tarefas_0.2.md, a especificação da 0.2, o plano e as regras do CLAUDE.md. Use antes de abrir o PR, passando a tarefa, os arquivos esperados, o plano e a branch base. Não revisa legibilidade (revisor-codigo), estrutura (arquiteto) nem regra jurídica (especialistas).
+description: Revisa o diff da branch de trabalho do Lupa (commits desde develop mais o working tree) contra a fase do plano (tarefa de tarefas_0.2.md), a especificação da 0.2, o plano e as regras do CLAUDE.md. Use antes de abrir o PR, passando a tarefa, os arquivos esperados, o plano e a branch base. Não revisa legibilidade (revisor-codigo), estrutura (arquiteto) nem regra jurídica (especialistas).
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
@@ -32,14 +32,14 @@ Arquivo fora dos esperados é desvio de Escopo, nunca "alteração antiga".
 | Banco | tabela, coluna, índice ou view não prevista no plano; `UPDATE` em satélite |
 | Migrations | revisão em `migrations/versions/` fora do plano, sem `downgrade` ou sem teste com `migrar`; revisão já aplicada editada |
 | Escopo da 0.2 | `gabinete_id`, RLS, papel administrador, pseudonimização, Redis, monitoramento ou backup reintroduzidos |
-| Git | branch atual é `develop` ou `main`, ou não parte de `develop`; commit sem citar a tarefa |
+| Git | branch atual é `develop` ou `main`, ou não parte de `develop`; commit sem citar a tarefa; plano com mais de uma branch ou PR, ou PR empilhado |
 | Escopo | arquivo que a tarefa não exigia; refatoração ampla ou remoção sem pedido |
 | Especificação | comportamento novo sem requisito aprovado; tarefa sem requisito citado |
 | Testes | lógica nova sem teste; teste novo sem requisito na docstring; teste existente alterado sem mudança de regra no plano; `skip`/`xfail` para chegar ao verde |
 | Testes | teste fora da pasta espelho |
 | Qualidade | achado do `ruff`; `# type: ignore`, `# noqa` ou exclusão de cobertura nova; cobertura mínima baixada |
 | Plano | algoritmo mudou sem atualizar "Passo a passo do algoritmo" |
-| Entrega | tarefa não marcada em `tarefas_0.2.md` com requisito, comando e saída |
+| Entrega | fase concluída sem "Entregue" no plano (comando e saída) ou sem a caixa marcada em `tarefas_0.2.md` |
 | Docs | `.md` fora de `docs/<tipo>/` ou ausente de `docs/README.md`; análise ou incidente sem data no nome; mudança percebida sem `CHANGELOG.md`; mudança de componente sem `docs/arquitetura.md` |
 | Config | `pyproject.toml`, `docker-compose*.yml`, `Dockerfile`, `Caddyfile` alterados sem necessidade; `requirements*.txt` fora de `make lock` |
 
