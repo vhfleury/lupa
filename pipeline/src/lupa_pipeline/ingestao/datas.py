@@ -45,49 +45,65 @@ MESES = (
     "dezembro",
 )
 ABREVIADOS = tuple(m[:3] for m in MESES)
-UNIDADES = {
-    "um": 1,
+_EXTENSO_UNIDADES = (
+    "",
+    "um",
+    "dois",
+    "tres",
+    "quatro",
+    "cinco",
+    "seis",
+    "sete",
+    "oito",
+    "nove",
+    "dez",
+    "onze",
+    "doze",
+    "treze",
+    "catorze",
+    "quinze",
+    "dezesseis",
+    "dezessete",
+    "dezoito",
+    "dezenove",
+)
+_EXTENSO_DEZENAS = (
+    "",
+    "",
+    "vinte",
+    "trinta",
+    "quarenta",
+    "cinquenta",
+    "sessenta",
+    "setenta",
+    "oitenta",
+    "noventa",
+)
+_EXTENSO_CENTENAS = (
+    "",
+    "cento",
+    "duzentos",
+    "trezentos",
+    "quatrocentos",
+    "quinhentos",
+    "seiscentos",
+    "setecentos",
+    "oitocentos",
+    "novecentos",
+)
+_VARIANTES_EXTENSO = {
     "uma": 1,
-    "dois": 2,
     "duas": 2,
-    "tres": 3,
-    "quatro": 4,
-    "cinco": 5,
-    "seis": 6,
-    "sete": 7,
-    "oito": 8,
-    "nove": 9,
-    "dez": 10,
-    "onze": 11,
-    "doze": 12,
-    "treze": 13,
-    "catorze": 14,
     "quatorze": 14,
-    "quinze": 15,
-    "dezesseis": 16,
     "dezasseis": 16,
-    "dezessete": 17,
-    "dezoito": 18,
-    "dezenove": 19,
-    "vinte": 20,
-    "trinta": 30,
-    "quarenta": 40,
-    "cinquenta": 50,
-    "sessenta": 60,
-    "setenta": 70,
-    "oitenta": 80,
-    "noventa": 90,
     "cem": 100,
-    "cento": 100,
-    "duzentos": 200,
-    "trezentos": 300,
-    "quatrocentos": 400,
-    "quinhentos": 500,
-    "seiscentos": 600,
-    "setecentos": 700,
-    "oitocentos": 800,
-    "novecentos": 900,
     "primeiro": 1,
+}
+UNIDADES = {
+    **{nome: valor for valor, nome in enumerate(_EXTENSO_UNIDADES) if nome},
+    **{nome: valor * 10 for valor, nome in enumerate(_EXTENSO_DEZENAS) if nome},
+    **{nome: valor * 100 for valor, nome in enumerate(_EXTENSO_CENTENAS) if nome},
+    **_VARIANTES_EXTENSO,
 }
 _PALAVRA_NUMERO = "|".join(sorted(UNIDADES, key=len, reverse=True))
 _NUMERO_EXTENSO = rf"(?:(?:{_PALAVRA_NUMERO})(?:\s+e\s+(?:{_PALAVRA_NUMERO}))*)"
@@ -248,54 +264,6 @@ def datas_no_dobrado(dobrado: str, texto: str | None = None) -> list[OcorrenciaD
             inicio, fim = achado.span()
             ocorrencias.append(OcorrenciaData(valor, inicio, fim, fonte[inicio:fim], formato, dois))
     return _sem_sobreposicao(ocorrencias)
-
-
-_EXTENSO_UNIDADES = (
-    "",
-    "um",
-    "dois",
-    "tres",
-    "quatro",
-    "cinco",
-    "seis",
-    "sete",
-    "oito",
-    "nove",
-    "dez",
-    "onze",
-    "doze",
-    "treze",
-    "catorze",
-    "quinze",
-    "dezesseis",
-    "dezessete",
-    "dezoito",
-    "dezenove",
-)
-_EXTENSO_DEZENAS = (
-    "",
-    "",
-    "vinte",
-    "trinta",
-    "quarenta",
-    "cinquenta",
-    "sessenta",
-    "setenta",
-    "oitenta",
-    "noventa",
-)
-_EXTENSO_CENTENAS = (
-    "",
-    "cento",
-    "duzentos",
-    "trezentos",
-    "quatrocentos",
-    "quinhentos",
-    "seiscentos",
-    "setecentos",
-    "oitocentos",
-    "novecentos",
-)
 
 
 def _ate_cem(numero: int) -> str:

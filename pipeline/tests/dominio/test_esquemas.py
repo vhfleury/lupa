@@ -1,5 +1,8 @@
 """Testes dos esquemas pydantic e do número CNJ (sem banco)."""
 
+from collections.abc import AsyncIterator
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -18,7 +21,9 @@ from lupa_pipeline.dominio.esquemas import (
     Pagina,
     Processo,
     calcular_hash,
+    sha256_arquivo,
 )
+from lupa_pipeline.ingestao.recepcao import receber
 
 
 def test_numero_cnj_com_digito_correto_e_aceito() -> None:
@@ -179,3 +184,15 @@ def test_arquivo_exige_hks_nos_identificadores() -> None:
     assert Arquivo.model_validate(dados).processo_id == dados["processo_id"]
     with pytest.raises(ValidationError, match="processo_id"):
         Arquivo.model_validate(dados | {"processo_id": "00000000-0000-4000-8000-000000000000"})
+
+
+async def test_sha256_arquivo_igual_ao_da_recepcao(tmp_path: Path) -> None:
+    """RF-ING-03 e RNF-08: o hash do arquivo em disco é o mesmo que a recepção calcula."""
+    dados = b"%PDF-1.4 sintetico " * 100_000
+
+    async def blocos() -> AsyncIterator[bytes]:
+        yield dados[:7]
+        yield dados[7:]
+
+    recebido = await receber(blocos(), "autos.pdf", 10_000_000, tmp_path)
+    assert sha256_arquivo(recebido.caminho) == recebido.sha256

@@ -457,7 +457,13 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
   `tests/dominio/test_esquemas.py::test_sha256_arquivo_igual_ao_da_recepcao`.
 - Verde: `data_peca` com `datas.MESES`, `construir_data` e direção em `REGRAS`; `sha256_arquivo`
   em `dominio/esquemas.py`; `datas.UNIDADES` das tuplas de escrita.
-- Entregue:
+- Entregue: data_peca usa datas.MESES, construir_data e as faixas de ano de datas, e REGRAS passa a
+  (tipo, padrão, direção) com DO_FIM e DO_INICIO; sha256_arquivo vai de calibracao.py para
+  dominio/esquemas.py e dá o mesmo hash da recepção; datas.UNIDADES montada das tuplas de escrita
+  mais as variantes, com guarda de igualdade em test_datas.py. Especialista-ingestao: aprovado.
+  Vermelho: 2 errors de coleta (ImportError: sha256_arquivo, DO_FIM). Verde: verificar.sh na stack
+  inteira com F21: saída 0; pipeline 732 passed (95,39%), intranet 267 (98,23%), integração 6,
+  injeção 2, web 436 (100%), cabeçalhos e isolamento ok, agente 11.
 
 ### F22 — Sintéticos sem repetição
 

@@ -6,6 +6,7 @@
 import hashlib
 from collections.abc import Mapping
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Annotated, Any, Self
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
@@ -26,6 +27,7 @@ NumeroCnj = Annotated[str, AfterValidator(validar_numero_cnj)]
 IdPublico = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Sujeito = Annotated[str, Field(pattern=r"^([0-9a-f]{64})?$")]
 Confianca = Annotated[float, Field(ge=0.0, le=1.0)]
+TAMANHO_BLOCO = 1 << 20
 
 
 def _agora() -> datetime:
@@ -42,6 +44,22 @@ def calcular_hash(texto: str) -> str:
         Hash hexadecimal com 64 caracteres.
     """
     return hashlib.sha256(texto.encode("utf-8")).hexdigest()
+
+
+def sha256_arquivo(caminho: Path) -> str:
+    """SHA-256 do arquivo lido em blocos.
+
+    Args:
+        caminho: Arquivo.
+
+    Returns:
+        Hash hexadecimal.
+    """
+    resumo = hashlib.sha256()
+    with caminho.open("rb") as entrada:
+        while bloco := entrada.read(TAMANHO_BLOCO):
+            resumo.update(bloco)
+    return resumo.hexdigest()
 
 
 class EsquemaBase(BaseModel):
