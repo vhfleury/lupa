@@ -7,23 +7,16 @@ from apoio_comum import FabricaFato, gerar_numero_cnj
 from lupa_pipeline.dominio.cnj import NumeroCnjInvalidoError, validar_numero_cnj
 from lupa_pipeline.dominio.enums import (
     ClasseProcessual,
-    MetodoClassificacao,
-    OrigemPeca,
-    PapelUsuario,
     ResultadoAchado,
     TipoPagina,
-    TipoPeca,
 )
 from lupa_pipeline.dominio.esquemas import (
     Achado,
-    Anotacao,
     Arquivo,
     Evidencia,
     Fato,
     Pagina,
-    Peca,
     Processo,
-    Usuario,
     calcular_hash,
 )
 
@@ -107,36 +100,6 @@ def test_evidencia_com_fim_nao_maior_que_inicio_e_rejeitada() -> None:
         )
 
 
-def test_peca_com_pagina_final_antes_da_inicial_e_rejeitada() -> None:
-    """`pagina_final >= pagina_inicial`."""
-    with pytest.raises(ValidationError, match="pagina_final"):
-        Peca(
-            id=calcular_hash("peca"),
-            arquivo_id=calcular_hash("arquivo"),
-            tipo=TipoPeca.SENTENCA,
-            pagina_inicial=10,
-            pagina_final=9,
-            confianca=1.0,
-            metodo=MetodoClassificacao.REGRA,
-            origem=OrigemPeca.JUIZO,
-        )
-
-
-def test_peca_de_uma_pagina_e_aceita() -> None:
-    """Página inicial igual à final é válida."""
-    peca = Peca(
-        id=calcular_hash("peca"),
-        arquivo_id=calcular_hash("arquivo"),
-        tipo=TipoPeca.CERTIDAO,
-        pagina_inicial=3,
-        pagina_final=3,
-        confianca=0.5,
-        metodo=MetodoClassificacao.MANUAL,
-        origem=OrigemPeca.DESCONHECIDA,
-    )
-    assert peca.pagina_final == 3
-
-
 def test_pagina_calcula_e_confere_hash_do_texto() -> None:
     """`hash_texto` é calculado e, se informado, conferido."""
     pagina = Pagina(
@@ -178,24 +141,6 @@ def test_achado_com_resultado_fora_do_enum_e_rejeitado() -> None:
         explicacao="-",
     )
     assert achado.resultado is ResultadoAchado.VERIFICAR
-
-
-def test_anotacao_exige_exatamente_um_alvo() -> None:
-    """Anotação aponta para um achado ou um fato, nunca ambos nem nenhum."""
-    dados = {"id": calcular_hash("nota"), "usuario_id": calcular_hash("usuario"), "texto": "nota"}
-    with pytest.raises(ValidationError, match="exatamente um"):
-        Anotacao(**dados)
-    with pytest.raises(ValidationError, match="exatamente um"):
-        Anotacao(**dados, achado_id=calcular_hash("achado"), fato_id=calcular_hash("fato"))
-    assert Anotacao(**dados, fato_id=calcular_hash("fato")).achado_id is None
-
-
-@pytest.mark.parametrize("papel", list(PapelUsuario))
-def test_usuario_dos_dois_papeis_tem_id_publico_e_senha_oculta(papel: PapelUsuario) -> None:
-    """RF-ACE-03: os dois papéis do gabinete têm credencial protegida na representação."""
-    usuario = Usuario(id=calcular_hash("usuario"), nome_usuario="a", papel=papel, senha_hash="h")
-    assert usuario.papel == papel
-    assert "senha_hash" not in repr(usuario)
 
 
 def test_sujeito_e_ids_dos_fatos_exigem_hash_publico(fabrica_fato: FabricaFato) -> None:

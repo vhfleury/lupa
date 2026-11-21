@@ -5,7 +5,7 @@
 
 import hashlib
 from collections.abc import Mapping
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any, Self
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
@@ -14,20 +14,12 @@ from lupa_pipeline.dominio.cnj import validar_numero_cnj
 from lupa_pipeline.dominio.enums import (
     CenarioArquivo,
     ClasseProcessual,
-    EstadoJob,
-    EstadoLote,
     FlagPagina,
-    MetodoClassificacao,
-    MotivoFalha,
-    MotivoQuarentena,
-    OrigemPeca,
-    PapelUsuario,
     ResultadoAchado,
     StatusFato,
     StatusProcesso,
     TipoFato,
     TipoPagina,
-    TipoPeca,
 )
 
 NumeroCnj = Annotated[str, AfterValidator(validar_numero_cnj)]
@@ -81,31 +73,6 @@ class Arquivo(EsquemaBase):
     chave_storage: str = Field(min_length=1)
     enviado_por: IdPublico
     enviado_em: datetime = Field(default_factory=_agora)
-
-
-class Peca(EsquemaBase):
-    """Peça processual identificada dentro de um arquivo."""
-
-    id: IdPublico
-    arquivo_id: IdPublico
-    tipo: TipoPeca
-    pagina_inicial: int = Field(ge=1)
-    pagina_final: int = Field(ge=1)
-    confianca: Confianca
-    metodo: MetodoClassificacao
-    origem: OrigemPeca
-    data: date | None = None
-    tipo_data: str | None = None
-    data_evidencia_id: IdPublico | None = None
-    vigente: bool = True
-    flags: dict[str, Any] = Field(default_factory=dict)
-    classificacao: dict[str, Any] = Field(default_factory=dict)
-
-    @model_validator(mode="after")
-    def _paginas_em_ordem(self) -> Self:
-        if self.pagina_final < self.pagina_inicial:
-            raise ValueError("pagina_final deve ser maior ou igual a pagina_inicial")
-        return self
 
 
 class Pagina(EsquemaBase):
@@ -199,37 +166,6 @@ class Achado(EsquemaBase):
     criado_em: datetime = Field(default_factory=_agora)
 
 
-class Anotacao(EsquemaBase):
-    """Nota de usuário sobre um achado ou um fato; não altera nenhum dos dois."""
-
-    id: IdPublico
-    achado_id: IdPublico | None = None
-    fato_id: IdPublico | None = None
-    usuario_id: IdPublico
-    texto: str = Field(min_length=1)
-    criado_em: datetime = Field(default_factory=_agora)
-
-    @model_validator(mode="after")
-    def _um_alvo(self) -> Self:
-        if (self.achado_id is None) == (self.fato_id is None):
-            raise ValueError("informe exatamente um entre achado_id e fato_id")
-        return self
-
-
-class Usuario(EsquemaBase):
-    """Assessor ou desembargador do gabinete."""
-
-    id: IdPublico
-    nome_usuario: str = Field(min_length=1)
-    papel: PapelUsuario
-    senha_hash: str = Field(min_length=1, repr=False)
-    mfa_segredo: str | None = Field(default=None, repr=False)
-    mfa_confirmado: bool = False
-    ativo: bool = True
-    troca_senha_obrigatoria: bool = True
-    criado_em: datetime = Field(default_factory=_agora)
-
-
 class EventoAuditoria(EsquemaBase):
     """Evento da cadeia única com os identificadores públicos dos hubs (RF-AUD-04)."""
 
@@ -264,35 +200,6 @@ class EntradaManifesto(EsquemaBase):
     nome: str = Field(min_length=1)
     tamanho_bytes: int = Field(ge=0)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-
-
-class JobIngestao(EsquemaBase):
-    """Estado da ingestão de um arquivo em seu processo (A3 e A4)."""
-
-    processo_id: IdPublico
-    arquivo_id: IdPublico
-    estado: EstadoJob = EstadoJob.RECEBIDO
-    motivo_quarentena: MotivoQuarentena | None = None
-    motivo_falha: MotivoFalha | None = None
-    tentativas: int = Field(default=0, ge=0)
-    total_paginas: int | None = Field(default=None, ge=0)
-    manifesto: tuple[EntradaManifesto, ...] | None = None
-    criado_em: datetime = Field(default_factory=_agora)
-
-    @model_validator(mode="after")
-    def _motivo_conforme_estado(self) -> Self:
-        if (self.estado is EstadoJob.QUARENTENA) != (self.motivo_quarentena is not None):
-            raise ValueError("motivo_quarentena é obrigatório só no estado quarentena")
-        return self
-
-
-class LoteIngestao(EsquemaBase):
-    """Lote de extração identificado pelo arquivo e pelo número (A5)."""
-
-    arquivo_id: IdPublico
-    numero: int = Field(ge=1)
-    estado: EstadoLote
-    resultado: dict[str, Any] = Field(default_factory=dict)
 
 
 class DiagnosticoArquivo(EsquemaBase):

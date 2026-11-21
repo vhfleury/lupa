@@ -428,7 +428,14 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
 - Revisão manual: saem `TextoAnalise`, `encontrar_datas`, os esquemas `Anotacao`, `Usuario`,
   `JobIngestao`, `LoteIngestao` e `Peca`, e `HUBS`, `LINKS`, `SATELITES` (calculadas no teste),
   com os testes deles no mesmo commit; grep em `pipeline/` e `intranet/` sem referência.
-- Entregue:
+- Entregue: saem datas.TextoAnalise e encontrar_datas, os esquemas Peca, Anotacao, Usuario,
+  JobIngestao e LoteIngestao, e tabelas.HUBS, LINKS e SATELITES (calculados em
+  test_migracao_0001.py), com os testes deles; grep em pipeline/, intranet/ e scripts/ sem uso real.
+  test_datas.py passa a usar um auxiliar local sobre datas_no_dobrado; test_estados.py mantém o
+  diagnóstico e ganha a checagem de extra_forbidden. Arquiteto: aprovado com condições, atendidas.
+  Revisão manual (sem vermelho). Verde: verificar.sh na stack inteira com F13 e F20: saída 0;
+  pipeline 727 passed (95,35%), intranet 267 (98,23%), integração 6, injeção 2, web 436 (100%),
+  cabeçalhos e isolamento ok, agente 11.
 
 ### F21 — Duplicações menores da ingestão
 

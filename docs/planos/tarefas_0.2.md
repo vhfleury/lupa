@@ -1210,7 +1210,7 @@ no "Entregue" de cada fase.
 - [ ] **T12.17** Gravação de páginas em lote — RF-ING-03. [fase F17](plano_limpeza_pipeline.md)
 - [ ] **T12.18** MinIO para arquivo e PDF aberto pelo caminho — RF-ING-04. [fase F18](plano_limpeza_pipeline.md)
 - [ ] **T12.19** Leituras repetidas na fila e nos repositórios — RF-ING-07. [fase F19](plano_limpeza_pipeline.md)
-- [ ] **T12.20** Remoção do código sem uso — RNF-08. [fase F20](plano_limpeza_pipeline.md)
+- [x] **T12.20** Remoção do código sem uso — RNF-08. [fase F20](plano_limpeza_pipeline.md)
 - [ ] **T12.21** Duplicações menores da ingestão — RNF-08, RF-ING-03. [fase F21](plano_limpeza_pipeline.md)
 - [ ] **T12.22** Sintéticos sem repetição — RNF-04. [fase F22](plano_limpeza_pipeline.md)
 - [ ] **T12.23** Documentação — RNF-08. [fase F23](plano_limpeza_pipeline.md)

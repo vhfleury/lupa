@@ -15,8 +15,8 @@ no literal. Datas impossíveis (31/02, mês 13) e anos fora de 1900 a 2100 são 
 
 A busca acontece sobre o texto normalizado (``lupa_pipeline.ingestao.saneamento.normalizar``: NFKC,
 homóglifos, sem caracteres de controle) "dobrado" caractere a caractere (minúsculas, sem
-acento), que tem o mesmo comprimento do normalizado; os offsets voltam ao original pelo mapa do
-normalizado. ``reconferir`` é a conferência independente da 4F.4: em vez de interpretar o
+acento), que tem o mesmo comprimento do normalizado; os offsets saem nesse texto de busca.
+``reconferir`` é a conferência independente da 4F.4: em vez de interpretar o
 trecho, escreve a data em todas as formas aceitas e procura alguma delas literalmente no trecho.
 """
 
@@ -24,7 +24,7 @@ import re
 from dataclasses import dataclass
 from datetime import date
 
-from lupa_pipeline.ingestao.saneamento import TextoNormalizado, normalizar
+from lupa_pipeline.ingestao.saneamento import normalizar
 from lupa_pipeline.ingestao.texto import dobrar
 
 ANO_MINIMO = 1900
@@ -248,76 +248,6 @@ def datas_no_dobrado(dobrado: str, texto: str | None = None) -> list[OcorrenciaD
             inicio, fim = achado.span()
             ocorrencias.append(OcorrenciaData(valor, inicio, fim, fonte[inicio:fim], formato, dois))
     return _sem_sobreposicao(ocorrencias)
-
-
-@dataclass(frozen=True)
-class TextoAnalise:
-    """Texto original de uma página com o normalizado e o dobrado usados nas buscas.
-
-    Attributes:
-        original: Texto original (``pagina.texto``).
-        normalizado: Normalizado com o mapa de offsets.
-        dobrado: Normalizado dobrado (mesmo comprimento do normalizado).
-    """
-
-    original: str
-    normalizado: TextoNormalizado
-    dobrado: str
-
-    @classmethod
-    def de(cls, original: str) -> "TextoAnalise":
-        """Prepara o texto para busca.
-
-        Args:
-            original: Texto original da página.
-
-        Returns:
-            Texto de análise.
-        """
-        normalizado = normalizar(original)
-        return cls(original, normalizado, dobrar(normalizado.texto))
-
-    def para_original(self, inicio: int, fim: int) -> tuple[int, int]:
-        """Converte um intervalo do dobrado/normalizado para o original.
-
-        Args:
-            inicio: Início no dobrado.
-            fim: Fim no dobrado.
-
-        Returns:
-            Intervalo no original.
-        """
-        return self.normalizado.para_original(inicio, fim)
-
-    def datas(self) -> list[OcorrenciaData]:
-        """Datas do texto com offsets no dobrado (literal do normalizado)."""
-        return datas_no_dobrado(self.dobrado, self.normalizado.texto)
-
-
-def encontrar_datas(texto: str) -> list[OcorrenciaData]:
-    """Todas as datas do texto original, com offsets e literal no original.
-
-    Args:
-        texto: Texto original (por exemplo, ``pagina.texto``).
-
-    Returns:
-        Ocorrências em ordem de posição.
-    """
-    analise = TextoAnalise.de(texto)
-    saida = []
-    for ocorrencia in analise.datas():
-        inicio, fim = analise.para_original(ocorrencia.inicio, ocorrencia.fim)
-        saida.append(
-            OcorrenciaData(
-                ocorrencia.data,
-                inicio,
-                fim,
-                texto[inicio:fim],
-                ocorrencia.formato,
-                ocorrencia.ano_dois_digitos,
-            )
-        )
-    return saida
 
 
 _EXTENSO_UNIDADES = (
