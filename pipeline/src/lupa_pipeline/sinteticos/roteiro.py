@@ -11,8 +11,14 @@ from lupa_pipeline.sinteticos import identidades as ids
 from lupa_pipeline.sinteticos.gabarito import Composicao, TipoData, VetorInjecao
 from lupa_pipeline.sinteticos.injecao import VISIVEIS, paragrafo_injecao
 from lupa_pipeline.sinteticos.textos import Marca, Paragrafo, enchimento, renderizar_peca
+from lupa_pipeline.validacoes.catalogo import validacoes_de
+from lupa_pipeline.validacoes.civel import cabimento, preparo, representacao, tempestividade
 
 PARAGRAFOS_POR_PAGINA = 13
+_PECA_PROCURADA = {
+    regra.NOME: regra.PECA_PROCURADA
+    for regra in (cabimento, preparo, representacao, tempestividade)
+}
 
 
 class PreparoSintetico(StrEnum):
@@ -195,6 +201,20 @@ class _Fabrica:
         )
 
 
+def fatos_procurados(classe: ClasseProcessual) -> frozenset[str]:
+    """Reúne os tipos de fato que as validações da classe procuram nos autos.
+
+    Args:
+        classe: Classe processual do roteiro.
+
+    Returns:
+        União das chaves de ``PECA_PROCURADA`` das regras de ``validacoes_de(classe)``.
+    """
+    return frozenset(
+        tipo for validacao in validacoes_de(classe) for tipo in _PECA_PROCURADA[validacao.nome]
+    )
+
+
 def _capa(partes: Partes, linha: Linha, classe: ClasseProcessual) -> PecaPlano:
     classe_na_capa = {
         ClasseProcessual.APELACAO_CIVEL: "Apelação cível",
@@ -239,7 +259,7 @@ def _nucleo(fab: _Fabrica, linha: Linha) -> list[PecaPlano]:
     parte, juizo = OrigemPeca.PARTE, OrigemPeca.JUIZO
     config, partes = fab.config, fab.partes
     classe = config.classe
-    # A capa, os documentos da relação de origem e a decisão aparecem em todas as classes.
+    fatos = fatos_procurados(classe)
     pecas = [
         fab.peca(
             "peticao_inicial",
@@ -273,12 +293,11 @@ def _nucleo(fab: _Fabrica, linha: Linha) -> list[PecaPlano]:
                 {"data_decisao_recorrida": linha.decisao, "hipotese_decisao_agravada": "I"},
                 {
                     "marco_decisao": marco,
-                    "hipotese": hipotese if classe == ClasseProcessual.AGRAVO_INSTRUMENTO else "",
+                    "hipotese": hipotese if "hipotese_decisao_agravada" in fatos else "",
                 },
             )
         )
-    # Nos agravos de interlocutória a sentença é posterior à interposição do recurso.
-    recorre_sentenca = not agravo and classe != ClasseProcessual.ACAO_ORIGINARIA
+    recorre_sentenca = not agravo and bool(fatos)
     pecas.append(
         fab.peca(
             "sentenca",
@@ -288,7 +307,7 @@ def _nucleo(fab: _Fabrica, linha: Linha) -> list[PecaPlano]:
             {"marco_decisao": marco if recorre_sentenca else ""},
         )
     )
-    if classe == ClasseProcessual.ACAO_ORIGINARIA:
+    if not fatos:
         pecas.append(fab.peca("acordao", linha.acordao, juizo, {"data_acordao": linha.acordao}))
         return pecas
     pecas.append(
@@ -310,7 +329,7 @@ def _nucleo(fab: _Fabrica, linha: Linha) -> list[PecaPlano]:
                 },
             )
         )
-    if config.preparo == PreparoSintetico.PAGO and classe != ClasseProcessual.EMBARGOS_DECLARACAO:
+    if config.preparo == PreparoSintetico.PAGO and "comprovante_preparo" in fatos:
         pecas.append(
             fab.peca(
                 "comprovante_preparo",

@@ -38,7 +38,7 @@ from lupa_pipeline.sinteticos.injecao import (
     VISIVEIS,
     texto_visivel,
 )
-from lupa_pipeline.sinteticos.paginacao import FONTE, LARGURA, PaginaPlano, paginar
+from lupa_pipeline.sinteticos.paginacao import FONTE, LARGURA, MarcaPagina, PaginaPlano, paginar
 from lupa_pipeline.sinteticos.roteiro import Configuracao, Roteiro, montar_roteiro
 from lupa_pipeline.validacoes.modelo import ModeloProcesso
 from lupa_pipeline.validacoes.motor import executar_catalogo
@@ -217,6 +217,44 @@ _FATOS_DO_RECORRENTE = {
 }
 
 
+def _injecao(vetor: VetorInjecao, pagina: int | None, visivel: bool) -> InjecaoGabarito:
+    return InjecaoGabarito(
+        vetor=vetor,
+        objetivo=INJECOES[vetor].objetivo,
+        pagina=pagina,
+        texto=INJECOES[vetor].texto,
+        visivel=visivel,
+    )
+
+
+def _parte(roteiro: Roteiro, plano: PaginaPlano, marca: MarcaPagina, trecho: str) -> ParteGabarito:
+    autora = marca.rotulo == "parte_autora"
+    return ParteGabarito(
+        nome=marca.valor,
+        polo=Polo.ATIVO if autora else Polo.PASSIVO,
+        qualidade=roteiro.configuracao.qualidade if autora else QualidadeParte.PARTICULAR,
+        trecho=trecho,
+        pagina=plano.numero,
+        inicio=marca.inicio,
+        fim=marca.fim,
+    )
+
+
+def _evento(
+    roteiro: Roteiro, plano: PaginaPlano, marca: MarcaPagina, trecho: str
+) -> EventoGabarito:
+    tipo = TipoFato(marca.rotulo)
+    return EventoGabarito(
+        tipo=tipo,
+        valor=_valor_json(marca.valor),
+        sujeito=roteiro.partes.autor if tipo in _FATOS_DO_RECORRENTE else "",
+        pagina=plano.numero,
+        trecho=trecho,
+        inicio=marca.inicio,
+        fim=marca.fim,
+    )
+
+
 def _ler_marcas(
     roteiro: Roteiro, planos: list[PaginaPlano], ocultas: dict[int, VetorInjecao]
 ) -> tuple[tuple[ParteGabarito, ...], tuple[EventoGabarito, ...], tuple[InjecaoGabarito, ...]]:
@@ -228,53 +266,13 @@ def _ler_marcas(
             trecho = plano.texto[marca.inicio : marca.fim]
             if marca.rotulo == ROTULO:
                 vetor = next(v for v in VISIVEIS if texto_visivel(v) == trecho.replace("\n", " "))
-                injecoes.append(
-                    InjecaoGabarito(
-                        vetor=vetor,
-                        objetivo=INJECOES[vetor].objetivo,
-                        pagina=plano.numero,
-                        texto=INJECOES[vetor].texto,
-                        visivel=True,
-                    )
-                )
+                injecoes.append(_injecao(vetor, plano.numero, visivel=True))
             elif marca.rotulo in ("parte_autora", "parte_re"):
-                autora = marca.rotulo == "parte_autora"
-                partes.append(
-                    ParteGabarito(
-                        nome=marca.valor,
-                        polo=Polo.ATIVO if autora else Polo.PASSIVO,
-                        qualidade=roteiro.configuracao.qualidade
-                        if autora
-                        else QualidadeParte.PARTICULAR,
-                        trecho=trecho,
-                        pagina=plano.numero,
-                        inicio=marca.inicio,
-                        fim=marca.fim,
-                    )
-                )
+                partes.append(_parte(roteiro, plano, marca, trecho))
             else:
-                tipo = TipoFato(marca.rotulo)
-                eventos.append(
-                    EventoGabarito(
-                        tipo=tipo,
-                        valor=_valor_json(marca.valor),
-                        sujeito=roteiro.partes.autor if tipo in _FATOS_DO_RECORRENTE else "",
-                        pagina=plano.numero,
-                        trecho=trecho,
-                        inicio=marca.inicio,
-                        fim=marca.fim,
-                    )
-                )
+                eventos.append(_evento(roteiro, plano, marca, trecho))
     for folha, vetor in sorted(ocultas.items()):
-        injecoes.append(
-            InjecaoGabarito(
-                vetor=vetor,
-                objetivo=INJECOES[vetor].objetivo,
-                pagina=folha,
-                texto=INJECOES[vetor].texto,
-                visivel=vetor == VetorInjecao.IMAGEM_COM_TEXTO,
-            )
-        )
+        injecoes.append(_injecao(vetor, folha, visivel=vetor == VetorInjecao.IMAGEM_COM_TEXTO))
     return tuple(partes), tuple(eventos), tuple(injecoes)
 
 
@@ -372,15 +370,7 @@ def gerar_conteudo(config: Configuracao) -> Conteudo:
     )
     partes, eventos, injecoes = _ler_marcas(roteiro, planos, ocultas)
     if VetorInjecao.METADADO_XMP in config.injecoes:
-        injecoes += (
-            InjecaoGabarito(
-                vetor=VetorInjecao.METADADO_XMP,
-                objetivo=INJECOES[VetorInjecao.METADADO_XMP].objetivo,
-                pagina=None,
-                texto=INJECOES[VetorInjecao.METADADO_XMP].texto,
-                visivel=False,
-            ),
-        )
+        injecoes += (_injecao(VetorInjecao.METADADO_XMP, None, visivel=False),)
     numero = roteiro.partes.numero
     return Conteudo(
         roteiro, documento, _pecas(roteiro, planos), paginas, partes, eventos,

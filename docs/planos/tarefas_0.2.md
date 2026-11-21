@@ -1212,5 +1212,5 @@ no "Entregue" de cada fase.
 - [ ] **T12.19** Leituras repetidas na fila e nos repositórios — RF-ING-07. [fase F19](plano_limpeza_pipeline.md)
 - [x] **T12.20** Remoção do código sem uso — RNF-08. [fase F20](plano_limpeza_pipeline.md)
 - [x] **T12.21** Duplicações menores da ingestão — RNF-08, RF-ING-03. [fase F21](plano_limpeza_pipeline.md)
-- [ ] **T12.22** Sintéticos sem repetição — RNF-04. [fase F22](plano_limpeza_pipeline.md)
+- [x] **T12.22** Sintéticos sem repetição — RNF-04. [fase F22](plano_limpeza_pipeline.md)
 - [ ] **T12.23** Documentação — RNF-08. [fase F23](plano_limpeza_pipeline.md)

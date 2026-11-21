@@ -486,7 +486,16 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
   `_injecao`; peças do roteiro derivadas de `validacoes_de(classe)` e `PECA_PROCURADA`.
   Guarda: `tests/sinteticos/test_roteiro.py::test_gabaritos_gerados_iguais_aos_atuais`
   (D17).
-- Entregue:
+- Entregue: diagnostico_esperado derivado de cenario (property com model_serializer, porque o mypy
+  recusa computed_field sobre property e # type: ignore é proibido; um validador de entrada aceita o
+  campo ao reler o JSON e recusa valor divergente); _ler_marcas com _parte, _evento e _injecao;
+  peças do roteiro derivadas de validacoes_de(classe) e PECA_PROCURADA por roteiro.fatos_procurados.
+  Guarda D17 test_gabaritos_gerados_iguais_aos_atuais (20 casos) passa: nada saiu. Especialista-
+  validacoes: aprovado com ressalvas (classe sem validação tratada como ação originária; mudança no
+  catálogo muda os sintéticos). Vermelho: 3 failed (ValidationError) e erro de coleta
+  (fatos_procurados ausente). Verde: verificar.sh na stack inteira com F18 e F22: saída 0; pipeline
+  763 passed (95,91%), intranet 267 (98,23%), integração 6, injeção 2, web 436 (100%), cabeçalhos e
+  isolamento ok, agente 11.
 
 ### F23 — Documentação
 

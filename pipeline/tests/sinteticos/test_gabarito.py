@@ -6,7 +6,12 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from lupa_pipeline.sinteticos.gabarito import Gabarito
+from lupa_pipeline.sinteticos.gabarito import (
+    DIAGNOSTICO_ESPERADO,
+    Cenario,
+    Gabarito,
+    ProcessoGabarito,
+)
 from lupa_pipeline.validacoes.catalogo import validacoes_de
 
 Mutacao = Callable[[dict[str, Any]], None]
@@ -77,3 +82,13 @@ def test_gabarito_inconsistente_e_rejeitado(gabarito: Gabarito, nome: str) -> No
     """Gabarito inconsistente e rejeitado."""
     with pytest.raises(ValidationError):
         Gabarito.model_validate(_mutado(gabarito, MUTACOES[nome]))
+
+
+@pytest.mark.parametrize("cenario", list(Cenario))
+def test_diagnostico_esperado_deriva_do_cenario(gabarito: Gabarito, cenario: Cenario) -> None:
+    """RNF-04: o diagnóstico esperado sai do cenário, sem ser informado, e vai para o JSON."""
+    dados = gabarito.processo.model_dump(mode="json")
+    del dados["diagnostico_esperado"]
+    processo = ProcessoGabarito.model_validate({**dados, "cenario": cenario})
+    assert processo.diagnostico_esperado == DIAGNOSTICO_ESPERADO[cenario]
+    assert processo.model_dump(mode="json")["diagnostico_esperado"] == DIAGNOSTICO_ESPERADO[cenario]

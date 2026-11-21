@@ -16,7 +16,6 @@ from pathlib import Path
 import fitz
 
 from lupa_pipeline.sinteticos.gabarito import (
-    DIAGNOSTICO_ESPERADO,
     ArquivoGabarito,
     Cenario,
     Gabarito,
@@ -117,7 +116,6 @@ def _gabarito(conteudo: Conteudo, cenario: Cenario, arquivos: list[ArquivoGabari
         numero_cnj=conteudo.numero,
         classe=conteudo.roteiro.configuracao.classe,
         cenario=cenario,
-        diagnostico_esperado=DIAGNOSTICO_ESPERADO[cenario],
         semente=conteudo.roteiro.configuracao.semente,
         data_referencia=conteudo.referencia,
     )
