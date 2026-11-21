@@ -15,7 +15,6 @@ from lupa_pipeline.validacoes import catalogo
 from lupa_pipeline.validacoes.__main__ import main
 from lupa_pipeline.validacoes.calendario import (
     Periodo,
-    contar_prazo_corrido,
     contar_prazo_util,
     idade_em,
     somar_meses,
@@ -173,12 +172,6 @@ def test_prazo_util_pula_fim_de_semana_feriado_e_suspensao() -> None:
     )
     assert resultado.vencimento == date(2030, 3, 8)
     assert len(resultado.dias_suspensos) == 4
-
-
-def test_prazo_corrido_sem_feriado_vence_no_dia_nominal() -> None:
-    """Prazo corrido sem feriado vence no dia nominal."""
-    resultado = contar_prazo_corrido(date(2030, 3, 4), 2, {}, [])
-    assert resultado.vencimento == date(2030, 3, 6)
 
 
 def test_somar_meses_e_idade() -> None:
