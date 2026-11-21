@@ -33,7 +33,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
 | `eventos/etapa.processar_eventos` | lê processo e fatos duas vezes | passa o processo lido adiante |
 | `dominio/esquemas.Fato.valor` (`Any`) | escalar ou `{"valor": ...}` | sempre o escalar; `de_registro` converte o formato antigo ao ler (D12) |
 | `validacoes/modelo.valor_de` | desembrulha em cada consumidor | removida; consumidores leem `fato.valor` |
-| `eventos/saida.py`, `sinteticos/gerador.py` (caso `PROCURACAO`) | cada um troca o outorgante pelo nome | `partes.nome_do_outorgante`, usado pelos dois; o fato de procuração não muda (D13) |
+| `eventos/saida.py`, `sinteticos/gerador.py` (caso `PROCURACAO`) | a saída troca o código do outorgante pelo nome e o gerador troca o nome pelo código, cada um à mão | `partes.nome_do_outorgante` (saída) e `partes.codigo_do_outorgante` (gerador), com a regra do substabelecimento num lugar só; o fato não muda (D13) |
 | `dominio/esquemas.Anotacao`, `Usuario`, `JobIngestao`, `LoteIngestao`, `Peca` | sem consumidor | removidos com os testes (D9) |
 | `dominio/tabelas.HUBS`, `LINKS`, `SATELITES` | constantes só do teste | calculadas no teste de migração |
 | `ingestao/processamento._processar` | `if/elif` por nome de etapa | `ETAPAS: tuple[Etapa, ...]` executada a partir de `primeira_etapa` (D11) |
@@ -152,9 +152,10 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
   `{"valor": x}` em `x` ao ler da view; fatos novos já saem normalizados.
 - **D13.** O fato de procuração não muda: o id do fato é `chave_hash([processo, tipo, sujeito,
   evidência])`, e gravar o outorgante como sujeito mudaria o id a que correções e notas do
-  gabinete apontam. F11 só tira o caso especial repetido: `partes.nome_do_outorgante` traduz o
-  outorgante para o nome e é usado por `eventos/saida.py` e `sinteticos/gerador.py`; um teste
-  fixa que o id das procurações não muda. O outorgante como sujeito do fato vira dívida em
+  gabinete apontam. F11 só tira os casos especiais repetidos: `partes.nome_do_outorgante`
+  (código → nome, para `eventos/saida.py`) e `partes.codigo_do_outorgante` (nome → código, para
+  `sinteticos/gerador.py`), com a regra do substabelecimento num lugar só; um teste fixa que o
+  id das procurações não muda (decisão do usuário na F11, 21/11/2026). O outorgante como sujeito do fato vira dívida em
   `docs/dividas/todo.md` (decisão do usuário, 21/11/2026).
 - **D14.** Um PR para o plano inteiro, da branch `refactor/limpeza-pipeline`, com um commit por
   fase. F1 a F7 já entraram na `develop` pelos PRs #20 a #26 e #27, antes desta regra; a branch
@@ -276,12 +277,19 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
 - Arquivos: `ingestao/eventos/partes.py`, `ingestao/eventos/saida.py`, `sinteticos/gerador.py`,
   `tests/ingestao/test_eventos.py`, `docs/dividas/todo.md`.
 - Depende de: F10. Paralela com: F16.
-- Vermelho: `tests/ingestao/test_eventos.py::test_nome_do_outorgante_resolve_o_codigo_da_parte`.
-- Verde: `partes.nome_do_outorgante(valor, partes)`; `saida.py` e `gerador.py` passam a usá-la
-  e saem os casos `PROCURACAO` deles. Guarda:
+- Vermelho: `tests/ingestao/test_eventos.py::test_nome_do_outorgante_resolve_o_codigo_da_parte` e
+  `::test_codigo_do_outorgante_resolve_o_nome`.
+- Verde: `partes.nome_do_outorgante(valor, nomes)` em `saida.py` e
+  `partes.codigo_do_outorgante(valor, sujeito)` em `gerador.py`; saem os casos `PROCURACAO`. Guarda:
   `tests/ingestao/test_eventos.py::test_id_da_procuracao_nao_muda`, que fixa o id atual. Dívida
   do outorgante como sujeito registrada em `docs/dividas/todo.md`.
-- Entregue:
+- Entregue: partes.nome_do_outorgante (código → nome) em saida.py e partes.codigo_do_outorgante
+  (nome → código) em gerador.py, com a regra do substabelecimento em _trocar_outorgante; saem os
+  dois casos PROCURACAO. Guarda test_id_da_procuracao_nao_muda passou antes e depois. Especialista-
+  validacoes e especialista-ingestao: aprovado. Vermelho: 2 failed (AttributeError: funções
+  ausentes). Verde: verificar.sh na stack inteira com F11 e F16: saída 0; pipeline 732 passed
+  (95,40%), intranet 267 (98,23%), integração 6, injeção 2, web 436 (100%), cabeçalhos e isolamento
+  ok, agente 11.
 
 ### F12 — Ids de fato e evidência pelo hub
 
@@ -483,10 +491,11 @@ Grupos, cada um fechado por `verificar.sh` na stack inteira antes do seguinte:
 3. Se `restantes` está vazio: gravar o estado dos lotes e ir ao passo 9.
 4. Entrada: `restantes`, `extracao_paginas_por_lote`. Ação: `planejar`. Saída: tarefas.
 5. Entrada: tarefas, `extracao_lotes_por_job`. Ação: `executar_em_paralelo` roda até N filhos sandbox em threads. Saída: resultados à medida que terminam.
-6. Para cada resultado, na thread do worker e na conexão do lock: gravar páginas em lote (hubs e links com `executemany`, `hash_diff` correntes lidos uma vez por lote) e o satélite do lote. Saída: lote gravado.
+6. Para cada resultado, na thread do worker e na conexão do lock: gravar as páginas e o satélite do lote. Saída: lote gravado. A gravação em lote com `executemany` entra na F17.
 7. Resultado com motivo retentável: até `max_retentativas` novas execuções do lote; depois, o lote fica falho com o motivo.
-8. Erro de gravação: a transação do lote é desfeita, as threads pendentes são canceladas e o erro sobe; a retomada (RF-ING-07) refaz só os lotes sem satélite.
+8. Erro de gravação: a transação do lote é desfeita, os lotes em curso terminam sem gravar, os não submetidos não rodam e o erro sobe; a retomada (RF-ING-07) refaz só os lotes sem satélite.
 9. Saída: relatório da etapa `paginas`.
+10. Parada pedida: nenhum lote novo é submetido; os que estão em curso terminam e são gravados. O teste de retomada (`test_interrupcao_retoma_sem_reextrair_pagina_gravada`) fixa `extracao_lotes_por_job=1`, o modo em série da D5, porque com 2 lotes simultâneos os dois já estariam em curso na parada (mudança de teste junto com a regra do padrão 2).
 
 ### Texto da página guardado (F3)
 
@@ -519,11 +528,15 @@ Grupos, cada um fechado por `verificar.sh` na stack inteira antes do seguinte:
 
 ### Nome do outorgante (F11)
 
-1. Entrada: valor do fato de procuração e o mapa `chave_nome → hk da parte`. Ação:
-   `nome_do_outorgante`. Saída: o nome da parte.
-2. Outorgante já é um nome (substabelecimento, com `nome` e `oab`): devolver o nome sem consulta.
-3. Código sem parte correspondente no mapa: devolver o código, como hoje.
-4. `saida.eventos_saida` e `gerador` chamam a função; o fato gravado, o sujeito e o id não mudam.
+1. Saída (`eventos/saida.py`): entrada, valor do fato de procuração e o mapa `código → nome`.
+   Ação: `nome_do_outorgante`. Saída: valor com o nome do outorgante.
+2. Gerador (`sinteticos/gerador.py`): entrada, valor do gabarito com o nome e a função que dá o
+   código da parte sintética. Ação: `codigo_do_outorgante`. Saída: valor com o código, igual ao
+   que a extração grava.
+3. Valor que não é de procuração (substabelecimento, outorgante `{nome, oab}`): devolver sem
+   troca, regra única usada pelas duas funções.
+4. Código sem nome no mapa: devolver o código, como hoje.
+5. O fato gravado, o sujeito e o id não mudam.
 
 ### Etapas em lista ordenada (F14)
 

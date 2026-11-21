@@ -15,6 +15,7 @@ import fitz
 from lupa_pipeline.dominio.chaves import chave_hash, normalizar_cnj
 from lupa_pipeline.dominio.enums import ClasseProcessual, Polo, QualidadeParte, TipoFato
 from lupa_pipeline.dominio.esquemas import Evidencia, Fato
+from lupa_pipeline.ingestao.eventos.partes import codigo_do_outorgante
 from lupa_pipeline.sinteticos import render
 from lupa_pipeline.sinteticos.gabarito import (
     COM_IMAGEM,
@@ -294,9 +295,7 @@ def fatos_do_gabarito(numero: str, eventos: tuple[EventoGabarito, ...]) -> list[
             inicio=evento.inicio,
             fim=evento.fim,
         )
-        valor = evento.valor
-        if evento.tipo == TipoFato.PROCURACAO and valor.get("tipo") == "procuracao":
-            valor = {**valor, "outorgante": _sujeito(numero, valor["outorgante"])}
+        valor = codigo_do_outorgante(evento.valor, lambda nome: _sujeito(numero, nome))
         fatos.append(
             Fato(
                 id=chave_hash([processo_id, "fato", indice]).hex(),
