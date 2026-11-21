@@ -10,7 +10,7 @@ from typing import Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_validator
 
-from lupa_pipeline.validacoes.calendario import Calendario, Periodo
+from lupa_pipeline.validacoes.calendario import Calendario, FeriadoCalendario, Periodo
 
 
 class ArquivoVersionado(BaseModel):
@@ -99,12 +99,15 @@ def carregar[M: ArquivoVersionado](origem: Traversable | Path, modelo: type[M]) 
 
 def montar_calendario(feriados: list[ArquivoFeriados], suspensoes: ArquivoSuspensoes) -> Calendario:
     """Indexa os dias sem expediente preservando a fonte de cada ocorrência."""
-    dias = {f.data: f.descricao for arq in feriados for f in arq.feriados}
-    fontes = {f.data: f.fonte or arq.fonte for arq in feriados for f in arq.feriados}
+    dias = {
+        f.data: FeriadoCalendario(f.descricao, f.fonte or arq.fonte)
+        for arq in feriados
+        for f in arq.feriados
+    }
     periodos = tuple(
         Periodo(s.inicio, s.fim, s.descricao, s.base_legal, s.anual) for s in suspensoes.suspensoes
     )
-    return Calendario(feriados=dias, suspensoes=periodos, fontes=fontes)
+    return Calendario(feriados=dias, suspensoes=periodos)
 
 
 @lru_cache(maxsize=1)

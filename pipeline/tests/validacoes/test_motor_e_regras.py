@@ -14,6 +14,7 @@ from lupa_pipeline.logging import configurar_logging
 from lupa_pipeline.validacoes import catalogo
 from lupa_pipeline.validacoes.__main__ import main
 from lupa_pipeline.validacoes.calendario import (
+    FeriadoCalendario,
     Periodo,
     contar_prazo_util,
     idade_em,
@@ -167,7 +168,7 @@ def test_prazo_util_pula_fim_de_semana_feriado_e_suspensao() -> None:
     resultado = contar_prazo_util(
         sexta,
         3,
-        {date(2030, 3, 5): "feriado sintético"},
+        {date(2030, 3, 5): FeriadoCalendario("feriado sintético")},
         [Periodo(date(2030, 3, 6), date(2030, 3, 6), "suspensão sintética")],
     )
     assert resultado.vencimento == date(2030, 3, 8)

@@ -2,7 +2,13 @@
 
 from datetime import date
 
-from lupa_pipeline.validacoes.calendario import DiaDesconsiderado, Periodo, dias_uteis_entre
+from lupa_pipeline.validacoes.calendario import (
+    DiaDesconsiderado,
+    FeriadoCalendario,
+    Periodo,
+    dias_uteis_entre,
+)
+from lupa_pipeline.validacoes.dados import calendario_padrao
 
 
 def test_dias_uteis_entre_registra_feriado_e_fim_de_semana() -> None:
@@ -11,7 +17,7 @@ def test_dias_uteis_entre_registra_feriado_e_fim_de_semana() -> None:
     contagem, pulados = dias_uteis_entre(
         sexta,
         date(2030, 3, 8),
-        {date(2030, 3, 5): "feriado sintético"},
+        {date(2030, 3, 5): FeriadoCalendario("feriado sintético")},
         [Periodo(date(2030, 3, 6), date(2030, 3, 6), "suspensão sintética")],
     )
     assert contagem == 3
@@ -26,3 +32,12 @@ def test_dias_uteis_entre_registra_feriado_e_fim_de_semana() -> None:
 def test_dias_uteis_entre_sem_intervalo_e_zero() -> None:
     """RF-VAL-02. Fim igual ou anterior ao início não conta nenhum dia."""
     assert dias_uteis_entre(date(2030, 3, 4), date(2030, 3, 4), {}, []) == (0, ())
+
+
+def test_calendario_guarda_descricao_e_fonte_de_cada_feriado() -> None:
+    """RF-VAL-02. Cada feriado do calendário traz a descrição e a fonte do arquivo de dados."""
+    calendario, _ = calendario_padrao()
+    feriado = calendario.feriados[date(2026, 10, 30)]
+    assert isinstance(feriado, FeriadoCalendario)
+    assert "tjgo.jus.br" in feriado.fonte
+    assert calendario.fonte_em(date(2026, 10, 30)) == feriado.fonte

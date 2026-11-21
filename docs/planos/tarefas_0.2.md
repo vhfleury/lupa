@@ -1127,11 +1127,26 @@ suíte existente; o Vermelho de cada tarefa é o teste novo que só passa com o 
     (stack inteira). Vermelho: 2 failed (`assert -1 == 3`, `(-1, ()) == (0, ())`, com função
     provisória). Verde: saída 0; pipeline 708 passed (95,29%), intranet 266 passed (98,23%),
     integração 6, injeção 2, web 436 passed (100%), cabeçalhos e isolamento ok, agente 11.
-- [ ] **T12.5** `Calendario.feriados` com descrição e fonte; tempestividade pelo calendário. RF-VAL-02. Fase 3; P6, D7.
+- [x] **T12.5** `Calendario.feriados` com descrição e fonte; tempestividade pelo calendário. RF-VAL-02. Fase 3; P6, D7.
   - Vermelho: `pipeline/tests/validacoes/test_motor_e_regras.py::test_tempestividade_com_atraso_mantem_o_texto`.
   - Verde: `Feriado` e `Mapping[date, Feriado]` em `calendario.py` e `dados.montar_calendario`; sai `fontes`; `tempestividade.py` usa `dias_uteis_entre`.
   - Limpeza: nenhuma.
   - Revisão: especialista-validacoes.
+  - Entregue: `calendario.FeriadoCalendario(descricao, fonte)` (o nome `Feriado` já é o modelo
+    do YAML em `dados.py`); `Calendario.feriados: Mapping[date, FeriadoCalendario]`, sem
+    `fontes`; `fonte_em` lê a fonte do feriado; `montar_calendario` monta com
+    `f.fonte or arq.fonte`; `tempestividade.py` usa `dias_uteis_entre` e mantém `fonte_em` em
+    cada dia descartado. Os testes com feriado em texto passam a usar `FeriadoCalendario`
+    (mudança de tipo, mesma asserção). `test_tempestividade_com_atraso_mantem_o_texto` ficou
+    em `test_tempestividade.py`, onde estão os testes da regra, e fixa a saída do código
+    anterior (passa antes e depois); o vermelho é
+    `test_calendario.py::test_calendario_guarda_descricao_e_fonte_de_cada_feriado`.
+    Especialista-validacoes: aprovado, mesma explicação, atraso, dias não contados e fontes.
+    Testes: `docker compose exec -T worker python -m pytest -c pipeline/pyproject.toml
+    pipeline/tests/validacoes --no-cov` e `bash scripts/verificar.sh` (stack inteira).
+    Vermelho: 1 failed (`isinstance('Dia do Servidor Público…', FeriadoCalendario)` falso).
+    Verde: saída 0; pipeline 710 passed (95,28%), intranet 266 passed (98,23%), integração 6,
+    injeção 2, web 436 passed (100%), cabeçalhos e isolamento ok, agente 11.
 - [ ] **T12.6** Tabela de dispensas própria e `Coleta.qualidade()`. RF-VAL-03, RF-VAL-04. Fase 4; P7, D8.
   - Vermelho: `pipeline/tests/validacoes/test_motor_e_regras.py::test_dispensa_por_qualidade_le_a_tabela_de_dispensas`.
   - Verde: `validacoes/dados/dispensas.yaml`, `TabelaDispensas` e `dispensas_padrao()` em `dados.py`; sai `dispensas` de `preparo.yaml`; `preparo` e `representacao` usam `coleta.qualidade()`; `VERSAO_CATALOGO` sobe.
