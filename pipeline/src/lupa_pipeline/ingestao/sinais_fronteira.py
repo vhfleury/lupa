@@ -20,7 +20,6 @@ e assinatura. Os sinais gravados em `pagina.sinais_fronteira`:
 """
 
 import re
-import unicodedata
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -31,6 +30,8 @@ from statistics import median
 from typing import Any
 
 import yaml
+
+from lupa_pipeline.ingestao.texto import maiusculas_sem_acento
 
 LINHAS_TOPO = 4
 LINHAS_FIM = 6
@@ -78,20 +79,6 @@ class ListaTitulos:
     titulos: tuple[Titulo, ...]
 
 
-def normalizar(texto: str) -> str:
-    """Maiúsculas, sem acento e sem pontuação, com espaços simples.
-
-    Args:
-        texto: Texto livre.
-
-    Returns:
-        Texto normalizado.
-    """
-    sem_acento = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
-    limpo = re.sub(r"[^A-Za-z0-9/ ]+", " ", sem_acento)
-    return " ".join(limpo.upper().split())
-
-
 def mascara(linha: str) -> str:
     """Forma da linha para comparar cabeçalhos e rodapés: números e códigos viram `#`.
 
@@ -101,7 +88,7 @@ def mascara(linha: str) -> str:
     Returns:
         Máscara normalizada.
     """
-    return PADRAO_DIGITOS.sub("#", normalizar(PADRAO_HEX.sub("#", linha)))
+    return PADRAO_DIGITOS.sub("#", maiusculas_sem_acento(PADRAO_HEX.sub("#", linha)))
 
 
 def titulos_de(dados: dict[str, Any]) -> ListaTitulos:
@@ -115,10 +102,10 @@ def titulos_de(dados: dict[str, Any]) -> ListaTitulos:
     """
     titulos = tuple(
         Titulo(
-            normalizar(item["titulo"]),
+            maiusculas_sem_acento(item["titulo"]),
             item.get("tipo"),
             bool(item.get("secao", False)),
-            tuple(normalizar(v) for v in item["variacoes"]),
+            tuple(maiusculas_sem_acento(v) for v in item["variacoes"]),
         )
         for item in dados["titulos"]
     )
@@ -154,7 +141,7 @@ def e_assinatura(linha: str) -> bool:
     Returns:
         Verdadeiro para linha de assinatura.
     """
-    forma = normalizar(linha).lower()
+    forma = maiusculas_sem_acento(linha).lower()
     if "assinad" not in forma or "autentic" in forma or "codigo" in forma:
         return False
     return "eletr" in forma or bool(PADRAO_POR.search(forma) or PADRAO_DATA.search(forma))
@@ -228,7 +215,7 @@ def reconhecer_titulo(linha: str, lista: ListaTitulos) -> Titulo | None:
     Returns:
         O título (igual ou parecido, por semelhança ≥ 0,86), ou None.
     """
-    forma = normalizar(linha)
+    forma = maiusculas_sem_acento(linha)
     if not forma or len(forma) > MAX_TITULO:
         return None
     melhor: tuple[float, Titulo | None] = (0.0, None)
@@ -257,7 +244,7 @@ def _titulo(linhas: Sequence[str], lista: ListaTitulos) -> dict[str, Any]:
 
 def _numero_folha(linhas: Sequence[str]) -> tuple[int | None, bool]:
     for linha in list(linhas[:3]) + list(linhas[-3:]):
-        forma = normalizar(linha).lower()
+        forma = maiusculas_sem_acento(linha).lower()
         achado = PADRAO_FOLHA.match(forma) or PADRAO_PAGINA_DE.search(forma)
         if achado:
             numero = int(achado.group(1))
@@ -309,7 +296,7 @@ def medir_sinais_fronteira(
     if not todas:
         return {"vazia": True, "versao_titulos": lista.versao}
     linhas = corpo(texto, repetidas)
-    topo = [normalizar(linha).lower() for linha in linhas[:LINHAS_TOPO]]
+    topo = [maiusculas_sem_acento(linha).lower() for linha in linhas[:LINHAS_TOPO]]
     numero, reinicio = _numero_folha(todas)
     return {
         "vazia": False,

@@ -1079,10 +1079,21 @@ suíte existente; o Vermelho de cada tarefa é o teste novo que só passa com o 
     pipeline/tests/ingestao/test_texto.py --no-cov` e `bash scripts/verificar.sh`. Vermelho: 1
     failed (`assert '' == 'istanbul acao'`, com `dobrar` provisório). Verde: pipeline 703 passed
     (95,25%), intranet 266 passed (98,23%), integração 6, injeção 2; ruff e mypy limpos.
-- [ ] **T12.2** `levenshtein` e normalizações em `texto.py`. RNF-08. Fase 1; P3, D2.
+- [x] **T12.2** `levenshtein` e normalizações em `texto.py`. RNF-08. Fase 1; P3, D2.
   - Vermelho: `pipeline/tests/ingestao/test_texto.py::test_levenshtein_com_prefixo_e_sufixo_comuns`, `::test_colapsar_espacos_aplica_nfc`, `::test_maiusculas_sem_acento_remove_pontuacao`.
   - Verde: `texto.levenshtein` (versão de `medicao`), `colapsar_espacos`, `maiusculas_sem_acento`; `hibridas`, `sinais_fronteira` e `sinteticos/medicao` passam a importá-las; saem as cópias e os três `normalizar`/`_normalizar`.
   - Limpeza: nenhuma.
+  - Entregue: as três funções em `texto.py`; saem `hibridas.levenshtein` e `_normalizar`,
+    `medicao.levenshtein` e `normalizar` e `sinais_fronteira.normalizar`; `classificacao.py`,
+    `scripts/medir_extracao.py`, `test_hibridas.py` e `test_medicao.py` importam de `texto`
+    (só o import mudou nos testes). `colapsar_espacos` aplica NFC também na medição dos
+    sintéticos. Testes: `docker compose exec -T worker python -m pytest -c
+    pipeline/pyproject.toml pipeline/tests/ingestao/test_texto.py --no-cov` e `bash
+    scripts/verificar.sh` (stack inteira, inclui o código da T12.1). Vermelho: 3 failed
+    (`assert -1 == 1`, texto sem colapsar, texto sem maiúsculas, com funções provisórias).
+    Verde: saída 0; pipeline 706 passed (95,24%), intranet 266 passed (98,23%), integração 6,
+    injeção 2, web 436 passed (100%), cabeçalhos e isolamento ok, agente 11. Na T12.1 o script
+    tinha parado na suíte web por falta do contêiner `proxy`; esta execução cobre as duas.
 - [ ] **T12.3** `PaginaTexto` guarda o texto dobrado e as datas. RF-FAT-01. Fase 2; P2, D3.
   - Vermelho: `pipeline/tests/ingestao/eventos/test_fatos.py::test_candidatos_iguais_com_texto_da_pagina_guardado` (compara com os candidatos dos sintéticos e conta uma dobragem por página).
   - Verde: `cached_property` `dobrado` e `datas` em `eventos/modelo.PaginaTexto`; `fatos`, `capa`, `base`, `recurso`, `preparo` e `decisao_agravada` leem delas; `capa._valor` recorta o dobrado.

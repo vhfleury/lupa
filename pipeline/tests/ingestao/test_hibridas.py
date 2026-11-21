@@ -9,8 +9,9 @@ from apoio_ingestao import AutosSinteticos
 from lupa_pipeline.dominio.enums import FlagPagina, TipoPagina
 from lupa_pipeline.ingestao import extrator_paginas
 from lupa_pipeline.ingestao.extrator_paginas import extrair_intervalo, main, processar_pagina
-from lupa_pipeline.ingestao.hibridas import cobertura, comparar, fundir, levenshtein
+from lupa_pipeline.ingestao.hibridas import cobertura, comparar, fundir
 from lupa_pipeline.ingestao.ocr import LinhaOcr, OcrIndisponivelError
+from lupa_pipeline.ingestao.texto import levenshtein
 from lupa_pipeline.ingestao.texto_nativo import Linha
 from lupa_pipeline.sinteticos.gabarito import Cenario, Composicao, Elemento, VetorInjecao
 
