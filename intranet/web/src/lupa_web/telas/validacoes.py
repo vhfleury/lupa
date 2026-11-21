@@ -90,11 +90,7 @@ def _no_do_identificador(indices: Indices, valor: str) -> dict[str, Any]:
     if fonte:
         link = link_da_evidencia(indices.processo_id, fonte["id"])
         return {"tipo": "link", "texto": f"Folha {fonte['pagina'] or '?'}", "link": link}
-    return {
-        "tipo": "abreviado",
-        "texto": f"{valor[:rotulos.PREFIXO_DO_IDENTIFICADOR]}…",
-        "titulo": valor,
-    }
+    return {"tipo": "abreviado", "texto": rotulos.abreviar_identificador(valor), "titulo": valor}
 
 
 def no_do_valor(
