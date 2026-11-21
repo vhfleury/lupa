@@ -14,7 +14,7 @@ Siga as seções "Versão 0.2", "Conteúdo obrigatório de um plano" e "Entrega 
    agente, arquivos, dependências, Vermelho (ou "revisão manual") e Pronto quando, ou se o plano
    tiver decisão pendente.
 3. Acrescente em `docs/planos/tarefas_0.2.md` uma seção com o nome do plano, a branch e o PR
-   únicos, e uma caixa por fase: `- [ ] **T<nn>.<n>** <resumo> — <requisito>. [F<n>](<plano>#f<n>)`,
-   continuando a numeração do arquivo. O detalhe fica só no plano.
+   únicos, e uma caixa por fase: `- [ ] **T<nn>.<n>** <resumo> — <requisito>. [fase F<n>](<plano>)`,
+   continuando a numeração do arquivo; o link aponta para o plano e nomeia a fase. O detalhe fica só no plano.
 4. Responda com a lista de caixas e os grupos de fases que podem rodar em paralelo. Não comece a
    implementação.
