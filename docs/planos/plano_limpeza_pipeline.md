@@ -33,7 +33,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
 | `eventos/etapa.processar_eventos` | lê processo e fatos duas vezes | passa o processo lido adiante |
 | `dominio/esquemas.Fato.valor` (`Any`) | escalar ou `{"valor": ...}` | sempre o escalar; `de_registro` converte o formato antigo ao ler (D12) |
 | `validacoes/modelo.valor_de` | desembrulha em cada consumidor | removida; consumidores leem `fato.valor` |
-| `eventos/saida.py`, `sinteticos/gerador.py` (caso `PROCURACAO`) | troca o outorgante pelo nome em cada um | o fato de procuração traz o outorgante como sujeito, resolvido em `eventos/partes.py` (D12) |
+| `eventos/saida.py`, `sinteticos/gerador.py` (caso `PROCURACAO`) | cada um troca o outorgante pelo nome | `partes.nome_do_outorgante`, usado pelos dois; o fato de procuração não muda (D13) |
 | `dominio/esquemas.Anotacao`, `Usuario`, `JobIngestao`, `LoteIngestao`, `Peca` | sem consumidor | removidos com os testes (D9) |
 | `dominio/tabelas.HUBS`, `LINKS`, `SATELITES` | constantes só do teste | calculadas no teste de migração |
 | `ingestao/processamento._processar` | `if/elif` por nome de etapa | `ETAPAS: tuple[Etapa, ...]` executada a partir de `primeira_etapa` (D11) |
@@ -50,21 +50,21 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
 | `ingestao/repositorio_pecas._serializar` | `session.get(VisaoEvidencia)` por peça | um `select ... where hk in (...)` em `indice_processo` |
 | `ingestao/repositorio._atributos_correntes`, `repositorio_pecas._atributos` | dois helpers | `atributos(visao, satelite)` ao lado de `atributos_do_satelite` |
 | fila: travar processo e checar `DESCARTADO` (`processamento.py`, `worker.py`, `reprocessamento.py`) | três cópias | `processo_ativo(session, hk) -> VisaoProcesso \| None` em `repositorio.py` |
-| `validacoes/calendario.Calendario` | `feriados: Mapping[date, str]` e `fontes` paralelos | `feriados: Mapping[date, Feriado]` com descrição e fonte (D7) |
+| `validacoes/calendario.Calendario` | `feriados: Mapping[date, str]` e `fontes` paralelos | `feriados: Mapping[date, FeriadoCalendario]` com descrição e fonte (D7) |
 | `validacoes/calendario.contar_prazo_corrido` | só usada em teste | removida com o teste (D7) |
-| `validacoes/calendario.contar_prazo_util`, `fonte_em`, `_prorrogar` | laços copiados | `_contar(base, dias, sem_contagem)` e `dias_uteis_entre(inicio, fim)` (D7) |
+| `validacoes/calendario.contar_prazo_util`, `fonte_em`, `_prorrogar` | laços copiados | gerador `_dias_seguintes`, usado por `contar_prazo_util` e por `dias_uteis_entre(inicio, fim)`; `_prorrogar` sai com `contar_prazo_corrido` (D7) |
 | `validacoes/civel/tempestividade.py` | conta dias úteis e monta os descartados à mão | `calendario.dias_uteis_entre` |
 | `validacoes/dados/dispensas.yaml` (arquivo) | `preparo.yaml` com `qualidade → rótulo` | renomeado; `qualidade → {rotulo, preparo, mandato}` com os mesmos valores, versão 0.3.0 (D8) |
 | `validacoes/dados.TabelaPreparo`, `preparo_padrao()` | tabela do preparo, lida também por `eventos/partes.py` | `TabelaDispensas` e `dispensas_padrao()`; `partes.py` lê dela (D8) |
 | `validacoes/apoio.Coleta.unico` | anota o conflito e cada regra checa `coleta.conflitos` | em fato opcional, levanta `FatoPendenteError`; o decorador `@regra` converte em `coleta.verificar()` (D8) |
 | `validacoes/apoio.Coleta.pendente`, `Coleta.qualidade()` | `pendente` sem uso; qualidade lida em duas regras | sai `pendente`; entra `qualidade()` |
-| `validacoes/apoio.PECAS` | dicionário central com `KeyError` para tipo novo | `peca_procurada` em cada regra, consultada pela `Coleta` |
+| `validacoes/apoio.PECAS` | dicionário central com `KeyError` para tipo novo | `PECA_PROCURADA` em cada módulo de `civel/`, consultada pela `Coleta` |
 | `validacoes/modelo.ModeloProcesso.fato`, `recorrentes` | serializa a cada consulta e refaz o índice | resultado memorizado por instância |
 | `validacoes/adaptador.para_modelo` | repassa para `ModeloProcesso` | removida; chamadores usam `ModeloProcesso` |
-| `validacoes/versao.VERSAO_CATALOGO` | versão atual | sobe uma versão menor (D8) |
+| `validacoes/versao.VERSAO_CATALOGO` | `0.2.0` | `0.3.0` (D8) |
 | `sinteticos/gerador._ler_marcas` e as três montagens de `InjecaoGabarito` | aninhado, repetido | `_parte`, `_evento`, `_injecao` |
 | `sinteticos/gabarito.ProcessoGabarito.diagnostico_esperado` | campo gravado e validado | `computed_field` derivado de `cenario` |
-| `sinteticos/roteiro.py` (ifs por `ClasseProcessual`) | repete o catálogo | peças derivadas de `validacoes_de(classe)` e de `peca_procurada` |
+| `sinteticos/roteiro.py` (ifs por `ClasseProcessual`) | repete o catálogo | peças derivadas de `validacoes_de(classe)` e de `PECA_PROCURADA` |
 | `sinteticos/identidades._MESES` | tabela própria | mantida (D2) |
 
 ### Arquivos
@@ -86,7 +86,8 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
 | `docs/sistema/ingestao.md`, `docs/sistema/validacoes.md`, `docs/sistema/modelo-de-dados.md` | atualizar |
 | `docs/arquitetura.md` | extração paralela no worker |
 | `CHANGELOG.md` | `Não publicado`: paralelismo da extração e variável removida |
-| `docs/decisoes/registro.md` | D4, D7, D8, D12 |
+| `docs/decisoes/registro.md` | D4, D7, D8, D12, D13 |
+| `docs/dividas/todo.md` | dívida do outorgante como sujeito da procuração (D13) |
 
 ### O que não muda
 
@@ -97,6 +98,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
 - Texto dos achados, resultado de cada validação, base legal e templates de frase.
 - Rotas da API, `lupa_web` e o contrato HTTP.
 - `sinteticos/identidades._MESES` e os gabaritos sintéticos gravados.
+- Sujeito e id dos fatos de procuração, e as correções e notas que apontam para eles (D13).
 
 ## Problemas
 
@@ -134,7 +136,7 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
   segunda variável com o mesmo papel.
 - **D6.** Gravação em lote só dentro da transação que já existe; o `hash_diff` continua por linha.
 - **D7.** `contar_prazo_corrido` sai com o teste; `feriados` e `fontes` viram um só
-  `Mapping[date, Feriado]`; o especialista-validacoes revisa.
+  `Mapping[date, FeriadoCalendario]`; o especialista-validacoes revisa.
 - **D8.** `preparo.yaml` vira `dispensas.yaml`, tabela própria com os mesmos valores, lida pelas regras e por `eventos/partes.py`; as versões de fatos e catálogo do reprocessamento passam a citar `dispensas=`, e fatos e achados são regravados uma vez (decisão do usuário na T12.6); `Coleta.unico` interrompe a
   regra em conflito de fato opcional (decisão do usuário na T12.8; o obrigatório já cai em conferência coletando os demais); o especialista-validacoes revisa. A troca de arquivo de dados muda
   `versoes_dados` do achado, então `VERSAO_CATALOGO` sobe e o reprocessamento (RF-ING-08)
@@ -146,12 +148,13 @@ Nenhuma tabela, coluna, índice, função ou view muda. Sem migration.
 - **D11.** Despachos viram registros declarativos: extratores por espécie, formatos por mime,
   etapas em lista ordenada.
 - **D12.** `Fato.valor` passa a ser sempre o escalar. Sem migration: `Fato.de_registro` converte
-  `{"valor": x}` em `x` ao ler da view; fatos novos já saem normalizados. O outorgante da
-  procuração vira o sujeito do fato, resolvido em `eventos/partes.py` e usado por extração,
-  saída e gerador.
-- **D13.** O outorgante como sujeito (F11) só entra se o id dos fatos de procuração não mudar,
-  fixado por teste; se mudar, a fase sai do plano e vira dívida, sem parar (decisão do usuário,
-  21/11/2026). Correções e notas do gabinete apontam para esse id.
+  `{"valor": x}` em `x` ao ler da view; fatos novos já saem normalizados.
+- **D13.** O fato de procuração não muda: o id do fato é `chave_hash([processo, tipo, sujeito,
+  evidência])`, e gravar o outorgante como sujeito mudaria o id a que correções e notas do
+  gabinete apontam. F11 só tira o caso especial repetido: `partes.nome_do_outorgante` traduz o
+  outorgante para o nome e é usado por `eventos/saida.py` e `sinteticos/gerador.py`; um teste
+  fixa que o id das procurações não muda. O outorgante como sujeito do fato vira dívida em
+  `docs/dividas/todo.md` (decisão do usuário, 21/11/2026).
 - **D14.** Um PR para o plano inteiro, da branch `refactor/limpeza-pipeline`, com um commit por
   fase. F1 a F7 já entraram na `develop` pelos PRs #20 a #26 e #27, antes desta regra; a branch
   parte da `develop` com F8.
@@ -239,18 +242,18 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
 - Verde: `Fato.de_registro` converte `{"valor": x}`; extratores gravam o escalar; sai `valor_de`.
 - Entregue:
 
-### F11 — Outorgante da procuração como sujeito
+### F11 — Nome do outorgante num lugar só
 
-- Requisito: RF-VAL-04 · P8 · D12, D13.
+- Requisito: RF-VAL-04 · P8 · D13.
 - Revisores: especialista-validacoes, especialista-ingestao.
-- Arquivos: `ingestao/eventos/partes.py`, `ingestao/eventos/procuracao.py`,
-  `ingestao/eventos/saida.py`, `sinteticos/gerador.py`, `validacoes/civel/representacao.py`,
-  `tests/ingestao/test_eventos.py`.
+- Arquivos: `ingestao/eventos/partes.py`, `ingestao/eventos/saida.py`, `sinteticos/gerador.py`,
+  `tests/ingestao/test_eventos.py`, `docs/dividas/todo.md`.
 - Depende de: F10. Paralela com: F16.
-- Vermelho: `tests/ingestao/test_eventos.py::test_procuracao_traz_o_outorgante_como_sujeito` e
-  `::test_id_da_procuracao_nao_muda_com_o_sujeito`.
-- Verde: resolução em `partes.py`; saem os casos `PROCURACAO` de `saida.py` e `gerador.py`. Se o
-  teste do id falhar: a fase é revertida e vira dívida (D13).
+- Vermelho: `tests/ingestao/test_eventos.py::test_nome_do_outorgante_resolve_o_codigo_da_parte`.
+- Verde: `partes.nome_do_outorgante(valor, partes)`; `saida.py` e `gerador.py` passam a usá-la
+  e saem os casos `PROCURACAO` deles. Guarda:
+  `tests/ingestao/test_eventos.py::test_id_da_procuracao_nao_muda`, que fixa o id atual. Dívida
+  do outorgante como sujeito registrada em `docs/dividas/todo.md`.
 - Entregue:
 
 ### F12 — Ids de fato e evidência pelo hub
@@ -453,9 +456,9 @@ Grupos, cada um fechado por `verificar.sh` na stack inteira antes do seguinte:
 
 ### Contagem de prazo (F4 e F5)
 
-1. Entrada: data base, dias, calendário. Ação: `_contar` avança um dia por vez, pulando os dias com `motivo_sem_expediente`. Saída: termo final e dias descartados com descrição e fonte.
-2. Termo final sem expediente: prorrogar ao próximo dia útil (`_prorrogar`) e registrar os dias pulados.
-3. Entrada: início e fim. Ação: `dias_uteis_entre` usa o mesmo laço. Saída: contagem e descartados.
+1. Entrada: data base, dias, calendário. Ação: `contar_prazo_util` percorre `_dias_seguintes`, um dia por vez, pulando os dias com `motivo_sem_expediente`. Saída: vencimento e dias pulados.
+2. Prazo de zero dias: vencimento na própria data base, sem dias pulados. O vencimento sempre cai num dia útil, porque a contagem só termina num dia contado.
+3. Entrada: início e fim. Ação: `dias_uteis_entre` percorre o mesmo gerador de `inicio + 1` até `fim`. Fim igual ou anterior ao início: `(0, ())`. Saída: contagem e dias pulados.
 4. Tempestividade: atraso igual a `dias_uteis_entre(termo, protocolo)`; texto do achado igual ao atual.
 
 ### Regra com conflito (F8)
@@ -466,12 +469,71 @@ Grupos, cada um fechado por `verificar.sh` na stack inteira antes do seguinte:
 4. `@regra` captura `FatoPendenteError` e devolve `coleta.verificar()`. Saída: achado "verificar" com os conflitos, igual ao atual.
 5. Sem conflito: a regra segue e devolve o achado. Outras exceções sobem como hoje.
 
-### Leitura do fato (F10 e F11)
+### Leitura do fato (F10)
 
 1. Entrada: linha de `v_fato`. Ação: `Fato.de_registro`. Saída: `Fato`.
 2. Valor `dict` com só a chave `valor`: substituir pelo escalar.
-3. Fato novo: o extrator grava o escalar; procuração grava o outorgante como sujeito.
+3. Fato novo: o extrator grava o escalar.
 4. Consumidores (validações, saída, gerador, `agente/dossie.py`) leem `fato.valor`.
+
+### Nome do outorgante (F11)
+
+1. Entrada: valor do fato de procuração e o mapa `chave_nome → hk da parte`. Ação:
+   `nome_do_outorgante`. Saída: o nome da parte.
+2. Outorgante já é um nome (substabelecimento, com `nome` e `oab`): devolver o nome sem consulta.
+3. Código sem parte correspondente no mapa: devolver o código, como hoje.
+4. `saida.eventos_saida` e `gerador` chamam a função; o fato gravado, o sujeito e o id não mudam.
+
+### Etapas em lista ordenada (F14)
+
+1. Entrada: arquivo travado e `versoes_atuais()`. Ação: `primeira_etapa(arquivo, versoes)`.
+   Saída: nome da primeira etapa a refazer, ou `None`.
+2. `None` com arquivo novo: começar em `paginas`. `None` com arquivo já processado: encerrar sem
+   refazer nada.
+3. Entrada: nome da etapa. Ação: localizar sua posição em `ETAPAS` (`paginas`, `pecas`, `fatos`,
+   `catalogo`). Saída: as etapas dali até o fim, na ordem.
+4. Para cada etapa: executar a função dela na conexão do lock. Saída: a parte do relatório da
+   etapa.
+5. Etapa `catalogo`: juntar a parte dela ao relatório existente em vez de substituí-lo, como hoje.
+6. Erro numa etapa: o erro sobe, as etapas seguintes não rodam e a retomada (RF-ING-07) recomeça
+   pela primeira etapa sem versão gravada.
+7. Saída: relatório com `versoes_processamento` iguais a `versoes_atuais()`.
+
+### Formatos por tipo de arquivo (F15)
+
+1. Entrada: arquivo lacrado (`mime`). Ação: `FORMATOS[mime]`. Saída: o `Formato` do arquivo.
+2. Mime sem formato: recusar como hoje (RF-ING-02), sem tocar o storage.
+3. Entrada: caminho baixado. Ação: `formato.inventariar`. Saída: entradas (um PDF é uma entrada).
+4. Entrada: entradas e o mapa de nomes internos (`entrada-<n>.pdf`). Ação: `formato.diagnosticar`.
+   Saída: diagnóstico com fronteiras de origem e metadados descartados já com os nomes internos.
+5. Entrada: entradas. Ação: `formato.persistir` no storage, numa transação. Saída: fontes de
+   páginas (`FontePaginas`).
+6. Retomada com manifesto: `_fontes_do_manifesto` devolve as fontes e o diagnóstico gravados, sem
+   os passos 3 a 5.
+7. Nome interno sem entrada correspondente: erro de integridade, em vez do padrão `entrada-1.pdf`.
+
+### Gravação de páginas em lote (F17)
+
+1. Entrada: páginas extraídas de um lote. Ação: montar as chaves de hub e de link de cada uma.
+   Saída: listas de hubs e links.
+2. Ação: `INSERT ... ON CONFLICT DO NOTHING` dos hubs e dos links com `executemany`. Saída: hubs e
+   links gravados.
+3. Ação: um `SELECT DISTINCT ON (pai)` dos `hash_diff` correntes dos satélites das páginas do
+   lote. Saída: mapa `pai → hash_diff`.
+4. Para cada satélite de cada página: calcular o `hash_diff`; igual ao corrente, não gravar;
+   diferente, incluir na lista de linhas novas.
+5. Ação: inserir as linhas novas de satélite com `executemany`. Saída: lote gravado.
+6. Erro: a transação do lote é desfeita inteira; nada do lote fica gravado e a retomada refaz o
+   lote.
+
+### Processo ativo na fila (F19)
+
+1. Entrada: sessão e `hk_processo`. Ação: `SELECT ... FOR UPDATE` do processo em `v_processo`.
+   Saída: `VisaoProcesso` travado.
+2. Processo descartado: devolver `None`.
+3. `Trabalho.transacao`: `None` levanta o erro de processo descartado, como hoje.
+4. Worker: `None` marca o item da fila como encerrado, como hoje.
+5. Reprocessamento: `None` pula o arquivo, como hoje.
 
 ## Execução
 
