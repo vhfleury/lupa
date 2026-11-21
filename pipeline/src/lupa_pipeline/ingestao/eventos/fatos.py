@@ -6,7 +6,6 @@ from lupa_pipeline.config import PAGINAS_IDENTIFICACAO_PADRAO
 from lupa_pipeline.dominio.chaves import chave_hash
 from lupa_pipeline.dominio.enums import TipoPeca
 from lupa_pipeline.dominio.esquemas import Fato
-from lupa_pipeline.ingestao.datas import dobrar
 from lupa_pipeline.ingestao.eventos import (
     capa,
     certidao,
@@ -21,6 +20,7 @@ from lupa_pipeline.ingestao.eventos.base import Fonte
 from lupa_pipeline.ingestao.eventos.modelo import Candidato, PecaTexto, evidencia_de
 from lupa_pipeline.ingestao.eventos.padroes import padroes
 from lupa_pipeline.ingestao.eventos.partes import chave_nome
+from lupa_pipeline.ingestao.texto import dobrar
 
 VERSAO = str(padroes()["versao"])
 ORIGEM = "pipeline.eventos"

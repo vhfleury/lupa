@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 
 from lupa_pipeline.dominio.enums import TipoFato
-from lupa_pipeline.ingestao.datas import dobrar
+from lupa_pipeline.ingestao.texto import dobrar
 
 
 @cache
