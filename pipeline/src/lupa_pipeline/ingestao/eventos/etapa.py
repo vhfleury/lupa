@@ -30,7 +30,8 @@ from lupa_pipeline.ingestao.eventos.fatos import ORIGEM, VERSAO, candidatos_da_p
 from lupa_pipeline.ingestao.eventos.modelo import PaginaTexto, PecaTexto, evidencia_de
 from lupa_pipeline.ingestao.eventos.partes import chave_nome, extrair_partes
 from lupa_pipeline.ingestao.repositorio_eventos import gravar_achados
-from lupa_pipeline.validacoes.adaptador import para_dominio, para_modelo
+from lupa_pipeline.validacoes.adaptador import para_dominio
+from lupa_pipeline.validacoes.modelo import ModeloProcesso
 from lupa_pipeline.validacoes.motor import executar_catalogo
 
 
@@ -125,7 +126,7 @@ def achados_do_processo(
 ) -> list[Achado]:
     """Executa as regras para cada recorrente, usando somente as versões atuais dos fatos."""
     processo = session.get_one(VisaoProcesso, processo_id)
-    modelo = para_modelo(listar_fatos_por_processo(session, processo_id))
+    modelo = ModeloProcesso(listar_fatos_por_processo(session, processo_id))
     resultado = []
     for calculo in executar_catalogo(modelo, classe, referencia):
         chave = {

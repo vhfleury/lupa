@@ -195,3 +195,25 @@ def test_abertura_de_zip_so_no_filho_e_membros_temporarios_opacos(
     assert len(vistos) == 2 and all(not p.exists() for p in vistos)
     with fabrica_sessao() as sessao:
         assert sessao.get_one(VisaoArquivo, hk).estado == "concluido"
+
+
+@pytest.mark.parametrize(
+    ("primeira", "esperadas"),
+    [
+        ("paginas", ("paginas", "pecas", "fatos", "catalogo")),
+        ("pecas", ("pecas", "fatos", "catalogo")),
+        ("fatos", ("fatos", "catalogo")),
+        ("catalogo", ("catalogo",)),
+    ],
+)
+def test_etapas_executam_a_partir_da_primeira_agendada(
+    primeira: str, esperadas: tuple[str, ...]
+) -> None:
+    """RF-ING-08: a execução segue a ordem de `ETAPAS` a partir da primeira etapa agendada."""
+    assert tuple(nome for nome, _ in processamento.ETAPAS) == (
+        "paginas",
+        "pecas",
+        "fatos",
+        "catalogo",
+    )
+    assert tuple(nome for nome, _ in processamento.etapas_desde(primeira)) == esperadas

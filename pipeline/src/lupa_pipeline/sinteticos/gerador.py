@@ -39,7 +39,7 @@ from lupa_pipeline.sinteticos.injecao import (
 )
 from lupa_pipeline.sinteticos.paginacao import FONTE, LARGURA, PaginaPlano, paginar
 from lupa_pipeline.sinteticos.roteiro import Configuracao, Roteiro, montar_roteiro
-from lupa_pipeline.validacoes.adaptador import para_modelo
+from lupa_pipeline.validacoes.modelo import ModeloProcesso
 from lupa_pipeline.validacoes.motor import executar_catalogo
 
 TENTATIVAS_TAMANHO = 6
@@ -318,7 +318,9 @@ def resultado_esperado(
 ) -> tuple[ResultadoEsperado, ...]:
     """Aplica o catálogo da classe aos eventos conhecidos pelo gerador antes da extração."""
     por_sujeito = {_sujeito(numero, e.sujeito): e.sujeito for e in eventos}
-    achados = executar_catalogo(para_modelo(fatos_do_gabarito(numero, eventos)), classe, referencia)
+    achados = executar_catalogo(
+        ModeloProcesso(fatos_do_gabarito(numero, eventos)), classe, referencia
+    )
     return tuple(
         ResultadoEsperado(
             validacao=a.validacao,

@@ -16,8 +16,9 @@ from lupa_pipeline.dominio.repositorios import (
 )
 from lupa_pipeline.dominio.tabelas import hub_achado
 from lupa_pipeline.dominio.visoes import VisaoProcesso
-from lupa_pipeline.validacoes.adaptador import para_dominio, para_modelo
+from lupa_pipeline.validacoes.adaptador import para_dominio
 from lupa_pipeline.validacoes.apoio import data_de
+from lupa_pipeline.validacoes.modelo import ModeloProcesso
 from lupa_pipeline.validacoes.motor import executar_catalogo
 from tests.validacoes.conftest import PROCESSO_SINTETICO, SUJEITO, criar_fato, id_sintetico
 
@@ -38,7 +39,7 @@ def test_para_dominio_vincula_processo_sujeito_e_fontes() -> None:
         criar_fato("data_interposicao", "2026-08-24"),
         criar_fato("qualidade_recorrente", "particular"),
     ]
-    achados = executar_catalogo(para_modelo(fatos), "apelacao_civel", date(2026, 8, 24))
+    achados = executar_catalogo(ModeloProcesso(fatos), "apelacao_civel", date(2026, 8, 24))
     assert len(achados) == 3
     for calculado in achados:
         hk = id_sintetico(calculado.validacao)
@@ -64,7 +65,7 @@ def test_ida_e_volta_pelo_data_vault_preserva_referencias(
         salvar_fato(sessao, fabrica_fato(processo, pagina, tipo, valor))
     lidos = listar_fatos_por_processo(sessao, processo)
     assert len(lidos) == 4
-    calculados = executar_catalogo(para_modelo(lidos), "apelacao_civel", date(2026, 8, 24))
+    calculados = executar_catalogo(ModeloProcesso(lidos), "apelacao_civel", date(2026, 8, 24))
     cnj = sessao.get_one(VisaoProcesso, processo).numero_cnj
     novos = []
     for calculado in calculados:
