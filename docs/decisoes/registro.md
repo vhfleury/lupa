@@ -878,6 +878,18 @@ decisão anterior.
 | 61 | Merge | squash em `develop`; merge commit de `release/x.y.z` em `main`, com tag anotada |
 | 62 | Proteção | push direto em `main` e `develop` proibido; só por PR |
 
+### Limpeza da pipeline — 21/11/2026
+
+Plano em [plano_limpeza_pipeline.md](../planos/plano_limpeza_pipeline.md); nenhum requisito muda.
+
+| Decisão | Tema | Resposta |
+| --- | --- | --- |
+| 67 (D4) | Extração paralela | `ThreadPoolExecutor` com limite global; o semáforo por gabinete (`LimitadorGabinete`) e `LUPA_EXTRACAO_LOTES_POR_GABINETE` saem, porque gabinete é conceito fora da 0.2. O limite é `LUPA_EXTRACAO_LOTES_POR_JOB`, padrão 2 (`1` = série), que antes não tinha efeito e valia 4. Substitui a extração de lotes em série |
+| 68 (D7) | Calendário | `contar_prazo_corrido` sai com o teste, sem uso em produção; `feriados` e `fontes` viram um só `Mapping[date, FeriadoCalendario]`; a contagem de dias úteis da tempestividade passa a `dias_uteis_entre`. Substitui os dicionários paralelos e a contagem feita na regra |
+| 69 (D8) | Dispensas e conflito | `preparo.yaml` vira `dispensas.yaml`, com `rotulo`, `preparo` e `mandato` por qualidade, lida pelas regras e por `eventos/partes.py`; `VERSAO_CATALOGO` sobe para `0.3.0` e as versões de fatos e catálogo do reprocessamento citam `dispensas=`, de modo que fatos e achados são regravados uma vez, com o mesmo resultado; conflito em fato opcional interrompe a regra (`FatoPendenteError`, convertido por `@regra`), e em fato obrigatório a regra segue coletando. Substitui a tabela `preparo.yaml` (`TabelaPreparo`) e a checagem de `coleta.conflitos` em cada regra |
+| 70 (D12) | Valor do fato | `Fato.valor` é o escalar, sem o envoltório `{"valor": x}`; `Fato.de_registro` converte o formato antigo ao ler, sem migration; a rota de fatos devolve o valor gravado. Substitui o desembrulhar de `valor_de` em cada consumidor |
+| 71 (D13) | Procuração | O fato não muda: o outorgante não vira sujeito, para não mudar o id a que correções e notas apontam. A troca código-nome fica em `partes.nome_do_outorgante` e `partes.codigo_do_outorgante`. Substitui os dois casos especiais de `saida.py` e `gerador.py`; o outorgante como sujeito é dívida em `docs/dividas/todo.md` |
+
 ## Resultado das revisões
 
 | Revisão | Resultado |

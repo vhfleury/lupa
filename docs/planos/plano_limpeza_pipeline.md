@@ -516,7 +516,13 @@ verdes com 90% de cobertura, `ruff` e `mypy` limpos e, em fase que toca ingestã
 - Revisão manual: extração paralela e variável removida no `CHANGELOG.md`; D4, D7, D8, D12 e
   D13 no registro.
 - Pronto quando: `bash scripts/verificar.sh` na stack inteira com saída 0 e links conferidos.
-- Entregue:
+- Entregue: docs/sistema/ingestao.md, validacoes.md e modelo-de-dados.md, docs/arquitetura.md
+  (extração paralela e falhas), CHANGELOG.md em Não publicado (extração paralela,
+  LUPA_EXTRACAO_LOTES_POR_GABINETE removida, catálogo 0.3.0 e regravação única) e
+  docs/decisoes/registro.md (decisões 67 a 71: D4, D7, D8, D12, D13). Links locais conferidos; a
+  âncora #prazos-incidentes de CONFORMIDADE.md já faltava antes, em texto da v1. Revisão manual.
+  Verde: verificar.sh na stack inteira, saída 0; pipeline 765 passed (95,90%), intranet 267
+  (98,23%), integração 6, injeção 2, web 436 (100%), cabeçalhos e isolamento ok, agente 11.
 
 ## Distribuição
 
