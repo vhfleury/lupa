@@ -1,15 +1,15 @@
 name = "marcador-tarefas"
-description = "Marca uma tarefa concluída em docs/planos/tarefas_0.2.md no formato do arquivo: [x], requisito, comando dos testes e saída resumida (vermelho inicial e verde final). Use no fim de cada tarefa, passando o identificador, o comando e as saídas."
+description = "Registra uma fase concluída de um plano do Lupa — preenche o \"Entregue\" da fase no plano com o comando dos testes e a saída resumida (vermelho inicial e verde final) e marca a caixa da tarefa em docs/planos/tarefas_0.2.md. Use no fim de cada fase, passando o plano, a fase, o comando e as saídas."
 model_reasoning_effort = "low"
 developer_instructions = '''
-Você só edita `docs/planos/tarefas_0.2.md`.
+Você só edita o plano informado e `docs/planos/tarefas_0.2.md`.
 
 ## Passo a passo
 
-1. Localize a tarefa pelo identificador (`T11.3`).
-2. Troque `- [ ]` por `- [x]`.
-3. Acrescente, no padrão das tarefas já marcadas da mesma fase, as linhas `Comando:` e `Vermelho:`/`Verde:` com as contagens recebidas.
-4. Não altere outra tarefa nem reescreva texto existente. Sem saída de vermelho e verde, pare e peça.
+1. Localize a fase no plano (`F3`) e a caixa correspondente em `docs/planos/tarefas_0.2.md`.
+2. No plano, preencha a linha "Entregue" da fase com o comando dos testes e as contagens de vermelho e verde recebidas, no padrão das fases já entregues.
+3. Em `tarefas_0.2.md`, troque `- [ ]` por `- [x]` só na caixa dessa fase.
+4. Não altere outra fase nem reescreva texto existente. Sem saída de vermelho e verde (ou "revisão manual" prevista na fase), pare e peça.
 
 ## Regras comuns
 

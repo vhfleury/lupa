@@ -12,14 +12,23 @@ Siga as seções "Versão 0.2" e "Conteúdo obrigatório de um plano" do `CLAUDE
 2. Pare e avise o usuário se algum requisito citado não estiver aprovado ou tiver pergunta em
    aberto.
 3. Levante no código todas as decisões de implementação que a especificação não fixa e pergunte
-   todas ao usuário antes de escrever. O plano não sai com decisão pendente. Decisão que muda um
-   requisito volta para a especificação.
+   todas ao usuário antes de escrever, inclusive as que só apareceriam no meio de uma fase
+   (efeito em dados gravados, versões, ids, contratos entre pacotes, arquivos lidos por outros
+   módulos). O plano não sai com decisão pendente; para cada risco que uma fase pode revelar, ele
+   já diz o que fazer. Decisão que muda um requisito volta para a especificação.
 4. Crie `docs/planos/plano_<tema>.md` (sem branch nem commit). A primeira linha depois do título
    lista os requisitos que o plano cobre.
 5. Abra com "O que muda": tabela `Objeto | Antes | Depois` (cada tabela, coluna, índice, função ou
    view, com o tipo), tabela `Arquivo | Ação` e lista "O que não muda".
-6. Problemas e decisões numerados (P/D); fases de uma linha que citam P/D e requisitos; cada fato
-   uma vez; sem motivação nem resultado previsto.
+6. Problemas e decisões numerados (P/D); cada fato uma vez; sem motivação nem resultado previsto.
+6a. Cada tarefa é uma fase `F<n>`, na ordem de execução, pequena o bastante para um commit. Cada
+   fase traz, uma linha cada: requisito e P/D; agente que implementa (`executor`, `tdd` ou
+   especialista) e agentes que revisam; arquivos que toca; depende de; pode rodar em paralelo com
+   (sem arquivo em comum e sem depender do resultado); Vermelho (`<arquivo>::<teste>`); Verde;
+   Pronto quando; e "Entregue", vazio até a conclusão. Migration é fase própria, antes da primeira
+   que depende dela; exceção ao TDD diz "revisão manual" no lugar de Vermelho e Verde.
+6b. Seção "Distribuição": tabela `Fase | Agente | Revisores | Depende de | Paralela com`, e os
+   grupos de fases que podem rodar ao mesmo tempo.
 7. Seção "Passo a passo do algoritmo": passos numerados com entrada, ação e saída; desvios,
    paradas e erros como passos próprios; um bloco por algoritmo (ou em
    `docs/planos/plano_<tema>_execucao.md`, com lista de arquivos e checklist de testes).
@@ -28,6 +37,7 @@ Siga as seções "Versão 0.2" e "Conteúdo obrigatório de um plano" do `CLAUDE
 9. Checklist de testes: cada critério de aceite vira pelo menos um teste, no formato
    `<requisito>: <arquivo de teste>::<nome do teste> — <o que verifica>`. Exceções do `CLAUDE.md`
    marcadas como revisão manual.
-10. Execução em no máximo 3 etapas, na ordem de `docs/operacao/operacao.md`.
-11. Inclua o plano em `docs/README.md`. Responda com o caminho e a tabela `Requisito | Teste`. Não
-    escreva código.
+10. Execução em no máximo 3 etapas, na ordem de `docs/operacao/operacao.md`; o plano inteiro é um
+   único PR, da branch `<tipo>/<tema-do-plano>`, com um commit por fase.
+11. Inclua o plano em `docs/README.md`. Responda com o caminho, a tabela `Requisito | Fase` e a
+    distribuição. Não escreva código.
