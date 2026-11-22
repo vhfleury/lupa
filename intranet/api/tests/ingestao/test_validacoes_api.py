@@ -7,6 +7,7 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from apoio_comum import eventos_do_banco
+from lupa_pipeline.dominio.repositorios import gravar_valor, listar_fatos_por_processo
 from lupa_pipeline.dominio.tabelas import sat_fato_anotacao
 from lupa_pipeline.dominio.visoes import VisaoPagina
 from lupa_pipeline.ingestao.eventos.etapa import processar_eventos
@@ -80,3 +81,20 @@ def test_anotacao_nova_grava_record_source_api(autos_civeis: Autos, engine_teste
             select(sat_fato_anotacao.c.record_source).where(sat_fato_anotacao.c.texto == texto)
         ).all()
     assert origens == ["api.anotacao"]
+
+
+def test_resposta_de_fatos_nao_muda_com_valor_antigo(
+    autos_civeis: Autos, engine_teste: Engine
+) -> None:
+    """RF-FAT-01, D16: a rota de fatos devolve o valor gravado no formato `{"valor": x}`."""
+    c, base = autos_civeis.cliente, autos_civeis.url
+    fatos = c.get(base + "/fatos").json()["fatos"]
+    antes = next(f for f in fatos if f["tipo"] == "data_intimacao")
+    with Session(engine_teste) as s, s.begin():
+        corrente = listar_fatos_por_processo(s, autos_civeis.processo)
+        fato = next(f for f in corrente if f.id == antes["id"])
+        antigo = fato.model_copy(update={"valor": {"valor": fato.valor}})
+        gravar_valor(s, bytes.fromhex(fato.id), antigo, None)
+    depois = next(f for f in c.get(base + "/fatos").json()["fatos"] if f["id"] == antes["id"])
+    esperado = antes | {"valor": {"valor": "2025-03-04"}, "criado_em": depois["criado_em"]}
+    assert depois == esperado

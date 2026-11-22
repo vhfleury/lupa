@@ -18,6 +18,12 @@ O formato segue o [Keep a Changelog 1.1.0](https://keepachangelog.com/pt-BR/1.1.
 
 ### Alterado
 
+- A extração das páginas passa a rodar até dois lotes ao mesmo tempo, cada um em um processo isolado
+  (`LUPA_EXTRACAO_LOTES_POR_JOB=2`; `1` volta à extração em série). A gravação das páginas de um lote
+  passa a ser feita de uma vez.
+- O catálogo de validações sobe para a `0.3.0` (dispensas de preparo e de mandato em
+  `dispensas.yaml`). O reprocessamento regrava uma vez os fatos e os achados dos arquivos já
+  processados, com o mesmo resultado e o mesmo texto. Ação: `docker compose up -d --build --wait`.
 - A intranet adota o padrão visual: paleta verde (primária `#00613b`, `#4cc489` no tema escuro),
   fontes Source servidas pelo próprio front, botões, tabelas, avisos e etiquetas iguais em todas
   as telas. O estado do processamento aparece numa etiqueta neutra, e o resultado de cada
@@ -35,6 +41,7 @@ O formato segue o [Keep a Changelog 1.1.0](https://keepachangelog.com/pt-BR/1.1.
 
 ### Removido
 
+- A variável `LUPA_EXTRACAO_LOTES_POR_GABINETE`. Se ainda estiver no `.env`, é ignorada.
 - A opção "Visualizar como assessor" do desembargador.
 - O SvelteKit e toda a cadeia Node do front (Vitest, Playwright em TypeScript, Prettier, ESLint e
   `npm`).

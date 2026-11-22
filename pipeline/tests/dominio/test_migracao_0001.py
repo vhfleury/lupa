@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from apoio_comum import banco_vazio, migrar
 from lupa_pipeline.dominio.chaves import chave_hash, chave_link
-from lupa_pipeline.dominio.tabelas import HUBS, LINKS, SATELITES, metadata
+from lupa_pipeline.dominio.tabelas import metadata
 from lupa_pipeline.migrations.esquema_v0001 import VISOES
 
 pytestmark = pytest.mark.integracao
@@ -55,10 +55,14 @@ def test_migracao_coincide_com_tabelas(engine_teste: Engine) -> None:
 
 def test_modelo_tem_os_hubs_links_e_satelites_do_plano() -> None:
     """RES-03: 13 hubs, 15 links e 27 satélites, com os prefixos de RES-13."""
-    assert (len(HUBS), len(LINKS), len(SATELITES)) == (13, 15, 27)
-    assert all(t.name.startswith("hub_") for t in HUBS)
-    assert all(t.name.startswith("link_") for t in LINKS)
-    assert all(t.name.startswith("sat_") for t in SATELITES)
+    tabelas = metadata.tables.values()
+    hubs = tuple(t for t in tabelas if t.info["tipo"] == "hub")
+    links = tuple(t for t in tabelas if t.info["tipo"] == "link")
+    satelites = tuple(t for t in tabelas if t.info["tipo"] == "satelite")
+    assert (len(hubs), len(links), len(satelites)) == (13, 15, 27)
+    assert all(t.name.startswith("hub_") for t in hubs)
+    assert all(t.name.startswith("link_") for t in links)
+    assert all(t.name.startswith("sat_") for t in satelites)
 
 
 def test_toda_tabela_tem_o_trigger_de_imutabilidade(engine_teste: Engine) -> None:

@@ -5,12 +5,36 @@ from datetime import date
 import pytest
 
 from lupa_pipeline.ingestao.datas import (
+    UNIDADES,
+    OcorrenciaData,
     construir_data,
-    encontrar_datas,
+    datas_no_dobrado,
     escrever_por_extenso,
     numero_por_extenso,
     reconferir,
 )
+from lupa_pipeline.ingestao.saneamento import normalizar
+from lupa_pipeline.ingestao.texto import dobrar
+
+
+def _datas_no_original(texto: str) -> list[OcorrenciaData]:
+    """Datas do texto com offsets e literal levados ao original pelo mapa do normalizado."""
+    normalizado = normalizar(texto)
+    saida = []
+    for ocorrencia in datas_no_dobrado(dobrar(normalizado.texto), normalizado.texto):
+        inicio, fim = normalizado.para_original(ocorrencia.inicio, ocorrencia.fim)
+        saida.append(
+            OcorrenciaData(
+                ocorrencia.data,
+                inicio,
+                fim,
+                texto[inicio:fim],
+                ocorrencia.formato,
+                ocorrencia.ano_dois_digitos,
+            )
+        )
+    return saida
+
 
 FORMATOS = [
     ("em 15/05/2014.", "15/05/2014", "2014-05-15", "numerico"),
@@ -65,7 +89,7 @@ def test_reconhece_formato_e_normaliza_para_iso_com_offsets(
     texto: str, literal: str, iso: str, formato: str
 ) -> None:
     """Cada formato da suíte é reconhecido, com literal e offsets exatos no original."""
-    ocorrencias = encontrar_datas(texto)
+    ocorrencias = _datas_no_original(texto)
     assert len(ocorrencias) == 1
     unica = ocorrencias[0]
     assert (unica.iso, unica.literal, unica.formato) == (iso, literal, formato)
@@ -77,7 +101,7 @@ def test_suite_de_formatos_tem_cem_por_cento_de_acerto() -> None:
     """Todos os casos da suíte acertam data, literal e formato."""
     acertos = 0
     for texto, literal, iso, formato in FORMATOS:
-        achadas = encontrar_datas(texto)
+        achadas = _datas_no_original(texto)
         if [(o.iso, o.literal, o.formato) for o in achadas] == [(iso, literal, formato)]:
             acertos += 1
     assert acertos == len(FORMATOS)
@@ -100,27 +124,27 @@ def test_suite_de_formatos_tem_cem_por_cento_de_acerto() -> None:
 )
 def test_rejeita_data_impossivel(texto: str) -> None:
     """31/02, 29/02 fora de ano bissexto, mês 13 e anos fora da faixa não viram data."""
-    assert encontrar_datas(texto) == []
+    assert _datas_no_original(texto) == []
 
 
 def test_aceita_29_de_fevereiro_em_ano_bissexto() -> None:
     """29/02/2016 existe."""
-    assert [o.iso for o in encontrar_datas("em 29/02/2016")] == ["2016-02-29"]
+    assert [o.iso for o in _datas_no_original("em 29/02/2016")] == ["2016-02-29"]
 
 
 def test_ano_de_dois_digitos_usa_pivo_e_fica_marcado() -> None:
     """Abaixo do pivô vira 20xx; acima, 19xx; as duas ocorrências saem marcadas."""
-    recentes, antigas = encontrar_datas("em 15/05/14 e em 15/05/85")
+    recentes, antigas = _datas_no_original("em 15/05/14 e em 15/05/85")
     assert (recentes.iso, recentes.ano_dois_digitos) == ("2014-05-15", True)
     assert (antigas.iso, antigas.ano_dois_digitos) == ("1985-05-15", True)
-    assert not encontrar_datas("em 15/05/2014")[0].ano_dois_digitos
+    assert not _datas_no_original("em 15/05/2014")[0].ano_dois_digitos
 
 
 def test_offsets_apontam_para_o_texto_original_mesmo_com_normalizacao() -> None:
     """Com dígitos de largura total e invisíveis, literal e offsets são os do original."""
     largura_total = "\N{FULLWIDTH DIGIT ONE}\N{FULLWIDTH DIGIT FIVE}/05/2014"
     texto = f"Data:\N{ZERO WIDTH SPACE} {largura_total} e de\N{SOFT HYPHEN}pois 16/05/2014"
-    primeira, segunda = encontrar_datas(texto)
+    primeira, segunda = _datas_no_original(texto)
     assert primeira.iso == "2014-05-15"
     assert texto[primeira.inicio : primeira.fim] == largura_total
     assert texto[segunda.inicio : segunda.fim] == "16/05/2014"
@@ -129,13 +153,13 @@ def test_offsets_apontam_para_o_texto_original_mesmo_com_normalizacao() -> None:
 def test_ignora_numero_de_processo_cpf_e_hora() -> None:
     """Número CNJ, CPF e horário não são datas."""
     texto = "Processo 9923884-34.2014.8.99.0008, CPF 123.456.789-00, às 10.30 horas"
-    assert encontrar_datas(texto) == []
+    assert _datas_no_original(texto) == []
 
 
 def test_varias_datas_em_ordem_sem_sobreposicao() -> None:
     """Datas em formatos diferentes no mesmo texto saem em ordem de posição."""
     texto = "Fato em 28/04/2014; denúncia em 8 de julho de 2014; recebida em 08.08.2014."
-    assert [o.iso for o in encontrar_datas(texto)] == ["2014-04-28", "2014-07-08", "2014-08-08"]
+    assert [o.iso for o in _datas_no_original(texto)] == ["2014-04-28", "2014-07-08", "2014-08-08"]
 
 
 def test_reconferir_exige_a_data_literal_no_trecho() -> None:
@@ -163,3 +187,17 @@ def test_construir_data_recusa_fora_da_faixa() -> None:
     assert construir_data(1899, 1, 1) is None
     assert construir_data(2101, 1, 1) is None
     assert construir_data(2000, 2, 29) == date(2000, 2, 29)
+
+
+def test_unidades_por_extenso_iguais_as_atuais() -> None:
+    """RNF-08: o dicionário montado das tuplas de escrita é o mesmo da lista literal anterior."""
+    assert UNIDADES == {
+        "um": 1, "uma": 1, "dois": 2, "duas": 2, "tres": 3, "quatro": 4, "cinco": 5, "seis": 6,
+        "sete": 7, "oito": 8, "nove": 9, "dez": 10, "onze": 11, "doze": 12, "treze": 13,
+        "catorze": 14, "quatorze": 14, "quinze": 15, "dezesseis": 16, "dezasseis": 16,
+        "dezessete": 17, "dezoito": 18, "dezenove": 19, "vinte": 20, "trinta": 30,
+        "quarenta": 40, "cinquenta": 50, "sessenta": 60, "setenta": 70, "oitenta": 80,
+        "noventa": 90, "cem": 100, "cento": 100, "duzentos": 200, "trezentos": 300,
+        "quatrocentos": 400, "quinhentos": 500, "seiscentos": 600, "setecentos": 700,
+        "oitocentos": 800, "novecentos": 900, "primeiro": 1,
+    }  # fmt: skip

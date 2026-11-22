@@ -6,17 +6,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from lupa_pipeline.dominio.enums import EstadoJob, StatusProcesso
-from lupa_pipeline.dominio.gravacao import gravar_satelite, travar_processo
+from lupa_pipeline.dominio.gravacao import gravar_satelite
 from lupa_pipeline.dominio.tabelas import sat_arquivo_ingestao
 from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoProcesso
 from lupa_pipeline.ingestao import extrator_paginas, indice
 from lupa_pipeline.ingestao.eventos import fatos
 from lupa_pipeline.ingestao.repositorio import (
-    CAMPOS_VARIAVEIS,
     ESTADOS_PRONTOS,
     ORIGEM,
+    atributos,
     atualizar_status_processo,
     ler_arquivo,
+    processo_ativo,
 )
 from lupa_pipeline.validacoes.dados import (
     cabimento_padrao,
@@ -78,14 +79,13 @@ def reagendar_desatualizados(fabrica: sessionmaker[Session]) -> None:
         ).all()
     for hk_arquivo, hk_processo in candidatos:
         with fabrica.begin() as session:
-            processo = travar_processo(session, hk_processo)
-            if processo is None or processo.status == StatusProcesso.DESCARTADO:
+            if processo_ativo(session, hk_processo) is None:
                 continue
             arquivo = ler_arquivo(session, hk_arquivo)
             etapa = primeira_etapa(arquivo, atuais)
             if arquivo.estado not in ESTADOS_PRONTOS or etapa is None:
                 continue
-            dados = {campo: getattr(arquivo, campo) for campo in CAMPOS_VARIAVEIS}
+            dados = atributos(arquivo, sat_arquivo_ingestao)
             dados.update(
                 estado=EstadoJob.EM_EXTRACAO.value,
                 tentativas=0,

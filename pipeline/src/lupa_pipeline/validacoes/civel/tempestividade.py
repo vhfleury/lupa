@@ -3,18 +3,25 @@
 from datetime import date
 
 from lupa_pipeline.dominio.enums import QualidadeParte, ResultadoAchado
-from lupa_pipeline.validacoes.apoio import Coleta, data_de
+from lupa_pipeline.validacoes.apoio import Coleta, data_de, regra
 from lupa_pipeline.validacoes.calendario import contar_prazo_util, dias_uteis_entre
 from lupa_pipeline.validacoes.dados import calendario_padrao, prazos_recursos_padrao
-from lupa_pipeline.validacoes.modelo import AchadoValidacao, ModeloProcesso, valor_de
+from lupa_pipeline.validacoes.modelo import AchadoValidacao, ModeloProcesso
 
 NOME = "tempestividade_recurso"
 BASE_LEGAL = "arts. 180, 183, 186, 219, 220, 224, 1.003 § 5º e 1.023 do CPC"
+PECA_PROCURADA = {
+    "tipo_recurso": "petição de recurso",
+    "data_intimacao": "certidão de intimação",
+    "data_interposicao": "protocolo da petição de recurso",
+    "qualidade_recorrente": "qualificação das partes na petição do recurso",
+}
 
 
+@regra
 def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     """Compara as datas provadas da intimação e da interposição com o vencimento do recurso."""
-    coleta = Coleta(modelo, NOME, BASE_LEGAL)
+    coleta = Coleta(modelo, NOME, BASE_LEGAL, PECA_PROCURADA)
     tipo = coleta.unico("tipo_recurso")
     intimacao = coleta.unico("data_intimacao")
     interposicao = coleta.unico("data_interposicao")
@@ -22,8 +29,8 @@ def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     if not (tipo and intimacao and interposicao and qualidade):
         return coleta.verificar()
     tabela = prazos_recursos_padrao()
-    regra = tabela.recursos.get(str(valor_de(tipo)))
-    entidade = str(valor_de(qualidade))
+    regra = tabela.recursos.get(str(tipo.valor))
+    entidade = str(qualidade.valor)
     if regra is None or entidade not in QualidadeParte:
         return coleta.verificar("Tipo de recurso ou qualidade do recorrente não reconhecidos.")
     try:

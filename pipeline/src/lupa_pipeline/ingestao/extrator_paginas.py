@@ -202,11 +202,11 @@ def saneamento_da_pagina(
     }
 
 
-def extrair_intervalo(dados: bytes, inicio: int, fim: int) -> dict[str, Any]:
+def extrair_intervalo(origem: bytes | Path, inicio: int, fim: int) -> dict[str, Any]:
     """Extrai as páginas `inicio..fim` do PDF.
 
     Args:
-        dados: Bytes do PDF.
+        origem: Bytes do PDF ou caminho do arquivo, aberto sem copiar para a memória.
         inicio: Primeira página (1-based).
         fim: Última página (inclusiva).
 
@@ -214,7 +214,11 @@ def extrair_intervalo(dados: bytes, inicio: int, fim: int) -> dict[str, Any]:
         `{"ok": true, "paginas": [...]}` ou `{"ok": false, "erro": "abertura"}`.
     """
     try:
-        documento = fitz.open(stream=dados, filetype="pdf")
+        documento = (
+            fitz.open(origem, filetype="pdf")
+            if isinstance(origem, Path)
+            else fitz.open(stream=origem, filetype="pdf")
+        )
     except Exception:
         return {"ok": False, "erro": "abertura"}
     ultima = min(fim, documento.page_count)
@@ -231,7 +235,7 @@ def main(argv: list[str] | None = None) -> None:
     bloquear_rede()
     caminho, inicio, fim = argv or sys.argv[1:]
     try:
-        resultado = extrair_intervalo(Path(caminho).read_bytes(), int(inicio), int(fim))
+        resultado = extrair_intervalo(Path(caminho), int(inicio), int(fim))
     except MemoryError:
         sys.exit(EXIT_MEMORIA)
     sys.stdout.write(json.dumps(resultado, ensure_ascii=False))

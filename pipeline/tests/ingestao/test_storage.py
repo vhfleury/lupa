@@ -3,6 +3,7 @@
 import io
 import os
 from collections.abc import Iterator
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -87,6 +88,20 @@ def test_gravar_de_novo_substitui(storage: tuple[ObjectStorage, str]) -> None:
     implementacao.gravar(chave, io.BytesIO(b"2"))
     assert implementacao.ler(chave) == b"2"
     assert implementacao.listar(prefixo) == [chave]
+
+
+def test_baixar_para_grava_o_objeto_no_caminho(
+    storage: tuple[ObjectStorage, str], tmp_path: Path
+) -> None:
+    """RF-ING-04: `baixar_para` grava o objeto no caminho; ausência vira `ObjetoAusenteError`."""
+    implementacao, prefixo = storage
+    chave = f"{prefixo}pdf"
+    implementacao.gravar(chave, io.BytesIO(b"conteudo-sintetico-3"))
+    destino = tmp_path / "copia"
+    implementacao.baixar_para(chave, destino)
+    assert destino.read_bytes() == b"conteudo-sintetico-3"
+    with pytest.raises(ObjetoAusenteError):
+        implementacao.baixar_para(f"{prefixo}inexistente", tmp_path / "ausente")
 
 
 def test_chave_por_processo_e_hash() -> None:

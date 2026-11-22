@@ -1,6 +1,5 @@
 """Execução e relatório de conferência da ingestão de autos cíveis."""
 
-import hashlib
 import time
 from collections import Counter
 from dataclasses import dataclass
@@ -15,6 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from lupa_pipeline.config import Settings
 from lupa_pipeline.dominio.cnj import calcular_digito_verificador
 from lupa_pipeline.dominio.enums import ClasseProcessual, EstadoJob, PapelUsuario, StatusProcesso
+from lupa_pipeline.dominio.esquemas import Fato, sha256_arquivo
 from lupa_pipeline.dominio.gravacao import (
     chave_do_hub,
     gravar_hub,
@@ -37,9 +37,6 @@ from lupa_pipeline.ingestao.processamento import processar_arquivo
 from lupa_pipeline.ingestao.recepcao import ArquivoRecebido, detectar_tipo, lacrar
 from lupa_pipeline.ingestao.storage import ObjectStorage
 from lupa_pipeline.ingestao.worker import TRAVA_WORKER
-from lupa_pipeline.validacoes.modelo import valor_de
-
-TAMANHO_BLOCO = 1 << 20
 
 
 @dataclass(frozen=True)
@@ -107,22 +104,6 @@ def novo_processo(
         session, sat_processo_estado, hk, {"status": StatusProcesso.CRIADO.value}, origem
     )
     return hk
-
-
-def sha256_arquivo(caminho: Path) -> str:
-    """SHA-256 do arquivo lido em blocos.
-
-    Args:
-        caminho: Arquivo.
-
-    Returns:
-        Hash hexadecimal.
-    """
-    resumo = hashlib.sha256()
-    with caminho.open("rb") as entrada:
-        while bloco := entrada.read(TAMANHO_BLOCO):
-            resumo.update(bloco)
-    return resumo.hexdigest()
 
 
 def enviar_e_processar(
@@ -199,13 +180,14 @@ def _paginas(session: Session, arquivo_id: bytes) -> dict[str, dict[str, Any]]:
 
 def _fatos(session: Session, processo_id: bytes, paginas: dict[str, dict[str, Any]]) -> list[Any]:
     saida = []
-    for fato in listar_fatos_por_processo(session, processo_id):
+    for registro in listar_fatos_por_processo(session, processo_id):
+        fato = Fato.de_registro(registro.model_dump())
         evidencia = fato.evidencias[0]
         pagina = paginas.get(evidencia.pagina_id, {})
         saida.append(
             {
                 "tipo": str(fato.tipo),
-                "valor": valor_de(fato),
+                "valor": fato.valor,
                 "sujeito": fato.sujeito,
                 "confianca": fato.confianca,
                 "pagina": pagina.get("numero"),

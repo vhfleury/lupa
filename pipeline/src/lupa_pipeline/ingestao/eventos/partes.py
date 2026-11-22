@@ -1,7 +1,9 @@
 """Reconhecimento de partes a partir das qualificações expressas (RF-FAT-04)."""
 
 import re
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from lupa_pipeline.dominio.enums import Polo, QualidadeParte, TipoPeca
 from lupa_pipeline.ingestao.eventos.modelo import PaginaTexto, PecaTexto
@@ -65,6 +67,44 @@ def qualidade(nome: str) -> QualidadeParte:
     if re.match(r"^(?:municipio de |estado (?:de|do|da) |uniao(?: federal)?$)", simples):
         return QualidadeParte.FAZENDA_PUBLICA
     return QualidadeParte.PARTICULAR
+
+
+def _trocar_outorgante(valor: Any, trocar: Callable[[str], str]) -> Any:
+    """Aplica ``trocar`` ao outorgante de uma procuração; outro valor volta sem troca."""
+    if not isinstance(valor, dict) or valor.get("tipo") != "procuracao":
+        return valor
+    outorgante = valor.get("outorgante")
+    if not isinstance(outorgante, str):
+        return valor
+    return {**valor, "outorgante": trocar(outorgante)}
+
+
+def nome_do_outorgante(valor: Any, nomes: Mapping[str, str]) -> Any:
+    """Troca o código da parte outorgante pelo nome; código sem parte em ``nomes`` fica.
+
+    Args:
+        valor: Valor de um fato.
+        nomes: Nome da parte por código.
+
+    Returns:
+        O valor com o nome do outorgante se for procuração; senão, o próprio valor
+        (inclusive substabelecimento, cujo outorgante já traz nome e OAB).
+    """
+    return _trocar_outorgante(valor, lambda codigo: nomes.get(codigo, codigo))
+
+
+def codigo_do_outorgante(valor: Any, sujeito: Callable[[str], str]) -> Any:
+    """Troca o nome da parte outorgante pelo código calculado por ``sujeito``.
+
+    Args:
+        valor: Valor de um evento, com o nome literal do outorgante na procuração.
+        sujeito: Função que calcula o código da parte a partir do nome.
+
+    Returns:
+        O valor com o código do outorgante se for procuração; senão, o próprio valor
+        (inclusive substabelecimento, cujo outorgante já traz nome e OAB).
+    """
+    return _trocar_outorgante(valor, sujeito)
 
 
 def extrair_partes(peca: PecaTexto) -> list[ParteExtraida]:

@@ -11,7 +11,15 @@ from datetime import date
 from enum import StrEnum
 from typing import Any, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 from lupa_pipeline.dominio.cnj import validar_numero_cnj
 from lupa_pipeline.dominio.enums import (
@@ -189,20 +197,36 @@ class ProcessoGabarito(_Base):
     numero_cnj: str
     classe: ClasseProcessual
     cenario: Cenario
-    diagnostico_esperado: str
     semente: int
     data_referencia: date
+
+    @model_validator(mode="before")
+    @classmethod
+    def _diagnostico_lido(cls, dados: Any) -> Any:
+        if not isinstance(dados, dict) or "diagnostico_esperado" not in dados:
+            return dados
+        restante = {k: v for k, v in dados.items() if k != "diagnostico_esperado"}
+        cenario = restante.get("cenario")
+        if cenario in DIAGNOSTICO_ESPERADO and (
+            dados["diagnostico_esperado"] != DIAGNOSTICO_ESPERADO[cenario]
+        ):
+            raise ValueError("diagnóstico esperado não corresponde ao cenário")
+        return restante
 
     @field_validator("numero_cnj")
     @classmethod
     def _cnj(cls, valor: str) -> str:
         return validar_numero_cnj(valor)
 
-    @model_validator(mode="after")
-    def _diagnostico(self) -> Self:
-        if self.diagnostico_esperado != DIAGNOSTICO_ESPERADO[self.cenario]:
-            raise ValueError("diagnóstico esperado não corresponde ao cenário")
-        return self
+    @property
+    def diagnostico_esperado(self) -> str:
+        """Diagnóstico de arquivo que a ingestão deve dar ao cenário."""
+        return DIAGNOSTICO_ESPERADO[self.cenario]
+
+    @model_serializer(mode="wrap")
+    def _com_diagnostico(self, serializar: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        dados: dict[str, Any] = serializar(self)
+        return {**dados, "diagnostico_esperado": self.diagnostico_esperado}
 
 
 class PecaGabarito(_Base):

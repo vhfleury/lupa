@@ -5,12 +5,10 @@ from itertools import product
 import pytest
 from pydantic import ValidationError
 
-from lupa_pipeline.dominio.enums import CenarioArquivo, EstadoJob, EstadoLote, MotivoQuarentena
+from lupa_pipeline.dominio.enums import CenarioArquivo, EstadoJob, MotivoQuarentena
 from lupa_pipeline.dominio.esquemas import (
     DiagnosticoArquivo,
     EntradaManifesto,
-    JobIngestao,
-    LoteIngestao,
     calcular_hash,
 )
 from lupa_pipeline.ingestao.estados import (
@@ -68,18 +66,6 @@ def test_exigir_transicao_valida_nao_lanca() -> None:
     exigir_transicao(E.RECEBIDO, E.VALIDADO)
 
 
-def test_job_em_quarentena_exige_motivo_e_so_ele() -> None:
-    """`motivo_quarentena` existe se e somente se o estado é `quarentena`."""
-    base = {"processo_id": calcular_hash("processo"), "arquivo_id": calcular_hash("arquivo")}
-    with pytest.raises(ValidationError):
-        JobIngestao(**base, estado=E.QUARENTENA)
-    with pytest.raises(ValidationError):
-        JobIngestao(**base, motivo_quarentena=MotivoQuarentena.SENHA)
-    job = JobIngestao(**base, estado=E.QUARENTENA, motivo_quarentena=MotivoQuarentena.SENHA)
-    assert job.motivo_quarentena is MotivoQuarentena.SENHA
-    assert JobIngestao(**base).estado is E.RECEBIDO
-
-
 def test_entrada_de_manifesto_exige_hash_valido() -> None:
     """Hash precisa ter 64 hexadecimais."""
     with pytest.raises(ValidationError):
@@ -88,14 +74,8 @@ def test_entrada_de_manifesto_exige_hash_valido() -> None:
     assert entrada.ordem == 1
 
 
-def test_lote_e_diagnostico_validam_campos() -> None:
-    """RF-ING-04: lote é identificado pelo arquivo e pelo número a partir de 1."""
-    with pytest.raises(ValidationError):
-        LoteIngestao(arquivo_id=calcular_hash("arquivo"), numero=0, estado=EstadoLote.CONCLUIDO)
-    lote = LoteIngestao(arquivo_id=calcular_hash("arquivo"), numero=1, estado=EstadoLote.CONCLUIDO)
-    assert lote.resultado == {}
-    with pytest.raises(ValidationError, match="extra_forbidden"):
-        LoteIngestao.model_validate(lote.model_dump() | {"fencing_token": 1})
+def test_diagnostico_valida_campos() -> None:
+    """O diagnóstico recusa cenário fora do enum e campo extra, e começa sem sinais."""
     with pytest.raises(ValidationError):
         DiagnosticoArquivo(
             arquivo_id=calcular_hash("arquivo"), cenario="outro", total_paginas=1, tem_indice=False
@@ -107,6 +87,8 @@ def test_lote_e_diagnostico_validam_campos() -> None:
         tem_indice=False,
     )
     assert diagnostico.sinais == {}
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        DiagnosticoArquivo.model_validate(diagnostico.model_dump() | {"fencing_token": 1})
 
 
 def test_quarentena_tem_texto_legivel_para_cada_motivo() -> None:

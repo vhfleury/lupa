@@ -11,6 +11,7 @@ from lupa_pipeline.dominio.gravacao import (
     gravar_hub,
     gravar_link,
     gravar_satelite,
+    gravar_satelites,
 )
 from lupa_pipeline.dominio.sessao import assumir_papel_aplicacao
 from lupa_pipeline.dominio.tabelas import (
@@ -162,6 +163,21 @@ def test_satelite_multiativo_compara_dentro_da_mesma_subchave(sessao: Session) -
 
     assert (lote(1), lote(2), lote(1), lote(2)) == (True, True, False, False)
     assert _contar(sessao, sat_arquivo_lote, "hk_arquivo", hk) == 2
+
+
+def test_satelites_em_lote_comparam_com_o_corrente_de_cada_subchave(sessao: Session) -> None:
+    """RF-ING-03: no lote, só entra a versão cuja subchave mudou ou é nova (F17, D6)."""
+    hk = _arquivo(sessao)
+
+    def lote(numero: int, estado: str) -> dict[str, object]:
+        return {"numero": numero, "estado": estado, "resultado": {"paginas": [numero]}}
+
+    gravar_satelites(sessao, sat_arquivo_lote, [(hk, lote(1, "concluido"))], ORIGEM)
+    gravar_satelites(sessao, sat_arquivo_lote, [(hk, lote(2, "falho"))], ORIGEM)
+    versoes = [(hk, lote(1, "concluido")), (hk, lote(2, "concluido")), (hk, lote(3, "falho"))]
+    assert gravar_satelites(sessao, sat_arquivo_lote, versoes, ORIGEM) == 2
+    assert gravar_satelites(sessao, sat_arquivo_lote, [], ORIGEM) == 0
+    assert _contar(sessao, sat_arquivo_lote, "hk_arquivo", hk) == 4
 
 
 def test_satelite_que_sempre_insere_grava_cada_falha(sessao: Session) -> None:

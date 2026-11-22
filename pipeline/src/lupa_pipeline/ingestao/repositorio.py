@@ -7,13 +7,15 @@ muda e grava por `dominio.gravacao`. O status do processo segue os estados dos s
 (A5, passo 11).
 """
 
+from collections.abc import Callable
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import Table, select
 from sqlalchemy.orm import Session, defer
+from sqlalchemy.orm.attributes import set_committed_value
 
 from lupa_pipeline.dominio.enums import EstadoJob, MotivoFalha, MotivoQuarentena, StatusProcesso
-from lupa_pipeline.dominio.gravacao import gravar_satelite
+from lupa_pipeline.dominio.gravacao import gravar_satelite, travar_processo
 from lupa_pipeline.dominio.tabelas import (
     atributos_do_satelite,
     sat_arquivo_ingestao,
@@ -23,6 +25,7 @@ from lupa_pipeline.dominio.visoes import VisaoArquivo, VisaoPagina, VisaoProcess
 from lupa_pipeline.ingestao.estados import exigir_transicao
 from lupa_pipeline.ingestao.qualidade import resumo_saneamento
 
+_trocar_sem_gravar: Callable[[object, str, Any], None] = set_committed_value
 ORIGEM = "pipeline.ingestao"
 ESTADOS_EM_ANDAMENTO = frozenset({EstadoJob.RECEBIDO, EstadoJob.VALIDADO, EstadoJob.EM_EXTRACAO})
 ESTADOS_PRONTOS = frozenset({EstadoJob.CONCLUIDO, EstadoJob.PARCIAL})
@@ -74,8 +77,34 @@ def registrar_recebido(session: Session, hk_arquivo: bytes) -> None:
     gravar_satelite(session, sat_arquivo_ingestao, hk_arquivo, atributos, ORIGEM)
 
 
-def _atributos_correntes(arquivo: VisaoArquivo) -> dict[str, Any]:
-    return {campo: getattr(arquivo, campo) for campo in CAMPOS_VARIAVEIS}
+def atributos(visao: Any, satelite: Table) -> dict[str, Any]:
+    """Copia da linha da view os atributos de negócio de um satélite.
+
+    Args:
+        visao: Linha de uma view `v_*` que expõe as colunas do satélite.
+        satelite: Satélite cujos atributos são copiados.
+
+    Returns:
+        Os atributos do satélite com os valores da linha.
+    """
+    return {campo: getattr(visao, campo) for campo in atributos_do_satelite(satelite)}
+
+
+def processo_ativo(session: Session, hk_processo: bytes) -> VisaoProcesso | None:
+    """Trava o processo com a trava do descarte e o devolve se não foi descartado (RF-ING-07).
+
+    Args:
+        session: Sessão com transação aberta.
+        hk_processo: Processo.
+
+    Returns:
+        A linha de `v_processo` relida sob a trava, ou None se o processo não existe ou foi
+        descartado.
+    """
+    processo = travar_processo(session, hk_processo)
+    if processo is None or processo.status == StatusProcesso.DESCARTADO:
+        return None
+    return processo
 
 
 def mudar_estado(
@@ -103,7 +132,8 @@ def mudar_estado(
         **mudancas: Atributos que mudam na linha nova.
 
     Returns:
-        O arquivo relido de `v_arquivo`.
+        A linha de `v_arquivo` lida antes da gravação, com os atributos do satélite trocados
+        pelos gravados, sem reler a view; `estado_em` continua o da linha anterior.
 
     Raises:
         ArquivoNaoEncontradoError: Arquivo inexistente.
@@ -119,14 +149,16 @@ def mudar_estado(
         raise ArquivoNaoEncontradoError(hk_arquivo.hex())
     if novo is not corrente:
         exigir_transicao(corrente, novo)
-    atributos = _atributos_correntes(arquivo) | mudancas
-    atributos |= {
+    dados = atributos(arquivo, sat_arquivo_ingestao) | mudancas
+    dados |= {
         "estado": novo.value,
         "motivo_quarentena": motivo_quarentena.value if motivo_quarentena else None,
         "motivo_falha": motivo_falha.value if motivo_falha else None,
     }
-    gravar_satelite(session, sat_arquivo_ingestao, hk_arquivo, atributos, ORIGEM)
-    return ler_arquivo(session, hk_arquivo)
+    gravar_satelite(session, sat_arquivo_ingestao, hk_arquivo, dados, ORIGEM)
+    for campo, valor in dados.items():
+        _trocar_sem_gravar(arquivo, campo, valor)
+    return arquivo
 
 
 def _status_pelos_arquivos(estados: set[EstadoJob]) -> StatusProcesso | None:

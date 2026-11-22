@@ -2,17 +2,16 @@
 
 Cada lote de páginas é um processo filho do sandbox (`extrator_paginas`), que abre o seu
 próprio documento: o PyMuPDF nunca é usado por duas threads. No pai, um pool de threads só
-espera os filhos. O paralelismo efetivo de um job é limitado por dois tetos configuráveis:
-lotes simultâneos por job e lotes simultâneos por gabinete (semáforo por gabinete, válido
-dentro do processo worker; com várias réplicas de worker o teto vale por réplica).
+espera os filhos; o worker processa um job por vez, então o teto de lotes simultâneos por job
+é o teto global.
 """
 
-import threading
-from collections.abc import Callable, Iterator, Sequence
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from collections.abc import Callable, Generator, Iterable, Sequence
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
-from itertools import groupby
+from itertools import groupby, islice
 from pathlib import Path
+from threading import Event
 from typing import Any
 
 from lupa_pipeline.dominio.enums import MotivoFalha
@@ -81,37 +80,11 @@ class Paralelismo:
     Attributes:
         paginas_por_lote: Páginas por processo filho.
         lotes_por_job: Lotes simultâneos de um job.
-        lotes_por_gabinete: Lotes simultâneos de um gabinete.
     """
 
     paginas_por_lote: int = 8
-    lotes_por_job: int = 4
-    lotes_por_gabinete: int = 4
+    lotes_por_job: int = 2
 
-
-class LimitadorGabinete:
-    """Semáforos por gabinete, compartilhados por todos os jobs do processo worker."""
-
-    def __init__(self) -> None:
-        """Cria o registro vazio."""
-        self._trava = threading.Lock()
-        self._semaforos: dict[str, threading.BoundedSemaphore] = {}
-
-    def semaforo(self, gabinete: str, limite: int) -> threading.BoundedSemaphore:
-        """Semáforo do gabinete (criado no primeiro uso com o limite dado).
-
-        Args:
-            gabinete: Identificador do gabinete.
-            limite: Teto de lotes simultâneos.
-
-        Returns:
-            Semáforo do gabinete.
-        """
-        with self._trava:
-            return self._semaforos.setdefault(gabinete, threading.BoundedSemaphore(limite))
-
-
-LIMITADOR_PADRAO = LimitadorGabinete()
 
 Executor = Callable[[str, list[str], LimitesSandbox], ResultadoSandbox]
 
@@ -189,39 +162,37 @@ def executar_tarefa(
     return _converter(tarefa, executor(MODULO_EXTRATOR, argumentos, limites))
 
 
-def executar_em_paralelo(
-    tarefas: Sequence[Tarefa],
-    limites: LimitesSandbox,
-    paralelismo: Paralelismo,
-    gabinete: str,
-    *,
-    limitador: LimitadorGabinete = LIMITADOR_PADRAO,
-    executor: Executor = executar,
-) -> Iterator[ResultadoTarefa]:
-    """Executa os lotes em processos filhos, devolvendo cada resultado assim que termina.
+def executar_em_paralelo[Item, Resultado](
+    itens: Iterable[Item],
+    rodar: Callable[[Item], Resultado],
+    lotes_por_job: int,
+    parar: Event | None = None,
+) -> Generator[Resultado, None, None]:
+    """Roda os itens em até `lotes_por_job` threads, devolvendo cada resultado ao terminar.
+
+    Um item só é submetido quando há thread livre e `parar` não está marcado; os itens em curso
+    terminam e são devolvidos. Fechar o iterador (erro de quem consome) descarta os itens ainda
+    não submetidos e espera os em curso.
 
     Args:
-        tarefas: Lotes.
-        limites: Limites de cada filho.
-        paralelismo: Tetos por job e por gabinete.
-        gabinete: Gabinete do job (chave do semáforo).
-        limitador: Registro de semáforos por gabinete.
-        executor: Função que roda o filho.
+        itens: Itens a rodar, na ordem de submissão.
+        rodar: Função executada na thread (só espera o processo filho do sandbox).
+        lotes_por_job: Itens simultâneos; `1` roda um por vez.
+        parar: Sinal que interrompe novas submissões.
 
     Yields:
         Resultados na ordem de término.
     """
-    semaforo = limitador.semaforo(gabinete, paralelismo.lotes_por_gabinete)
-
-    def _rodar(tarefa: Tarefa) -> ResultadoTarefa:
-        with semaforo:
-            return executar_tarefa(tarefa, limites, executor)
-
-    trabalhadores = max(1, min(paralelismo.lotes_por_job, paralelismo.lotes_por_gabinete))
+    fila = iter(itens)
+    trabalhadores = max(1, lotes_por_job)
     with ThreadPoolExecutor(max_workers=trabalhadores, thread_name_prefix="lote") as pool:
-        futuros: list[Future[ResultadoTarefa]] = [pool.submit(_rodar, t) for t in tarefas]
-        for futuro in as_completed(futuros):
-            yield futuro.result()
+        em_curso = {pool.submit(rodar, item) for item in islice(fila, trabalhadores)}
+        while em_curso:
+            prontos, em_curso = wait(em_curso, return_when=FIRST_COMPLETED)
+            for futuro in prontos:
+                if parar is None or not parar.is_set():
+                    em_curso.update(pool.submit(rodar, item) for item in islice(fila, 1))
+                yield futuro.result()
 
 
 def linha_pagina(pagina: dict[str, Any], versao_extrator: str) -> dict[str, Any]:

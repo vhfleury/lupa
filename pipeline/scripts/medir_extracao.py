@@ -31,6 +31,7 @@ import sys
 import tempfile
 import time
 from collections import Counter, defaultdict
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -44,9 +45,9 @@ from lupa_pipeline.ingestao.eventos.partes import chave_nome, extrair_partes
 from lupa_pipeline.ingestao.eventos.saida import eventos_saida
 from lupa_pipeline.ingestao.extracao import (
     FontePaginas,
-    LimitadorGabinete,
     Paralelismo,
     executar_em_paralelo,
+    executar_tarefa,
     linha_pagina,
     planejar,
 )
@@ -71,7 +72,7 @@ from lupa_pipeline.sinteticos.achados import referencias_de_paginas, referencias
 from lupa_pipeline.sinteticos.gabarito import Cenario, Gabarito
 from lupa_pipeline.sinteticos.medicao import mapa_folhas, medir
 from lupa_pipeline.sinteticos.saida_pipeline import PaginaSaida, RefPagina, SaidaPipeline
-from lupa_pipeline.validacoes.adaptador import para_modelo
+from lupa_pipeline.validacoes.modelo import ModeloProcesso
 from lupa_pipeline.validacoes.motor import executar_catalogo
 
 RAIZ = Path("/app/.sinteticos/referencia")
@@ -265,7 +266,7 @@ def _rodar(caminho: Path, nome: str, paginas: int, paralelismo: Paralelismo) -> 
     inicio = time.perf_counter()
     resultados = list(
         executar_em_paralelo(
-            tarefas, LIMITES_LOTE, paralelismo, "medicao", limitador=LimitadorGabinete()
+            tarefas, partial(executar_tarefa, limites=LIMITES_LOTE), paralelismo.lotes_por_job
         )
     )
     return resultados, time.perf_counter() - inicio
@@ -287,8 +288,8 @@ def _subconjunto(composicoes: set[str], quantidade: int, destino: Path) -> int:
 
 
 def comando_tempo(args: argparse.Namespace) -> dict[str, Any]:
-    """Tempo por mil páginas com o paralelismo padrão (4 lotes de 8 páginas)."""
-    paralelismo = Paralelismo(args.lote, args.lotes, args.lotes)
+    """Tempo por mil páginas com o paralelismo padrão (2 lotes de 8 páginas)."""
+    paralelismo = Paralelismo(args.lote, args.lotes)
     resultado: dict[str, Any] = {"paralelismo": paralelismo.__dict__}
     SAIDA.mkdir(parents=True, exist_ok=True)
     for nome, composicoes, quantidade in (
@@ -313,7 +314,7 @@ def comando_extrair(args: argparse.Namespace) -> dict[str, Any]:
     """Pipeline completa de um processo de referência, sem banco."""
     pasta = RAIZ / args.processo / args.cenario
     gabarito = _gabarito(pasta)
-    paralelismo = Paralelismo(args.lote, args.lotes, args.lotes)
+    paralelismo = Paralelismo(args.lote, args.lotes)
     caminho = pasta / ("autos.zip" if args.cenario == "zip_por_peca" else "autos.pdf")
     if args.cenario == "zip_por_peca":
         raise SystemExit("extrair mede os cenários de PDF único")
@@ -587,7 +588,7 @@ def _eventos_cenario(
     fatos = [f for c in candidatos if (f := confirmar(c, processo)) is not None]
     segundos = time.perf_counter() - inicio
     achados = executar_catalogo(
-        para_modelo(fatos), gabarito.processo.classe, gabarito.processo.data_referencia
+        ModeloProcesso(fatos), gabarito.processo.classe, gabarito.processo.data_referencia
     )
     saida = SaidaPipeline(
         pecas=pecas_saida(resultado.pecas, paginas, "autos.pdf"),

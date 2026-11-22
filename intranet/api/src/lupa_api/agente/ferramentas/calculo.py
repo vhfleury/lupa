@@ -13,8 +13,8 @@ from lupa_api.agente.ferramentas.leitura import erro
 from lupa_api.agente.ferramentas.sessao import SessaoAgente
 from lupa_api.auditoria.eventos import AcaoAuditoria
 from lupa_pipeline.dominio.repositorios import listar_fatos_por_processo
-from lupa_pipeline.validacoes.adaptador import para_modelo
 from lupa_pipeline.validacoes.catalogo import validacoes_de
+from lupa_pipeline.validacoes.modelo import ModeloProcesso
 from lupa_pipeline.validacoes.motor import executar_catalogo
 
 
@@ -44,7 +44,7 @@ def executar_validacao(sessao: SessaoAgente, argumentos: dict[str, Any]) -> str:
     disponiveis = nomes_validacoes(sessao.classe)
     if nome not in disponiveis:
         return erro(f"validação desconhecida; use uma de: {', '.join(disponiveis)}")
-    modelo = para_modelo(listar_fatos_por_processo(sessao.session, sessao.processo_id))
+    modelo = ModeloProcesso(listar_fatos_por_processo(sessao.session, sessao.processo_id))
     achados = [
         a.model_dump(mode="json")
         for a in executar_catalogo(modelo, sessao.classe, sessao.referencia)

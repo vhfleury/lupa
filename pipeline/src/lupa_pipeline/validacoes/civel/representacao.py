@@ -7,12 +7,16 @@ from datetime import date
 from typing import Any
 
 from lupa_pipeline.dominio.enums import QualidadeParte, ResultadoAchado
-from lupa_pipeline.validacoes.apoio import Coleta
+from lupa_pipeline.validacoes.apoio import Coleta, regra
 from lupa_pipeline.validacoes.dados import dispensas_padrao
-from lupa_pipeline.validacoes.modelo import AchadoValidacao, Fato, ModeloProcesso, valor_de
+from lupa_pipeline.validacoes.modelo import AchadoValidacao, Fato, ModeloProcesso
 
 NOME = "representacao_recurso"
 BASE_LEGAL = "arts. 75, 103 e 104 do CPC"
+PECA_PROCURADA = {
+    "qualidade_recorrente": "qualificação das partes na petição do recurso",
+    "advogado_subscritor": "assinatura da petição de recurso",
+}
 
 
 def _nome(texto: str) -> str:
@@ -39,7 +43,7 @@ def _cadeia(modelo: ModeloProcesso, assinante: tuple[str, str], mandatos: list[F
     fila: deque[tuple[tuple[str, str], list[Fato]]] = deque()
     substabelecimentos: list[tuple[tuple[str, str], tuple[str, str], Fato]] = []
     for fato in mandatos:
-        dados = valor_de(fato)
+        dados = fato.valor
         if not isinstance(dados, dict):
             continue
         outorgante = dados.get("outorgante")
@@ -62,9 +66,10 @@ def _cadeia(modelo: ModeloProcesso, assinante: tuple[str, str], mandatos: list[F
     return []
 
 
+@regra
 def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     """Verifica se o subscritor recebeu poderes diretamente ou por substabelecimento."""
-    coleta = Coleta(modelo, NOME, BASE_LEGAL)
+    coleta = Coleta(modelo, NOME, BASE_LEGAL, PECA_PROCURADA)
     entidade = coleta.qualidade()
     if entidade is None:
         return coleta.verificar()
@@ -82,7 +87,7 @@ def executar(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
     subscritor = coleta.unico("advogado_subscritor")
     if subscritor is None:
         return coleta.verificar()
-    advogado = _advogado(valor_de(subscritor))
+    advogado = _advogado(subscritor.valor)
     if not any(advogado):
         return coleta.verificar("A assinatura na petição de recurso não identifica o subscritor.")
     mandatos = modelo.fatos("procuracao")

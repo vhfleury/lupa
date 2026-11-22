@@ -8,7 +8,7 @@ física inicial. A Etapa 4E confere essas fronteiras contra o conteúdo.
 """
 
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import date
 from pathlib import PurePosixPath
 from typing import Any
@@ -29,6 +29,10 @@ PADRAO_LINHA_INDICE = re.compile(
 )
 PADRAO_DATA_BR = re.compile(r"\b(\d{2})/(\d{2})/(\d{4})\b")
 PADRAO_DATA_NOME = re.compile(r"(?:(\d{4})-(\d{2})-(\d{2}))|(?:(\d{2})-(\d{2})-(\d{4}))")
+
+
+class NomeInternoAusenteError(ValueError):
+    """Entrada do diagnóstico sem nome interno correspondente no mapa de nomes."""
 
 
 def _data_iso(dia: str, mes: str, ano: str) -> str | None:
@@ -230,22 +234,59 @@ def _suspeito(descartados: Sequence[dict[str, Any]]) -> bool:
     return any(item.get("categorias") for item in descartados)
 
 
-def diagnosticar_pdf(arquivo_id: str, nome: str, inspecao: dict[str, Any]) -> DiagnosticoArquivo:
+def _nome_interno(nomes: Mapping[str, str], nome: str) -> str:
+    if nome not in nomes:
+        raise NomeInternoAusenteError("entrada sem nome interno no mapa de nomes")
+    return nomes[nome]
+
+
+def _fronteiras_internas(
+    fronteiras: Iterable[dict[str, Any]], nomes: Mapping[str, str]
+) -> list[dict[str, Any]]:
+    return [
+        {chave: valor for chave, valor in fronteira.items() if chave != "titulo"}
+        | {"arquivo": _nome_interno(nomes, fronteira["arquivo"])}
+        for fronteira in fronteiras
+    ]
+
+
+def _descartados_internos(
+    entradas: Iterable[tuple[str, dict[str, Any]]], nomes: Mapping[str, str]
+) -> list[dict[str, Any]]:
+    internos = [(_nome_interno(nomes, nome), inspecao) for nome, inspecao in entradas]
+    return [
+        dict(item) | {"entrada": interno}
+        for interno, inspecao in internos
+        for item in inspecao.get("metadados", [])
+    ]
+
+
+def diagnosticar_pdf(
+    arquivo_id: str, nome: str, inspecao: dict[str, Any], nomes: Mapping[str, str]
+) -> DiagnosticoArquivo:
     """Diagnóstico de um PDF único a partir da inspeção do sandbox.
+
+    As fronteiras e os metadados descartados saem com o nome interno do arquivo, sem o título.
 
     Args:
         arquivo_id: Arquivo.
-        nome: Nome do arquivo físico (vai para as fronteiras).
+        nome: Nome do arquivo físico.
         inspecao: Resultado do lote (`paginas`, `toc`, `indice`, `paginas_indice`).
+        nomes: Nome interno (`entrada-<n>.pdf`) de cada nome de arquivo físico.
 
     Returns:
         Diagnóstico com cenário, sinais e fronteiras de origem.
+
+    Raises:
+        NomeInternoAusenteError: `nome` não está em `nomes`.
     """
     toc = list(inspecao.get("toc", []))
-    descartados = [dict(i) | {"entrada": nome} for i in inspecao.get("metadados", [])]
+    descartados = _descartados_internos([(nome, inspecao)], nomes)
     indice = list(inspecao.get("indice", []))
     cenario = cenario_pdf(bool(toc), bool(indice))
-    fronteiras = fronteiras_do_indice(indice, nome) + fronteiras_do_sumario(toc, nome)
+    fronteiras = _fronteiras_internas(
+        fronteiras_do_indice(indice, nome) + fronteiras_do_sumario(toc, nome), nomes
+    )
     sinais = {
         "entradas": 1,
         "bookmarks": len(toc),
@@ -265,31 +306,32 @@ def diagnosticar_pdf(arquivo_id: str, nome: str, inspecao: dict[str, Any]) -> Di
 
 
 def diagnosticar_zip(
-    arquivo_id: str, entradas: Sequence[tuple[str, dict[str, Any]]]
+    arquivo_id: str, entradas: Sequence[tuple[str, dict[str, Any]]], nomes: Mapping[str, str]
 ) -> DiagnosticoArquivo:
     """Diagnóstico de um ZIP a partir das entradas inspecionadas.
 
     Um ZIP com uma única entrada é diagnosticado pelo PDF que contém; com duas ou mais, é
-    `zip_por_peca` e cada entrada é uma fronteira candidata.
+    `zip_por_peca` e cada entrada é uma fronteira candidata. As fronteiras e os metadados
+    descartados saem com os nomes internos, sem o título; a data vem do nome da entrada.
 
     Args:
         arquivo_id: Arquivo (o ZIP).
         entradas: Pares `(nome da entrada, resultado da inspeção)` na ordem do manifesto.
+        nomes: Nome interno (`entrada-<n>.pdf`) de cada nome de entrada.
 
     Returns:
         Diagnóstico com cenário, sinais e fronteiras de origem.
+
+    Raises:
+        NomeInternoAusenteError: Uma entrada não está em `nomes`.
     """
     if len(entradas) == 1:
         nome, inspecao = entradas[0]
-        unico = diagnosticar_pdf(arquivo_id, nome, inspecao)
+        unico = diagnosticar_pdf(arquivo_id, nome, inspecao, nomes)
         return unico.model_copy(update={"sinais": unico.sinais | {"zip_com_um_pdf": True}})
     paginas = [(nome, int(inspecao.get("paginas", 0))) for nome, inspecao in entradas]
     datados = sum(data_no_nome(nome) is not None for nome, _ in entradas)
-    descartados = [
-        dict(i) | {"entrada": nome}
-        for nome, inspecao in entradas
-        for i in inspecao.get("metadados", [])
-    ]
+    descartados = _descartados_internos(entradas, nomes)
     return DiagnosticoArquivo(
         arquivo_id=arquivo_id,
         cenario=CenarioArquivo.ZIP_POR_PECA,
@@ -300,6 +342,6 @@ def diagnosticar_zip(
             "nomes_datados": datados,
             "metadado_suspeito": _suspeito(descartados),
         },
-        fronteiras_origem=fronteiras_do_manifesto(paginas),
+        fronteiras_origem=_fronteiras_internas(fronteiras_do_manifesto(paginas), nomes),
         metadados_descartados=descartados,
     )

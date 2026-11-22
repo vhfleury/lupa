@@ -18,23 +18,32 @@ from dataclasses import dataclass
 from datetime import date
 
 from lupa_pipeline.dominio.esquemas import calcular_hash
+from lupa_pipeline.ingestao.datas import MESES, construir_data
 
-MESES = {
-    "janeiro": 1, "fevereiro": 2, "marco": 3, "março": 3, "abril": 4, "maio": 5, "junho": 6,
-    "julho": 7, "agosto": 8, "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12,
-}  # fmt: skip
-ANO_MINIMO = 1900
-ANO_MAXIMO = 2100
+DO_FIM = "fim"
+DO_INICIO = "inicio"
 NUMERICA = r"(?P<data>\d{1,2}/\d{1,2}/\d{4})"
 EXTENSO = r"(?P<ext>\d{1,2}º? de [a-zç]+ de \d{4})"
 QUALQUER = rf"(?:{NUMERICA}|{EXTENSO})"
 _I = re.IGNORECASE
 SEM_RODAPE = r"(?:(?!c[óo]digo|autentica)[\s\S])"
-REGRAS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("protocolo", re.compile(rf"protocolad[oa]\s+em\s+{QUALQUER}", _I)),
-    ("assinatura", re.compile(rf"assinad[oa]\b{SEM_RODAPE}{{0,220}}?\be[mn]\s+{NUMERICA}", _I)),
-    ("assinatura", re.compile(rf"^[A-ZÀ-Ú][^\n,]{{2,60}},\s+{QUALQUER}\.?\s*$", re.MULTILINE)),
-    ("juntada", re.compile(rf"(?:juntad[oa]s?|autuad[oa]|recebid[oa]s?)\s+em\s+{QUALQUER}", _I)),
+REGRAS: tuple[tuple[str, re.Pattern[str], str], ...] = (
+    ("protocolo", re.compile(rf"protocolad[oa]\s+em\s+{QUALQUER}", _I), DO_FIM),
+    (
+        "assinatura",
+        re.compile(rf"assinad[oa]\b{SEM_RODAPE}{{0,220}}?\be[mn]\s+{NUMERICA}", _I),
+        DO_FIM,
+    ),
+    (
+        "assinatura",
+        re.compile(rf"^[A-ZÀ-Ú][^\n,]{{2,60}},\s+{QUALQUER}\.?\s*$", re.MULTILINE),
+        DO_FIM,
+    ),
+    (
+        "juntada",
+        re.compile(rf"(?:juntad[oa]s?|autuad[oa]|recebid[oa]s?)\s+em\s+{QUALQUER}", _I),
+        DO_INICIO,
+    ),
 )
 
 
@@ -75,19 +84,15 @@ def interpretar(literal: str) -> date | None:
         dia, mes, ano = (int(g) for g in numerica.groups())
     else:
         extenso = re.fullmatch(r"(\d{1,2})º? de ([a-zç]+) de (\d{4})", literal.strip(), _I)
-        if not extenso or extenso.group(2).lower() not in MESES:
+        nome_mes = extenso.group(2).lower().replace("ç", "c") if extenso else ""
+        if not extenso or nome_mes not in MESES:
             return None
         dia, mes, ano = (
             int(extenso.group(1)),
-            MESES[extenso.group(2).lower()],
+            MESES.index(nome_mes) + 1,
             int(extenso.group(3)),
         )
-    if not ANO_MINIMO <= ano <= ANO_MAXIMO:
-        return None
-    try:
-        return date(ano, mes, dia)
-    except ValueError:
-        return None
+    return construir_data(ano, mes, dia)
 
 
 def _grupo(achado: re.Match[str]) -> tuple[str, int, int] | None:
@@ -121,10 +126,11 @@ def data_da_peca(textos: Sequence[str]) -> DataPeca | None:
     Returns:
         Data com evidência, ou None quando a peça não traz data reconhecível.
     """
-    for tipo_data, padrao in REGRAS:
-        ordem = range(len(textos)) if tipo_data == "juntada" else range(len(textos) - 1, -1, -1)
+    for tipo_data, padrao, direcao in REGRAS:
+        do_fim = direcao == DO_FIM
+        ordem = range(len(textos) - 1, -1, -1) if do_fim else range(len(textos))
         for posicao in ordem:
-            achado = _na_pagina(textos[posicao], padrao, tipo_data != "juntada")
+            achado = _na_pagina(textos[posicao], padrao, do_fim)
             if achado is not None:
                 valor, literal, inicio, fim = achado
                 return DataPeca(

@@ -1,8 +1,8 @@
 """Coleta fatos e evidências, localiza conflitos e preenche os modelos de frase."""
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Mapping
 from datetime import date, datetime
-from functools import cache
+from functools import cache, wraps
 from importlib.resources import files
 from typing import Any
 
@@ -12,27 +12,13 @@ from lupa_pipeline.validacoes.modelo import (
     ConflitoDeFatosError,
     Fato,
     ModeloProcesso,
-    valor_de,
 )
 from lupa_pipeline.validacoes.versao import VERSAO_CATALOGO
-
-PECAS = {
-    "tipo_recurso": "petição de recurso",
-    "data_intimacao": "certidão de intimação",
-    "data_interposicao": "protocolo da petição de recurso",
-    "qualidade_recorrente": "qualificação das partes na petição do recurso",
-    "comprovante_preparo": "comprovante de preparo",
-    "gratuidade_pedido": "petição do recorrente",
-    "gratuidade_decisao": "decisão sobre a gratuidade",
-    "advogado_subscritor": "assinatura da petição de recurso",
-    "procuracao": "procuração ou substabelecimento",
-    "hipotese_decisao_agravada": "decisão interlocutória agravada",
-}
 
 
 def data_de(fato: Fato) -> date:
     """Lê uma data civil ISO, sem truncar um instante para data."""
-    valor = valor_de(fato)
+    valor = fato.valor
     if isinstance(valor, str):
         return date.fromisoformat(valor)
     if isinstance(valor, date) and not isinstance(valor, datetime):
@@ -51,12 +37,62 @@ def renderizar(nome: str, **campos: object) -> str:
     return _modelo_de_frase(nome).format(**campos)
 
 
+class FatoPendenteError(Exception):
+    """Conflito num fato opcional que interrompe a regra para conferência."""
+
+    def __init__(self, coleta: "Coleta") -> None:
+        """Guarda a coleta com o conflito registrado.
+
+        Args:
+            coleta: Coleta da regra interrompida.
+        """
+        super().__init__("fato opcional em conflito")
+        self.coleta = coleta
+
+
+def regra(
+    executar: Callable[[ModeloProcesso, date], AchadoValidacao],
+) -> Callable[[ModeloProcesso, date], AchadoValidacao]:
+    """Converte a interrupção por conflito num achado de conferência.
+
+    Args:
+        executar: Função da regra.
+
+    Returns:
+        A mesma regra, que devolve ``coleta.verificar()`` quando um fato opcional diverge.
+    """
+
+    @wraps(executar)
+    def executar_com_conferencia(modelo: ModeloProcesso, referencia: date) -> AchadoValidacao:
+        try:
+            return executar(modelo, referencia)
+        except FatoPendenteError as erro:
+            return erro.coleta.verificar()
+
+    return executar_com_conferencia
+
+
 class Coleta:
     """Valores considerados numa validação e evidência de cada um."""
 
-    def __init__(self, modelo: ModeloProcesso, validacao: str, base_legal: str) -> None:
-        """Inicia a coleta do recorrente sem fatos utilizados."""
+    def __init__(
+        self,
+        modelo: ModeloProcesso,
+        validacao: str,
+        base_legal: str,
+        pecas: Mapping[str, str] | None = None,
+    ) -> None:
+        """Inicia a coleta do recorrente sem fatos utilizados.
+
+        Args:
+            modelo: Fatos do recorrente.
+            validacao: Nome da regra.
+            base_legal: Dispositivos citados no achado.
+            pecas: Peça procurada por tipo de fato, a ``PECA_PROCURADA`` da regra; todo tipo
+                lido como obrigatório precisa ter entrada.
+        """
         self.modelo = modelo
+        self.pecas: Mapping[str, str] = pecas or {}
         self.validacao = validacao
         self.base_legal = base_legal
         self.usados: dict[str, Fato] = {}
@@ -70,15 +106,21 @@ class Coleta:
     def qualidade(self) -> str | None:
         """Qualidade do recorrente provada, ou ``None`` quando falta ou diverge."""
         fato = self.unico("qualidade_recorrente")
-        return None if fato is None else str(valor_de(fato))
+        return None if fato is None else str(fato.valor)
 
     def unico(self, tipo: str, *, obrigatorio: bool = True) -> Fato | None:
-        """Seleciona o valor único ou registra sua ausência ou divergência."""
+        """Seleciona o valor único ou registra sua ausência ou divergência.
+
+        Divergência num fato opcional levanta `FatoPendenteError`, que `regra` converte em
+        conferência.
+        """
         try:
             fato = self.modelo.fato(tipo)
         except ConflitoDeFatosError as erro:
             self.conflitos.append({"tipo": tipo, "fato_ids": erro.fato_ids})
             self.registrar(self.modelo.fatos(tipo))
+            if not obrigatorio:
+                raise FatoPendenteError(self) from erro
             return None
         if fato is not None:
             self.registrar([fato])
@@ -98,7 +140,7 @@ class Coleta:
             }
             for _, fato in sorted(self.usados.items())
         ]
-        pecas = {tipo: PECAS[tipo] for tipo in self.faltantes}
+        pecas = {tipo: self.pecas[tipo] for tipo in self.faltantes}
         return AchadoValidacao(
             validacao=self.validacao,
             sujeito=self.modelo.sujeito,
@@ -123,7 +165,7 @@ class Coleta:
 
     def verificar(self, motivo: str = "") -> AchadoValidacao:
         """Explica uma ausência ou cita os fatos incompatíveis na saída de conferência."""
-        faltas = [f"{tipo} ({PECAS[tipo]})" for tipo in self.faltantes]
+        faltas = [f"{tipo} ({self.pecas[tipo]})" for tipo in self.faltantes]
         conflitos = [f"{c['tipo']} ({', '.join(c['fato_ids'])})" for c in self.conflitos]
         razoes = [motivo] if motivo else []
         if faltas:
@@ -133,8 +175,3 @@ class Coleta:
         if conflitos:
             razoes.append("Os fatos divergem em " + ", ".join(conflitos) + ".")
         return self.concluir(ResultadoAchado.VERIFICAR, " ".join(razoes))
-
-    @property
-    def pendente(self) -> bool:
-        """Indica falta ou conflito em um dos valores necessários."""
-        return bool(self.faltantes or self.conflitos)

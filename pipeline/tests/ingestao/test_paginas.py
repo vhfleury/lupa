@@ -6,10 +6,22 @@ from typing import Any
 import fitz
 import pytest
 from PIL import Image
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+from apoio_comum import criar_pagina, criar_processo
 from apoio_ingestao import AutosSinteticos
 from lupa_pipeline.dominio.enums import TipoPagina
 from lupa_pipeline.dominio.esquemas import calcular_hash
+from lupa_pipeline.dominio.tabelas import (
+    atributos_do_satelite,
+    hub_pagina,
+    link_arquivo_pagina,
+    sat_pagina_extracao,
+    sat_pagina_saneamento,
+)
+from lupa_pipeline.dominio.visoes import VisaoArquivo
+from lupa_pipeline.ingestao.paginas import gravar_pagina, gravar_paginas
 from lupa_pipeline.ingestao.roteador import Limiares, limiares_de, limiares_padrao, rotear
 from lupa_pipeline.ingestao.sinais import medir_sinais
 from lupa_pipeline.ingestao.texto_nativo import Bloco, Linha, extrair_texto_nativo, ordenar_blocos
@@ -246,3 +258,81 @@ def test_ordenacao_sem_vao_cai_em_topo_e_esquerda() -> None:
     a = Bloco((10, 10, 100, 100), [Linha("a", (10, 10, 100, 100))])
     b = Bloco((50, 5, 150, 90), [Linha("b", (50, 5, 150, 90))])
     assert [blk.linhas[0].texto for blk in ordenar_blocos([a, b])] == ["b", "a"]
+
+
+def _linha_pagina(numero: int, texto: str) -> dict[str, Any]:
+    return {
+        "numero": numero,
+        "tipo": TipoPagina.NATIVA.value,
+        "texto": texto,
+        "texto_nativo": texto,
+        "texto_ocr": None,
+        "coordenadas": {},
+        "sinais": {"palavras": numero},
+        "extracao": {"metodo": "nativo"},
+        "versao_extrator": "teste-1",
+        "origem_arquivo": None,
+        "pagina_origem": None,
+        "texto_normalizado": texto.lower(),
+        "flags": {},
+        "trechos_ocultos": [],
+        "trechos_suspeitos": [],
+    }
+
+
+def _arquivo_sintetico(sessao: Session) -> VisaoArquivo:
+    hk_pagina = criar_pagina(sessao, criar_processo(sessao))
+    hk_arquivo = sessao.scalars(
+        select(link_arquivo_pagina.c.hk_arquivo).where(link_arquivo_pagina.c.hk_pagina == hk_pagina)
+    ).one()
+    return sessao.get_one(VisaoArquivo, hk_arquivo)
+
+
+def _linhas_gravadas(sessao: Session, arquivo: VisaoArquivo) -> dict[str, list[tuple[Any, ...]]]:
+    links = sessao.scalars(
+        select(link_arquivo_pagina.c.hk_pagina).where(
+            link_arquivo_pagina.c.hk_arquivo == arquivo.hk_arquivo
+        )
+    ).all()
+    consulta_hubs = select(hub_pagina.c.hk_pagina, hub_pagina.c.numero).where(
+        hub_pagina.c.hk_pagina.in_(links)
+    )
+    numero_da_pagina = {hk: numero for hk, numero in sessao.execute(consulta_hubs)}
+    gravadas: dict[str, list[tuple[Any, ...]]] = {
+        "hub_pagina": sorted((numero,) for numero in numero_da_pagina.values()),
+        "link_arquivo_pagina": sorted((numero_da_pagina[hk],) for hk in links),
+    }
+    for tabela in (sat_pagina_extracao, sat_pagina_saneamento):
+        colunas = ["hash_diff", "record_source", *atributos_do_satelite(tabela)]
+        consulta = (
+            select(tabela.c.hk_pagina, *(tabela.c[coluna] for coluna in colunas))
+            .where(tabela.c.hk_pagina.in_(links))
+            .order_by(tabela.c.load_dts)
+        )
+        gravadas[tabela.name] = sorted(
+            (numero_da_pagina[linha[0]], repr(tuple(linha[1:])))
+            for linha in sessao.execute(consulta)
+        )
+    return gravadas
+
+
+@pytest.mark.integracao
+def test_gravacao_em_lote_igual_a_gravacao_por_pagina(sessao: Session) -> None:
+    """RF-ING-03: a gravação em lote grava as mesmas linhas de hub, link e satélite (F17, D6)."""
+    linhas = [
+        _linha_pagina(1, "Página um alterada."),
+        _linha_pagina(2, "Página dois."),
+        _linha_pagina(3, "Página três."),
+        _linha_pagina(2, "Página dois."),
+        _linha_pagina(3, "Página três corrigida."),
+    ]
+    por_pagina = _arquivo_sintetico(sessao)
+    em_lote = _arquivo_sintetico(sessao)
+    hks_por_pagina = [gravar_pagina(sessao, por_pagina, linha) for linha in linhas]
+    hks_em_lote = gravar_paginas(sessao, em_lote, linhas)
+    assert len(hks_em_lote) == len(hks_por_pagina)
+    assert gravar_paginas(sessao, em_lote, []) == []
+    esperadas = _linhas_gravadas(sessao, por_pagina)
+    assert len(esperadas["sat_pagina_extracao"]) == 5
+    assert len(esperadas["sat_pagina_saneamento"]) == 5
+    assert _linhas_gravadas(sessao, em_lote) == esperadas

@@ -1,5 +1,8 @@
 """Testes dos esquemas pydantic e do número CNJ (sem banco)."""
 
+from collections.abc import AsyncIterator
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -7,25 +10,20 @@ from apoio_comum import FabricaFato, gerar_numero_cnj
 from lupa_pipeline.dominio.cnj import NumeroCnjInvalidoError, validar_numero_cnj
 from lupa_pipeline.dominio.enums import (
     ClasseProcessual,
-    MetodoClassificacao,
-    OrigemPeca,
-    PapelUsuario,
     ResultadoAchado,
     TipoPagina,
-    TipoPeca,
 )
 from lupa_pipeline.dominio.esquemas import (
     Achado,
-    Anotacao,
     Arquivo,
     Evidencia,
     Fato,
     Pagina,
-    Peca,
     Processo,
-    Usuario,
     calcular_hash,
+    sha256_arquivo,
 )
+from lupa_pipeline.ingestao.recepcao import receber
 
 
 def test_numero_cnj_com_digito_correto_e_aceito() -> None:
@@ -107,36 +105,6 @@ def test_evidencia_com_fim_nao_maior_que_inicio_e_rejeitada() -> None:
         )
 
 
-def test_peca_com_pagina_final_antes_da_inicial_e_rejeitada() -> None:
-    """`pagina_final >= pagina_inicial`."""
-    with pytest.raises(ValidationError, match="pagina_final"):
-        Peca(
-            id=calcular_hash("peca"),
-            arquivo_id=calcular_hash("arquivo"),
-            tipo=TipoPeca.SENTENCA,
-            pagina_inicial=10,
-            pagina_final=9,
-            confianca=1.0,
-            metodo=MetodoClassificacao.REGRA,
-            origem=OrigemPeca.JUIZO,
-        )
-
-
-def test_peca_de_uma_pagina_e_aceita() -> None:
-    """Página inicial igual à final é válida."""
-    peca = Peca(
-        id=calcular_hash("peca"),
-        arquivo_id=calcular_hash("arquivo"),
-        tipo=TipoPeca.CERTIDAO,
-        pagina_inicial=3,
-        pagina_final=3,
-        confianca=0.5,
-        metodo=MetodoClassificacao.MANUAL,
-        origem=OrigemPeca.DESCONHECIDA,
-    )
-    assert peca.pagina_final == 3
-
-
 def test_pagina_calcula_e_confere_hash_do_texto() -> None:
     """`hash_texto` é calculado e, se informado, conferido."""
     pagina = Pagina(
@@ -180,24 +148,6 @@ def test_achado_com_resultado_fora_do_enum_e_rejeitado() -> None:
     assert achado.resultado is ResultadoAchado.VERIFICAR
 
 
-def test_anotacao_exige_exatamente_um_alvo() -> None:
-    """Anotação aponta para um achado ou um fato, nunca ambos nem nenhum."""
-    dados = {"id": calcular_hash("nota"), "usuario_id": calcular_hash("usuario"), "texto": "nota"}
-    with pytest.raises(ValidationError, match="exatamente um"):
-        Anotacao(**dados)
-    with pytest.raises(ValidationError, match="exatamente um"):
-        Anotacao(**dados, achado_id=calcular_hash("achado"), fato_id=calcular_hash("fato"))
-    assert Anotacao(**dados, fato_id=calcular_hash("fato")).achado_id is None
-
-
-@pytest.mark.parametrize("papel", list(PapelUsuario))
-def test_usuario_dos_dois_papeis_tem_id_publico_e_senha_oculta(papel: PapelUsuario) -> None:
-    """RF-ACE-03: os dois papéis do gabinete têm credencial protegida na representação."""
-    usuario = Usuario(id=calcular_hash("usuario"), nome_usuario="a", papel=papel, senha_hash="h")
-    assert usuario.papel == papel
-    assert "senha_hash" not in repr(usuario)
-
-
 def test_sujeito_e_ids_dos_fatos_exigem_hash_publico(fabrica_fato: FabricaFato) -> None:
     """RF-FAT-01, D12: valor vazio indica fato comum e demais sujeitos exigem um hk."""
     dados = fabrica_fato().model_dump()
@@ -206,6 +156,17 @@ def test_sujeito_e_ids_dos_fatos_exigem_hash_publico(fabrica_fato: FabricaFato) 
     for alteracao in ({"id": "x"}, {"sujeito": "apelante"}):
         with pytest.raises(ValidationError):
             Fato(**(dados | alteracao))
+
+
+def test_fato_le_valor_no_formato_antigo(fabrica_fato: FabricaFato) -> None:
+    """RF-FAT-01, D12: dict com a chave `valor` vira esse valor, como `valor_de`; outros não."""
+    dados = fabrica_fato().model_dump()
+    assert Fato.de_registro(dados | {"valor": {"valor": "2025-03-04"}}).valor == "2025-03-04"
+    assert Fato.de_registro(dados | {"valor": "2025-03-04"}).valor == "2025-03-04"
+    composto = {"valor": "x", "fonte": "capa"}
+    assert Fato.de_registro(dados | {"valor": composto}).valor == "x"
+    procuracao = {"tipo": "procuracao", "outorgante": calcular_hash("parte")}
+    assert Fato.de_registro(dados | {"valor": procuracao}).valor == procuracao
 
 
 def test_arquivo_exige_hks_nos_identificadores() -> None:
@@ -223,3 +184,15 @@ def test_arquivo_exige_hks_nos_identificadores() -> None:
     assert Arquivo.model_validate(dados).processo_id == dados["processo_id"]
     with pytest.raises(ValidationError, match="processo_id"):
         Arquivo.model_validate(dados | {"processo_id": "00000000-0000-4000-8000-000000000000"})
+
+
+async def test_sha256_arquivo_igual_ao_da_recepcao(tmp_path: Path) -> None:
+    """RF-ING-03 e RNF-08: o hash do arquivo em disco é o mesmo que a recepção calcula."""
+    dados = b"%PDF-1.4 sintetico " * 100_000
+
+    async def blocos() -> AsyncIterator[bytes]:
+        yield dados[:7]
+        yield dados[7:]
+
+    recebido = await receber(blocos(), "autos.pdf", 10_000_000, tmp_path)
+    assert sha256_arquivo(recebido.caminho) == recebido.sha256

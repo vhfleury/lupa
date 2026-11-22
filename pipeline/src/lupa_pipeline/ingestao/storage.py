@@ -7,6 +7,7 @@ recebidos, sem cifra da aplicação (RF-SEG-01).
 """
 
 import io
+from pathlib import Path
 from typing import Any, BinaryIO, Protocol
 
 import boto3
@@ -56,6 +57,9 @@ class ObjectStorage(Protocol):
     def ler(self, chave: str) -> bytes:
         """Lê o objeto inteiro; lança `ObjetoAusenteError` se não existir."""
 
+    def baixar_para(self, chave: str, caminho: Path) -> None:
+        """Grava o objeto no arquivo `caminho`; lança `ObjetoAusenteError` se não existir."""
+
     def existe(self, chave: str) -> bool:
         """Diz se a chave existe."""
 
@@ -98,6 +102,18 @@ class ArmazenamentoMemoria:
             return self._objetos[chave]
         except KeyError:
             raise ObjetoAusenteError(chave) from None
+
+    def baixar_para(self, chave: str, caminho: Path) -> None:
+        """Grava o objeto no arquivo.
+
+        Args:
+            chave: Chave do objeto.
+            caminho: Arquivo de destino, criado ou sobrescrito.
+
+        Raises:
+            ObjetoAusenteError: Se a chave não existir.
+        """
+        caminho.write_bytes(self.ler(chave))
 
     def existe(self, chave: str) -> bool:
         """Diz se a chave existe.
@@ -172,6 +188,24 @@ class ArmazenamentoS3:
                 raise ObjetoAusenteError(chave) from None
             raise
         return destino.getvalue()
+
+    def baixar_para(self, chave: str, caminho: Path) -> None:
+        """Grava o objeto no arquivo em streaming, sem passar o conteúdo inteiro pela memória.
+
+        Args:
+            chave: Chave do objeto.
+            caminho: Arquivo de destino, criado ou sobrescrito.
+
+        Raises:
+            ObjetoAusenteError: Se a chave não existir.
+        """
+        with caminho.open("wb") as destino:
+            try:
+                self._cliente.download_fileobj(self._bucket, chave, destino)
+            except ClientError as erro:
+                if _ausente(erro):
+                    raise ObjetoAusenteError(chave) from None
+                raise
 
     def existe(self, chave: str) -> bool:
         """Diz se a chave existe.

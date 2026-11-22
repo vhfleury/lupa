@@ -1,13 +1,14 @@
 """Testes das páginas híbridas (4C.7) e do extrator de páginas no sandbox."""
 
 from pathlib import Path
+from typing import Any
 
 import fitz
 import pytest
 
 from apoio_ingestao import AutosSinteticos
 from lupa_pipeline.dominio.enums import FlagPagina, TipoPagina
-from lupa_pipeline.ingestao import extrator_paginas
+from lupa_pipeline.ingestao import extrator_paginas, renderizacao
 from lupa_pipeline.ingestao.extrator_paginas import extrair_intervalo, main, processar_pagina
 from lupa_pipeline.ingestao.hibridas import cobertura, comparar, fundir
 from lupa_pipeline.ingestao.ocr import LinhaOcr, OcrIndisponivelError
@@ -155,3 +156,23 @@ def test_intervalo_e_main_escrevem_json_e_pdf_ilegivel_e_recusado(
     assert extrair_intervalo(b"lixo", 1, 1) == {"ok": False, "erro": "abertura"}
     main([str(caminho), "1", "1"])
     assert '"versao_extrator"' in capsys.readouterr().out
+
+
+def _sem_tempo(resultado: dict[str, Any]) -> dict[str, Any]:
+    paginas = [
+        {chave: valor for chave, valor in pagina.items() if chave != "segundos"}
+        for pagina in resultado["paginas"]
+    ]
+    return {**resultado, "paginas": paginas}
+
+
+def test_pdf_aberto_pelo_caminho_rende_o_mesmo_que_pelos_bytes(
+    autos_sinteticos: AutosSinteticos,
+) -> None:
+    """RF-ING-04: abrir o PDF pelo caminho dá as mesmas páginas, texto, imagens e pixels."""
+    caminho = Path(autos_sinteticos.arquivos[Cenario.PDF_LISO])
+    dados = caminho.read_bytes()
+    assert _sem_tempo(extrair_intervalo(caminho, 1, 3)) == _sem_tempo(
+        extrair_intervalo(dados, 1, 3)
+    )
+    assert renderizacao.desenhar(caminho, 2, 1.0) == renderizacao.desenhar(dados, 2, 1.0)

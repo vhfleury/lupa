@@ -11,7 +11,9 @@ from lupa_pipeline.ingestao.eventos import (
     capa,
     decisao_agravada,
     fatos,
+    marcos,
     modelo,
+    partes,
     preparo,
     recurso,
 )
@@ -186,3 +188,68 @@ def test_candidatos_iguais_com_texto_da_pagina_guardado(monkeypatch: pytest.Monk
         (TipoFato.GRATUIDADE_PEDIDO, "True", 61, 91),
     }
     assert len(dobragens) == 1
+
+
+def test_id_da_procuracao_nao_muda() -> None:
+    """RF-VAL-04. O id e o sujeito do fato de procuração continuam os mesmos (D13)."""
+    pagina = _pagina("Outorgante: Ré de Teste\nOutorgada: Ana de Tal, OAB/GO 12.345.")
+    candidatos = candidatos_da_peca(
+        PecaTexto(TipoPeca.PROCURACAO, (pagina,)), {chave_nome("Ré de Teste"): "e" * 64}
+    )
+    candidato = next(c for c in candidatos if c.tipo is TipoFato.PROCURACAO)
+    fato = confirmar(candidato, "f" * 64)
+    assert fato is not None
+    assert fato.sujeito == "e" * 64
+    assert fato.id == "7d83390a98518458da62613b57d2cc9bfbdb9e9757fd7d1aa746086a997decad"
+    assert fato.valor["outorgante"] == "e" * 64
+
+
+def test_nome_do_outorgante_resolve_o_codigo_da_parte() -> None:
+    """RF-VAL-04. O código do outorgante vira o nome; nome já literal e código órfão ficam."""
+    advogado = {"nome": "Ana de Tal", "oab": "GO12345"}
+    procuracao = {"tipo": "procuracao", "outorgante": "e" * 64, "advogado": advogado}
+    orfa = procuracao | {"outorgante": "c" * 64}
+    substabelecimento = {"tipo": "substabelecimento", "outorgante": advogado, "advogado": advogado}
+    nomes = {"e" * 64: "Ré de Teste"}
+    assert partes.nome_do_outorgante(procuracao, nomes) == procuracao | {
+        "outorgante": "Ré de Teste"
+    }
+    assert partes.nome_do_outorgante(orfa, nomes) == orfa
+    assert partes.nome_do_outorgante(substabelecimento, nomes) == substabelecimento
+
+
+def test_codigo_do_outorgante_resolve_o_nome() -> None:
+    """RF-VAL-04. O nome do outorgante vira o código da parte; substabelecimento fica."""
+    advogado = {"nome": "Ana de Tal", "oab": "GO12345"}
+    procuracao = {"tipo": "procuracao", "outorgante": "Ré de Teste", "advogado": advogado}
+    substabelecimento = {"tipo": "substabelecimento", "outorgante": advogado, "advogado": advogado}
+    codigos = {"Ré de Teste": "e" * 64}
+    assert partes.codigo_do_outorgante(procuracao, codigos.__getitem__) == procuracao | {
+        "outorgante": "e" * 64
+    }
+    assert partes.codigo_do_outorgante(substabelecimento, codigos.__getitem__) == (
+        substabelecimento
+    )
+
+
+def test_toda_especie_com_extrator_esta_no_registro() -> None:
+    """RF-FAT-01: o registro declara, por espécie, a capa e os extratores próprios dela."""
+    proprios = {tipo: 1 for tipo in recurso.RECURSOS}
+    proprios |= {tipo: 1 for tipo in marcos.MARCOS}
+    proprios |= {
+        TipoPeca.PETICAO_INICIAL: 2,
+        TipoPeca.ACORDAO: 2,
+        TipoPeca.CERTIDAO: 1,
+        TipoPeca.SENTENCA: 1,
+        TipoPeca.DECISAO_INTERLOCUTORIA: 1,
+        TipoPeca.PROCURACAO: 1,
+        TipoPeca.COMPROVANTE_PREPARO: 1,
+    }
+    assert not set(recurso.RECURSOS) & set(marcos.MARCOS)
+    assert set(fatos.EXTRATORES) == set(TipoPeca)
+    assert all(extratores[0] is fatos.capa_inicial for extratores in fatos.EXTRATORES.values())
+    assert {
+        tipo: len(extratores) - 1
+        for tipo, extratores in fatos.EXTRATORES.items()
+        if len(extratores) > 1
+    } == proprios
